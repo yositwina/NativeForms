@@ -148,6 +148,97 @@
       "Contact": ["FirstName", "LastName", "Email"],
       "Case": ["Subject", "Description", "Status", "Origin", "ContactId"]
     }
+  },
+  "prefillDefinition": {
+    "onNotFound": "ignore",
+    "commands": [
+      {
+        "type": "findOne",
+        "commandKey": "findContact",
+        "objectApiName": "Contact",
+        "where": {
+          "Email": "{params.email}"
+        },
+        "fieldsToReturn": ["Id", "Email", "LastName", "FirstName"],
+        "storeResultAs": "foundContact"
+      },
+      {
+        "type": "findMany",
+        "commandKey": "findCases",
+        "objectApiName": "Case",
+        "where": {
+          "ContactId": "{foundContact.Id}"
+        },
+        "fieldsToReturn": ["Id", "CaseNumber", "Subject", "Description", "Status"],
+        "orderBy": {
+          "field": "CaseNumber",
+          "direction": "ASC"
+        },
+        "limit": 20,
+        "storeResultAs": "foundCases"
+      }
+    ],
+    "responseMapping": {
+      "input.firstName": "{foundContact.FirstName}",
+      "input.lastName": "{foundContact.LastName}",
+      "input.email": "{foundContact.Email}",
+      "hidden.contactId": "{foundContact.Id}",
+      "meta.foundContact": "{foundContact.Id}",
+      "repeatGroups.existingCases": "{foundCases}"
+    }
+  },
+  "submitDefinition": {
+    "commands": [
+      {
+        "type": "update",
+        "commandKey": "updateContact",
+        "runIf": {
+          "var": "input.contactId",
+          "isNotBlank": true
+        },
+        "objectApiName": "Contact",
+        "id": "{input.contactId}",
+        "fields": {
+          "FirstName": "{input.firstName}",
+          "LastName": "{input.lastName}",
+          "Email": "{input.email}"
+        },
+        "storeResultAs": "updatedContact"
+      },
+      {
+        "type": "upsertMany",
+        "commandKey": "saveExistingCases",
+        "runIf": {
+          "var": "input.contactId",
+          "isNotBlank": true
+        },
+        "objectApiName": "Case",
+        "rows": "{input.existingCases}",
+        "idField": "Id",
+        "relationshipField": "ContactId",
+        "relationshipValue": "{input.contactId}",
+        "fields": {
+          "Subject": "{row.Subject}",
+          "Description": "{row.Description}",
+          "Status": "{row.Status}"
+        },
+        "allowDelete": true,
+        "deleteIds": "{input._deletedRepeatGroups.existingCases}",
+        "storeResultAs": "savedCases"
+      },
+      {
+        "type": "create",
+        "commandKey": "createNewCase",
+        "objectApiName": "Case",
+        "fields": {
+          "Subject": "{input.subject}",
+          "Description": "{input.description}",
+          "Origin": "Web",
+          "ContactId": "{input.contactId}"
+        },
+        "storeResultAs": "createdCase"
+      }
+    ]
   }
 }</textarea>
     </div>

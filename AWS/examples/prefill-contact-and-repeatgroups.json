@@ -2,40 +2,8 @@
   "publishToken": "demo-problem-report-v1-token",
   "request": {
     "formId": "problem-report-demo",
-    "onNotFound": "ignore",
     "params": {
       "email": "user@example.com"
-    },
-    "commands": [
-      {
-        "type": "findOne",
-        "commandKey": "findContact",
-        "objectApiName": "Contact",
-        "where": {
-          "Email": "{params.email}"
-        },
-        "fieldsToReturn": ["Id", "Email", "FirstName", "LastName"],
-        "storeResultAs": "foundContact"
-      },
-      {
-        "type": "findMany",
-        "commandKey": "findIssueUpdates",
-        "objectApiName": "Issue_Update__c",
-        "where": {
-          "Contact__c": "{foundContact.Id}"
-        },
-        "fieldsToReturn": ["Id", "Title__c", "Notes__c"],
-        "limit": 25,
-        "storeResultAs": "issueUpdates"
-      }
-    ],
-    "responseMapping": {
-      "input.email": "{foundContact.Email}",
-      "input.firstName": "{foundContact.FirstName}",
-      "input.lastName": "{foundContact.LastName}",
-      "hidden.contactId": "{foundContact.Id}",
-      "meta.foundContact": "{foundContact.Id}",
-      "repeatGroups.issueUpdates": "{issueUpdates}"
     }
   }
 }

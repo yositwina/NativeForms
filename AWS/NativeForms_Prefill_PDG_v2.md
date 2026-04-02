@@ -7,25 +7,45 @@ Define the JSON protocol for the NativeForms Prefill Lambda. This Lambda is sepa
 The Prefill Lambda is a dedicated read engine.
 
 - S3 HTML: presentation and client-side field binding
-- Prefill Lambda: read data, execute read commands, map results to normalized JSON
-- Submit Lambda: execute write commands on submit
+- Prefill Lambda: read data, load server-side prefill definition, map results to normalized JSON
+- Submit Lambda: execute server-side write commands on submit
 - Salesforce: source of truth
+- DynamoDB: source of truth for prefill definition and security policy
 
 ## Top-Level Request Contract
 ```json
 {
-  "prefillToken": "abc123",
+  "publishToken": "abc123",
   "request": {
     "formId": "supportForm1",
-    "onNotFound": "ignore",
     "params": {
       "email": "user@example.com"
-    },
+    }
+  }
+}
+```
+
+The browser no longer sends:
+- `commands`
+- `responseMapping`
+- `onNotFound`
+
+Those are loaded by Lambda from the form record stored in DynamoDB.
+
+## Server-Side Prefill Definition
+Each published form record stores:
+
+```json
+{
+  "prefillDefinition": {
+    "onNotFound": "ignore",
     "commands": [ ... ],
     "responseMapping": { ... }
   }
 }
 ```
+
+Lambda resolves the form by `request.formId`, validates the `publishToken`, loads `prefillDefinition`, and executes only that stored definition.
 
 ## Supported Command Types
 
@@ -108,7 +128,7 @@ Supported forms:
 ```
 
 ## Not Found Behavior
-`request.onNotFound` or command-level `onNotFound` controls behavior when `findOne` or `getById` returns no record.
+Stored `prefillDefinition.onNotFound` or command-level `onNotFound` controls behavior when `findOne` or `getById` returns no record.
 
 Supported values:
 - `ignore`
@@ -130,6 +150,8 @@ Supported now:
 - `limit`
 - `orderBy`
 - normalized `repeatGroups` output
+- browser sends only `publishToken`, `request.formId`, and `params`
+- commands and response mapping are enforced server-side from DynamoDB
 
 Still deferred:
 - pagination

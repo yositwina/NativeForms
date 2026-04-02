@@ -11,8 +11,10 @@ Each published form has:
 - a server-side security policy record stored in AWS
 
 The browser sends:
-- `formId` on submit
+- `request.formId` on prefill
+- top-level `formId` on submit
 - `publishToken` on prefill and submit
+- only user `params` or `input`
 
 AWS validates requests against the stored server-side policy before executing any Lambda commands.
 
@@ -26,6 +28,8 @@ For every published form, AWS stores a DynamoDB record with:
 - `tokenHash`
 - `prefillPolicy`
 - `submitPolicy`
+- `prefillDefinition`
+- `submitDefinition`
 - timestamps
 
 Example shape:
@@ -48,6 +52,14 @@ Example shape:
       "Contact": ["FirstName", "LastName", "Email"],
       "Case": ["Subject", "Description", "Status", "Origin", "ContactId"]
     }
+  },
+  "prefillDefinition": {
+    "onNotFound": "ignore",
+    "commands": [],
+    "responseMapping": {}
+  },
+  "submitDefinition": {
+    "commands": []
   }
 }
 ```
@@ -75,7 +87,7 @@ The publish token is not enough by itself. AWS also enforces:
 When Salesforce publishes a form:
 1. Salesforce generates or stores `formId`
 2. Salesforce generates a per-form publish token
-3. Salesforce sends the form security record to AWS
+3. Salesforce sends the form security record and executable form definitions to AWS
 4. AWS stores the record under the form id
 5. Salesforce publishes HTML that includes the matching publish token
 
@@ -89,13 +101,20 @@ Current read endpoint:
 The Prefill Lambda requires:
 - `publishToken`
 - `request.formId`
+- browser `params`
 
 Before executing commands, Lambda:
 1. loads the stored form security record
 2. checks the form is published
 3. hashes the incoming publish token and compares to the stored hash
-4. validates that each prefill command type is allowed
-5. validates that each prefill object is allowed
+4. loads `prefillDefinition` from DynamoDB
+5. validates that each stored prefill command type is allowed
+6. validates that each stored prefill object is allowed
+
+The browser does not send:
+- prefill commands
+- response mapping
+- object names to execute
 
 Blocked examples:
 - `findMany` on an object not listed in `prefillPolicy.allowedObjects`
@@ -105,15 +124,22 @@ Blocked examples:
 The Submit Lambda requires:
 - top-level `formId`
 - top-level `publishToken`
+- browser `input`
 
 Before executing commands, Lambda:
 1. loads the stored form security record
 2. checks the form is published
 3. hashes the incoming publish token and compares to the stored hash
-4. validates that each submit command type is allowed
-5. validates that each submit object is allowed
-6. validates writable fields for `create`, `update`, and `upsertMany`
-7. checks whether the form security mode allows risky commands
+4. loads `submitDefinition` from DynamoDB
+5. validates that each stored submit command type is allowed
+6. validates that each stored submit object is allowed
+7. validates writable fields for `create`, `update`, and `upsertMany`
+8. checks whether the form security mode allows risky commands
+
+The browser does not send:
+- submit commands
+- object names to execute
+- writable field allowlists
 
 Blocked examples:
 - updating an object not listed in `submitPolicy.allowedObjects`
@@ -140,7 +166,8 @@ This model improves security over a single shared static token because:
 - each form has its own token
 - each form has its own server-side policy
 - Lambdas do not trust the incoming JSON blindly
-- commands, objects, and fields are enforced server-side
+- commands, mappings, objects, and fields are enforced server-side
+- the browser cannot tamper with execution definitions per request
 
 ## Current Implementation Note
 For this prototype, the server-side registry is stored in AWS DynamoDB using one item per form in a table such as:

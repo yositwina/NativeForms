@@ -15,32 +15,19 @@ page fills visible and hidden fields.
 Top-level request
 -----------------
 {
-  "prefillToken": "abc123",
+  "publishToken": "abc123",
   "request": {
     "formId": "supportForm1",
     "params": {
       "email": "user@example.com"
-    },
-    "commands": [
-      {
-        "type": "findOne",
-        "commandKey": "findContact",
-        "objectApiName": "Contact",
-        "where": {
-          "Email": "{params.email}"
-        },
-        "fieldsToReturn": ["Id", "Email", "LastName"],
-        "storeResultAs": "foundContact"
-      }
-    ],
-    "responseMapping": {
-      "input.email": "{foundContact.Email}",
-      "input.lastName": "{foundContact.LastName}",
-      "hidden.contactId": "{foundContact.Id}",
-      "meta.foundContact": "{foundContact.Id}"
     }
   }
 }
+
+Server-side execution definition
+--------------------------------
+Commands, response mapping, and onNotFound behavior are stored in DynamoDB
+per form record and loaded by Lambda using request.formId.
 
 Top-level response
 ------------------
@@ -127,6 +114,7 @@ responseMapping behavior
 Execution model
 ---------------
 - Commands run sequentially.
+- Commands are loaded from the stored server-side form definition, not from the browser.
 - Later commands may reference earlier stored results.
 - Results are stored under storeResultAs.
 - Lambda returns both normalized mapped output and command result summaries.
@@ -266,6 +254,16 @@ function ensureFormToken(formSecurity, publishToken, mode) {
 
   if (!formSecurity.prefillPolicy || mode !== "prefill") {
     const error = new Error("Prefill policy is not configured for this form");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (
+    !formSecurity.prefillDefinition ||
+    !Array.isArray(formSecurity.prefillDefinition.commands) ||
+    !formSecurity.prefillDefinition.responseMapping
+  ) {
+    const error = new Error("Prefill definition is not configured for this form");
     error.statusCode = 403;
     throw error;
   }
@@ -807,22 +805,9 @@ export const handler = async (event) => {
       });
     }
 
-    if (!Array.isArray(request.commands)) {
-      return jsonResponse(400, {
-        success: false,
-        error: "Missing or invalid 'request.commands' array"
-      });
-    }
-
-    if (!request.responseMapping || typeof request.responseMapping !== "object") {
-      return jsonResponse(400, {
-        success: false,
-        error: "Missing or invalid 'request.responseMapping'"
-      });
-    }
-
     const formSecurity = await getFormSecurityRecord(request.formId);
     ensureFormToken(formSecurity, payload.publishToken, "prefill");
+    const prefillDefinition = formSecurity.prefillDefinition;
 
     const secret = await getSecret(SECRET_NAME);
     assertSecret(secret);
@@ -832,13 +817,13 @@ export const handler = async (event) => {
     const context = {
       params: request.params || {},
       request: {
-        onNotFound: request.onNotFound || "ignore"
+        onNotFound: prefillDefinition.onNotFound || "ignore"
       }
     };
 
     const results = [];
 
-    for (const command of request.commands) {
+    for (const command of prefillDefinition.commands) {
       try {
         if (!command.type) {
           throw new Error("Each command must include 'type'");
@@ -883,7 +868,7 @@ export const handler = async (event) => {
 
     console.log("Context after commands:", JSON.stringify(context));
 
-    const mapped = applyResponseMapping(request.responseMapping, context);
+    const mapped = applyResponseMapping(prefillDefinition.responseMapping, context);
     console.log("Mapped output:", JSON.stringify(mapped));
     
     return jsonResponse(200, buildPrefillResponse({

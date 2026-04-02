@@ -138,6 +138,21 @@ function validateFormSecurityPayload(payload) {
   if (!payload?.submitPolicy || typeof payload.submitPolicy !== 'object') {
     throw new Error('Missing required field: submitPolicy');
   }
+  if (!payload?.prefillDefinition || typeof payload.prefillDefinition !== 'object') {
+    throw new Error('Missing required field: prefillDefinition');
+  }
+  if (!Array.isArray(payload.prefillDefinition.commands)) {
+    throw new Error('Missing required field: prefillDefinition.commands');
+  }
+  if (!payload.prefillDefinition.responseMapping || typeof payload.prefillDefinition.responseMapping !== 'object') {
+    throw new Error('Missing required field: prefillDefinition.responseMapping');
+  }
+  if (!payload?.submitDefinition || typeof payload.submitDefinition !== 'object') {
+    throw new Error('Missing required field: submitDefinition');
+  }
+  if (!Array.isArray(payload.submitDefinition.commands)) {
+    throw new Error('Missing required field: submitDefinition.commands');
+  }
 }
 export const handler = async (event) => {
   const path = event?.requestContext?.http?.path || event?.rawPath || '/';
@@ -319,6 +334,8 @@ export const handler = async (event) => {
         tokenHash: hashToken(payload.publishToken),
         prefillPolicy: payload.prefillPolicy,
         submitPolicy: payload.submitPolicy,
+        prefillDefinition: payload.prefillDefinition,
+        submitDefinition: payload.submitDefinition,
         createdAt,
         updatedAt: now
       };

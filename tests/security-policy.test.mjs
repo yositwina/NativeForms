@@ -93,6 +93,15 @@ const secureEditPolicy = {
       Contact: ["FirstName", "LastName", "Email"],
       Case: ["Subject", "Description", "Status", "Origin", "ContactId"]
     }
+  },
+  prefillDefinition: {
+    commands: [{ type: "findMany", objectApiName: "Case" }],
+    responseMapping: {
+      "repeatGroups.existingCases": "{foundCases}"
+    }
+  },
+  submitDefinition: {
+    commands: [{ type: "create", objectApiName: "Case" }]
   }
 };
 
@@ -103,6 +112,8 @@ const publicCreatePolicy = {
 
 ensureFormToken(secureEditPolicy, "demo-problem-report-v1-token");
 assert.throws(() => ensureFormToken(secureEditPolicy, "wrong-token"), /invalid publish token/);
+assert.equal(Array.isArray(secureEditPolicy.prefillDefinition.commands), true);
+assert.equal(Array.isArray(secureEditPolicy.submitDefinition.commands), true);
 
 validatePrefillCommandAgainstPolicy({
   type: "findMany",

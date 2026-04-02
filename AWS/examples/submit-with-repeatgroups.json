@@ -8,49 +8,21 @@
     "subject": "Problem Report",
     "description": "The public form is missing repeat-group support.",
     "contactId": "003xx0000001234AAA",
-    "issueUpdates": [
+    "existingCases": [
       {
-        "Id": "a01xx0000000001AAA",
-        "title": "Initial Investigation",
-        "notes": "Existing child row that should update."
+        "Id": "500xx0000000001AAA",
+        "Subject": "Existing Case Row",
+        "Description": "Existing child row that should update.",
+        "Status": "Working"
       },
       {
-        "title": "New Follow Up",
-        "notes": "New child row that should insert."
+        "Subject": "New Follow Up",
+        "Description": "New child row that should insert.",
+        "Status": "New"
       }
     ],
     "_deletedRepeatGroups": {
-      "issueUpdates": ["a01xx0000000009AAA"]
+      "existingCases": ["500xx0000000009AAA"]
     }
-  },
-  "commands": [
-    {
-      "type": "create",
-      "commandKey": "createCase",
-      "objectApiName": "Case",
-      "fields": {
-        "Subject": "{input.subject}",
-        "Description": "{input.description}",
-        "Origin": "Web",
-        "ContactId": "{input.contactId}"
-      },
-      "storeResultAs": "createdCase"
-    },
-    {
-      "type": "upsertMany",
-      "commandKey": "saveIssueUpdates",
-      "objectApiName": "Issue_Update__c",
-      "rows": "{input.issueUpdates}",
-      "idField": "Id",
-      "relationshipField": "Case__c",
-      "relationshipValue": "{createdCase.id}",
-      "fields": {
-        "Title__c": "{row.title}",
-        "Notes__c": "{row.notes}"
-      },
-      "allowDelete": true,
-      "deleteIds": "{input._deletedRepeatGroups.issueUpdates}",
-      "storeResultAs": "savedIssueUpdates"
-    }
-  ]
+  }
 }

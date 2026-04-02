@@ -9,6 +9,7 @@ Each published form includes:
 - Embedded `FORM_DEF` JSON
 - Generic runtime engine
 - Optional custom CSS and JS
+- only UI/runtime metadata in the browser
 
 ## FORM_DEF Structure
 ```js
@@ -16,7 +17,7 @@ Each published form includes:
   version: "1.0",
   formId: "example-form",
   endpoints: { prefillUrl: "...", submitUrl: "..." },
-  tokens: { prefill: "...", submit: "..." },
+  tokens: { publish: "..." },
   settings: { debug: false },
   theme: {
     maxWidth: "760px",
@@ -31,8 +32,9 @@ Each published form includes:
   resources: { customCss: "", customJs: "" },
   ui: { title: "Form Title" },
   elements: [ ... ],
-  prefill: { ... },
-  submit: { ... }
+  prefill: {
+    params: { email: "{input.email}" }
+  }
 }
 ```
 
@@ -55,37 +57,29 @@ Planned/documented but not yet implemented in this runtime sample:
 - section
 - columns
 
-## Prefill Structure
+## Server-Side Execution Model
+The browser no longer sends prefill or submit commands.
+
+Instead:
+- HTML sends `formId`, `publishToken`, and user `params` / `input`
+- AWS loads `prefillDefinition` and `submitDefinition` from DynamoDB
+- Lambda executes only the stored server-side definitions
+
+Stored in DynamoDB per form:
+- `prefillDefinition.commands`
+- `prefillDefinition.responseMapping`
+- `prefillDefinition.onNotFound`
+- `submitDefinition.commands`
+- security policies and allowlists
+
+## Prefill Structure In HTML
 ```js
 prefill: {
-  onNotFound: "ignore",
-  params: { email: "{input.email}" },
-  commands: [
-    {
-      type: "findMany",
-      objectApiName: "Case",
-      where: { ContactId: "{foundContact.Id}" },
-      fieldsToReturn: ["Id", "CaseNumber", "Subject"],
-      orderBy: { field: "CreatedDate", direction: "DESC" },
-      limit: 20,
-      storeResultAs: "foundCases"
-    }
-  ],
-  responseMapping: {
-    "repeatGroups.existingCases": "{foundCases}"
-  }
+  params: { email: "{input.email}" }
 }
 ```
 
-## Submit Structure
-```js
-submit: {
-  commands: [
-    { type: "update", objectApiName: "Contact", ... },
-    { type: "upsertMany", objectApiName: "Case", rows: "{input.existingCases}", ... }
-  ]
-}
-```
+The full prefill commands and response mapping now belong to the published form record in DynamoDB, not the HTML.
 
 ## Expression Syntax
 Supported expressions:
@@ -283,7 +277,7 @@ window.addEventListener("nativeforms:change", (event) => {
 2. `elements` is ordered.
 3. Input values are collected into the `input` object.
 4. Tokens are required.
-5. The engine handles execution.
+5. The engine handles UI/runtime behavior, while AWS handles execution definitions.
 6. Custom JS is optional.
 7. `repeatGroup.viewMode` is optional. Default rendering remains stacked.
 8. Table view does not change Lambda payload shape.

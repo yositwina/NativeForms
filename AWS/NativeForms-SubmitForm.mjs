@@ -4,61 +4,25 @@ NativeForms Submit Engine - V1 Command Spec
 Purpose
 -------
 Generic Lambda execution engine for Salesforce-backed forms.
-The HTML/JS payload does not send business-specific instructions hardcoded in Lambda.
-Instead, it sends:
-1) input      -> raw user-entered values
-2) commands   -> ordered generic actions for Lambda to execute
+The browser sends only the form identity and raw user-entered values.
+Lambda loads the ordered submit commands from the server-side DynamoDB
+form definition for that form.
 
 Top-level payload
 -----------------
 {
-  "formToken": "abc123",
+  "publishToken": "abc123",
+  "formId": "supportForm1",
   "input": {
     "email": "user@example.com",
     "problem": "Something is wrong"
-  },
-  "commands": [
-    {
-      "type": "findOne",
-      "commandKey": "findContact",
-      "objectApiName": "Contact",
-      "where": {
-        "Email": "{input.email}"
-      },
-      "storeResultAs": "foundContact"
-    },
-    {
-      "type": "create",
-      "commandKey": "createContact",
-      "runIf": {
-        "var": "foundContact.Id",
-        "isBlank": true
-      },
-      "objectApiName": "Contact",
-      "fields": {
-        "LastName": "{input.email}",
-        "Email": "{input.email}"
-      },
-      "storeResultAs": "createdContact"
-    },
-    {
-      "type": "create",
-      "commandKey": "createCase",
-      "objectApiName": "Case",
-      "fields": {
-        "Subject": "Problem Report",
-        "Description": "{input.problem}",
-        "Origin": "Web",
-        "ContactId": "{firstNotBlank(foundContact.Id, createdContact.id)}"
-      },
-      "storeResultAs": "createdCase"
-    }
-  ]
+  }
 }
 
 Execution model
 ---------------
 - Commands run in array order.
+- Commands are loaded from the stored server-side form definition, not from the browser.
 - Later commands may reference:
   - input values:              {input.email}
   - previous stored results:   {foundContact.Id}
@@ -256,6 +220,12 @@ function ensureFormToken(formSecurity, publishToken) {
 
   if (!formSecurity.submitPolicy) {
     const error = new Error("Submit policy is not configured for this form");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (!formSecurity.submitDefinition || !Array.isArray(formSecurity.submitDefinition.commands)) {
+    const error = new Error("Submit definition is not configured for this form");
     error.statusCode = 403;
     throw error;
   }
@@ -806,12 +776,12 @@ async function executeCommand(command, context, sf) {
 
 export const handler = async (event) => {
   try {
-    const isDirectPayload =
+  const isDirectPayload =
     !!event &&
     typeof event === "object" &&
     !event?.requestContext &&
     !event?.httpMethod &&
-    (event?.commands || event?.input || event?.formToken);
+    (event?.input || event?.publishToken || event?.formId);
   
   const method =
     event?.requestContext?.http?.method ||
@@ -849,15 +819,9 @@ export const handler = async (event) => {
       });
     }
 
-    if (!Array.isArray(inputPayload.commands)) {
-      return jsonResponse(400, {
-        success: false,
-        error: "Missing or invalid 'commands' array"
-      });
-    }
-
     const formSecurity = await getFormSecurityRecord(inputPayload.formId);
     ensureFormToken(formSecurity, inputPayload.publishToken);
+    const submitCommands = formSecurity.submitDefinition.commands;
 
     const secret = await getSecret(SECRET_NAME);
     assertSecret(secret);
@@ -870,7 +834,7 @@ export const handler = async (event) => {
 
     const results = [];
 
-    for (const command of inputPayload.commands) {
+    for (const command of submitCommands) {
       try {
     
         if (!command.type) {
