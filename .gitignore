@@ -3,7 +3,7 @@ node_modules/
 .sfdx/
 *.log
 AWS/*.pdf
-!AWS/NativeForms_HTML_V1_Guide_v3.pdf
-!AWS/NativeForms_Prefill_PDG_v2.pdf
-!AWS/Security Protocols.pdf
-!AWS/Tasks for later.pdf
+!AWS/documentation/NativeForms_HTML_V1_Guide_v3.pdf
+!AWS/documentation/NativeForms_Prefill_PDG_v2.pdf
+!AWS/documentation/Security Protocols.pdf
+!AWS/documentation/Tasks for later.pdf
