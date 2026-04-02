@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NativeForms Contact Test</title>
+</head>
+<body>
+  <h2>Contact Form Test</h2>
+
+  <form id="contactForm">
+    <div>
+      <label>First Name</label><br />
+      <input type="text" id="firstName" />
+    </div>
+    <br />
+
+    <div>
+      <label>Last Name</label><br />
+      <input type="text" id="lastName" required />
+    </div>
+    <br />
+
+    <div>
+      <label>Email</label><br />
+      <input type="email" id="email" />
+    </div>
+    <br />
+
+    <button type="submit">Submit</button>
+  </form>
+
+  <br />
+  <pre id="result"></pre>
+
+  <script>
+    const functionUrl = "https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/";
+    const formToken = "abc123";
+
+    document.getElementById("contactForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const resultEl = document.getElementById("result");
+      resultEl.textContent = "Sending...";
+
+      const payload = {
+        formToken: formToken,
+        objectApiName: "Contact",
+        fields: {
+          FirstName: document.getElementById("firstName").value,
+          LastName: document.getElementById("lastName").value,
+          Email: document.getElementById("email").value
+        }
+      };
+
+      try {
+        const response = await fetch(functionUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultEl.textContent = "Error: " + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

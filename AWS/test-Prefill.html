@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NativeForms Prefill Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 10px 16px; cursor: pointer; }
+    pre { margin-top: 20px; padding: 12px; background: #f4f4f4; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h2>NativeForms Prefill Test</h2>
+
+  <label for="lookupEmail">Lookup Email</label>
+  <input id="lookupEmail" value="yositest@gmail.com" />
+
+  <button id="loadBtn">Load Prefill</button>
+
+  <label for="firstName">First Name</label>
+  <input id="firstName" />
+
+  <label for="lastName">Last Name</label>
+  <input id="lastName" />
+
+  <label for="email">Email</label>
+  <input id="email" />
+
+  <label for="contactId">Hidden Contact Id</label>
+  <input id="contactId" />
+
+  <pre id="debug"></pre>
+
+<script>
+  const PREFILL_URL = "https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/";
+  const PREFILL_TOKEN = "abc123";
+
+  function getQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+  }
+
+  async function loadPrefill() {
+    const lookupEmail = document.getElementById("lookupEmail").value.trim();
+    const debug = document.getElementById("debug");
+
+    if (!lookupEmail) {
+      debug.textContent = "No email provided";
+      return;
+    }
+
+    const payload = {
+      prefillToken: PREFILL_TOKEN,
+      request: {
+        formId: "testForm",
+        params: {
+          email: lookupEmail
+        },
+        commands: [
+          {
+            type: "findOne",
+            commandKey: "findContact",
+            objectApiName: "Contact",
+            where: {
+              Email: "{params.email}"
+            },
+            fieldsToReturn: ["Id", "Email", "LastName", "FirstName"],
+            storeResultAs: "foundContact"
+          }
+        ],
+        responseMapping: {
+          "input.email": "{foundContact.Email}",
+          "input.lastName": "{foundContact.LastName}",
+          "input.firstName": "{foundContact.FirstName}",
+          "hidden.contactId": "{foundContact.Id}"
+        }
+      }
+    };
+
+    try {
+      debug.textContent = "Loading...";
+
+      const response = await fetch(PREFILL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      debug.textContent = JSON.stringify(result, null, 2);
+
+      if (!result.success) {
+        alert("Prefill failed");
+        return;
+      }
+
+      document.getElementById("firstName").value = result.input?.firstName || "";
+      document.getElementById("lastName").value = result.input?.lastName || "";
+      document.getElementById("email").value = result.input?.email || "";
+      document.getElementById("contactId").value = result.hidden?.contactId || "";
+    } catch (err) {
+      debug.textContent = "ERROR: " + err.message;
+      console.error(err);
+    }
+  }
+
+  document.getElementById("loadBtn").addEventListener("click", loadPrefill);
+
+  window.addEventListener("DOMContentLoaded", () => {
+    const emailFromUrl = getQueryParam("email");
+
+    if (emailFromUrl) {
+      document.getElementById("lookupEmail").value = emailFromUrl;
+      loadPrefill();
+    }
+  });
+</script>
+</body>
+</html>

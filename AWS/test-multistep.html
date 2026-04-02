@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NativeForms Problem Report</title>
+</head>
+<body>
+  <h2>Report a Problem</h2>
+
+  <form id="problemForm">
+    <div>
+      <label for="email">Email</label><br />
+      <input type="email" id="email" required />
+    </div>
+    <br />
+
+    <div>
+      <label for="lastName">Last Name</label><br />
+      <input type="text" id="lastName" required />
+    </div>
+    <br />
+
+    <div>
+      <label for="problem">Problem</label><br />
+      <textarea id="problem" rows="6" cols="50" required></textarea>
+    </div>
+    <br />
+
+    <button type="submit">Send</button>
+  </form>
+
+  <br />
+  <pre id="result"></pre>
+
+  <script>
+    const functionUrl = "https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/";
+    const formToken = "abc123";
+
+    document.getElementById("problemForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const resultEl = document.getElementById("result");
+      resultEl.textContent = "Sending...";
+
+      const email = document.getElementById("email").value.trim();
+      const lastName = document.getElementById("lastName").value.trim();
+      const problem = document.getElementById("problem").value.trim();
+
+      const payload = {
+        formToken,
+        input: {
+          email,
+          lastName,
+          problem
+        },
+        commands: [
+          {
+            type: "findOne",
+            commandKey: "findContact",
+            objectApiName: "Contact",
+            where: {
+              Email: "{input.email}"
+            },
+            fieldsToReturn: ["Id", "Email", "LastName"],
+            storeResultAs: "foundContact"
+          },
+          {
+            type: "create",
+            commandKey: "createContact",
+            runIf: {
+              var: "foundContact.Id",
+              isBlank: true
+            },
+            objectApiName: "Contact",
+            fields: {
+              LastName: "{input.lastName}",
+              Email: "{input.email}"
+            },
+            storeResultAs: "createdContact"
+          },
+          {
+            type: "create",
+            commandKey: "createCase",
+            objectApiName: "Case",
+            fields: {
+              Subject: "Problem Report",
+              Description: "{input.problem}",
+              Origin: "Web",
+              ContactId: "{firstNotBlank(foundContact.Id, createdContact.id)}"
+            },
+            storeResultAs: "createdCase"
+          }
+        ]
+      };
+
+      try {
+        const response = await fetch(functionUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultEl.textContent = "Error: " + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

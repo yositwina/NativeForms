@@ -1,0 +1,1925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NativeForms V1 Demo</title>
+  <style>
+    :root {
+      --nf-page-background: linear-gradient(180deg, #dbeafe 0%, #93c5fd 45%, #60a5fa 100%);
+      --nf-form-max-width: 760px;
+      --nf-form-background: #ffffff;
+      --nf-button-background: #111827;
+      --nf-button-text: #ffffff;
+      --nf-table-header-background: #f3f4f6;
+      --nf-table-header-text: #374151;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--nf-page-background);
+      margin: 0;
+      padding: 24px;
+    }
+
+    .nf-form-wrapper {
+      max-width: var(--nf-form-max-width);
+      margin: 0 auto;
+      background: var(--nf-form-background);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    .nf-title {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+    }
+
+    .nf-description {
+      margin: 0 0 20px 0;
+      color: #555;
+    }
+
+    .nf-element {
+      margin-top: 14px;
+    }
+
+    .nf-label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .nf-input,
+    .nf-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .nf-textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .nf-input.nf-invalid,
+    .nf-textarea.nf-invalid {
+      border-color: #d93025;
+      background: #fff8f7;
+    }
+
+    .nf-error {
+      color: #d93025;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .nf-text {
+      line-height: 1.5;
+      color: #333;
+    }
+
+    .nf-link a {
+      color: #0a66c2;
+      text-decoration: none;
+    }
+
+    .nf-link a:hover {
+      text-decoration: underline;
+    }
+
+    .nf-image img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+    }
+
+    .nf-actions {
+      margin-top: 22px;
+    }
+
+    .nf-submit-btn {
+      padding: 10px 18px;
+      font-size: 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--nf-button-background);
+      color: var(--nf-button-text);
+    }
+
+    .nf-submit-btn:hover {
+      opacity: 0.92;
+    }
+
+    .nf-submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .nf-form-error {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fff4f4;
+      color: #b42318;
+      border: 1px solid #f1b3b3;
+      display: none;
+    }
+
+    .nf-form-success {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f0fff4;
+      color: #166534;
+      border: 1px solid #b7e4c7;
+      display: none;
+    }
+
+    .nf-debug {
+      margin-top: 20px;
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      overflow: auto;
+    }
+
+    .nf-hidden {
+      display: none;
+    }
+
+    .nf-repeat-group {
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .nf-repeat-group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .nf-repeat-group-title {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .nf-repeat-group-description {
+      margin: 6px 0 0 0;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .nf-repeat-row {
+      margin-top: 12px;
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .nf-repeat-row-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .nf-repeat-row-title {
+      font-weight: bold;
+      color: #374151;
+    }
+
+    .nf-repeat-btn {
+      padding: 8px 12px;
+      font-size: 13px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .nf-repeat-table-wrap {
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+
+    .nf-repeat-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    .nf-repeat-table th,
+    .nf-repeat-table td {
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .nf-repeat-table th {
+      background: var(--nf-table-header-background);
+      font-size: 13px;
+      color: var(--nf-table-header-text);
+    }
+
+    .nf-repeat-table td .nf-input,
+    .nf-repeat-table td .nf-textarea {
+      margin: 0;
+    }
+
+    .nf-repeat-table .nf-error {
+      margin-top: 4px;
+    }
+
+    .nf-repeat-table-actions {
+      width: 120px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .nf-disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    // =========================================================
+    // 1. FORM_DEF
+    // =========================================================
+    const FORM_DEF = {
+      version: "1.0",
+      formId: "problem-report-demo",
+      formName: "Problem Report Demo",
+
+      endpoints: {
+        prefillUrl: "https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/",
+        submitUrl: "https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/"
+      },
+      tokens: {
+      publish: "demo-problem-report-v1-token"
+      },
+      settings: {
+        debug: true
+      },
+      theme: {
+        maxWidth: "900px",
+        pageBackground: "linear-gradient(180deg, #dbeafe 0%, #93c5fd 45%, #60a5fa 100%)",
+        formBackground: "#ffffff",
+        buttonBackground: "#1d4ed8",
+        buttonTextColor: "#ffffff",
+        tableHeaderBackground: "#dbeafe",
+        tableHeaderTextColor: "#1e3a8a",
+        direction: "ltr"
+      },
+      resources: {
+        customCss: ".nf-form-wrapper { border: 1px solid rgba(29, 78, 216, 0.22); }",
+        customJs: "NativeForms.on('form:ready', () => console.log('hello'));"
+      },
+      prefill: {
+        onNotFound: "ignore",
+        params: {
+          email: "{input.email}"
+        },
+        commands: [
+          {
+            type: "findOne",
+            commandKey: "findContact",
+            objectApiName: "Contact",
+            where: {
+              Email: "{params.email}"
+            },
+            fieldsToReturn: ["Id", "Email", "LastName", "FirstName"],
+            storeResultAs: "foundContact"
+          },
+          {
+            type: "findMany",
+            commandKey: "findCases",
+            objectApiName: "Case",
+            where: {
+              ContactId: "{foundContact.Id}"
+            },
+            fieldsToReturn: ["Id", "CaseNumber", "Subject", "Description", "Status"],
+            orderBy: {
+              field: "CaseNumber",
+              direction: "ASC"
+            },
+            limit: 20,
+            storeResultAs: "foundCases"
+          }
+        ],
+        responseMapping: {
+          "input.firstName": "{foundContact.FirstName}",
+          "input.lastName": "{foundContact.LastName}",
+          "input.email": "{foundContact.Email}",
+          "hidden.contactId": "{foundContact.Id}",
+          "meta.foundContact": "{foundContact.Id}",
+          "repeatGroups.existingCases": "{foundCases}"
+        }
+      },
+      submit: {
+        commands: [
+          {
+            type: "update",
+            commandKey: "updateContact",
+            runIf: {
+              var: "input.contactId",
+              isNotBlank: true
+            },
+            objectApiName: "Contact",
+            id: "{input.contactId}",
+            fields: {
+              FirstName: "{input.firstName}",
+              LastName: "{input.lastName}",
+              Email: "{input.email}"
+            },
+            storeResultAs: "updatedContact"
+          },
+          {
+            type: "upsertMany",
+            commandKey: "saveExistingCases",
+            runIf: {
+              var: "input.contactId",
+              isNotBlank: true
+            },
+            objectApiName: "Case",
+            rows: "{input.existingCases}",
+            idField: "Id",
+            relationshipField: "ContactId",
+            relationshipValue: "{input.contactId}",
+            fields: {
+              Subject: "{row.Subject}",
+              Description: "{row.Description}",
+              Status: "{row.Status}"
+            },
+            allowDelete: true,
+            deleteIds: "{input._deletedRepeatGroups.existingCases}",
+            storeResultAs: "savedCases"
+          },
+          {
+            type: "create",
+            commandKey: "createNewCase",
+            objectApiName: "Case",
+            fields: {
+              Subject: "{input.subject}",
+              Description: "{input.description}",
+              Origin: "Web",
+              ContactId: "{input.contactId}"
+            },
+            storeResultAs: "createdCase"
+          }
+        ]
+      },
+      ui: {
+        title: "Report a Problem",
+        description: "This demo prefills a Contact and that Contact's existing Cases, then updates the Contact, saves edited Case rows, and creates a new Case on submit.",
+        submitButtonLabel: "Send",
+        successMessage: "Contact updated, existing Cases saved, and a new Case was created.",
+        prefillNotFoundMessage: "No matching Contact was found. You can continue and submit manually."
+      },
+
+      elements: [
+        {
+          id: "heading1",
+          type: "heading",
+          text: "Report a Problem",
+          level: 2
+        },
+        {
+          id: "text1",
+          type: "text",
+          text: "Please fill in the required fields before sending."
+        },
+        {
+          id: "email",
+          type: "input",
+          inputType: "email",
+          key: "email",
+          label: "Email",
+          required: true,
+          placeholder: "name@example.com"
+        },
+        {
+          id: "firstName",
+          type: "input",
+          inputType: "text",
+          key: "firstName",
+          label: "First Name",
+          placeholder: "First name"
+        },
+        {
+          id: "lastName",
+          type: "input",
+          inputType: "text",
+          key: "lastName",
+          label: "Last Name",
+          required: true,
+          placeholder: "Last name"
+        },
+        {
+          id: "subject",
+          type: "input",
+          inputType: "text",
+          key: "subject",
+          label: "Subject",
+          defaultValue: "Problem Report",
+          required: true
+        },
+        {
+          id: "description",
+          type: "textarea",
+          key: "description",
+          label: "Description",
+          rows: 6,
+          required: true,
+          placeholder: "Describe the problem"
+        },
+        {
+          id: "existingCases",
+          type: "repeatGroup",
+          key: "existingCases",
+          label: "Existing Cases",
+          description: "When prefill finds the Contact, this section shows that Contact's existing Case records.",
+          viewMode: "table",
+          addButtonLabel: "+ Add another case row",
+          maxRows: 20,
+          visibility: {
+            mode: "conditional",
+            logic: "all",
+            conditions: [
+              {
+                field: "contactId",
+                operator: "isNotBlank"
+              }
+            ],
+            whenFalse: "hide",
+            clearWhenHidden: false
+          },
+          minRows: 0,
+          fields: [
+            {
+              id: "existingCaseNumber",
+              type: "input",
+              inputType: "text",
+              key: "CaseNumber",
+              label: "Case Number",
+              columnWidth: "140px",
+              readOnly: true,
+              placeholder: "Filled from Salesforce"
+            },
+            {
+              id: "existingCaseSubject",
+              type: "input",
+              inputType: "text",
+              key: "Subject",
+              label: "Subject",
+              columnWidth: "220px",
+              placeholder: "Case subject"
+            },
+            {
+              id: "existingCaseStatus",
+              type: "input",
+              inputType: "text",
+              key: "Status",
+              label: "Status",
+              columnWidth: "140px",
+              placeholder: "Case status"
+            },
+            {
+              id: "existingCaseDescription",
+              type: "textarea",
+              key: "Description",
+              label: "Description",
+              columnWidth: "320px",
+              rows: 3,
+              placeholder: "Case description"
+            },
+            {
+              id: "existingCaseId",
+              type: "hidden",
+              key: "Id",
+              defaultValue: ""
+            }
+          ]
+        },
+        {
+          id: "contactId",
+          type: "hidden",
+          key: "contactId",
+          defaultValue: ""
+        }
+      ]
+    };
+
+    // =========================================================
+    // 2. STATE STORE
+    // =========================================================
+    class StateStore {
+      constructor(formDef) {
+        this.formDef = formDef;
+        this.input = {};
+        this.errors = {};
+        this.deletedRepeatGroups = {};
+      }
+
+      initialize() {
+        for (const el of this.formDef.elements) {
+          if (el.key) {
+            if (el.type === "repeatGroup") {
+              this.input[el.key] = this.getInitialRepeatRows(el);
+              this.deletedRepeatGroups[el.key] = [];
+            } else {
+              this.input[el.key] = el.defaultValue ?? "";
+            }
+          }
+        }
+      }
+
+      getInitialRepeatRows(element) {
+        const rows = Array.isArray(element.defaultRows)
+          ? JSON.parse(JSON.stringify(element.defaultRows))
+          : [];
+
+        const targetLength = Math.max(rows.length, element.minRows || 0);
+        while (rows.length < targetLength) {
+          rows.push(this.createEmptyRepeatRow(element));
+        }
+
+        return this.limitRepeatRows(element, rows);
+      }
+
+      createEmptyRepeatRow(element) {
+        const row = {};
+        for (const field of element.fields || []) {
+          if (field.key) {
+            row[field.key] = field.defaultValue ?? "";
+          }
+        }
+        return row;
+      }
+
+      getValue(key) {
+        return this.input[key];
+      }
+
+      setValue(key, value) {
+        this.input[key] = value;
+      }
+
+      getAll() {
+        return {
+          ...this.input,
+          _deletedRepeatGroups: JSON.parse(JSON.stringify(this.deletedRepeatGroups))
+        };
+      }
+
+      getRepeatRows(key) {
+        return Array.isArray(this.input[key]) ? this.input[key] : [];
+      }
+
+      limitRepeatRows(element, rows) {
+        if (!Number.isInteger(element.maxRows) || element.maxRows <= 0) {
+          return rows;
+        }
+
+        return rows.slice(0, element.maxRows);
+      }
+
+      replaceRepeatRows(key, rows) {
+        const element = this.formDef.elements.find((item) => item.key === key);
+        const safeRows = Array.isArray(rows) ? rows : [];
+        this.input[key] = element ? this.limitRepeatRows(element, safeRows) : safeRows;
+      }
+
+      addRepeatRow(element) {
+        const rows = this.getRepeatRows(element.key).slice();
+        if (Number.isInteger(element.maxRows) && element.maxRows > 0 && rows.length >= element.maxRows) {
+          return false;
+        }
+        rows.push(this.createEmptyRepeatRow(element));
+        this.input[element.key] = rows;
+        return true;
+      }
+
+      removeRepeatRow(element, index) {
+        const rows = this.getRepeatRows(element.key).slice();
+        const [removed] = rows.splice(index, 1);
+
+        if (removed?.Id) {
+          this.deletedRepeatGroups[element.key] = this.deletedRepeatGroups[element.key] || [];
+          this.deletedRepeatGroups[element.key].push(removed.Id);
+        }
+
+        this.input[element.key] = rows;
+      }
+
+      updateRepeatRowField(groupKey, rowIndex, fieldKey, value) {
+        const rows = this.getRepeatRows(groupKey).slice();
+        const nextRow = {
+          ...(rows[rowIndex] || {}),
+          [fieldKey]: value
+        };
+        rows[rowIndex] = nextRow;
+        this.input[groupKey] = rows;
+      }
+
+      setError(key, message) {
+        this.errors[key] = message;
+      }
+
+      clearError(key) {
+        delete this.errors[key];
+      }
+
+      clearAllErrors() {
+        this.errors = {};
+      }
+
+      getErrors() {
+        return { ...this.errors };
+      }
+
+      hasErrors() {
+        return Object.keys(this.errors).length > 0;
+      }
+    }
+
+    // =========================================================
+    // 3. VALIDATION
+    // =========================================================
+    class ValidationEngine {
+      constructor(state, formDef) {
+        this.state = state;
+        this.formDef = formDef;
+      }
+
+      getRuntimeValue(input, path) {
+        if (!path) return undefined;
+        return String(path).split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), input);
+      }
+
+      evaluateCondition(condition, input) {
+        const actual = this.getRuntimeValue(input, condition.field);
+        const operator = condition.operator || "equals";
+        const expected = condition.value;
+
+        if (operator === "equals") return actual === expected;
+        if (operator === "notEquals") return actual !== expected;
+        if (operator === "isBlank") return actual === undefined || actual === null || actual === "";
+        if (operator === "isNotBlank") return !(actual === undefined || actual === null || actual === "");
+        if (operator === "contains") return String(actual || "").includes(String(expected || ""));
+        return false;
+      }
+
+      evaluateVisibility(element, input) {
+        const rule = element.visibility;
+        if (!rule || rule.mode !== "conditional" || !Array.isArray(rule.conditions) || rule.conditions.length === 0) {
+          return { visible: true, disabled: false };
+        }
+
+        const evaluations = rule.conditions.map((condition) => this.evaluateCondition(condition, input));
+        const logic = (rule.logic || "all").toLowerCase();
+        const matched = logic === "any" ? evaluations.some(Boolean) : evaluations.every(Boolean);
+
+        if (matched) {
+          return { visible: true, disabled: false };
+        }
+
+        return {
+          visible: rule.whenFalse !== "hide",
+          disabled: rule.whenFalse === "disable"
+        };
+      }
+
+      validateForm() {
+        this.state.clearAllErrors();
+        const input = this.state.getAll();
+
+        for (const el of this.formDef.elements) {
+          if (!el.key || el.type === "hidden") continue;
+          const visibility = this.evaluateVisibility(el, input);
+          if (!visibility.visible || visibility.disabled) continue;
+
+          if (el.type === "repeatGroup") {
+            const rows = this.state.getRepeatRows(el.key);
+            rows.forEach((row, rowIndex) => {
+              for (const field of el.fields || []) {
+                if (!field.key || field.type === "hidden" || !field.required) continue;
+
+                const value = (row[field.key] ?? "").toString().trim();
+                if (!value) {
+                  this.state.setError(
+                    `${el.key}.${rowIndex}.${field.key}`,
+                    `${field.label || field.key} is required.`
+                  );
+                }
+              }
+            });
+            continue;
+          }
+
+          if (el.required) {
+            const value = (this.state.getValue(el.key) ?? "").toString().trim();
+            if (!value) {
+              this.state.setError(el.key, `${el.label || el.key} is required.`);
+            }
+          }
+        }
+
+        return {
+          valid: !this.state.hasErrors(),
+          errors: this.state.getErrors()
+        };
+      }
+    }
+
+    // =========================================================
+    // 4. API CLIENT
+    // =========================================================
+    class ApiClient {
+      constructor(formDef) {
+        this.formDef = formDef;
+      }
+      async runPrefill(input) {
+        const prefillUrl = this.formDef.endpoints?.prefillUrl;
+        if (!prefillUrl) {
+            throw new Error("FORM_DEF.endpoints.prefillUrl is missing");
+        }
+
+        const payload = {
+          publishToken: this.formDef.tokens?.publish || "",
+          request: {
+            formId: this.formDef.formId,
+            onNotFound: this.formDef.prefill?.onNotFound || "ignore",
+            params: {
+              email: input.email || ""
+            },
+            commands: this.formDef.prefill?.commands || [],
+            responseMapping: this.formDef.prefill?.responseMapping || {}
+          }
+        };
+
+        const response = await fetch(prefillUrl, {
+            method: "POST",
+            headers: {
+            "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        return {
+            ok: response.ok,
+            status: response.status,
+            data
+        };
+      }
+
+      async submitSimple(input) {
+        const submitUrl = this.formDef.endpoints?.submitUrl;
+        if (!submitUrl) {
+          throw new Error("FORM_DEF.endpoints.submitUrl is missing");
+        }
+
+        const payload = {
+          formId: this.formDef.formId,
+          publishToken: this.formDef.tokens?.publish || "",
+          input,
+          commands: this.formDef.submit?.commands || []
+        };
+
+        const response = await fetch(submitUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (e) {
+          data = { rawText: await response.text?.() };
+        }
+
+        return {
+          ok: response.ok,
+          status: response.status,
+          data
+        };
+      }
+    }
+
+    // =========================================================
+    // 5. RENDERER
+    // =========================================================
+    class Renderer {
+      constructor(state) {
+        this.state = state;
+        this.formDef = null;
+      }
+      applyTheme(formDef) {
+        const root = document.documentElement;
+        const theme = formDef.theme || {};
+
+        if (theme.pageBackground) {
+          root.style.setProperty("--nf-page-background", theme.pageBackground);
+        }
+        if (theme.maxWidth) {
+          root.style.setProperty("--nf-form-max-width", theme.maxWidth);
+        }
+        if (theme.formBackground) {
+          root.style.setProperty("--nf-form-background", theme.formBackground);
+        }
+        if (theme.buttonBackground) {
+          root.style.setProperty("--nf-button-background", theme.buttonBackground);
+        }
+        if (theme.buttonTextColor) {
+          root.style.setProperty("--nf-button-text", theme.buttonTextColor);
+        }
+        if (theme.tableHeaderBackground) {
+          root.style.setProperty("--nf-table-header-background", theme.tableHeaderBackground);
+        }
+        if (theme.tableHeaderTextColor) {
+          root.style.setProperty("--nf-table-header-text", theme.tableHeaderTextColor);
+        }
+
+        document.body.dir = theme.direction || "ltr";
+      }
+      applyCustomCss(formDef) {
+        const styleId = "nf-custom-css";
+        let styleEl = document.getElementById(styleId);
+
+        if (!styleEl) {
+          styleEl = document.createElement("style");
+          styleEl.id = styleId;
+          document.head.appendChild(styleEl);
+        }
+
+        styleEl.textContent = formDef.resources?.customCss || "";
+      }
+      setDebugVisibility(formDef) {
+        const debugEl = document.getElementById("nf-debug");
+        if (!debugEl) return;
+
+        debugEl.style.display = formDef.settings?.debug === false ? "none" : "block";
+      }
+      refreshInputsFromState() {
+        document.querySelectorAll("[data-key]").forEach(el => {
+          if (el.dataset.repeatGroupKey) {
+            return;
+          }
+
+          const key = el.dataset.key;
+          if (!key) return;
+
+          const value = this.state.getValue(key) ?? "";
+          if (el.value !== value) {
+            el.value = value;
+          }
+        });
+
+        this.refreshRepeatGroupsFromState();
+        this.applyElementRuntimeState(this.formDef);
+      }
+      render(formDef, mountEl) {
+        this.formDef = formDef;
+        this.applyTheme(formDef);
+        this.applyCustomCss(formDef);
+        mountEl.innerHTML = "";
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "nf-form-wrapper";
+
+        if (formDef.ui?.title) {
+          const titleEl = document.createElement("h1");
+          titleEl.className = "nf-title";
+          titleEl.textContent = formDef.ui.title;
+          wrapper.appendChild(titleEl);
+        }
+
+        if (formDef.ui?.description) {
+          const descEl = document.createElement("div");
+          descEl.className = "nf-description";
+          descEl.textContent = formDef.ui.description;
+          wrapper.appendChild(descEl);
+        }
+
+        const formErrorEl = document.createElement("div");
+        formErrorEl.className = "nf-form-error";
+        formErrorEl.id = "nf-form-error";
+        wrapper.appendChild(formErrorEl);
+
+        const formSuccessEl = document.createElement("div");
+        formSuccessEl.className = "nf-form-success";
+        formSuccessEl.id = "nf-form-success";
+        wrapper.appendChild(formSuccessEl);
+
+        const bodyEl = document.createElement("div");
+        bodyEl.className = "nf-form-body";
+
+        for (const element of formDef.elements) {
+          const node = this.renderElement(element);
+          if (node) {
+            bodyEl.appendChild(node);
+          }
+        }
+
+        const actionsEl = document.createElement("div");
+        actionsEl.className = "nf-actions";
+        
+        const prefillBtn = document.createElement("button");
+        prefillBtn.type = "button";
+        prefillBtn.className = "nf-submit-btn";
+        prefillBtn.id = "nf-prefill-btn";
+        prefillBtn.textContent = "Prefill";
+
+        actionsEl.appendChild(prefillBtn);
+        const submitBtn = document.createElement("button");
+        submitBtn.type = "button";
+        submitBtn.className = "nf-submit-btn";
+        submitBtn.id = "nf-submit-btn";
+        submitBtn.textContent = formDef.ui?.submitButtonLabel || "Submit";
+
+        actionsEl.appendChild(submitBtn);
+
+        const debugEl = document.createElement("pre");
+        debugEl.className = "nf-debug";
+        debugEl.id = "nf-debug";
+        debugEl.textContent = "Form initialized.";
+
+        wrapper.appendChild(bodyEl);
+        wrapper.appendChild(actionsEl);
+        wrapper.appendChild(debugEl);
+
+        mountEl.appendChild(wrapper);
+        this.setDebugVisibility(formDef);
+        this.applyElementRuntimeState(formDef);
+      }
+
+      renderElement(element) {
+        switch (element.type) {
+          case "heading":
+            return this.renderHeading(element);
+          case "text":
+            return this.renderText(element);
+          case "input":
+            return this.renderInput(element);
+          case "textarea":
+            return this.renderTextarea(element);
+          case "repeatGroup":
+            return this.renderRepeatGroup(element);
+          case "hidden":
+            return this.renderHidden(element);
+          default:
+            return this.renderUnknown(element);
+        }
+      }
+
+      renderHeading(element) {
+        const wrap = this.baseWrap(element);
+        const level = element.level >= 1 && element.level <= 6 ? element.level : 2;
+        const tag = document.createElement(`h${level}`);
+        tag.textContent = element.text || "";
+        wrap.appendChild(tag);
+        return wrap;
+      }
+
+      renderText(element) {
+        const wrap = this.baseWrap(element);
+        const div = document.createElement("div");
+        div.className = "nf-text";
+        div.textContent = element.text || "";
+        wrap.appendChild(div);
+        return wrap;
+      }
+
+      renderInput(element) {
+        const wrap = this.baseWrap(element);
+
+        const label = document.createElement("label");
+        label.className = "nf-label";
+        label.setAttribute("for", element.id);
+        label.textContent = this.buildLabel(element);
+
+        const input = document.createElement("input");
+        input.className = "nf-input";
+        input.type = element.inputType || "text";
+        input.id = element.id;
+        input.dataset.key = element.key || "";
+        input.dataset.errorKey = element.key || "";
+        input.placeholder = element.placeholder || "";
+        input.value = this.state.getValue(element.key) ?? "";
+        input.readOnly = !!element.readOnly;
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "nf-error";
+        errorEl.id = `error-${element.key}`;
+
+        input.addEventListener("input", (e) => {
+          this.state.setValue(element.key, e.target.value);
+          this.clearFieldError(element.key, input, errorEl);
+          this.clearMessages();
+          this.applyElementRuntimeState(this.formDef);
+          window.NativeForms?.__app?.emit("change", {
+            key: element.key,
+            value: e.target.value,
+            input: window.NativeForms.__app.state.getAll(),
+            source: "user"
+          });
+        });
+
+        wrap.appendChild(label);
+        wrap.appendChild(input);
+        wrap.appendChild(errorEl);
+        return wrap;
+      }
+
+      renderTextarea(element) {
+        const wrap = this.baseWrap(element);
+
+        const label = document.createElement("label");
+        label.className = "nf-label";
+        label.setAttribute("for", element.id);
+        label.textContent = this.buildLabel(element);
+
+        const textarea = document.createElement("textarea");
+        textarea.className = "nf-textarea";
+        textarea.id = element.id;
+        textarea.dataset.key = element.key || "";
+        textarea.dataset.errorKey = element.key || "";
+        textarea.rows = element.rows || 4;
+        textarea.placeholder = element.placeholder || "";
+        textarea.value = this.state.getValue(element.key) ?? "";
+        textarea.readOnly = !!element.readOnly;
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "nf-error";
+        errorEl.id = `error-${element.key}`;
+
+        textarea.addEventListener("input", (e) => {
+          this.state.setValue(element.key, e.target.value);
+          this.clearFieldError(element.key, textarea, errorEl);
+          this.clearMessages();
+          this.applyElementRuntimeState(this.formDef);
+          window.NativeForms?.__app?.emit("change", {
+            key: element.key,
+            value: e.target.value,
+            input: window.NativeForms.__app.state.getAll(),
+            source: "user"
+          });
+        });
+
+        wrap.appendChild(label);
+        wrap.appendChild(textarea);
+        wrap.appendChild(errorEl);
+        return wrap;
+      }
+
+      renderHidden(element) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.id = element.id;
+        input.dataset.key = element.key || "";
+        input.value = this.state.getValue(element.key) ?? "";
+
+        input.addEventListener("input", (e) => {
+          this.state.setValue(element.key, e.target.value);
+        });
+
+        return input;
+      }
+
+      renderRepeatGroup(element) {
+        const wrap = this.baseWrap(element);
+        wrap.classList.add("nf-repeat-group");
+
+        const header = document.createElement("div");
+        header.className = "nf-repeat-group-header";
+
+        const titleBox = document.createElement("div");
+        const title = document.createElement("h3");
+        title.className = "nf-repeat-group-title";
+        title.textContent = element.label || "Repeat Group";
+        titleBox.appendChild(title);
+
+        if (element.description) {
+          const description = document.createElement("div");
+          description.className = "nf-repeat-group-description";
+          description.textContent = element.description;
+          titleBox.appendChild(description);
+        }
+
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "nf-repeat-btn";
+        addBtn.id = `repeat-group-add-${element.id}`;
+        addBtn.textContent = element.addButtonLabel || "Add another";
+        addBtn.addEventListener("click", () => {
+          const added = this.state.addRepeatRow(element);
+          if (!added) {
+            this.showFormError(`Maximum rows reached for ${element.label || element.key}.`);
+            return;
+          }
+          if (element.viewMode === "table") {
+            this.renderRepeatGroupTable(element);
+          } else {
+            this.renderRepeatGroupRows(element);
+          }
+          this.clearMessages();
+        });
+
+        header.appendChild(titleBox);
+        header.appendChild(addBtn);
+        wrap.appendChild(header);
+
+        const body = document.createElement("div");
+        body.id = `repeat-group-body-${element.id}`;
+        wrap.appendChild(body);
+
+        if (element.viewMode === "table") {
+          this.renderRepeatGroupTable(element, body);
+        } else {
+          this.renderRepeatGroupRows(element, body);
+        }
+        this.updateRepeatGroupAddButton(element);
+        return wrap;
+      }
+
+      renderRepeatGroupRows(element, providedBody = null) {
+        const body = providedBody || document.getElementById(`repeat-group-body-${element.id}`);
+        if (!body) return;
+
+        body.innerHTML = "";
+        const rows = this.state.getRepeatRows(element.key);
+
+        rows.forEach((row, rowIndex) => {
+          const rowEl = document.createElement("div");
+          rowEl.className = "nf-repeat-row";
+
+          const rowHeader = document.createElement("div");
+          rowHeader.className = "nf-repeat-row-header";
+
+          const rowTitle = document.createElement("div");
+          rowTitle.className = "nf-repeat-row-title";
+          rowTitle.textContent = `${element.label || "Row"} ${rowIndex + 1}`;
+          rowHeader.appendChild(rowTitle);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "nf-repeat-btn";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => {
+            this.state.removeRepeatRow(element, rowIndex);
+            this.renderRepeatGroupRows(element);
+            this.clearMessages();
+          });
+          rowHeader.appendChild(removeBtn);
+          rowEl.appendChild(rowHeader);
+
+          for (const field of element.fields || []) {
+            if (field.type === "hidden") {
+              continue;
+            }
+
+            const fieldWrap = document.createElement("div");
+            fieldWrap.className = "nf-element";
+
+            const label = document.createElement("label");
+            label.className = "nf-label";
+            label.textContent = field.required ? `${field.label || field.key} *` : (field.label || field.key);
+            fieldWrap.appendChild(label);
+
+            const control = field.type === "textarea"
+              ? document.createElement("textarea")
+              : document.createElement("input");
+
+            control.className = field.type === "textarea" ? "nf-textarea" : "nf-input";
+            if (field.type !== "textarea") {
+              control.type = field.inputType || "text";
+            } else {
+              control.rows = field.rows || 4;
+            }
+
+            control.dataset.key = field.key || "";
+            control.dataset.errorKey = `${element.key}.${rowIndex}.${field.key}`;
+            control.dataset.repeatGroupKey = element.key;
+            control.dataset.repeatRowIndex = String(rowIndex);
+            control.placeholder = field.placeholder || "";
+            control.value = row[field.key] ?? "";
+            control.readOnly = !!field.readOnly;
+            control.addEventListener("input", (e) => {
+              this.state.updateRepeatRowField(element.key, rowIndex, field.key, e.target.value);
+              this.clearFieldError(control.dataset.errorKey, control, errorEl);
+              this.clearMessages();
+              this.applyElementRuntimeState(this.formDef);
+              window.NativeForms?.__app?.emit("change", {
+                key: `${element.key}.${rowIndex}.${field.key}`,
+                value: e.target.value,
+                input: window.NativeForms.__app.state.getAll(),
+                source: "user"
+              });
+            });
+            fieldWrap.appendChild(control);
+
+            const errorEl = document.createElement("div");
+            errorEl.className = "nf-error";
+            errorEl.id = `error-${element.key}-${rowIndex}-${field.key}`;
+            fieldWrap.appendChild(errorEl);
+
+            rowEl.appendChild(fieldWrap);
+          }
+
+          body.appendChild(rowEl);
+        });
+
+        this.updateRepeatGroupAddButton(element);
+      }
+
+      renderRepeatGroupTable(element, providedBody = null) {
+        const body = providedBody || document.getElementById(`repeat-group-body-${element.id}`);
+        if (!body) return;
+
+        body.innerHTML = "";
+        const rows = this.state.getRepeatRows(element.key);
+
+        const tableWrap = document.createElement("div");
+        tableWrap.className = "nf-repeat-table-wrap";
+
+        const table = document.createElement("table");
+        table.className = "nf-repeat-table";
+
+        const thead = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+
+        for (const field of element.fields || []) {
+          if (field.type === "hidden") continue;
+          const th = document.createElement("th");
+          th.textContent = field.label || field.key || "";
+          if (field.columnWidth) {
+            th.style.width = field.columnWidth;
+          }
+          headerRow.appendChild(th);
+        }
+
+        const actionsHeader = document.createElement("th");
+        actionsHeader.className = "nf-repeat-table-actions";
+        actionsHeader.textContent = "Actions";
+        headerRow.appendChild(actionsHeader);
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+
+        rows.forEach((row, rowIndex) => {
+          const tr = document.createElement("tr");
+
+          for (const field of element.fields || []) {
+            if (field.type === "hidden") continue;
+
+            const td = document.createElement("td");
+            if (field.columnWidth) {
+              td.style.width = field.columnWidth;
+            }
+
+            const control = field.type === "textarea"
+              ? document.createElement("textarea")
+              : document.createElement("input");
+
+            control.className = field.type === "textarea" ? "nf-textarea" : "nf-input";
+            if (field.type !== "textarea") {
+              control.type = field.inputType || "text";
+            } else {
+              control.rows = field.rows || 3;
+            }
+
+            control.dataset.key = field.key || "";
+            control.dataset.errorKey = `${element.key}.${rowIndex}.${field.key}`;
+            control.dataset.repeatGroupKey = element.key;
+            control.dataset.repeatRowIndex = String(rowIndex);
+            control.placeholder = field.placeholder || "";
+            control.value = row[field.key] ?? "";
+            control.readOnly = !!field.readOnly;
+            control.addEventListener("input", (e) => {
+              this.state.updateRepeatRowField(element.key, rowIndex, field.key, e.target.value);
+              this.clearFieldError(control.dataset.errorKey, control, errorEl);
+              this.clearMessages();
+              this.applyElementRuntimeState(this.formDef);
+              window.NativeForms?.__app?.emit("change", {
+                key: `${element.key}.${rowIndex}.${field.key}`,
+                value: e.target.value,
+                input: window.NativeForms.__app.state.getAll(),
+                source: "user"
+              });
+            });
+            td.appendChild(control);
+
+            const errorEl = document.createElement("div");
+            errorEl.className = "nf-error";
+            errorEl.id = `error-${element.key}-${rowIndex}-${field.key}`;
+            td.appendChild(errorEl);
+
+            tr.appendChild(td);
+          }
+
+          const actionsTd = document.createElement("td");
+          actionsTd.className = "nf-repeat-table-actions";
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "nf-repeat-btn";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => {
+            this.state.removeRepeatRow(element, rowIndex);
+            this.renderRepeatGroupTable(element);
+            this.clearMessages();
+          });
+
+          actionsTd.appendChild(removeBtn);
+          tr.appendChild(actionsTd);
+          tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
+        body.appendChild(tableWrap);
+        this.updateRepeatGroupAddButton(element);
+      }
+
+      refreshRepeatGroupsFromState() {
+        if (!this.formDef) return;
+        for (const element of this.formDef.elements) {
+          if (element.type === "repeatGroup") {
+            if (element.viewMode === "table") {
+              this.renderRepeatGroupTable(element);
+            } else {
+              this.renderRepeatGroupRows(element);
+            }
+          }
+        }
+      }
+      updateRepeatGroupAddButton(element) {
+        const btn = document.getElementById(`repeat-group-add-${element.id}`);
+        if (!btn) return;
+
+        const rows = this.state.getRepeatRows(element.key);
+        const maxRows = Number.isInteger(element.maxRows) ? element.maxRows : null;
+        const isFull = maxRows != null && maxRows > 0 && rows.length >= maxRows;
+
+        btn.disabled = isFull;
+        btn.textContent = isFull
+          ? `${element.addButtonLabel || "Add another"} (Max ${maxRows})`
+          : (element.addButtonLabel || "Add another");
+      }
+      applyElementRuntimeState(formDef) {
+        if (!formDef) return;
+
+        const input = this.state.getAll();
+        for (const element of formDef.elements) {
+          const visibility = this.evaluateElementVisibility(element, input);
+          this.applyElementVisibility(element, visibility);
+        }
+      }
+      evaluateElementVisibility(element, input) {
+        const rule = element.visibility;
+
+        if (!rule || rule.mode !== "conditional" || !Array.isArray(rule.conditions) || rule.conditions.length === 0) {
+          return {
+            visible: true,
+            disabled: false
+          };
+        }
+
+        const evaluations = rule.conditions.map((condition) => this.evaluateCondition(condition, input));
+        const logic = (rule.logic || "all").toLowerCase();
+        const matched = logic === "any"
+          ? evaluations.some(Boolean)
+          : evaluations.every(Boolean);
+
+        if (matched) {
+          return {
+            visible: true,
+            disabled: false
+          };
+        }
+
+        return {
+          visible: rule.whenFalse !== "hide",
+          disabled: rule.whenFalse === "disable"
+        };
+      }
+      evaluateCondition(condition, input) {
+        const actual = this.getRuntimeValue(input, condition.field);
+        const operator = condition.operator || "equals";
+        const expected = condition.value;
+
+        if (operator === "equals") return actual === expected;
+        if (operator === "notEquals") return actual !== expected;
+        if (operator === "isBlank") return actual === undefined || actual === null || actual === "";
+        if (operator === "isNotBlank") return !(actual === undefined || actual === null || actual === "");
+        if (operator === "contains") return String(actual || "").includes(String(expected || ""));
+        return false;
+      }
+      getRuntimeValue(input, path) {
+        if (!path) return undefined;
+        return String(path).split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), input);
+      }
+      applyElementVisibility(element, visibility) {
+        const target = document.querySelector(`[data-nf-id="${element.id}"]`);
+        if (!target) return;
+
+        target.style.display = visibility.visible ? "" : "none";
+        target.classList.toggle("nf-disabled", visibility.disabled);
+
+        target.querySelectorAll("input, textarea, select, button").forEach((control) => {
+          if (control.id && control.id.startsWith("repeat-group-add-")) {
+            control.disabled = visibility.disabled;
+            return;
+          }
+
+          const isReadOnly = control.readOnly === true;
+          if (!isReadOnly) {
+            control.disabled = visibility.disabled;
+          }
+        });
+
+        if (!visibility.visible && element.visibility?.clearWhenHidden && this.elementHasValue(element)) {
+          this.clearElementValue(element);
+          this.refreshInputsFromState();
+        }
+
+        if (element.type === "repeatGroup" && visibility.visible) {
+          this.updateRepeatGroupAddButton(element);
+        }
+      }
+      clearElementValue(element) {
+        if (!element.key) return;
+
+        if (element.type === "repeatGroup") {
+          this.state.replaceRepeatRows(element.key, []);
+          return;
+        }
+
+        this.state.setValue(element.key, element.defaultValue ?? "");
+      }
+      elementHasValue(element) {
+        if (!element.key) return false;
+
+        if (element.type === "repeatGroup") {
+          return this.state.getRepeatRows(element.key).length > 0;
+        }
+
+        const value = this.state.getValue(element.key);
+        return !(value === undefined || value === null || value === "");
+      }
+
+      renderUnknown(element) {
+        const wrap = this.baseWrap(element);
+        const div = document.createElement("div");
+        div.style.color = "red";
+        div.textContent = `Unsupported element type: ${element.type}`;
+        wrap.appendChild(div);
+        return wrap;
+      }
+
+      showValidationErrors(errors) {
+        this.clearAllRenderedErrors();
+        this.hideSuccess();
+
+        for (const [key, message] of Object.entries(errors)) {
+          const fieldEl = document.querySelector(`[data-error-key="${key}"], [data-key="${key}"]`);
+          const errorId = key.includes(".")
+            ? `error-${key.replace(/\./g, "-")}`
+            : `error-${key}`;
+          const errorEl = document.getElementById(errorId);
+
+          if (fieldEl) fieldEl.classList.add("nf-invalid");
+          if (errorEl) errorEl.textContent = message;
+        }
+
+        const formErrorEl = document.getElementById("nf-form-error");
+        if (formErrorEl && Object.keys(errors).length > 0) {
+          formErrorEl.textContent = "Please fill in the required fields.";
+          formErrorEl.style.display = "block";
+        }
+      }
+
+      showFormError(message) {
+        this.hideSuccess();
+        const el = document.getElementById("nf-form-error");
+        if (el) {
+          el.textContent = message;
+          el.style.display = "block";
+        }
+      }
+
+      showSuccess(message) {
+        const errorEl = document.getElementById("nf-form-error");
+        if (errorEl) {
+          errorEl.textContent = "";
+          errorEl.style.display = "none";
+        }
+
+        const successEl = document.getElementById("nf-form-success");
+        if (successEl) {
+          successEl.textContent = message;
+          successEl.style.display = "block";
+        }
+      }
+
+      hideSuccess() {
+        const successEl = document.getElementById("nf-form-success");
+        if (successEl) {
+          successEl.textContent = "";
+          successEl.style.display = "none";
+        }
+      }
+
+      clearMessages() {
+        const formErrorEl = document.getElementById("nf-form-error");
+        if (formErrorEl) {
+          formErrorEl.textContent = "";
+          formErrorEl.style.display = "none";
+        }
+        this.hideSuccess();
+      }
+
+      clearAllRenderedErrors() {
+        document.querySelectorAll(".nf-invalid").forEach(el => {
+          el.classList.remove("nf-invalid");
+        });
+
+        document.querySelectorAll(".nf-error").forEach(el => {
+          el.textContent = "";
+        });
+
+        const formErrorEl = document.getElementById("nf-form-error");
+        if (formErrorEl) {
+          formErrorEl.textContent = "";
+          formErrorEl.style.display = "none";
+        }
+      }
+
+      clearFieldError(key, fieldEl, errorEl) {
+        this.state.clearError(key);
+        if (fieldEl) fieldEl.classList.remove("nf-invalid");
+        if (errorEl) errorEl.textContent = "";
+      }
+
+      setSubmitLoading(isLoading) {
+        const btn = document.getElementById("nf-submit-btn");
+        if (!btn) return;
+
+        btn.disabled = isLoading;
+        btn.textContent = isLoading ? "Sending..." : (FORM_DEF.ui?.submitButtonLabel || "Submit");
+      }
+
+      baseWrap(element) {
+        const wrap = document.createElement("div");
+        wrap.className = "nf-element";
+        wrap.dataset.nfId = element.id || "";
+        wrap.dataset.nfType = element.type || "";
+        return wrap;
+      }
+
+      buildLabel(element) {
+        return element.required ? `${element.label || ""} *` : (element.label || "");
+      }
+    }
+
+    // =========================================================
+    // 6. APP
+    // =========================================================
+    class NativeFormsApp {
+      constructor(formDef, mountEl) {
+        this.formDef = formDef;
+        this.mountEl = mountEl;
+        this.state = new StateStore(formDef);
+        this.renderer = new Renderer(this.state);
+        this.validator = new ValidationEngine(this.state, formDef);
+        this.api = new ApiClient(formDef);
+        this.eventTarget = new EventTarget();
+        this.publicApi = this.buildPublicApi();
+      }
+
+      async init() {
+        this.emit("form:init", {
+          formId: this.formDef.formId
+        });
+        this.validateFormDef();
+        this.state.initialize();
+        this.renderer.render(this.formDef, this.mountEl);
+        this.attachPrefillHandler();
+        this.attachSubmitHandler();
+        this.exposePublicApi();
+        this.applyCustomJs();
+        this.updateDebug(
+          "Form ready.\n\nCurrent input:\n" +
+          JSON.stringify(this.state.getAll(), null, 2)
+        );
+        this.emit("form:ready", {
+          input: this.state.getAll()
+        });
+        await this.tryAutoPrefillFromUrl();
+      }
+
+      buildPublicApi() {
+        return {
+          getValue: (key) => this.state.getValue(key),
+          setValue: (key, value) => {
+            this.state.setValue(key, value);
+            this.renderer.refreshInputsFromState();
+            this.emit("change", {
+              key,
+              value,
+              input: this.state.getAll(),
+              source: "api"
+            });
+          },
+          getAll: () => this.state.getAll(),
+          showElement: (id) => this.setManualElementVisibility(id, true),
+          hideElement: (id) => this.setManualElementVisibility(id, false),
+          on: (eventName, handler) => this.on(eventName, handler),
+          off: (eventName, handler) => this.off(eventName, handler)
+        };
+      }
+
+      exposePublicApi() {
+        this.publicApi.__app = this;
+        window.NativeForms = this.publicApi;
+      }
+
+      applyCustomJs() {
+        const customJs = this.formDef.resources?.customJs;
+        if (!customJs || !String(customJs).trim()) {
+          return;
+        }
+
+        try {
+          const runner = new Function("NativeForms", customJs);
+          runner(this.publicApi);
+        } catch (error) {
+          console.error("NativeForms customJs error:", error);
+        }
+      }
+
+      on(eventName, handler) {
+        const wrapped = (event) => handler(event.detail);
+        handler.__nfWrapped = handler.__nfWrapped || new Map();
+        handler.__nfWrapped.set(eventName, wrapped);
+        this.eventTarget.addEventListener(eventName, wrapped);
+        return () => this.off(eventName, handler);
+      }
+
+      off(eventName, handler) {
+        const wrapped = handler?.__nfWrapped?.get(eventName);
+        if (!wrapped) return;
+        this.eventTarget.removeEventListener(eventName, wrapped);
+        handler.__nfWrapped.delete(eventName);
+      }
+
+      emit(eventName, detail = {}) {
+        const payload = {
+          formId: this.formDef.formId,
+          ...detail
+        };
+
+        this.eventTarget.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
+        window.dispatchEvent(new CustomEvent(`nativeforms:${eventName}`, { detail: payload }));
+      }
+
+      setManualElementVisibility(id, visible) {
+        const target = document.querySelector(`[data-nf-id="${id}"]`);
+        if (!target) return;
+        target.style.display = visible ? "" : "none";
+      }
+
+      getQueryParam(name) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(name);
+      }
+
+      async tryAutoPrefillFromUrl() {
+        const emailFromUrl = this.getQueryParam("email");
+
+        if (!emailFromUrl) {
+            return;
+        }
+
+        this.state.setValue("email", emailFromUrl);
+        this.renderer.refreshInputsFromState();
+
+        const btn = document.getElementById("nf-prefill-btn");
+        if (btn) {
+            btn.click();
+        }
+      }
+      
+      attachPrefillHandler() {
+        const btn = document.getElementById("nf-prefill-btn");
+        if (!btn) return;
+
+        btn.addEventListener("click", async () => {
+            this.renderer.clearMessages();
+
+            const input = this.state.getAll();
+            this.emit("prefill:before", {
+              input
+            });
+
+            try {
+            const response = await this.api.runPrefill(input);
+
+            if (!response.ok || !response.data?.success) {
+                const msg =
+                response.data?.error ||
+                response.data?.message ||
+                `Prefill failed with status ${response.status}`;
+                this.renderer.showFormError(msg);
+                this.updateDebug(
+                "Prefill failed.\n\nInput:\n" +
+                JSON.stringify(input, null, 2) +
+                "\n\nResponse:\n" +
+                JSON.stringify(response, null, 2)
+                );
+                this.emit("prefill:error", {
+                  input,
+                  response
+                });
+                return;
+            }
+
+            const foundContact = response.data?.meta?.foundContact || response.data?.results?.some(result => result.commandKey === "findContact" && result.found);
+            this.state.setValue("firstName", response.data.input?.firstName || "");
+            this.state.setValue("lastName", response.data.input?.lastName || "");
+            this.state.setValue("email", response.data.input?.email || input.email || "");
+            this.state.setValue("contactId", response.data.hidden?.contactId || "");
+
+            for (const [groupKey, rows] of Object.entries(response.data.repeatGroups || {})) {
+              this.state.replaceRepeatRows(groupKey, Array.isArray(rows) ? rows : []);
+            }
+
+            this.renderer.refreshInputsFromState();
+
+            if (!foundContact) {
+              this.renderer.showFormError(this.formDef.ui?.prefillNotFoundMessage || "No matching record was found.");
+            }
+
+            this.emit("prefill:after", {
+              input: this.state.getAll(),
+              response: response.data
+            });
+
+            this.updateDebug(
+                "Prefill succeeded.\n\nUpdated input:\n" +
+                JSON.stringify(this.state.getAll(), null, 2) +
+                "\n\nResponse:\n" +
+                JSON.stringify(response, null, 2)
+            );
+            } catch (error) {
+            this.renderer.showFormError(error.message || "Unexpected prefill error");
+            this.updateDebug(
+                "Prefill exception.\n\nInput:\n" +
+                JSON.stringify(input, null, 2) +
+                "\n\nError:\n" +
+                (error.message || String(error))
+            );
+            this.emit("prefill:error", {
+              input,
+              error: error.message || String(error)
+            });
+            }
+        });
+      }
+
+      validateFormDef() {
+        if (!this.formDef) {
+          throw new Error("FORM_DEF is missing");
+        }
+        if (!Array.isArray(this.formDef.elements)) {
+          throw new Error("FORM_DEF.elements must be an array");
+        }
+      }
+
+      attachSubmitHandler() {
+        const btn = document.getElementById("nf-submit-btn");
+        if (!btn) return;
+
+        btn.addEventListener("click", async () => {
+          this.emit("submit:before", {
+            input: this.state.getAll()
+          });
+          const result = this.validator.validateForm();
+
+          if (!result.valid) {
+            this.renderer.showValidationErrors(result.errors);
+            this.updateDebug(
+              "Validation failed.\n\nErrors:\n" +
+              JSON.stringify(result.errors, null, 2) +
+              "\n\nCurrent input:\n" +
+              JSON.stringify(this.state.getAll(), null, 2)
+            );
+            this.emit("submit:error", {
+              input: this.state.getAll(),
+              errors: result.errors,
+              reason: "validation"
+            });
+            return;
+          }
+
+          this.renderer.clearAllRenderedErrors();
+          this.renderer.clearMessages();
+          this.renderer.setSubmitLoading(true);
+
+          const input = this.state.getAll();
+
+          try {
+            const response = await this.api.submitSimple(input);
+
+            if (!response.ok) {
+              const msg =
+                response.data?.error ||
+                response.data?.message ||
+                `Submit failed with status ${response.status}`;
+              this.renderer.showFormError(msg);
+              this.updateDebug(
+                "Submit failed.\n\nPayload input:\n" +
+                JSON.stringify(input, null, 2) +
+                "\n\nResponse:\n" +
+                JSON.stringify(response, null, 2)
+              );
+              this.emit("submit:error", {
+                input,
+                response
+              });
+              return;
+            }
+
+            this.renderer.showSuccess(this.formDef.ui?.successMessage || "Submitted successfully.");
+            this.emit("submit:after", {
+              input,
+              response: response.data
+            });
+            this.updateDebug(
+              "Submit succeeded.\n\nPayload input:\n" +
+              JSON.stringify(input, null, 2) +
+              "\n\nResponse:\n" +
+              JSON.stringify(response, null, 2)
+            );
+          } catch (error) {
+            this.renderer.showFormError(error.message || "Unexpected submit error");
+            this.updateDebug(
+              "Submit exception.\n\nPayload input:\n" +
+              JSON.stringify(input, null, 2) +
+              "\n\nError:\n" +
+              (error.message || String(error))
+            );
+            this.emit("submit:error", {
+              input,
+              error: error.message || String(error)
+            });
+          } finally {
+            this.renderer.setSubmitLoading(false);
+          }
+        });
+      }
+
+      updateDebug(text) {
+        const debugEl = document.getElementById("nf-debug");
+        if (debugEl) {
+          debugEl.textContent = text;
+        }
+      }
+    }
+
+    // =========================================================
+    // 7. BOOT
+    // =========================================================
+    const appEl = document.getElementById("app");
+    const app = new NativeFormsApp(FORM_DEF, appEl);
+    app.init();
+  </script>
+</body>
+</html>

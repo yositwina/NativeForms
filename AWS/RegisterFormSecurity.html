@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NativeForms Form Security Registration</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 980px;
+      margin: 32px auto;
+      padding: 0 16px 40px;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #dbe3ee;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+    }
+
+    .desc {
+      margin: 0 0 20px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .row {
+      margin-top: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 420px;
+      resize: vertical;
+      font-family: Consolas, "Courier New", monospace;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      background: #1d4ed8;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    pre {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 120px;
+    }
+
+    .tip {
+      margin-top: 12px;
+      color: #475569;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Register Form Security</h1>
+    <p class="desc">
+      Load a JSON definition, review or edit it, then send it to the Backend Lambda
+      <code>/forms/register</code> endpoint. This is a browser-based stand-in for the future Salesforce publish flow.
+    </p>
+
+    <div class="row">
+      <label for="backendUrl">Backend Lambda URL</label>
+      <input
+        id="backendUrl"
+        type="text"
+        value=""
+        placeholder="https://your-backend-lambda-url.lambda-url.eu-north-1.on.aws/forms/register"
+      />
+    </div>
+
+    <div class="row">
+      <label for="jsonFile">Load JSON File</label>
+      <input id="jsonFile" type="file" accept=".json,application/json" />
+    </div>
+
+    <div class="row">
+      <label for="jsonText">Registration JSON</label>
+      <textarea id="jsonText">{
+  "formId": "problem-report-demo",
+  "publishedVersionId": "v1",
+  "publishToken": "demo-problem-report-v1-token",
+  "status": "published",
+  "securityMode": "secure-edit",
+  "rateLimitProfile": "standard",
+  "prefillPolicy": {
+    "allowedCommands": ["findOne", "getById", "findMany"],
+    "allowedObjects": ["Contact", "Case"]
+  },
+  "submitPolicy": {
+    "allowedCommands": ["create", "update", "upsertMany"],
+    "allowedObjects": ["Contact", "Case"],
+    "allowedWriteFields": {
+      "Contact": ["FirstName", "LastName", "Email"],
+      "Case": ["Subject", "Description", "Status", "Origin", "ContactId"]
+    }
+  }
+}</textarea>
+    </div>
+
+    <div class="actions">
+      <button id="sendBtn" type="button">Send To Backend</button>
+      <button id="formatBtn" class="secondary" type="button">Format JSON</button>
+    </div>
+
+    <div class="tip">
+      Tip: after a successful request, verify the item in DynamoDB table <code>NativeFormsFormSecurity</code>.
+    </div>
+
+    <pre id="result">Waiting for input.</pre>
+  </div>
+
+  <script>
+    const jsonFileEl = document.getElementById("jsonFile");
+    const jsonTextEl = document.getElementById("jsonText");
+    const backendUrlEl = document.getElementById("backendUrl");
+    const sendBtnEl = document.getElementById("sendBtn");
+    const formatBtnEl = document.getElementById("formatBtn");
+    const resultEl = document.getElementById("result");
+
+    function setResult(title, value) {
+      const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      resultEl.textContent = `${title}\n\n${text}`;
+    }
+
+    jsonFileEl.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        jsonTextEl.value = text;
+        setResult("Loaded file", {
+          fileName: file.name,
+          size: file.size
+        });
+      } catch (error) {
+        setResult("File load error", error.message || String(error));
+      }
+    });
+
+    formatBtnEl.addEventListener("click", () => {
+      try {
+        const parsed = JSON.parse(jsonTextEl.value);
+        jsonTextEl.value = JSON.stringify(parsed, null, 2);
+        setResult("JSON formatted", parsed);
+      } catch (error) {
+        setResult("Invalid JSON", error.message || String(error));
+      }
+    });
+
+    sendBtnEl.addEventListener("click", async () => {
+      const backendUrl = backendUrlEl.value.trim();
+      if (!backendUrl) {
+        setResult("Missing backend URL", "Enter the full Backend Lambda URL ending with /forms/register");
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(jsonTextEl.value);
+      } catch (error) {
+        setResult("Invalid JSON", error.message || String(error));
+        return;
+      }
+
+      sendBtnEl.disabled = true;
+      setResult("Sending", payload);
+
+      try {
+        const response = await fetch(backendUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        setResult(`Response ${response.status}`, data);
+      } catch (error) {
+        setResult("Request error", error.message || String(error));
+      } finally {
+        sendBtnEl.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

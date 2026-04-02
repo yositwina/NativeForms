@@ -1,0 +1,21 @@
+{
+  "formId": "problem-report-demo",
+  "publishedVersionId": "v1",
+  "status": "published",
+  "securityMode": "public-prefill",
+  "rateLimitProfile": "standard",
+  "tokenHash": "replace-with-sha256-hex",
+  "prefillPolicy": {
+    "allowedCommands": ["findOne", "getById", "findMany"],
+    "allowedObjects": ["Contact", "Case"]
+  },
+  "submitPolicy": {
+    "allowedCommands": ["create"],
+    "allowedObjects": ["Case"],
+    "allowedWriteFields": {
+      "Case": ["Subject", "Description", "Origin", "ContactId"]
+    }
+  },
+  "createdAt": "2026-04-01T00:00:00.000Z",
+  "updatedAt": "2026-04-01T00:00:00.000Z"
+}

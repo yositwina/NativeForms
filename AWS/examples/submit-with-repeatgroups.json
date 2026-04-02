@@ -1,0 +1,56 @@
+{
+  "formId": "problem-report-demo",
+  "publishToken": "demo-problem-report-v1-token",
+  "input": {
+    "email": "user@example.com",
+    "firstName": "Dana",
+    "lastName": "Cohen",
+    "subject": "Problem Report",
+    "description": "The public form is missing repeat-group support.",
+    "contactId": "003xx0000001234AAA",
+    "issueUpdates": [
+      {
+        "Id": "a01xx0000000001AAA",
+        "title": "Initial Investigation",
+        "notes": "Existing child row that should update."
+      },
+      {
+        "title": "New Follow Up",
+        "notes": "New child row that should insert."
+      }
+    ],
+    "_deletedRepeatGroups": {
+      "issueUpdates": ["a01xx0000000009AAA"]
+    }
+  },
+  "commands": [
+    {
+      "type": "create",
+      "commandKey": "createCase",
+      "objectApiName": "Case",
+      "fields": {
+        "Subject": "{input.subject}",
+        "Description": "{input.description}",
+        "Origin": "Web",
+        "ContactId": "{input.contactId}"
+      },
+      "storeResultAs": "createdCase"
+    },
+    {
+      "type": "upsertMany",
+      "commandKey": "saveIssueUpdates",
+      "objectApiName": "Issue_Update__c",
+      "rows": "{input.issueUpdates}",
+      "idField": "Id",
+      "relationshipField": "Case__c",
+      "relationshipValue": "{createdCase.id}",
+      "fields": {
+        "Title__c": "{row.title}",
+        "Notes__c": "{row.notes}"
+      },
+      "allowDelete": true,
+      "deleteIds": "{input._deletedRepeatGroups.issueUpdates}",
+      "storeResultAs": "savedIssueUpdates"
+    }
+  ]
+}

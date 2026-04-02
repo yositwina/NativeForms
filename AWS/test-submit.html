@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>NativeForms Submit Test</title>
+</head>
+<body>
+  <h2>NativeForms Test</h2>
+  <button id="sendBtn">Send Test Submission</button>
+  <pre id="result"></pre>
+
+  <script>
+    const functionUrl = "https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/";
+
+    document.getElementById("sendBtn").addEventListener("click", async () => {
+      const resultEl = document.getElementById("result");
+      resultEl.textContent = "Sending...";
+
+      try {
+        const response = await fetch(functionUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            subject: "Browser test submission",
+            description: "This was sent from a local HTML page using fetch()",
+            suppliedName: "Yosi Browser Test",
+            suppliedEmail: "test@example.com"
+          })
+        });
+
+        const data = await response.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultEl.textContent = "Error: " + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

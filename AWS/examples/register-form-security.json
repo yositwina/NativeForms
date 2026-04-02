@@ -1,0 +1,20 @@
+{
+  "formId": "problem-report-demo",
+  "publishedVersionId": "v1",
+  "publishToken": "demo-problem-report-v1-token",
+  "status": "published",
+  "securityMode": "secure-edit",
+  "rateLimitProfile": "standard",
+  "prefillPolicy": {
+    "allowedCommands": ["findOne", "getById", "findMany"],
+    "allowedObjects": ["Contact", "Case"]
+  },
+  "submitPolicy": {
+    "allowedCommands": ["create", "update", "upsertMany"],
+    "allowedObjects": ["Contact", "Case"],
+    "allowedWriteFields": {
+      "Contact": ["FirstName", "LastName", "Email"],
+      "Case": ["Subject", "Description", "Status", "Origin", "ContactId"]
+    }
+  }
+}

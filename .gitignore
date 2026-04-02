@@ -1,0 +1,5 @@
+node_modules/
+.codex_tmp/
+.sfdx/
+*.log
+AWS/*.pdf
