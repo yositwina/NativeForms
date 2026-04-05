@@ -2,25 +2,22 @@ import { LightningElement } from 'lwc';
 import getSetupContext from '@salesforce/apex/NativeFormsSetupController.getSetupContext';
 import registerOrg from '@salesforce/apex/NativeFormsSetupController.registerOrg';
 
-export default class NativeFormsSetup extends LightningElement {
+export default class NativeFormsGuidedSetup extends LightningElement {
     orgId = '';
     adminEmail = '';
     companyName = '';
     loginBaseUrl = '';
     salesforceClientId = '';
     salesforceClientSecret = '';
-    subscriptionState = 'trial';
-    subscriptionStartDate = '';
-    subscriptionEndDate = '';
-    isActive = true;
 
     tenantSecret = '';
     connectUrl = '';
-    rawResponse = '';
     errorMessage = '';
     successMessage = '';
     isBusy = false;
     isInitializing = true;
+    subscriptionStartDate = '';
+    subscriptionEndDate = '';
 
     connectedCallback() {
         const today = new Date();
@@ -56,25 +53,14 @@ export default class NativeFormsSetup extends LightningElement {
         }
 
         const parts = [];
+        if (error.body?.message) {
+            parts.push(error.body.message);
+        }
         if (error.message) {
             parts.push(error.message);
         }
-        if (error.name && error.name !== 'Error') {
-            parts.push(`name=${error.name}`);
-        }
-        if (error.stack) {
-            parts.push(error.stack);
-        }
 
         return parts.join('\n\n') || JSON.stringify(error);
-    }
-
-    get connectDisabled() {
-        return this.isBusy || !this.connectUrl;
-    }
-
-    get actionLabel() {
-        return this.connectUrl ? 'Reconnect NativeForms' : 'Connect NativeForms';
     }
 
     get actionDisabled() {
@@ -83,14 +69,9 @@ export default class NativeFormsSetup extends LightningElement {
 
     handleChange(event) {
         const field = event.target.dataset.field;
-        if (!field) {
-            return;
+        if (field) {
+            this[field] = event.target.value;
         }
-        this[field] = event.target.value;
-    }
-
-    handleActiveToggle(event) {
-        this.isActive = event.target.checked;
     }
 
     buildRegistrationPayload() {
@@ -101,50 +82,39 @@ export default class NativeFormsSetup extends LightningElement {
             loginBaseUrl: this.loginBaseUrl,
             salesforceClientId: this.salesforceClientId,
             salesforceClientSecret: this.salesforceClientSecret,
-            subscriptionState: this.subscriptionState,
-            subscriptionStartDate: this.subscriptionStartDate || null,
-            subscriptionEndDate: this.subscriptionEndDate || null,
-            isActive: this.isActive,
-            status: this.isActive ? 'active' : 'disabled'
+            subscriptionState: 'active',
+            subscriptionStartDate: this.subscriptionStartDate,
+            subscriptionEndDate: this.subscriptionEndDate,
+            isActive: true,
+            status: 'active'
         };
-    }
-
-    async registerOrg() {
-        this.errorMessage = '';
-        this.successMessage = '';
-        this.isBusy = true;
-
-        try {
-            const payload = this.buildRegistrationPayload();
-            const data = await registerOrg({ requestBody: payload });
-            this.rawResponse = data?.rawResponse || '';
-
-            if (!data?.success) {
-                throw new Error(data?.errorMessage || 'NativeForms registration failed.');
-            }
-
-            this.tenantSecret = data.tenantSecret || '';
-            this.connectUrl = data.connectUrl || '';
-            this.successMessage = 'Org registration succeeded.';
-        } catch (error) {
-            this.errorMessage = this.formatError(error);
-        } finally {
-            this.isBusy = false;
-        }
     }
 
     async handleConnect() {
         this.errorMessage = '';
         this.successMessage = '';
+        this.isBusy = true;
 
-        if (!this.connectUrl) {
-            await this.registerOrg();
-        }
+        try {
+            const result = await registerOrg({ requestBody: this.buildRegistrationPayload() });
 
-        if (!this.connectUrl) {
-            this.errorMessage = this.errorMessage || 'NativeForms could not generate a Salesforce connection URL.';
-            return;
+            if (!result?.success) {
+                throw new Error(result?.errorMessage || 'NativeForms registration failed.');
+            }
+
+            this.tenantSecret = result.tenantSecret || '';
+            this.connectUrl = result.connectUrl || '';
+            this.successMessage = 'NativeForms generated your tenant code and opened Salesforce authorization in a new tab.';
+
+            if (!this.connectUrl) {
+                throw new Error('NativeForms could not generate a Salesforce connection URL.');
+            }
+
+            window.open(this.connectUrl, '_blank');
+        } catch (error) {
+            this.errorMessage = this.formatError(error);
+        } finally {
+            this.isBusy = false;
         }
-        window.open(this.connectUrl, '_blank');
     }
 }

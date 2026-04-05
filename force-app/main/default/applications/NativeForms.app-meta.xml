@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
     <brand>
-        <headerColor>#1D4ED8</headerColor>
+        <headerColor>#0F6CBD</headerColor>
         <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
     </brand>
-    <description>Administrative app for NativeForms configuration, versioning, actions, and publication history.</description>
+    <description>Customer-facing NativeForms app for onboarding, configuration, and form publishing.</description>
     <formFactors>Large</formFactors>
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
-    <label>NativeForms Admin</label>
+    <label>NativeForms</label>
     <navType>Standard</navType>
-    <tabs>standard-home</tabs>
     <tabs>NativeForms_Guided_Setup</tabs>
-    <tabs>NativeForms_Setup</tabs>
     <tabs>NF_Form__c</tabs>
     <tabs>NF_Form_Version__c</tabs>
     <tabs>NF_Form_Element__c</tabs>
     <tabs>NF_Form_Action__c</tabs>
     <tabs>NF_Form_Publication__c</tabs>
+    <tabs>standard-home</tabs>
     <uiType>Lightning</uiType>
 </CustomApplication>

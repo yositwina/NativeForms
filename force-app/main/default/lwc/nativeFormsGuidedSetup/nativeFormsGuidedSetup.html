@@ -1,0 +1,99 @@
+<template>
+    <lightning-card title="NativeForms Connect" icon-name="custom:custom18">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="lead-text slds-m-bottom_medium">
+                Connect this Salesforce org to NativeForms to enable secure publish, prefill, and submit flows.
+            </p>
+
+            <div class="instruction-box slds-m-bottom_medium">
+                <p class="instruction-title">Before You Connect</p>
+                <ol class="instruction-list">
+                    <li>Open the <strong>NativeForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
+                    <li>Inside that permission set, open <strong>External Credential Principal Access</strong> and enable both principals:
+                        <div class="instruction-detail">`NativeFormsBootstrap / NativeFormsBootstrapPrincipal`</div>
+                        <div class="instruction-detail">`NativeFormsLambdaAuth / NativeFormsSharedSecret`</div>
+                    </li>
+                    <li>Open <strong>External Client App Manager</strong>, open <strong>NativForms</strong>, go to <strong>Auth Settings</strong>, click <strong>Consumer Key and Secret</strong>, and copy both values.</li>
+                    <li>Paste the client id and client secret below, then click <strong>Connect NativeForms</strong>.</li>
+                    <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>NativeForms</strong>, then open its <strong>External Credential</strong>.</li>
+                    <li>In that screen, find the <strong>Principal</strong> section and edit <strong>NativeFormsSharedSecret</strong>.</li>
+                    <li>Add an authentication parameter:
+                        <div class="instruction-detail">Name: `secret`</div>
+                        <div class="instruction-detail">Value: the tenant code shown on this screen and sent by email</div>
+                    </li>
+                </ol>
+            </div>
+
+            <template if:true={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">error</span>
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={isInitializing}>
+                <lightning-spinner alternative-text="Loading setup context" size="small"></lightning-spinner>
+            </template>
+
+            <div class="org-banner slds-m-bottom_medium">
+                <p class="org-banner__label">Organization</p>
+                <p class="org-banner__value">{companyName}</p>
+            </div>
+
+            <div class="slds-grid slds-wrap slds-gutters">
+                <div class="slds-col slds-size_1-of-1">
+                    <lightning-input
+                        label="Admin Email"
+                        value={adminEmail}
+                        onchange={handleChange}
+                        data-field="adminEmail"
+                    ></lightning-input>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
+                    <lightning-input
+                        label="Salesforce Client Id"
+                        value={salesforceClientId}
+                        onchange={handleChange}
+                        data-field="salesforceClientId"
+                    ></lightning-input>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
+                    <lightning-input
+                        type="password"
+                        label="Salesforce Client Secret"
+                        value={salesforceClientSecret}
+                        onchange={handleChange}
+                        data-field="salesforceClientSecret"
+                    ></lightning-input>
+                </div>
+            </div>
+
+            <div class="slds-m-top_medium">
+                <lightning-button
+                    variant="brand"
+                    label="Connect NativeForms"
+                    onclick={handleConnect}
+                    disabled={actionDisabled}
+                ></lightning-button>
+            </div>
+
+            <template if:true={tenantSecret}>
+                <div class="success-box slds-m-top_medium">
+                    <p class="success-title">NativeForms Tenant Code Created</p>
+                    <p class="success-text">{successMessage}</p>
+                    <p class="success-step">After the tenant secret is generated and emailed, open Named Credentials, open NativeForms, then open its External Credential.</p>
+                    <p class="success-step">In that screen, find the Principal section and edit NativeFormsSharedSecret.</p>
+                    <p class="success-step">Add an authentication parameter:</p>
+                    <div class="instruction-detail">Name: `secret`</div>
+                    <div class="instruction-detail">Value: the tenant code shown on this screen and sent by email</div>
+                    <div class="result-box slds-m-top_medium">
+                        <p class="slds-text-title_bold">Tenant Code</p>
+                        <p class="result-text">{tenantSecret}</p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

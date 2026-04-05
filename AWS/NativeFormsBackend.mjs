@@ -19,6 +19,7 @@ const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormS
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SES_FROM = process.env.SES_FROM || "";
+const DEV_MODE = String(process.env.DEV_MODE || "").toLowerCase() === "true";
 
 async function saveSalesforceConnection(secretName, payload) {
   const secretString = JSON.stringify(payload, null, 2);
@@ -586,7 +587,8 @@ export const handler = async (event) => {
       return {
         statusCode: 200,
         headers: { "Content-Type": "text/html" },
-        body: `
+        body: DEV_MODE
+          ? `
           <html>
             <body style="font-family: Arial, sans-serif; padding: 20px;">
               <h2>Salesforce Connected Successfully</h2>
@@ -599,6 +601,16 @@ export const handler = async (event) => {
               <p><b>Secret name:</b> ${secretName}</p>
               <p><b>Created new secret:</b> ${saveResult.created ? "Yes" : "No"}</p>
               <p><b>Updated existing secret:</b> ${saveResult.updated ? "Yes" : "No"}</p>
+            </body>
+          </html>
+        `
+          : `
+          <html>
+            <body style="font-family: Arial, sans-serif; padding: 24px; max-width: 640px; margin: 0 auto; color: #16325c;">
+              <h2>NativeForms Is Connected</h2>
+              <p>You can return to Salesforce now and finish setup.</p>
+              <p>The org-specific Salesforce connection was saved successfully.</p>
+              <p style="margin-top: 16px;"><a href="#" onclick="window.close(); return false;">Close this tab</a></p>
             </body>
           </html>
         `

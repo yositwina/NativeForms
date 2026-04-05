@@ -27,6 +27,36 @@
     margin-bottom: 0.9rem;
 }
 
+.instruction-box {
+    border: 1px solid #c7d2fe;
+    border-radius: 0.75rem;
+    background: linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
+    padding: 1rem 1.1rem;
+}
+
+.instruction-title {
+    color: #16325c;
+    font-size: 0.98rem;
+    font-weight: 700;
+    margin: 0 0 0.65rem;
+}
+
+.instruction-list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.instruction-list li {
+    margin-bottom: 0.55rem;
+}
+
+.instruction-detail {
+    color: #3e4e5c;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.84rem;
+    margin-top: 0.2rem;
+}
+
 .result-box {
     border: 1px solid #d8dde6;
     border-radius: 0.5rem;

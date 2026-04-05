@@ -1,10 +1,13 @@
-# External Credentials
+# NativeForms External Credentials
 
-This folder is reserved for NativeForms external credential metadata used during package setup.
+NativeForms uses the same deployable metadata pattern proven in FormCase:
 
-Planned use:
-- tenant/admin trust between Salesforce and AWS
-- subscriber-org setup experience
+- `NativeFormsBootstrap`
+  - label: `NativeForms Bootstrap`
+  - named principal: `NativeFormsBootstrapPrincipal`
+  - auth variant: `NoAuthentication`
+- `NativeFormsLambdaAuth`
+  - label: `NativeFormsLambdaAuth`
+  - named principal: `NativeFormsSharedSecret`
 
-See:
-- [Salesforce Connected App Strategy](../../../../SalesforcePackage/Salesforce_Connected_App_Strategy.md)
+These API names are referenced by the packaged named credential metadata.

@@ -1,10 +1,10 @@
-# Named Credentials
+# NativeForms Named Credentials
 
-This folder is reserved for NativeForms named credential metadata used by setup and publish flows.
+This package uses two named credentials:
 
-Planned use:
-- AWS admin endpoints
-- future packaged auth flows
+- `NativeForms_Bootstrap`
+  Bootstrap setup endpoint for org registration and initial setup.
+- `NativeForms`
+  Main authenticated endpoint for publish and other secure NativeForms admin callouts.
 
-See:
-- [Salesforce Connected App Strategy](../../../../SalesforcePackage/Salesforce_Connected_App_Strategy.md)
+Both point to the shared NativeForms AWS base URL and differ by external credential.

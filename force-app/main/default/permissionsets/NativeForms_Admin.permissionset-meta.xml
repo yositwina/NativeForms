@@ -5,6 +5,10 @@
     <label>NativeForms Admin</label>
 
     <applicationVisibilities>
+        <application>NativeForms</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+    <applicationVisibilities>
         <application>NativeForms_Admin</application>
         <visible>true</visible>
     </applicationVisibilities>
@@ -313,6 +317,10 @@
     </tabSettings>
     <tabSettings>
         <tab>NF_Form_Publication__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NativeForms_Guided_Setup</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
