@@ -67,8 +67,20 @@
       resize: vertical;
     }
 
+    .nf-select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+    }
+
     .nf-input.nf-invalid,
-    .nf-textarea.nf-invalid {
+    .nf-textarea.nf-invalid,
+    .nf-select.nf-invalid,
+    .nf-option-list.nf-invalid {
       border-color: #d93025;
       background: #fff8f7;
     }
@@ -156,6 +168,75 @@
 
     .nf-hidden {
       display: none;
+    }
+
+    .nf-image {
+      margin-top: 16px;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    .nf-image img {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+    }
+
+    .nf-section {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid #dbe3ee;
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+
+    .nf-section-title {
+      margin: 0 0 6px 0;
+      font-size: 20px;
+      color: #1e3a8a;
+    }
+
+    .nf-section-description {
+      margin: 0 0 10px 0;
+      color: #475569;
+    }
+
+    .nf-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 8px;
+    }
+
+    .nf-column {
+      min-width: 0;
+    }
+
+    .nf-option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .nf-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: normal;
+    }
+
+    .nf-option input {
+      margin: 0;
+    }
+
+    @media (max-width: 720px) {
+      .nf-columns {
+        grid-template-columns: 1fr;
+      }
     }
 
     .nf-repeat-group {
@@ -322,6 +403,12 @@
           text: "Please fill in the required fields before sending."
         },
         {
+          id: "heroImage",
+          type: "image",
+          src: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
+          alt: "Abstract support and workflow illustration"
+        },
+        {
           id: "email",
           type: "input",
           inputType: "email",
@@ -346,6 +433,61 @@
           label: "Last Name",
           required: true,
           placeholder: "Last name"
+        },
+        {
+          id: "additionalDetailsSection",
+          type: "section",
+          title: "Additional Details",
+          description: "These fields exercise the richer V1 builder controls before Salesforce implementation starts.",
+          elements: [
+            {
+              id: "contactPreferencesColumns",
+              type: "columns",
+              columns: [
+                {
+                  id: "leftInfoColumn",
+                  elements: [
+                    {
+                      id: "severity",
+                      type: "select",
+                      key: "severity",
+                      label: "Severity",
+                      required: true,
+                      options: [
+                        { label: "Low", value: "Low" },
+                        { label: "Medium", value: "Medium" },
+                        { label: "High", value: "High" }
+                      ],
+                      placeholder: "Select severity"
+                    },
+                    {
+                      id: "urgent",
+                      type: "checkbox",
+                      key: "urgent",
+                      label: "Mark this case as urgent"
+                    }
+                  ]
+                },
+                {
+                  id: "rightInfoColumn",
+                  elements: [
+                    {
+                      id: "preferredContact",
+                      type: "radio",
+                      key: "preferredContact",
+                      label: "Preferred Contact Method",
+                      required: true,
+                      options: [
+                        { label: "Email", value: "Email" },
+                        { label: "Phone", value: "Phone" },
+                        { label: "No Preference", value: "NoPreference" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         },
         {
           id: "subject",
@@ -454,16 +596,39 @@
       }
 
       initialize() {
-        for (const el of this.formDef.elements) {
+        for (const el of this.getAllElements()) {
           if (el.key) {
             if (el.type === "repeatGroup") {
               this.input[el.key] = this.getInitialRepeatRows(el);
               this.deletedRepeatGroups[el.key] = [];
             } else {
-              this.input[el.key] = el.defaultValue ?? "";
+              this.input[el.key] = this.getDefaultValueForElement(el);
             }
           }
         }
+      }
+
+      getAllElements(elements = this.formDef.elements) {
+        const out = [];
+        for (const el of elements || []) {
+          out.push(el);
+          if (el.type === "section") {
+            out.push(...this.getAllElements(el.elements || []));
+          }
+          if (el.type === "columns") {
+            for (const column of el.columns || []) {
+              out.push(...this.getAllElements(column.elements || []));
+            }
+          }
+        }
+        return out;
+      }
+
+      getDefaultValueForElement(element) {
+        if (element.type === "checkbox") {
+          return element.defaultValue ?? false;
+        }
+        return element.defaultValue ?? "";
       }
 
       getInitialRepeatRows(element) {
@@ -483,7 +648,9 @@
         const row = {};
         for (const field of element.fields || []) {
           if (field.key) {
-            row[field.key] = field.defaultValue ?? "";
+            row[field.key] = field.type === "checkbox"
+              ? (field.defaultValue ?? false)
+              : (field.defaultValue ?? "");
           }
         }
         return row;
@@ -517,7 +684,7 @@
       }
 
       replaceRepeatRows(key, rows) {
-        const element = this.formDef.elements.find((item) => item.key === key);
+        const element = this.getAllElements().find((item) => item.key === key);
         const safeRows = Array.isArray(rows) ? rows : [];
         this.input[key] = element ? this.limitRepeatRows(element, safeRows) : safeRows;
       }
@@ -626,7 +793,8 @@
         this.state.clearAllErrors();
         const input = this.state.getAll();
 
-        for (const el of this.formDef.elements) {
+        for (const el of this.state.getAllElements()) {
+          if (el.type === "section" || el.type === "columns") continue;
           if (!el.key || el.type === "hidden") continue;
           const visibility = this.evaluateVisibility(el, input);
           if (!visibility.visible || visibility.disabled) continue;
@@ -650,8 +818,10 @@
           }
 
           if (el.required) {
-            const value = (this.state.getValue(el.key) ?? "").toString().trim();
-            if (!value) {
+            const rawValue = this.state.getValue(el.key);
+            const value = typeof rawValue === "boolean" ? rawValue : (rawValue ?? "").toString().trim();
+            const isEmpty = el.type === "checkbox" ? value !== true : !value;
+            if (isEmpty) {
               this.state.setError(el.key, `${el.label || el.key} is required.`);
             }
           }
@@ -805,6 +975,16 @@
           if (!key) return;
 
           const value = this.state.getValue(key) ?? "";
+          if (el.type === "checkbox") {
+            el.checked = !!value;
+            return;
+          }
+
+          if (el.type === "radio") {
+            el.checked = el.value === value;
+            return;
+          }
+
           if (el.value !== value) {
             el.value = value;
           }
@@ -888,14 +1068,42 @@
         this.applyElementRuntimeState(formDef);
       }
 
+      getAllElements(elements = this.formDef?.elements || []) {
+        const out = [];
+        for (const element of elements || []) {
+          out.push(element);
+          if (element.type === "section") {
+            out.push(...this.getAllElements(element.elements || []));
+          }
+          if (element.type === "columns") {
+            for (const column of element.columns || []) {
+              out.push(...this.getAllElements(column.elements || []));
+            }
+          }
+        }
+        return out;
+      }
+
       renderElement(element) {
         switch (element.type) {
           case "heading":
             return this.renderHeading(element);
           case "text":
             return this.renderText(element);
+          case "image":
+            return this.renderImage(element);
+          case "section":
+            return this.renderSection(element);
+          case "columns":
+            return this.renderColumns(element);
           case "input":
             return this.renderInput(element);
+          case "select":
+            return this.renderSelect(element);
+          case "checkbox":
+            return this.renderCheckbox(element);
+          case "radio":
+            return this.renderRadio(element);
           case "textarea":
             return this.renderTextarea(element);
           case "repeatGroup":
@@ -922,6 +1130,64 @@
         div.className = "nf-text";
         div.textContent = element.text || "";
         wrap.appendChild(div);
+        return wrap;
+      }
+
+      renderImage(element) {
+        const wrap = this.baseWrap(element);
+        wrap.classList.add("nf-image");
+        const img = document.createElement("img");
+        img.src = element.src || "";
+        img.alt = element.alt || "";
+        wrap.appendChild(img);
+        return wrap;
+      }
+
+      renderSection(element) {
+        const wrap = this.baseWrap(element);
+        wrap.classList.add("nf-section");
+
+        if (element.title) {
+          const title = document.createElement("h3");
+          title.className = "nf-section-title";
+          title.textContent = element.title;
+          wrap.appendChild(title);
+        }
+
+        if (element.description) {
+          const desc = document.createElement("div");
+          desc.className = "nf-section-description";
+          desc.textContent = element.description;
+          wrap.appendChild(desc);
+        }
+
+        for (const child of element.elements || []) {
+          const node = this.renderElement(child);
+          if (node) wrap.appendChild(node);
+        }
+
+        return wrap;
+      }
+
+      renderColumns(element) {
+        const wrap = this.baseWrap(element);
+        wrap.classList.add("nf-columns");
+
+        for (const column of element.columns || []) {
+          const col = document.createElement("div");
+          col.className = "nf-column";
+          if (column.width) {
+            col.style.width = column.width;
+          }
+
+          for (const child of column.elements || []) {
+            const node = this.renderElement(child);
+            if (node) col.appendChild(node);
+          }
+
+          wrap.appendChild(col);
+        }
+
         return wrap;
       }
 
@@ -962,6 +1228,157 @@
 
         wrap.appendChild(label);
         wrap.appendChild(input);
+        wrap.appendChild(errorEl);
+        return wrap;
+      }
+
+      renderSelect(element) {
+        const wrap = this.baseWrap(element);
+
+        const label = document.createElement("label");
+        label.className = "nf-label";
+        label.setAttribute("for", element.id);
+        label.textContent = this.buildLabel(element);
+
+        const select = document.createElement("select");
+        select.className = "nf-select";
+        select.id = element.id;
+        select.dataset.key = element.key || "";
+        select.dataset.errorKey = element.key || "";
+
+        if (element.placeholder) {
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = element.placeholder;
+          select.appendChild(placeholder);
+        }
+
+        for (const option of element.options || []) {
+          const opt = document.createElement("option");
+          opt.value = option.value;
+          opt.textContent = option.label;
+          select.appendChild(opt);
+        }
+
+        select.value = this.state.getValue(element.key) ?? "";
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "nf-error";
+        errorEl.id = `error-${element.key}`;
+
+        select.addEventListener("change", (e) => {
+          this.state.setValue(element.key, e.target.value);
+          this.clearFieldError(element.key, select, errorEl);
+          this.clearMessages();
+          this.applyElementRuntimeState(this.formDef);
+          window.NativeForms?.__app?.emit("change", {
+            key: element.key,
+            value: e.target.value,
+            input: window.NativeForms.__app.state.getAll(),
+            source: "user"
+          });
+        });
+
+        wrap.appendChild(label);
+        wrap.appendChild(select);
+        wrap.appendChild(errorEl);
+        return wrap;
+      }
+
+      renderCheckbox(element) {
+        const wrap = this.baseWrap(element);
+        const optionList = document.createElement("div");
+        optionList.className = "nf-option-list";
+        optionList.dataset.errorKey = element.key || "";
+
+        const optionLabel = document.createElement("label");
+        optionLabel.className = "nf-option";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.id = element.id;
+        checkbox.dataset.key = element.key || "";
+        checkbox.checked = !!this.state.getValue(element.key);
+
+        const text = document.createElement("span");
+        text.textContent = this.buildLabel(element);
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "nf-error";
+        errorEl.id = `error-${element.key}`;
+
+        checkbox.addEventListener("change", (e) => {
+          this.state.setValue(element.key, !!e.target.checked);
+          this.clearFieldError(element.key, optionList, errorEl);
+          this.clearMessages();
+          this.applyElementRuntimeState(this.formDef);
+          window.NativeForms?.__app?.emit("change", {
+            key: element.key,
+            value: !!e.target.checked,
+            input: window.NativeForms.__app.state.getAll(),
+            source: "user"
+          });
+        });
+
+        optionLabel.appendChild(checkbox);
+        optionLabel.appendChild(text);
+        optionList.appendChild(optionLabel);
+        wrap.appendChild(optionList);
+        wrap.appendChild(errorEl);
+        return wrap;
+      }
+
+      renderRadio(element) {
+        const wrap = this.baseWrap(element);
+
+        const label = document.createElement("div");
+        label.className = "nf-label";
+        label.textContent = this.buildLabel(element);
+
+        const optionList = document.createElement("div");
+        optionList.className = "nf-option-list";
+        optionList.dataset.errorKey = element.key || "";
+
+        const currentValue = this.state.getValue(element.key) ?? "";
+
+        for (const option of element.options || []) {
+          const optionLabel = document.createElement("label");
+          optionLabel.className = "nf-option";
+
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = element.id;
+          radio.value = option.value;
+          radio.dataset.key = element.key || "";
+          radio.checked = currentValue === option.value;
+
+          radio.addEventListener("change", (e) => {
+            if (!e.target.checked) return;
+            this.state.setValue(element.key, e.target.value);
+            this.clearFieldError(element.key, optionList, errorEl);
+            this.clearMessages();
+            this.applyElementRuntimeState(this.formDef);
+            window.NativeForms?.__app?.emit("change", {
+              key: element.key,
+              value: e.target.value,
+              input: window.NativeForms.__app.state.getAll(),
+              source: "user"
+            });
+          });
+
+          const text = document.createElement("span");
+          text.textContent = option.label;
+          optionLabel.appendChild(radio);
+          optionLabel.appendChild(text);
+          optionList.appendChild(optionLabel);
+        }
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "nf-error";
+        errorEl.id = `error-${element.key}`;
+
+        wrap.appendChild(label);
+        wrap.appendChild(optionList);
         wrap.appendChild(errorEl);
         return wrap;
       }
@@ -1121,41 +1538,12 @@
             label.textContent = field.required ? `${field.label || field.key} *` : (field.label || field.key);
             fieldWrap.appendChild(label);
 
-            const control = field.type === "textarea"
-              ? document.createElement("textarea")
-              : document.createElement("input");
-
-            control.className = field.type === "textarea" ? "nf-textarea" : "nf-input";
-            if (field.type !== "textarea") {
-              control.type = field.inputType || "text";
-            } else {
-              control.rows = field.rows || 4;
-            }
-
-            control.dataset.key = field.key || "";
-            control.dataset.errorKey = `${element.key}.${rowIndex}.${field.key}`;
-            control.dataset.repeatGroupKey = element.key;
-            control.dataset.repeatRowIndex = String(rowIndex);
-            control.placeholder = field.placeholder || "";
-            control.value = row[field.key] ?? "";
-            control.readOnly = !!field.readOnly;
-            control.addEventListener("input", (e) => {
-              this.state.updateRepeatRowField(element.key, rowIndex, field.key, e.target.value);
-              this.clearFieldError(control.dataset.errorKey, control, errorEl);
-              this.clearMessages();
-              this.applyElementRuntimeState(this.formDef);
-              window.NativeForms?.__app?.emit("change", {
-                key: `${element.key}.${rowIndex}.${field.key}`,
-                value: e.target.value,
-                input: window.NativeForms.__app.state.getAll(),
-                source: "user"
-              });
-            });
-            fieldWrap.appendChild(control);
-
             const errorEl = document.createElement("div");
             errorEl.className = "nf-error";
             errorEl.id = `error-${element.key}-${rowIndex}-${field.key}`;
+
+            const controlNode = this.buildRepeatFieldControl(element, field, rowIndex, row, errorEl);
+            fieldWrap.appendChild(controlNode);
             fieldWrap.appendChild(errorEl);
 
             rowEl.appendChild(fieldWrap);
@@ -1213,41 +1601,11 @@
               td.style.width = field.columnWidth;
             }
 
-            const control = field.type === "textarea"
-              ? document.createElement("textarea")
-              : document.createElement("input");
-
-            control.className = field.type === "textarea" ? "nf-textarea" : "nf-input";
-            if (field.type !== "textarea") {
-              control.type = field.inputType || "text";
-            } else {
-              control.rows = field.rows || 3;
-            }
-
-            control.dataset.key = field.key || "";
-            control.dataset.errorKey = `${element.key}.${rowIndex}.${field.key}`;
-            control.dataset.repeatGroupKey = element.key;
-            control.dataset.repeatRowIndex = String(rowIndex);
-            control.placeholder = field.placeholder || "";
-            control.value = row[field.key] ?? "";
-            control.readOnly = !!field.readOnly;
-            control.addEventListener("input", (e) => {
-              this.state.updateRepeatRowField(element.key, rowIndex, field.key, e.target.value);
-              this.clearFieldError(control.dataset.errorKey, control, errorEl);
-              this.clearMessages();
-              this.applyElementRuntimeState(this.formDef);
-              window.NativeForms?.__app?.emit("change", {
-                key: `${element.key}.${rowIndex}.${field.key}`,
-                value: e.target.value,
-                input: window.NativeForms.__app.state.getAll(),
-                source: "user"
-              });
-            });
-            td.appendChild(control);
-
             const errorEl = document.createElement("div");
             errorEl.className = "nf-error";
             errorEl.id = `error-${element.key}-${rowIndex}-${field.key}`;
+            const controlNode = this.buildRepeatFieldControl(element, field, rowIndex, row, errorEl);
+            td.appendChild(controlNode);
             td.appendChild(errorEl);
 
             tr.appendChild(td);
@@ -1279,7 +1637,7 @@
 
       refreshRepeatGroupsFromState() {
         if (!this.formDef) return;
-        for (const element of this.formDef.elements) {
+        for (const element of this.getAllElements(this.formDef.elements)) {
           if (element.type === "repeatGroup") {
             if (element.viewMode === "table") {
               this.renderRepeatGroupTable(element);
@@ -1306,7 +1664,7 @@
         if (!formDef) return;
 
         const input = this.state.getAll();
-        for (const element of formDef.elements) {
+        for (const element of this.getAllElements(formDef.elements)) {
           const visibility = this.evaluateElementVisibility(element, input);
           this.applyElementVisibility(element, visibility);
         }
@@ -1391,7 +1749,10 @@
           return;
         }
 
-        this.state.setValue(element.key, element.defaultValue ?? "");
+        this.state.setValue(
+          element.key,
+          element.type === "checkbox" ? (element.defaultValue ?? false) : (element.defaultValue ?? "")
+        );
       }
       elementHasValue(element) {
         if (!element.key) return false;
@@ -1401,7 +1762,137 @@
         }
 
         const value = this.state.getValue(element.key);
+        if (element.type === "checkbox") {
+          return value === true;
+        }
         return !(value === undefined || value === null || value === "");
+      }
+
+      buildRepeatFieldControl(groupElement, field, rowIndex, row, errorEl) {
+        const errorKey = `${groupElement.key}.${rowIndex}.${field.key}`;
+        const emitRepeatChange = (value) => {
+          window.NativeForms?.__app?.emit("change", {
+            key: `${groupElement.key}.${rowIndex}.${field.key}`,
+            value,
+            input: window.NativeForms.__app.state.getAll(),
+            source: "user"
+          });
+        };
+
+        if (field.type === "select") {
+          const select = document.createElement("select");
+          select.className = "nf-select";
+          select.dataset.key = field.key || "";
+          select.dataset.errorKey = errorKey;
+          select.dataset.repeatGroupKey = groupElement.key;
+          select.dataset.repeatRowIndex = String(rowIndex);
+          if (field.placeholder) {
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = field.placeholder;
+            select.appendChild(placeholder);
+          }
+          for (const option of field.options || []) {
+            const opt = document.createElement("option");
+            opt.value = option.value;
+            opt.textContent = option.label;
+            select.appendChild(opt);
+          }
+          select.value = row[field.key] ?? "";
+          select.disabled = !!field.readOnly;
+          select.addEventListener("change", (e) => {
+            this.state.updateRepeatRowField(groupElement.key, rowIndex, field.key, e.target.value);
+            this.clearFieldError(errorKey, select, errorEl);
+            this.clearMessages();
+            this.applyElementRuntimeState(this.formDef);
+            emitRepeatChange(e.target.value);
+          });
+          return select;
+        }
+
+        if (field.type === "checkbox") {
+          const list = document.createElement("div");
+          list.className = "nf-option-list";
+          list.dataset.errorKey = errorKey;
+          const label = document.createElement("label");
+          label.className = "nf-option";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.key = field.key || "";
+          checkbox.dataset.repeatGroupKey = groupElement.key;
+          checkbox.dataset.repeatRowIndex = String(rowIndex);
+          checkbox.checked = !!row[field.key];
+          checkbox.disabled = !!field.readOnly;
+          checkbox.addEventListener("change", (e) => {
+            const nextValue = !!e.target.checked;
+            this.state.updateRepeatRowField(groupElement.key, rowIndex, field.key, nextValue);
+            this.clearFieldError(errorKey, list, errorEl);
+            this.clearMessages();
+            this.applyElementRuntimeState(this.formDef);
+            emitRepeatChange(nextValue);
+          });
+          const text = document.createElement("span");
+          text.textContent = field.label || field.key || "";
+          label.appendChild(checkbox);
+          label.appendChild(text);
+          list.appendChild(label);
+          return list;
+        }
+
+        if (field.type === "radio") {
+          const list = document.createElement("div");
+          list.className = "nf-option-list";
+          list.dataset.errorKey = errorKey;
+          for (const option of field.options || []) {
+            const label = document.createElement("label");
+            label.className = "nf-option";
+            const radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = `${groupElement.id}-${rowIndex}-${field.key}`;
+            radio.value = option.value;
+            radio.checked = (row[field.key] ?? "") === option.value;
+            radio.disabled = !!field.readOnly;
+            radio.addEventListener("change", (e) => {
+              if (!e.target.checked) return;
+              this.state.updateRepeatRowField(groupElement.key, rowIndex, field.key, e.target.value);
+              this.clearFieldError(errorKey, list, errorEl);
+              this.clearMessages();
+              this.applyElementRuntimeState(this.formDef);
+              emitRepeatChange(e.target.value);
+            });
+            const text = document.createElement("span");
+            text.textContent = option.label;
+            label.appendChild(radio);
+            label.appendChild(text);
+            list.appendChild(label);
+          }
+          return list;
+        }
+
+        const control = field.type === "textarea"
+          ? document.createElement("textarea")
+          : document.createElement("input");
+        control.className = field.type === "textarea" ? "nf-textarea" : "nf-input";
+        if (field.type !== "textarea") {
+          control.type = field.inputType || "text";
+        } else {
+          control.rows = field.rows || 4;
+        }
+        control.dataset.key = field.key || "";
+        control.dataset.errorKey = errorKey;
+        control.dataset.repeatGroupKey = groupElement.key;
+        control.dataset.repeatRowIndex = String(rowIndex);
+        control.placeholder = field.placeholder || "";
+        control.value = row[field.key] ?? "";
+        control.readOnly = !!field.readOnly;
+        control.addEventListener("input", (e) => {
+          this.state.updateRepeatRowField(groupElement.key, rowIndex, field.key, e.target.value);
+          this.clearFieldError(errorKey, control, errorEl);
+          this.clearMessages();
+          this.applyElementRuntimeState(this.formDef);
+          emitRepeatChange(e.target.value);
+        });
+        return control;
       }
 
       renderUnknown(element) {
@@ -1531,6 +2022,21 @@
         this.api = new ApiClient(formDef);
         this.eventTarget = new EventTarget();
         this.publicApi = this.buildPublicApi();
+      }
+
+      normalizeRuntimeErrorMessage(message, mode) {
+        const text = String(message || "");
+        if (/subscription has ended/i.test(text)) {
+          return mode === "submit"
+            ? "Data could not be updated in Salesforce because the subscription has ended."
+            : "Data could not be loaded from Salesforce because the subscription has ended.";
+        }
+        if (/subscription is not active/i.test(text)) {
+          return mode === "submit"
+            ? "Data could not be updated in Salesforce because the subscription is not active."
+            : "Data could not be loaded from Salesforce because the subscription is not active.";
+        }
+        return text;
       }
 
       async init() {
@@ -1666,7 +2172,7 @@
                 response.data?.error ||
                 response.data?.message ||
                 `Prefill failed with status ${response.status}`;
-                this.renderer.showFormError(msg);
+                this.renderer.showFormError(this.normalizeRuntimeErrorMessage(msg, "prefill"));
                 this.updateDebug(
                 "Prefill failed.\n\nInput:\n" +
                 JSON.stringify(input, null, 2) +
@@ -1708,7 +2214,7 @@
                 JSON.stringify(response, null, 2)
             );
             } catch (error) {
-            this.renderer.showFormError(error.message || "Unexpected prefill error");
+            this.renderer.showFormError(this.normalizeRuntimeErrorMessage(error.message || "Unexpected prefill error", "prefill"));
             this.updateDebug(
                 "Prefill exception.\n\nInput:\n" +
                 JSON.stringify(input, null, 2) +
@@ -1772,7 +2278,7 @@
                 response.data?.error ||
                 response.data?.message ||
                 `Submit failed with status ${response.status}`;
-              this.renderer.showFormError(msg);
+              this.renderer.showFormError(this.normalizeRuntimeErrorMessage(msg, "submit"));
               this.updateDebug(
                 "Submit failed.\n\nPayload input:\n" +
                 JSON.stringify(input, null, 2) +
@@ -1798,7 +2304,7 @@
               JSON.stringify(response, null, 2)
             );
           } catch (error) {
-            this.renderer.showFormError(error.message || "Unexpected submit error");
+            this.renderer.showFormError(this.normalizeRuntimeErrorMessage(error.message || "Unexpected submit error", "submit"));
             this.updateDebug(
               "Submit exception.\n\nPayload input:\n" +
               JSON.stringify(input, null, 2) +

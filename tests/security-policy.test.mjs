@@ -17,6 +17,35 @@ function ensureFormToken(formSecurity, publishToken) {
   }
 }
 
+function isSubscriptionEnded(subscriptionEndDate) {
+  if (!subscriptionEndDate) return false;
+  const end = new Date(`${subscriptionEndDate}T23:59:59.999Z`);
+  return !Number.isNaN(end.getTime()) && end.getTime() < Date.now();
+}
+
+function ensureActiveTenantForForm(formSecurity, tenantRecord, mode = "submit") {
+  if (!formSecurity?.orgId) {
+    throw new Error("Form is missing owning orgId");
+  }
+  if (!tenantRecord) {
+    throw new Error("Owning tenant was not found");
+  }
+  if (tenantRecord.status !== "active" || tenantRecord.isActive === false) {
+    throw new Error(
+      mode === "submit"
+        ? "Data could not be updated in Salesforce because the subscription is not active."
+        : "Data could not be loaded from Salesforce because the subscription is not active."
+    );
+  }
+  if (isSubscriptionEnded(tenantRecord.subscriptionEndDate)) {
+    throw new Error(
+      mode === "submit"
+        ? "Data could not be updated in Salesforce because the subscription has ended."
+        : "Data could not be loaded from Salesforce because the subscription has ended."
+    );
+  }
+}
+
 function isRiskySubmitCommand(commandType) {
   return ["update", "delete", "upsertMany"].includes(commandType);
 }
@@ -78,6 +107,7 @@ function validateSubmitCommandAgainstPolicy(command, formSecurity) {
 }
 
 const secureEditPolicy = {
+  orgId: "00D000000000001",
   formId: "problem-report-demo",
   status: "published",
   securityMode: "secure-edit",
@@ -110,8 +140,30 @@ const publicCreatePolicy = {
   securityMode: "public-create"
 };
 
+const activeTenant = {
+  orgId: "00D000000000001",
+  status: "active",
+  isActive: true
+};
+
+const disabledTenant = {
+  orgId: "00D000000000001",
+  status: "disabled",
+  isActive: false
+};
+
+const expiredTenant = {
+  orgId: "00D000000000001",
+  status: "active",
+  isActive: true,
+  subscriptionEndDate: "2000-01-01"
+};
+
 ensureFormToken(secureEditPolicy, "demo-problem-report-v1-token");
 assert.throws(() => ensureFormToken(secureEditPolicy, "wrong-token"), /invalid publish token/);
+ensureActiveTenantForForm(secureEditPolicy, activeTenant);
+assert.throws(() => ensureActiveTenantForForm(secureEditPolicy, disabledTenant), /subscription is not active/);
+assert.throws(() => ensureActiveTenantForForm(secureEditPolicy, expiredTenant), /subscription has ended/);
 assert.equal(Array.isArray(secureEditPolicy.prefillDefinition.commands), true);
 assert.equal(Array.isArray(secureEditPolicy.submitDefinition.commands), true);
 

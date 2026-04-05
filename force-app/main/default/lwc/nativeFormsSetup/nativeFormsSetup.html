@@ -1,0 +1,150 @@
+<template>
+    <lightning-card title="NativeForms Setup" icon-name="custom:custom18">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="slds-text-body_regular slds-m-bottom_medium">
+                Connect this Salesforce org to NativeForms so AWS can publish forms and run prefill and submit securely.
+            </p>
+
+            <template if:true={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">error</span>
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={successMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_success slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">success</span>
+                    <h2>{successMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={isInitializing}>
+                <lightning-spinner alternative-text="Loading setup context" size="small"></lightning-spinner>
+            </template>
+
+            <div class="slds-grid slds-wrap slds-gutters">
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+                    <div class="context-box">
+                        <p class="context-label">Organization</p>
+                        <p class="context-value">{companyName}</p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+                    <div class="context-box">
+                        <p class="context-label">Org Id</p>
+                        <p class="context-value">{orgId}</p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+                    <div class="context-box">
+                        <p class="context-label">Login Base URL</p>
+                        <p class="context-value">{loginBaseUrl}</p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1">
+                    <lightning-input label="Admin Email" value={adminEmail} onchange={handleChange} data-field="adminEmail"></lightning-input>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1">
+                    <lightning-input
+                        label="Salesforce Client Id"
+                        value={salesforceClientId}
+                        onchange={handleChange}
+                        data-field="salesforceClientId"
+                    ></lightning-input>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1">
+                    <lightning-input
+                        type="password"
+                        label="Salesforce Client Secret"
+                        value={salesforceClientSecret}
+                        onchange={handleChange}
+                        data-field="salesforceClientSecret"
+                    ></lightning-input>
+                </div>
+
+                <div class="slds-col slds-size_1-of-1">
+                    <div class="setup-panel">
+                        <p class="setup-panel__title">Tenant Access</p>
+                        <div class="slds-grid slds-wrap slds-gutters">
+                            <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+                                <lightning-input
+                                    label="Subscription State"
+                                    value={subscriptionState}
+                                    onchange={handleChange}
+                                    data-field="subscriptionState"
+                                ></lightning-input>
+                            </div>
+
+                            <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+                                <lightning-input
+                                    type="date"
+                                    label="Subscription Start Date"
+                                    value={subscriptionStartDate}
+                                    onchange={handleChange}
+                                    data-field="subscriptionStartDate"
+                                ></lightning-input>
+                            </div>
+
+                            <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-3">
+                                <lightning-input
+                                    type="date"
+                                    label="Subscription End Date"
+                                    value={subscriptionEndDate}
+                                    onchange={handleChange}
+                                    data-field="subscriptionEndDate"
+                                ></lightning-input>
+                            </div>
+
+                            <div class="slds-col slds-size_1-of-1">
+                                <lightning-input
+                                    type="toggle"
+                                    label="Tenant Active"
+                                    checked={isActive}
+                                    onchange={handleActiveToggle}
+                                ></lightning-input>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slds-m-top_medium slds-grid slds-wrap slds-gutters_small">
+                <div class="slds-col">
+                    <lightning-button
+                        variant="brand"
+                        label={actionLabel}
+                        onclick={handleConnect}
+                        disabled={actionDisabled}
+                    ></lightning-button>
+                </div>
+            </div>
+
+            <template if:true={tenantSecret}>
+                <div class="result-box slds-m-top_medium">
+                    <p class="slds-text-title_bold">Tenant Secret</p>
+                    <p class="result-text">{tenantSecret}</p>
+                </div>
+            </template>
+
+            <template if:true={connectUrl}>
+                <div class="result-box slds-m-top_medium">
+                    <p class="slds-text-title_bold">Connection Ready</p>
+                    <p class="result-text">NativeForms generated the Salesforce connection URL successfully.</p>
+                </div>
+            </template>
+
+            <template if:true={rawResponse}>
+                <div class="result-box slds-m-top_medium">
+                    <p class="slds-text-title_bold">Last Response</p>
+                    <pre>{rawResponse}</pre>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

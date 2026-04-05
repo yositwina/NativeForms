@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Prefill_Params_JSON__c</fullName>
+    <description>Client-side prefill parameter mapping source JSON.</description>
+    <inlineHelpText>Optional prefill params JSON.</inlineHelpText>
+    <label>Prefill Params JSON</label>
+    <length>131072</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <type>LongTextArea</type>
+    <visibleLines>6</visibleLines>
+</CustomField>

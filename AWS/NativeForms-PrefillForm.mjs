@@ -118,6 +118,7 @@ Execution model
 - Later commands may reference earlier stored results.
 - Results are stored under storeResultAs.
 - Lambda returns both normalized mapped output and command result summaries.
+- Commands may include optional `runIf` guards, matching the submit engine pattern.
 
 V1 boundaries
 -------------
@@ -134,9 +135,10 @@ import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-sec
 import { DynamoDBClient, GetItemCommand } from "@aws-sdk/client-dynamodb";
 import crypto from "crypto";
 
-const SECRET_NAME = "NativeForms/SalesforceConnection";
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
+const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const SALESFORCE_API_VERSION = "v60.0";
+const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
@@ -194,6 +196,10 @@ async function getSecret(secretName) {
   return JSON.parse(result.SecretString);
 }
 
+function getSalesforceConnectionSecretName(orgId) {
+  return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${orgId}`;
+}
+
 function hashToken(token) {
   return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
@@ -233,6 +239,26 @@ async function getFormSecurityRecord(formId) {
   return result.Item ? unmarshallItem(result.Item) : null;
 }
 
+async function getTenantRecord(orgId) {
+  const result = await dynamoClient.send(new GetItemCommand({
+    TableName: TENANT_TABLE,
+    Key: {
+      orgId: { S: orgId }
+    }
+  }));
+
+  return result.Item ? unmarshallItem(result.Item) : null;
+}
+
+function isSubscriptionEnded(subscriptionEndDate) {
+  if (!subscriptionEndDate) {
+    return false;
+  }
+
+  const end = new Date(`${subscriptionEndDate}T23:59:59.999Z`);
+  return !Number.isNaN(end.getTime()) && end.getTime() < Date.now();
+}
+
 function ensureFormToken(formSecurity, publishToken, mode) {
   if (!publishToken) {
     const error = new Error("Missing required field: publishToken");
@@ -269,6 +295,35 @@ function ensureFormToken(formSecurity, publishToken, mode) {
   }
 }
 
+async function ensureActiveTenantForForm(formSecurity) {
+  if (!formSecurity?.orgId) {
+    const error = new Error("Form is missing owning orgId");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const tenantRecord = await getTenantRecord(formSecurity.orgId);
+  if (!tenantRecord) {
+    const error = new Error("Owning tenant was not found");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (tenantRecord.status !== "active" || tenantRecord.isActive === false) {
+    const error = new Error("Data could not be loaded from Salesforce because the subscription is not active.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (isSubscriptionEnded(tenantRecord.subscriptionEndDate)) {
+    const error = new Error("Data could not be loaded from Salesforce because the subscription has ended.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return tenantRecord;
+}
+
 function validatePrefillCommandAgainstPolicy(command, formSecurity) {
   const allowedCommands = formSecurity.prefillPolicy?.allowedCommands || [];
   const allowedObjects = formSecurity.prefillPolicy?.allowedObjects || [];
@@ -288,7 +343,7 @@ function assertSecret(secret) {
   }
 }
 
-async function refreshAccessToken(secret) {
+async function refreshAccessToken(secret, loginUrl) {
   const tokenBody = querystring.stringify({
     grant_type: "refresh_token",
     client_id: secret.client_id,
@@ -298,7 +353,7 @@ async function refreshAccessToken(secret) {
 
   const response = await httpsRequest(
     {
-      hostname: "login.salesforce.com",
+      hostname: new URL(loginUrl).hostname,
       path: "/services/oauth2/token",
       method: "POST",
       headers: {
@@ -477,6 +532,30 @@ function resolveValue(value, context) {
   }
 
   return value;
+}
+
+function shouldRunCommand(runIf, context) {
+  if (!runIf) return true;
+
+  const actual = getByPath(context, runIf.var);
+
+  if (runIf.isBlank === true) {
+    return actual === undefined || actual === null || actual === "";
+  }
+
+  if (runIf.isNotBlank === true) {
+    return !(actual === undefined || actual === null || actual === "");
+  }
+
+  if (Object.prototype.hasOwnProperty.call(runIf, "equals")) {
+    return actual === runIf.equals;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(runIf, "notEquals")) {
+    return actual !== runIf.notEquals;
+  }
+
+  return true;
 }
 
 function applyResponseMapping(responseMapping, context) {
@@ -809,10 +888,11 @@ export const handler = async (event) => {
     ensureFormToken(formSecurity, payload.publishToken, "prefill");
     const prefillDefinition = formSecurity.prefillDefinition;
 
-    const secret = await getSecret(SECRET_NAME);
+    const tenantRecord = await ensureActiveTenantForForm(formSecurity);
+    const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
     assertSecret(secret);
 
-    const accessToken = await refreshAccessToken(secret);
+    const accessToken = await refreshAccessToken(secret, tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com");
 
     const context = {
       params: request.params || {},
@@ -827,6 +907,16 @@ export const handler = async (event) => {
       try {
         if (!command.type) {
           throw new Error("Each command must include 'type'");
+        }
+
+        if (!shouldRunCommand(command.runIf, context)) {
+          results.push({
+            commandKey: command.commandKey || null,
+            type: command.type,
+            skipped: true,
+            success: true
+          });
+          continue;
         }
 
         validatePrefillCommandAgainstPolicy(command, formSecurity);

@@ -1,6 +1,8 @@
 node_modules/
 .codex_tmp/
 .sfdx/
+.sf/
+.vscode/
 *.log
 AWS/*.pdf
 !AWS/documentation/NativeForms_HTML_V1_Guide_v3.pdf

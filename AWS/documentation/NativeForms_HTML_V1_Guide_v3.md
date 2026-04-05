@@ -44,18 +44,19 @@ Supported element types in the current runtime:
 - text
 - input
 - textarea
+- select
+- checkbox
+- radio
+- image
+- section
+- columns
 - hidden
 - repeatGroup
 
 Planned/documented but not yet implemented in this runtime sample:
 - link
-- image
 - divider
 - spacer
-- select
-- checkbox
-- section
-- columns
 
 ## Server-Side Execution Model
 The browser no longer sends prefill or submit commands.

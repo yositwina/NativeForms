@@ -1,0 +1,13 @@
+{
+  "orgId": "00D000000000001",
+  "adminEmail": "admin@example.com",
+  "companyName": "NativeForms Demo Tenant",
+  "loginBaseUrl": "https://example-dev-ed.develop.my.salesforce.com",
+  "salesforceClientId": "3MVG9...",
+  "salesforceClientSecret": "replace-me",
+  "subscriptionState": "trial",
+  "subscriptionStartDate": "2026-04-04",
+  "subscriptionEndDate": "2026-05-04",
+  "isActive": true,
+  "status": "active"
+}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Security_Mode__c</fullName>
+    <description>Security mode compiled into the AWS registration payload.</description>
+    <inlineHelpText>Controls AWS-side execution restrictions for the form version.</inlineHelpText>
+    <label>Security Mode</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>public-create</fullName>
+                <default>true</default>
+                <label>Public Create</label>
+            </value>
+            <value>
+                <fullName>public-prefill</fullName>
+                <default>false</default>
+                <label>Public Prefill</label>
+            </value>
+            <value>
+                <fullName>secure-edit</fullName>
+                <default>false</default>
+                <label>Secure Edit</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

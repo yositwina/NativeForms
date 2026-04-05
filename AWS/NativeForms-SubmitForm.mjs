@@ -100,9 +100,10 @@ import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-sec
 import { DynamoDBClient, GetItemCommand } from "@aws-sdk/client-dynamodb";
 import crypto from "crypto";
 
-const SECRET_NAME = "NativeForms/SalesforceConnection";
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
+const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const SALESFORCE_API_VERSION = "v60.0";
+const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
@@ -160,6 +161,10 @@ async function getSecret(secretName) {
   return JSON.parse(result.SecretString);
 }
 
+function getSalesforceConnectionSecretName(orgId) {
+  return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${orgId}`;
+}
+
 function hashToken(token) {
   return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
@@ -199,6 +204,26 @@ async function getFormSecurityRecord(formId) {
   return result.Item ? unmarshallItem(result.Item) : null;
 }
 
+async function getTenantRecord(orgId) {
+  const result = await dynamoClient.send(new GetItemCommand({
+    TableName: TENANT_TABLE,
+    Key: {
+      orgId: { S: orgId }
+    }
+  }));
+
+  return result.Item ? unmarshallItem(result.Item) : null;
+}
+
+function isSubscriptionEnded(subscriptionEndDate) {
+  if (!subscriptionEndDate) {
+    return false;
+  }
+
+  const end = new Date(`${subscriptionEndDate}T23:59:59.999Z`);
+  return !Number.isNaN(end.getTime()) && end.getTime() < Date.now();
+}
+
 function ensureFormToken(formSecurity, publishToken) {
   if (!publishToken) {
     const error = new Error("Missing required field: publishToken");
@@ -229,6 +254,35 @@ function ensureFormToken(formSecurity, publishToken) {
     error.statusCode = 403;
     throw error;
   }
+}
+
+async function ensureActiveTenantForForm(formSecurity) {
+  if (!formSecurity?.orgId) {
+    const error = new Error("Form is missing owning orgId");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const tenantRecord = await getTenantRecord(formSecurity.orgId);
+  if (!tenantRecord) {
+    const error = new Error("Owning tenant was not found");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (tenantRecord.status !== "active" || tenantRecord.isActive === false) {
+    const error = new Error("Data could not be updated in Salesforce because the subscription is not active.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (isSubscriptionEnded(tenantRecord.subscriptionEndDate)) {
+    const error = new Error("Data could not be updated in Salesforce because the subscription has ended.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return tenantRecord;
 }
 
 function isRiskySubmitCommand(commandType) {
@@ -281,7 +335,7 @@ function validateSubmitCommandAgainstPolicy(command, formSecurity) {
   }
 }
 
-async function refreshAccessToken(secret) {
+async function refreshAccessToken(secret, loginUrl) {
   const tokenBody = querystring.stringify({
     grant_type: "refresh_token",
     client_id: secret.client_id,
@@ -291,7 +345,7 @@ async function refreshAccessToken(secret) {
 
   const response = await httpsRequest(
     {
-      hostname: "login.salesforce.com",
+      hostname: new URL(loginUrl).hostname,
       path: "/services/oauth2/token",
       method: "POST",
       headers: {
@@ -821,12 +875,13 @@ export const handler = async (event) => {
 
     const formSecurity = await getFormSecurityRecord(inputPayload.formId);
     ensureFormToken(formSecurity, inputPayload.publishToken);
+    const tenantRecord = await ensureActiveTenantForForm(formSecurity);
     const submitCommands = formSecurity.submitDefinition.commands;
 
-    const secret = await getSecret(SECRET_NAME);
+    const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
     assertSecret(secret);
 
-    const accessToken = await refreshAccessToken(secret);
+    const accessToken = await refreshAccessToken(secret, tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com");
 
     const context = {
       input: inputPayload.input || {}

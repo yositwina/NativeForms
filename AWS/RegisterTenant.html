@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NativeForms Tenant Registration</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 920px;
+      margin: 32px auto;
+      padding: 0 16px 40px;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #dbe3ee;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+    }
+
+    .desc {
+      margin: 0 0 20px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .row {
+      margin-top: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 260px;
+      resize: vertical;
+      font-family: Consolas, "Courier New", monospace;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      background: #1d4ed8;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    pre {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 120px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Register Tenant</h1>
+    <p class="desc">
+      Use this helper once per Salesforce org to create or refresh the tenant record in AWS.
+      The response includes the tenant secret you can paste into the form-registration helper.
+    </p>
+
+    <div class="row">
+      <label for="backendUrl">Backend Lambda URL</label>
+      <input
+        id="backendUrl"
+        type="text"
+        value="https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenat/register"
+        placeholder="https://your-backend-lambda-url.lambda-url.eu-north-1.on.aws/tenant/register"
+      />
+    </div>
+
+    <div class="row">
+      <label for="jsonText">Tenant Registration JSON</label>
+      <textarea id="jsonText">{
+  "orgId": "00DgL00000C9obQ",
+  "adminEmail": "yosi@harmony-it.com",
+  "companyName": "NativeForms Demo Tenant",
+  "loginBaseUrl": "https://orgfarm-96486832bb-dev-ed.develop.my.salesforce.com",
+  "salesforceClientId": "3MVG9...",
+  "salesforceClientSecret": "replace-me",
+  "subscriptionState": "trial",
+  "subscriptionStartDate": "2026-04-04",
+  "subscriptionEndDate": "2026-05-04",
+  "isActive": true,
+  "status": "active"
+}</textarea>
+    </div>
+
+    <div class="actions">
+      <button id="sendBtn" type="button">Register Tenant</button>
+      <button id="formatBtn" class="secondary" type="button">Format JSON</button>
+    </div>
+
+    <pre id="result">Waiting for input.</pre>
+  </div>
+
+  <script>
+    const backendUrlEl = document.getElementById("backendUrl");
+    const jsonTextEl = document.getElementById("jsonText");
+    const sendBtnEl = document.getElementById("sendBtn");
+    const formatBtnEl = document.getElementById("formatBtn");
+    const resultEl = document.getElementById("result");
+
+    function setResult(title, value) {
+      const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      resultEl.textContent = `${title}\n\n${text}`;
+    }
+
+    formatBtnEl.addEventListener("click", () => {
+      try {
+        const parsed = JSON.parse(jsonTextEl.value);
+        jsonTextEl.value = JSON.stringify(parsed, null, 2);
+        setResult("JSON formatted", parsed);
+      } catch (error) {
+        setResult("Invalid JSON", error.message || String(error));
+      }
+    });
+
+    sendBtnEl.addEventListener("click", async () => {
+      const backendUrl = backendUrlEl.value.trim();
+      if (!backendUrl) {
+        setResult("Missing backend URL", "Enter the full Backend Lambda URL ending with /tenant/register");
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(jsonTextEl.value);
+      } catch (error) {
+        setResult("Invalid JSON", error.message || String(error));
+        return;
+      }
+
+      sendBtnEl.disabled = true;
+      setResult("Sending", payload);
+
+      try {
+        const response = await fetch(backendUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        setResult(`Response ${response.status}`, data);
+      } catch (error) {
+        setResult("Request error", error.message || String(error));
+      } finally {
+        sendBtnEl.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

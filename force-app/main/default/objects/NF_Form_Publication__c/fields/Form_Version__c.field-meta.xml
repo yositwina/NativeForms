@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Form_Version__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Form version associated with this publication record.</description>
+    <inlineHelpText>Related form version.</inlineHelpText>
+    <label>Form Version</label>
+    <referenceTo>NF_Form_Version__c</referenceTo>
+    <relationshipLabel>Version Publications</relationshipLabel>
+    <relationshipName>VersionPublications</relationshipName>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <type>Lookup</type>
+</CustomField>

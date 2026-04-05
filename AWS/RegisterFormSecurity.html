@@ -124,6 +124,16 @@
     </div>
 
     <div class="row">
+      <label for="tenantSecret">Tenant Bearer Secret</label>
+      <input
+        id="tenantSecret"
+        type="text"
+        value=""
+        placeholder="Paste the tenant secret returned by /tenant/register"
+      />
+    </div>
+
+    <div class="row">
       <label for="jsonFile">Load JSON File</label>
       <input id="jsonFile" type="file" accept=".json,application/json" />
     </div>
@@ -131,6 +141,7 @@
     <div class="row">
       <label for="jsonText">Registration JSON</label>
       <textarea id="jsonText">{
+  "orgId": "00D000000000001",
   "formId": "problem-report-demo",
   "publishedVersionId": "v1",
   "publishToken": "demo-problem-report-v1-token",
@@ -165,6 +176,10 @@
       {
         "type": "findMany",
         "commandKey": "findCases",
+        "runIf": {
+          "var": "foundContact.Id",
+          "isNotBlank": true
+        },
         "objectApiName": "Case",
         "where": {
           "ContactId": "{foundContact.Id}"
@@ -249,7 +264,8 @@
     </div>
 
     <div class="tip">
-      Tip: after a successful request, verify the item in DynamoDB table <code>NativeFormsFormSecurity</code>.
+      Tip: register the tenant first, then send this request with the returned tenant secret to save the item in
+      <code>NativeFormsFormSecurity</code>.
     </div>
 
     <pre id="result">Waiting for input.</pre>
@@ -259,6 +275,7 @@
     const jsonFileEl = document.getElementById("jsonFile");
     const jsonTextEl = document.getElementById("jsonText");
     const backendUrlEl = document.getElementById("backendUrl");
+    const tenantSecretEl = document.getElementById("tenantSecret");
     const sendBtnEl = document.getElementById("sendBtn");
     const formatBtnEl = document.getElementById("formatBtn");
     const resultEl = document.getElementById("result");
@@ -303,6 +320,12 @@
         return;
       }
 
+      const tenantSecret = tenantSecretEl.value.trim();
+      if (!tenantSecret) {
+        setResult("Missing tenant secret", "Paste the tenant secret you received from /tenant/register");
+        return;
+      }
+
       let payload;
       try {
         payload = JSON.parse(jsonTextEl.value);
@@ -318,7 +341,8 @@
         const response = await fetch(backendUrl, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${tenantSecret}`
           },
           body: JSON.stringify(payload)
         });

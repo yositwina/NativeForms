@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Published_Form_Id__c</fullName>
+    <description>Form id used by the publication operation.</description>
+    <inlineHelpText>Published form id.</inlineHelpText>
+    <label>Published Form Id</label>
+    <length>120</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <type>Text</type>
+</CustomField>

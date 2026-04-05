@@ -1,4 +1,5 @@
 {
+  "orgId": "00D000000000001",
   "formId": "problem-report-demo",
   "publishedVersionId": "v1",
   "publishToken": "demo-problem-report-v1-token",
@@ -33,6 +34,10 @@
       {
         "type": "findMany",
         "commandKey": "findCases",
+        "runIf": {
+          "var": "foundContact.Id",
+          "isNotBlank": true
+        },
         "objectApiName": "Case",
         "where": {
           "ContactId": "{foundContact.Id}"

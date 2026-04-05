@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Form_Version__c</fullName>
+    <description>Parent form version for this element.</description>
+    <inlineHelpText>Form version that owns this element.</inlineHelpText>
+    <label>Form Version</label>
+    <referenceTo>NF_Form_Version__c</referenceTo>
+    <relationshipLabel>Form Elements</relationshipLabel>
+    <relationshipName>FormElements</relationshipName>
+    <reparentableMasterDetail>false</reparentableMasterDetail>
+    <trackHistory>false</trackHistory>
+    <type>MasterDetail</type>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>
