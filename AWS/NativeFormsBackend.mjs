@@ -9,17 +9,22 @@ import {
   GetItemCommand,
   PutItemCommand
 } from "@aws-sdk/client-dynamodb";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
+const s3Client = new S3Client({});
 const sesClient = new SESClient({ region: process.env.SES_REGION || process.env.AWS_REGION || "eu-north-1" });
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SES_FROM = process.env.SES_FROM || "";
 const DEV_MODE = String(process.env.DEV_MODE || "").toLowerCase() === "true";
+const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "";
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, "");
 
 async function saveSalesforceConnection(secretName, payload) {
   const secretString = JSON.stringify(payload, null, 2);
@@ -67,7 +72,7 @@ async function getSalesforceConnection(secretName) {
 }
 
 function getSalesforceConnectionSecretName(orgId) {
-  return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${orgId}`;
+  return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${normalizeOrgId(orgId)}`;
 }
 
 function jsonResponse(statusCode, payload) {
@@ -89,6 +94,15 @@ function hashToken(token) {
 
 function generateSecret() {
   return crypto.randomBytes(32).toString("base64url");
+}
+
+function normalizeOrgId(orgId) {
+  if (typeof orgId !== "string") {
+    return orgId;
+  }
+
+  const trimmed = orgId.trim();
+  return trimmed.length >= 15 ? trimmed.substring(0, 15) : trimmed;
 }
 
 function toAttributeValue(value) {
@@ -162,11 +176,11 @@ async function getFormSecurityRecord(formId) {
 }
 
 async function getTenantRecord(orgId) {
-  return getItemByKey(TENANT_TABLE, "orgId", orgId);
+  return getItemByKey(TENANT_TABLE, "orgId", normalizeOrgId(orgId));
 }
 
 function validateOrgId(orgId) {
-  return typeof orgId === "string" && /^00D[A-Za-z0-9]{12,15}$/.test(orgId);
+  return typeof orgId === "string" && /^00D[A-Za-z0-9]{12,15}$/.test(normalizeOrgId(orgId));
 }
 
 function sanitizeTenantRecord(record) {
@@ -276,13 +290,15 @@ NativeForms`
 }
 
 async function requireTenantAuth(headers, orgId) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+
   if (!orgId) {
     const error = new Error("Missing required field: orgId");
     error.statusCode = 400;
     throw error;
   }
 
-  if (!validateOrgId(orgId)) {
+  if (!validateOrgId(normalizedOrgId)) {
     const error = new Error("Invalid orgId");
     error.statusCode = 400;
     throw error;
@@ -295,7 +311,7 @@ async function requireTenantAuth(headers, orgId) {
     throw error;
   }
 
-  const tenantRecord = await getTenantRecord(orgId);
+  const tenantRecord = await getTenantRecord(normalizedOrgId);
   if (!tenantRecord) {
     const error = new Error("Tenant not found");
     error.statusCode = 404;
@@ -314,7 +330,7 @@ async function requireTenantAuth(headers, orgId) {
 
 function validateTenantRegistrationPayload(payload) {
   if (!payload?.orgId) throw new Error("Missing required field: orgId");
-  if (!validateOrgId(payload.orgId)) throw new Error("Invalid orgId");
+  if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
   if (!payload?.adminEmail) throw new Error("Missing required field: adminEmail");
   if (!payload?.companyName) throw new Error("Missing required field: companyName");
   if (!payload?.loginBaseUrl) throw new Error("Missing required field: loginBaseUrl");
@@ -324,7 +340,7 @@ function validateTenantRegistrationPayload(payload) {
 
 function validateFormSecurityPayload(payload) {
   if (!payload?.orgId) throw new Error("Missing required field: orgId");
-  if (!validateOrgId(payload.orgId)) throw new Error("Invalid orgId");
+  if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
   if (!payload?.formId) throw new Error("Missing required field: formId");
   if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
   if (!payload?.publishedVersionId) throw new Error("Missing required field: publishedVersionId");
@@ -353,6 +369,29 @@ function validateFormSecurityPayload(payload) {
   }
 }
 
+function validatePublishPresignPayload(payload) {
+  if (!payload?.orgId) throw new Error("Missing required field: orgId");
+  if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
+  if (!payload?.formId) throw new Error("Missing required field: formId");
+  if (!payload?.fileName) throw new Error("Missing required field: fileName");
+}
+
+function sanitizeKeyPart(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "nativeforms";
+}
+
+function buildPublishKey(orgId, formId, versionId, fileName) {
+  const safeOrgId = sanitizeKeyPart(orgId);
+  const safeFormId = sanitizeKeyPart(formId);
+  const safeVersionId = sanitizeKeyPart(versionId || "current");
+  const safeFileName = sanitizeKeyPart(fileName);
+  return `org/${safeOrgId}/forms/${safeFormId}/${safeVersionId}/${safeFileName}`;
+}
+
 export const handler = async (event) => {
   const path = event?.requestContext?.http?.path || event?.rawPath || "/";
   const method = event?.requestContext?.http?.method || event?.httpMethod || "GET";
@@ -365,7 +404,7 @@ export const handler = async (event) => {
   }
 
   if (path === "/connect") {
-    const orgId = event?.queryStringParameters?.orgId;
+    const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
     if (!orgId || !validateOrgId(orgId)) {
       return {
         statusCode: 400,
@@ -438,7 +477,7 @@ export const handler = async (event) => {
     const code = event?.queryStringParameters?.code;
     const error = event?.queryStringParameters?.error;
     const errorDescription = event?.queryStringParameters?.error_description;
-    const orgId = event?.queryStringParameters?.state || event?.queryStringParameters?.orgId;
+    const orgId = normalizeOrgId(event?.queryStringParameters?.state || event?.queryStringParameters?.orgId);
 
     if (error) {
       return {
@@ -638,14 +677,15 @@ export const handler = async (event) => {
         : {};
 
       validateTenantRegistrationPayload(payload);
+      const orgId = normalizeOrgId(payload.orgId);
 
       const now = new Date().toISOString();
-      const existing = await getTenantRecord(payload.orgId);
-      const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(payload.orgId));
+      const existing = await getTenantRecord(orgId);
+      const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
       const tenantSecret = existing?.secret || generateSecret();
       const subscription = normalizeSubscriptionState(payload, existing);
       const tenantRecord = {
-        orgId: payload.orgId,
+        orgId,
         adminEmail: payload.adminEmail,
         companyName: payload.companyName,
         loginBaseUrl: payload.loginBaseUrl,
@@ -663,9 +703,9 @@ export const handler = async (event) => {
       };
 
       await saveItem(TENANT_TABLE, tenantRecord);
-      await saveSalesforceConnection(getSalesforceConnectionSecretName(payload.orgId), {
+      await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
         ...(existingConnection || {}),
-        orgId: payload.orgId,
+        orgId,
         loginBaseUrl: payload.loginBaseUrl,
         client_id: payload.salesforceClientId,
         client_secret: payload.salesforceClientSecret,
@@ -675,7 +715,7 @@ export const handler = async (event) => {
         token_issued_at: existingConnection?.token_issued_at || null,
         updated_at: now
       });
-      const emailSent = await sendTenantSecretEmail(payload.adminEmail, payload.orgId, tenantSecret)
+      const emailSent = await sendTenantSecretEmail(payload.adminEmail, orgId, tenantSecret)
         .catch((error) => {
           console.error("Failed to send tenant secret email:", error);
           return false;
@@ -688,7 +728,7 @@ export const handler = async (event) => {
         updated: !!existing,
         tenant: sanitizeTenantRecord(tenantRecord),
         tenantSecret,
-        connectUrl: baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(payload.orgId)}` : null,
+        connectUrl: baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(orgId)}` : null,
         emailSent
       });
     } catch (e) {
@@ -706,18 +746,21 @@ export const handler = async (event) => {
         : {};
 
       validateFormSecurityPayload(payload);
-      await requireTenantAuth(event?.headers, payload.orgId);
+      const orgId = normalizeOrgId(payload.orgId);
+      await requireTenantAuth(event?.headers, orgId);
 
       const now = new Date().toISOString();
       const existing = await getFormSecurityRecord(payload.formId);
       const record = {
         formId: payload.formId,
-        orgId: payload.orgId,
+        orgId,
         publishedVersionId: payload.publishedVersionId,
         status: payload.status,
         securityMode: payload.securityMode,
         rateLimitProfile: payload.rateLimitProfile || "standard",
         tokenHash: hashToken(payload.publishToken),
+        generatedHtmlRef: payload.generatedHtmlRef || null,
+        publicUrl: payload.publicUrl || null,
         prefillPolicy: payload.prefillPolicy,
         submitPolicy: payload.submitPolicy,
         prefillDefinition: payload.prefillDefinition,
@@ -743,6 +786,46 @@ export const handler = async (event) => {
     }
   }
 
+  if (path === "/forms/publish/presign" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validatePublishPresignPayload(payload);
+      const orgId = normalizeOrgId(payload.orgId);
+      await requireTenantAuth(event?.headers, orgId);
+
+      if (!PUBLISH_BUCKET || !PUBLIC_BASE_URL) {
+        throw new Error("Server misconfigured: PUBLISH_BUCKET and PUBLIC_BASE_URL are required");
+      }
+
+      const key = buildPublishKey(orgId, payload.formId, payload.versionId, payload.fileName);
+      const contentType = payload.contentType || "text/html; charset=utf-8";
+      const expiresIn = Number(payload.expires) > 0 ? Number(payload.expires) : 900;
+      const putCommand = new PutObjectCommand({
+        Bucket: PUBLISH_BUCKET,
+        Key: key,
+        ContentType: contentType
+      });
+      const putUrl = await getSignedUrl(s3Client, putCommand, { expiresIn });
+      const publicUrl = `${PUBLIC_BASE_URL}/${key}`;
+
+      return jsonResponse(200, {
+        success: true,
+        putUrl,
+        publicUrl,
+        key,
+        expiresAt: Date.now() + expiresIn * 1000
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
   if (path.startsWith("/forms/") && path.endsWith("/security") && method === "GET") {
     try {
       const formId = path.split("/")[2];
@@ -750,7 +833,7 @@ export const handler = async (event) => {
         throw new Error("Missing formId in path");
       }
 
-      const orgId = event?.queryStringParameters?.orgId;
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
       const tenantRecord = await requireTenantAuth(event?.headers, orgId);
       const record = await getFormSecurityRecord(formId);
       if (!record) {

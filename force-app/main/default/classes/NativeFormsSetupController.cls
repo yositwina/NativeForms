@@ -36,7 +36,7 @@ public with sharing class NativeFormsSetupController {
     public static SetupContext getSetupContext() {
         SetupContext context = new SetupContext();
 
-        context.orgId = UserInfo.getOrganizationId();
+        context.orgId = UserInfo.getOrganizationId().substring(0, 15);
         context.adminEmail = UserInfo.getUserEmail();
         context.loginBaseUrl = URL.getOrgDomainUrl().toExternalForm();
 

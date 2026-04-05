@@ -14,6 +14,14 @@
     </applicationVisibilities>
 
     <classAccesses>
+        <apexClass>NativeFormsAwsClient</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsPublisher</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>NativeFormsSetupController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
