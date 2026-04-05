@@ -14,6 +14,14 @@
     </applicationVisibilities>
 
     <classAccesses>
+        <apexClass>NativeFormsBuilderController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsPrefillActionsController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>NativeFormsAwsClient</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -23,6 +31,10 @@
     </classAccesses>
     <classAccesses>
         <apexClass>NativeFormsSetupController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsSubmitActionsController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
 
@@ -307,6 +319,18 @@
         <readable>true</readable>
     </fieldPermissions>
 
+    <tabSettings>
+        <tab>NativeForms_Builder</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NativeForms_Prefill_Actions</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NativeForms_Submit_Actions</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <tabSettings>
         <tab>NF_Form__c</tab>
         <visibility>Visible</visibility>

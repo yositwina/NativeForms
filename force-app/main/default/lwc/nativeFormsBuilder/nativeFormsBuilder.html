@@ -1,0 +1,318 @@
+<template>
+    <lightning-card title="NativeForms Builder" icon-name="custom:custom18">
+        <div class="builder-shell">
+            <div class="builder-toolbar">
+                <lightning-combobox
+                    class="version-picker"
+                    name="versionId"
+                    label="Form Version"
+                    value={selectedVersionId}
+                    options={versionOptions}
+                    onchange={handleVersionChange}>
+                </lightning-combobox>
+
+                <template if:true={workspaceLoaded}>
+                    <div class="version-meta">
+                        <p class="meta-label">Form</p>
+                        <p class="meta-value">{selectedFormName}</p>
+                        <p class="meta-inline">Key: {selectedFormKey}</p>
+                        <p class="meta-inline">Status: {selectedVersionStatus}</p>
+                    </div>
+                </template>
+
+                <div class="toolbar-actions">
+                    <lightning-button
+                        variant="brand"
+                        label="Publish Form"
+                        onclick={handlePublishVersion}>
+                    </lightning-button>
+                </div>
+            </div>
+
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={publishResult}>
+                <div class={publishResultClass}>
+                    <p class="result-title">{publishResultTitle}</p>
+                    <p>{publishResult.message}</p>
+                    <template if:true={publishResult.publicUrl}>
+                        <p><a href={publishResult.publicUrl} target="_blank" rel="noopener">Open published form</a></p>
+                    </template>
+                </div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading builder"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="builder-layout">
+                    <section class="pane pane-palette">
+                        <div class="pane-header">
+                            <p class="eyebrow">Left</p>
+                            <h2>Field Palette</h2>
+                            <p class="pane-copy">Click any tile to add that element to the canvas.</p>
+                        </div>
+                        <lightning-input
+                            type="search"
+                            name="paletteSearch"
+                            label="Search palette"
+                            value={paletteSearch}
+                            onchange={handlePaletteSearch}>
+                        </lightning-input>
+
+                        <template for:each={paletteSections} for:item="section">
+                            <div class="palette-group" key={section.label}>
+                                <h3>{section.label}</h3>
+                                <div class="palette-items">
+                                    <template for:each={section.items} for:item="item">
+                                        <button
+                                            key={item.type}
+                                            type="button"
+                                            class="palette-item"
+                                            data-type={item.type}
+                                            onclick={handleAddElement}>
+                                            <span class="palette-item__row">
+                                                <span class="palette-item__label">{item.label}</span>
+                                                <span class="palette-item__add">Add</span>
+                                            </span>
+                                            <span class="palette-item__meta">{item.hint}</span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </section>
+
+                    <section class="pane pane-canvas">
+                        <div class="pane-header">
+                            <p class="eyebrow">Center</p>
+                            <h2>Form Canvas</h2>
+                            <p class="pane-copy">Ordered elements for the selected form version.</p>
+                        </div>
+
+                        <template if:true={elements.length}>
+                            <div class="canvas-list">
+                                <template for:each={elements} for:item="item">
+                                    <article
+                                        key={item.id}
+                                        class={item.cardClass}
+                                        data-id={item.id}
+                                        onclick={handleSelectElement}>
+                                        <div class="canvas-item__main">
+                                            <div class="canvas-item__title">
+                                                <span>{item.label}</span>
+                                                <lightning-badge label={item.elementType}></lightning-badge>
+                                            </div>
+                                            <div class="canvas-item__meta">
+                                                <span>{item.fieldKeyDisplay}</span>
+                                                <span>Order {item.orderValue}</span>
+                                            </div>
+                                            <div class="canvas-item__chips">
+                                                <template if:true={item.hasFieldKey}>
+                                                    <span class="chip">Input</span>
+                                                </template>
+                                                <template if:true={item.prefillEnabled}>
+                                                    <span class="chip">Prefill</span>
+                                                </template>
+                                                <template if:true={item.saveOnSubmit}>
+                                                    <span class="chip">Submit</span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <div class="canvas-item__actions">
+                                            <lightning-button-icon
+                                                icon-name="utility:up"
+                                                variant="border-filled"
+                                                alternative-text="Move up"
+                                                title="Move up"
+                                                data-id={item.id}
+                                                data-direction="up"
+                                                onclick={handleMoveElement}>
+                                            </lightning-button-icon>
+                                            <lightning-button-icon
+                                                icon-name="utility:down"
+                                                variant="border-filled"
+                                                alternative-text="Move down"
+                                                title="Move down"
+                                                data-id={item.id}
+                                                data-direction="down"
+                                                onclick={handleMoveElement}>
+                                            </lightning-button-icon>
+                                        </div>
+                                    </article>
+                                </template>
+                            </div>
+                        </template>
+                        <template if:false={elements.length}>
+                            <div class="empty-state">
+                                Add the first field from the left palette to start designing this form.
+                            </div>
+                        </template>
+                    </section>
+
+                    <section class="pane pane-properties">
+                        <div class="pane-header">
+                            <p class="eyebrow">Right</p>
+                            <h2>Properties</h2>
+                        </div>
+
+                        <template if:true={selectedElement}>
+                            <div class="properties-form">
+                                <div class="properties-section">
+                                    <h3>Field Properties</h3>
+                                    <p class="section-copy">Basic settings for the selected input.</p>
+                                </div>
+                                <lightning-input
+                                    name="label"
+                                    label="Label"
+                                    value={draftElement.label}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+
+                                <lightning-combobox
+                                    name="elementType"
+                                    label="Element Type"
+                                    value={draftElement.elementType}
+                                    options={elementTypeOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+
+                                <lightning-input
+                                    name="placeholder"
+                                    label="Placeholder"
+                                    value={draftElement.placeholder}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+
+                                <lightning-input
+                                    type="checkbox"
+                                    name="required"
+                                    label="Required"
+                                    checked={draftElement.required}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+
+                                <div class="properties-section top-gap">
+                                    <h3>Prefill</h3>
+                                    <p class="section-copy">How this field should behave when form data is loaded from Salesforce.</p>
+                                </div>
+                                <lightning-input
+                                    type="checkbox"
+                                    name="prefillEnabled"
+                                    label="Prefill this field"
+                                    checked={draftElement.prefillEnabled}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+                                <lightning-combobox
+                                    name="prefillAlias"
+                                    label="Prefill Alias"
+                                    value={draftElement.prefillAlias}
+                                    options={prefillAliasOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+                                <lightning-input
+                                    type="search"
+                                    name="prefillFieldSearch"
+                                    label="Search Salesforce Fields"
+                                    value={prefillFieldSearch}
+                                    onchange={handlePrefillFieldSearch}>
+                                </lightning-input>
+                                <lightning-combobox
+                                    name="prefillFieldPath"
+                                    label="Salesforce Field"
+                                    value={draftElement.prefillFieldPath}
+                                    options={prefillFieldOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+                                <lightning-input
+                                    type="checkbox"
+                                    name="prefillReadOnly"
+                                    label="Read only when prefilled"
+                                    checked={draftElement.prefillReadOnly}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+
+                                <div class="properties-section top-gap">
+                                    <h3>Submit</h3>
+                                    <p class="section-copy">Map this field into a submit action and Salesforce field.</p>
+                                </div>
+                                <lightning-input
+                                    type="checkbox"
+                                    name="submitEnabled"
+                                    label="Use this field in submit"
+                                    checked={draftElement.submitEnabled}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+                                <lightning-combobox
+                                    name="submitActionKey"
+                                    label="Submit Action"
+                                    value={draftElement.submitActionKey}
+                                    options={submitActionOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+                                <lightning-input
+                                    type="search"
+                                    name="submitFieldSearch"
+                                    label="Search Salesforce Fields"
+                                    value={submitFieldSearch}
+                                    onchange={handleSubmitFieldSearch}>
+                                </lightning-input>
+                                <lightning-combobox
+                                    name="submitFieldPath"
+                                    label="Salesforce Field"
+                                    value={draftElement.submitFieldPath}
+                                    options={submitFieldOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+
+                                <lightning-accordion allow-multiple-sections-open class="top-gap">
+                                    <lightning-accordion-section name="advanced" label="Advanced">
+                                        <div class="advanced-grid">
+                                            <lightning-input
+                                                name="fieldKey"
+                                                label="Field Key"
+                                                value={draftElement.fieldKey}
+                                                onchange={handleDraftChange}>
+                                            </lightning-input>
+
+                                            <lightning-textarea
+                                                name="configJson"
+                                                label="Config JSON"
+                                                value={draftElement.configJson}
+                                                onchange={handleDraftChange}>
+                                            </lightning-textarea>
+                                        </div>
+                                    </lightning-accordion-section>
+                                </lightning-accordion>
+
+                                <div class="properties-actions">
+                                    <lightning-button
+                                        variant="brand"
+                                        label="Save Element"
+                                        onclick={handleSaveElement}>
+                                    </lightning-button>
+                                    <lightning-button
+                                        variant="destructive-text"
+                                        label="Delete"
+                                        onclick={handleDeleteElement}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template if:false={selectedElement}>
+                            <div class="empty-state">
+                                Select a field in the canvas to edit its properties.
+                            </div>
+                        </template>
+                    </section>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

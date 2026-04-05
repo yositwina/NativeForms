@@ -10,6 +10,9 @@
     <label>NativeForms</label>
     <navType>Standard</navType>
     <tabs>NativeForms_Guided_Setup</tabs>
+    <tabs>NativeForms_Builder</tabs>
+    <tabs>NativeForms_Prefill_Actions</tabs>
+    <tabs>NativeForms_Submit_Actions</tabs>
     <tabs>NF_Form__c</tabs>
     <tabs>NF_Form_Version__c</tabs>
     <tabs>NF_Form_Element__c</tabs>

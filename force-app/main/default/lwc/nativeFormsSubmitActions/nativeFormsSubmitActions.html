@@ -1,0 +1,174 @@
+<template>
+    <lightning-card title="NativeForms Submit Actions" icon-name="utility:forward">
+        <div class="shell">
+            <div class="toolbar">
+                <lightning-combobox
+                    name="versionId"
+                    label="Form Version"
+                    value={selectedVersionId}
+                    options={versionOptions}
+                    onchange={handleVersionChange}>
+                </lightning-combobox>
+
+                <template if:true={workspaceLoaded}>
+                    <div class="version-meta">
+                        <p class="eyebrow">Form</p>
+                        <p class="meta-title">{selectedFormName}</p>
+                        <p class="meta-inline">Version: {selectedVersionName}</p>
+                        <p class="meta-inline">Status: {selectedVersionStatus}</p>
+                    </div>
+                </template>
+            </div>
+
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading submit actions"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="layout">
+                    <section class="pane pane-list">
+                        <div class="pane-header">
+                            <p class="eyebrow">Left</p>
+                            <h2>Submit Actions</h2>
+                            <p class="pane-copy">Define which Salesforce records are created or updated on submit.</p>
+                        </div>
+
+                        <lightning-button
+                            variant="brand"
+                            label="New Submit Action"
+                            onclick={handleAddAction}>
+                        </lightning-button>
+
+                        <template if:true={actions.length}>
+                            <div class="action-list">
+                                <template for:each={actions} for:item="item">
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        class={item.cardClass}
+                                        data-id={item.id}
+                                        onclick={handleSelectAction}>
+                                        <span class="action-title">{item.objectApiName}</span>
+                                        <span class="action-meta">{item.commandType}</span>
+                                        <span class="action-meta">Result alias: {item.storeResultAs}</span>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+                    </section>
+
+                    <section class="pane pane-editor">
+                        <div class="pane-header">
+                            <p class="eyebrow">Center</p>
+                            <h2>Action Definition</h2>
+                        </div>
+
+                        <template if:true={selectedAction}>
+                            <div class="editor-grid">
+                                <lightning-input
+                                    name="storeResultAs"
+                                    label="Store Result As"
+                                    value={draftAction.storeResultAs}
+                                    onchange={handleDraftChange}>
+                                </lightning-input>
+
+                                <lightning-input
+                                    type="search"
+                                    name="objectSearch"
+                                    label="Search Objects"
+                                    value={objectSearch}
+                                    onchange={handleObjectSearch}>
+                                </lightning-input>
+
+                                <lightning-combobox
+                                    name="objectApiName"
+                                    label="Salesforce Object"
+                                    value={draftAction.objectApiName}
+                                    options={filteredObjectOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+
+                                <lightning-combobox
+                                    name="commandType"
+                                    label="Submit Mode"
+                                    value={draftAction.commandType}
+                                    options={commandTypeOptions}
+                                    onchange={handleDraftChange}>
+                                </lightning-combobox>
+
+                                <template if:true={isUpdateById}>
+                                    <lightning-input
+                                        name="recordIdSource"
+                                        label="Record Id Source"
+                                        value={draftAction.recordIdSource}
+                                        onchange={handleDraftChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={isFindAndUpdate}>
+                                    <lightning-textarea
+                                        name="whereClause"
+                                        label="Where Condition"
+                                        value={draftAction.whereClause}
+                                        onchange={handleDraftChange}>
+                                    </lightning-textarea>
+                                </template>
+
+                                <lightning-accordion allow-multiple-sections-open>
+                                    <lightning-accordion-section name="advanced" label="Advanced">
+                                        <lightning-input
+                                            name="actionKey"
+                                            label="Action Key"
+                                            value={draftAction.actionKey}
+                                            onchange={handleDraftChange}>
+                                        </lightning-input>
+                                        <lightning-textarea
+                                            name="configJson"
+                                            label="Config JSON"
+                                            value={draftAction.configJson}
+                                            onchange={handleDraftChange}>
+                                        </lightning-textarea>
+                                    </lightning-accordion-section>
+                                </lightning-accordion>
+
+                                <div class="editor-actions">
+                                    <lightning-button
+                                        variant="brand"
+                                        label="Save Submit Action"
+                                        onclick={handleSaveAction}>
+                                    </lightning-button>
+                                    <lightning-button
+                                        variant="destructive-text"
+                                        label="Delete"
+                                        onclick={handleDeleteAction}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+                        </template>
+                    </section>
+
+                    <section class="pane pane-help">
+                        <div class="pane-header">
+                            <p class="eyebrow">Right</p>
+                            <h2>How It Works</h2>
+                        </div>
+                        <div class="help-copy">
+                            <p>A submit action defines what NativeForms should do with Salesforce data after the user submits the form.</p>
+                            <p>Examples:</p>
+                            <p><code>Create a new Case</code></p>
+                            <p><code>Update Contact using a hidden id</code></p>
+                            <p><code>Find Contact by Email and update it</code></p>
+                            <p>Later, builder fields will map into these actions one field at a time.</p>
+                        </div>
+                    </section>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>
