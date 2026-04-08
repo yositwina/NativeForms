@@ -2,20 +2,11 @@
     <lightning-card title="NativeForms Prefill Actions" icon-name="utility:search">
         <div class="shell">
             <div class="toolbar">
-                <lightning-combobox
-                    name="versionId"
-                    label="Form Version"
-                    value={selectedVersionId}
-                    options={versionOptions}
-                    onchange={handleVersionChange}>
-                </lightning-combobox>
-
                 <template if:true={workspaceLoaded}>
                     <div class="version-meta">
-                        <p class="eyebrow">Form</p>
-                        <p class="meta-title">{selectedFormName}</p>
-                        <p class="meta-inline">Version: {selectedVersionName}</p>
-                        <p class="meta-inline">Status: {selectedVersionStatus}</p>
+                        <span class="meta-chip">{selectedFormName}</span>
+                        <span class="meta-chip">Version: {selectedVersionName}</span>
+                        <span class="meta-chip">Status: {selectedVersionStatus}</span>
                     </div>
                 </template>
             </div>
@@ -34,10 +25,14 @@
                 <div class="layout">
                     <section class="pane pane-list">
                         <div class="pane-header">
-                            <p class="eyebrow">Left</p>
                             <h2>Prefill Actions</h2>
                             <p class="pane-copy">Define aliases by querying Salesforce records.</p>
                         </div>
+
+                        <lightning-button
+                            label="Refresh from Designer"
+                            onclick={handleRefreshFromDesigner}>
+                        </lightning-button>
 
                         <lightning-button
                             variant="brand"
@@ -65,7 +60,6 @@
 
                     <section class="pane pane-editor">
                         <div class="pane-header">
-                            <p class="eyebrow">Center</p>
                             <h2>Action Definition</h2>
                         </div>
 
@@ -102,12 +96,55 @@
                                     onchange={handleDraftChange}>
                                 </lightning-combobox>
 
-                                <lightning-textarea
-                                    name="whereClause"
-                                    label="Where Condition"
-                                    value={draftAction.whereClause}
-                                    onchange={handleDraftChange}>
-                                </lightning-textarea>
+                                <div class="condition-builder">
+                                    <div class="condition-builder__header">
+                                        <span class="condition-builder__title">Match Conditions</span>
+                                        <lightning-combobox
+                                            name="conditionLogic"
+                                            label="Join Conditions With"
+                                            value={draftAction.conditionLogic}
+                                            options={conditionLogicOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </div>
+                                    <template for:each={conditionRows} for:item="row" for:index="index">
+                                        <div key={row.id} class="condition-row">
+                                            <lightning-combobox
+                                                data-index={index}
+                                                name="fieldApiName"
+                                                label="Salesforce Field"
+                                                value={row.fieldApiName}
+                                                options={fieldOptions}
+                                                onchange={handleConditionChange}>
+                                            </lightning-combobox>
+                                            <lightning-combobox
+                                                data-index={index}
+                                                name="operator"
+                                                label="Operator"
+                                                value={row.operator}
+                                                options={operatorOptions}
+                                                onchange={handleConditionChange}>
+                                            </lightning-combobox>
+                                            <lightning-input
+                                                data-index={index}
+                                                name="paramName"
+                                                label="URL Parameter"
+                                                value={row.paramName}
+                                                onchange={handleConditionChange}>
+                                            </lightning-input>
+                                            <lightning-button-icon
+                                                data-index={index}
+                                                icon-name="utility:delete"
+                                                alternative-text="Delete condition"
+                                                onclick={handleDeleteCondition}>
+                                            </lightning-button-icon>
+                                        </div>
+                                    </template>
+                                    <lightning-button
+                                        label="Add Condition"
+                                        onclick={handleAddCondition}>
+                                    </lightning-button>
+                                </div>
 
                                 <lightning-combobox
                                     name="onNotFound"
@@ -172,17 +209,26 @@
 
                     <section class="pane pane-help">
                         <div class="pane-header">
-                            <p class="eyebrow">Right</p>
-                            <h2>How It Works</h2>
+                            <h2>Used In Form</h2>
                         </div>
                         <div class="help-copy">
-                            <p>A prefill action creates an alias by querying Salesforce.</p>
-                            <p>Example:</p>
-                            <p><code>Contact where Email = &#123;input.email&#125;</code></p>
-                            <p>Alias: <code>foundContact</code></p>
-                            <p>Then fields can map to:</p>
-                            <p><code>foundContact.FirstName</code></p>
-                            <p><code>foundContact.LastName</code></p>
+                            <template if:true={hasFilteredMappings}>
+                                <template for:each={filteredMappings} for:item="mapping">
+                                    <div key={mapping.elementId} class="mapping-card">
+                                        <p><strong>{mapping.elementLabel}</strong></p>
+                                        <p>Field Key: <code>{mapping.fieldKey}</code></p>
+                                        <p>Salesforce Field: <code>{mapping.fieldPath}</code></p>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:false={hasFilteredMappings}>
+                                <p>No form fields are mapped to this prefill alias yet.</p>
+                            </template>
+                            <hr />
+                            <p><strong>How It Works</strong></p>
+                            <p><strong>&#123;params.name&#125;</strong> means a URL query parameter, for example <code>?email=test@example.com</code>.</p>
+                            <p><strong>Salesforce Field</strong> is a field on the selected object, such as <code>Email</code>.</p>
+                            <p><strong>On Not Found = Ignore</strong> means the form continues without prefilling. <strong>Error</strong> means the runtime should stop and show a failure.</p>
                         </div>
                     </section>
                 </div>

@@ -14,6 +14,10 @@
     </applicationVisibilities>
 
     <classAccesses>
+        <apexClass>NativeFormsDesignerController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>NativeFormsBuilderController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -319,6 +323,10 @@
         <readable>true</readable>
     </fieldPermissions>
 
+    <tabSettings>
+        <tab>NativeForms_Designer</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <tabSettings>
         <tab>NativeForms_Builder</tab>
         <visibility>Visible</visibility>

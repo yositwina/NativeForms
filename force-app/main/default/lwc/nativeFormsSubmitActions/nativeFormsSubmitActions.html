@@ -2,20 +2,11 @@
     <lightning-card title="NativeForms Submit Actions" icon-name="utility:forward">
         <div class="shell">
             <div class="toolbar">
-                <lightning-combobox
-                    name="versionId"
-                    label="Form Version"
-                    value={selectedVersionId}
-                    options={versionOptions}
-                    onchange={handleVersionChange}>
-                </lightning-combobox>
-
                 <template if:true={workspaceLoaded}>
                     <div class="version-meta">
-                        <p class="eyebrow">Form</p>
-                        <p class="meta-title">{selectedFormName}</p>
-                        <p class="meta-inline">Version: {selectedVersionName}</p>
-                        <p class="meta-inline">Status: {selectedVersionStatus}</p>
+                        <span class="meta-chip">{selectedFormName}</span>
+                        <span class="meta-chip">Version: {selectedVersionName}</span>
+                        <span class="meta-chip">Status: {selectedVersionStatus}</span>
                     </div>
                 </template>
             </div>
@@ -34,10 +25,14 @@
                 <div class="layout">
                     <section class="pane pane-list">
                         <div class="pane-header">
-                            <p class="eyebrow">Left</p>
                             <h2>Submit Actions</h2>
                             <p class="pane-copy">Define which Salesforce records are created or updated on submit.</p>
                         </div>
+
+                        <lightning-button
+                            label="Refresh from Designer"
+                            onclick={handleRefreshFromDesigner}>
+                        </lightning-button>
 
                         <lightning-button
                             variant="brand"
@@ -65,7 +60,6 @@
 
                     <section class="pane pane-editor">
                         <div class="pane-header">
-                            <p class="eyebrow">Center</p>
                             <h2>Action Definition</h2>
                         </div>
 
@@ -101,6 +95,7 @@
                                     options={commandTypeOptions}
                                     onchange={handleDraftChange}>
                                 </lightning-combobox>
+                                <p class="mode-help">{modeHelpText}</p>
 
                                 <template if:true={isUpdateById}>
                                     <lightning-input
@@ -112,12 +107,65 @@
                                 </template>
 
                                 <template if:true={isFindAndUpdate}>
-                                    <lightning-textarea
-                                        name="whereClause"
-                                        label="Where Condition"
-                                        value={draftAction.whereClause}
+                                    <div class="condition-builder">
+                                        <div class="condition-builder__header">
+                                            <span class="condition-builder__title">Match Conditions</span>
+                                            <lightning-combobox
+                                                name="conditionLogic"
+                                                label="Join Conditions With"
+                                                value={draftAction.conditionLogic}
+                                                options={conditionLogicOptions}
+                                                onchange={handleDraftChange}>
+                                            </lightning-combobox>
+                                        </div>
+                                        <template for:each={conditionRows} for:item="row" for:index="index">
+                                            <div key={row.id} class="condition-row">
+                                                <lightning-combobox
+                                                    data-index={index}
+                                                    name="fieldApiName"
+                                                    label="Salesforce Field"
+                                                    value={row.fieldApiName}
+                                                    options={fieldOptions}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-combobox>
+                                                <lightning-combobox
+                                                    data-index={index}
+                                                    name="operator"
+                                                    label="Operator"
+                                                    value={row.operator}
+                                                    options={operatorOptions}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-combobox>
+                                                <lightning-input
+                                                    data-index={index}
+                                                    name="paramName"
+                                                    label="URL Parameter"
+                                                    value={row.paramName}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-input>
+                                                <lightning-button-icon
+                                                    data-index={index}
+                                                    icon-name="utility:delete"
+                                                    alternative-text="Delete condition"
+                                                    onclick={handleDeleteCondition}>
+                                                </lightning-button-icon>
+                                            </div>
+                                        </template>
+                                        <lightning-button
+                                            label="Add Condition"
+                                            onclick={handleAddCondition}>
+                                        </lightning-button>
+                                    </div>
+                                </template>
+
+                                <template if:true={showNotFoundChoice}>
+                                    <lightning-combobox
+                                        name="onNotFound"
+                                        label="If no matching record is found"
+                                        value={draftAction.onNotFound}
+                                        options={notFoundOptions}
                                         onchange={handleDraftChange}>
-                                    </lightning-textarea>
+                                    </lightning-combobox>
                                 </template>
 
                                 <lightning-accordion allow-multiple-sections-open>
@@ -155,16 +203,28 @@
 
                     <section class="pane pane-help">
                         <div class="pane-header">
-                            <p class="eyebrow">Right</p>
-                            <h2>How It Works</h2>
+                            <h2>Fields Writing To This Action</h2>
                         </div>
                         <div class="help-copy">
-                            <p>A submit action defines what NativeForms should do with Salesforce data after the user submits the form.</p>
-                            <p>Examples:</p>
-                            <p><code>Create a new Case</code></p>
-                            <p><code>Update Contact using a hidden id</code></p>
-                            <p><code>Find Contact by Email and update it</code></p>
-                            <p>Later, builder fields will map into these actions one field at a time.</p>
+                            <template if:true={hasFilteredMappings}>
+                                <template for:each={filteredMappings} for:item="mapping">
+                                    <div key={mapping.elementId} class="mapping-card">
+                                        <p><strong>{mapping.elementLabel}</strong></p>
+                                        <p>Field Key: <code>{mapping.fieldKey}</code></p>
+                                        <p>Salesforce Field: <code>{mapping.fieldPath}</code></p>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:false={hasFilteredMappings}>
+                                <p>No form fields are mapped to this submit action yet.</p>
+                            </template>
+                            <hr />
+                            <p><strong>How It Works</strong></p>
+                            <p><strong>Create record</strong> always creates a new row.</p>
+                            <p><strong>Update by record Id</strong> updates one row using an Id from the form, such as <code>&#123;input.contactid&#125;</code>.</p>
+                            <p><strong>Find and update existing record</strong> first finds a row by conditions, then updates it.</p>
+                            <p><strong>&#123;input.fieldKey&#125;</strong> means a value coming from the form itself.</p>
+                            <p><strong>&#123;params.name&#125;</strong> means a URL query parameter from the page address.</p>
                         </div>
                     </section>
                 </div>

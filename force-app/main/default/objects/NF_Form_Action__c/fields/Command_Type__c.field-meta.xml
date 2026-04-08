@@ -16,6 +16,8 @@
             <value><fullName>findMany</fullName><default>false</default><label>findMany</label></value>
             <value><fullName>create</fullName><default>false</default><label>create</label></value>
             <value><fullName>update</fullName><default>false</default><label>update</label></value>
+            <value><fullName>updateById</fullName><default>false</default><label>updateById</label></value>
+            <value><fullName>findAndUpdate</fullName><default>false</default><label>findAndUpdate</label></value>
             <value><fullName>delete</fullName><default>false</default><label>delete</label></value>
             <value><fullName>upsertMany</fullName><default>false</default><label>upsertMany</label></value>
         </valueSetDefinition>

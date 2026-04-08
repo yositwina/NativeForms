@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Element_Index__c</fullName>
+    <description>Stable per-form element sequence number carried across versions.</description>
+    <inlineHelpText>Automatically assigned sequence number for this form element across all versions of the same form.</inlineHelpText>
+    <label>Element Index</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <trackHistory>false</trackHistory>
+    <type>Number</type>
+</CustomField>

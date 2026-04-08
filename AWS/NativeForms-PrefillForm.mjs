@@ -695,7 +695,9 @@ function buildOrderByClause(orderBy) {
 
 function buildFindOneSoql(command, resolvedWhere) {
   const fieldsToReturn = normalizeFieldsToReturn(command.fieldsToReturn);
-  const whereClause = buildWhereClause(resolvedWhere);
+  const whereClause = command.whereClause
+    ? interpolateWhereClause(command.whereClause, resolvedWhere)
+    : buildWhereClause(resolvedWhere);
 
   if (!whereClause) {
     throw new Error(`findOne command '${command.commandKey || "unknown"}' requires a non-empty where object`);
@@ -706,7 +708,9 @@ function buildFindOneSoql(command, resolvedWhere) {
 
 function buildFindManySoql(command, resolvedWhere) {
   const fieldsToReturn = normalizeFieldsToReturn(command.fieldsToReturn);
-  const whereClause = buildWhereClause(resolvedWhere);
+  const whereClause = command.whereClause
+    ? interpolateWhereClause(command.whereClause, resolvedWhere)
+    : buildWhereClause(resolvedWhere);
   const limit = Number.isInteger(command.limit) && command.limit > 0 ? command.limit : 50;
   const orderByClause = buildOrderByClause(command.orderBy);
 
@@ -725,11 +729,11 @@ async function executePrefillCommand(command, context, sf) {
   const type = command.type;
 
   if (type === "findOne") {
-    if (!command.objectApiName || !command.where) {
+    if (!command.objectApiName || (!command.where && !command.whereClause)) {
       throw new Error(`findOne command '${command.commandKey || "unknown"}' is missing objectApiName or where`);
     }
 
-    const resolvedWhere = resolveValue(command.where, context);
+    const resolvedWhere = command.whereClause ? context : resolveValue(command.where, context);
     const soql = buildFindOneSoql(command, resolvedWhere);
     const queryResult = await querySalesforce(instanceUrl, accessToken, soql);
     const record = queryResult.records && queryResult.records.length > 0 ? queryResult.records[0] : null;
@@ -795,7 +799,7 @@ async function executePrefillCommand(command, context, sf) {
       throw new Error(`findMany command '${command.commandKey || "unknown"}' is missing objectApiName or limit`);
     }
 
-    const resolvedWhere = resolveValue(command.where || {}, context);
+    const resolvedWhere = command.whereClause ? context : resolveValue(command.where || {}, context);
     const soql = buildFindManySoql(command, resolvedWhere);
     const queryResult = await querySalesforce(instanceUrl, accessToken, soql);
     const records = Array.isArray(queryResult.records) ? queryResult.records : [];
@@ -810,6 +814,19 @@ async function executePrefillCommand(command, context, sf) {
   }
 
   throw new Error(`Unsupported command type: ${type}`);
+}
+
+function interpolateWhereClause(template, context) {
+  if (!template) {
+    return "";
+  }
+  return String(template).replace(/\{([^}]+)\}/g, (_, expression) => {
+    const resolved = resolveExpression(expression, context);
+    if (resolved === undefined || resolved === null) {
+      return "";
+    }
+    return escapeSoqlValue(resolved);
+  });
 }
 
 function storeCommandResult(command, result, context) {

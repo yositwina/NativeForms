@@ -716,20 +716,19 @@ function buildFindOneSoql(command, resolvedWhere) {
     ? command.fieldsToReturn
     : ["Id"];
 
-  const filters = Object.entries(resolvedWhere || {});
+  const whereClause = command.whereClause
+    ? interpolateWhereClause(command.whereClause, resolvedWhere)
+    : Object.entries(resolvedWhere || {})
+      .map(([fieldName, value]) => {
+        if (value === null) return `${fieldName} = null`;
+        if (typeof value === "number" || typeof value === "boolean") return `${fieldName} = ${value}`;
+        return `${fieldName} = '${escapeSoqlValue(value)}'`;
+      })
+      .join(" AND ");
 
-  if (filters.length === 0) {
+  if (!whereClause) {
     throw new Error(`findOne command '${command.commandKey || "unknown"}' requires a non-empty where object`);
   }
-
-  const whereClause = filters
-    .map(([fieldName, value]) => {
-      if (value === null) return `${fieldName} = null`;
-      if (typeof value === "number" || typeof value === "boolean") return `${fieldName} = ${value}`;
-      return `${fieldName} = '${escapeSoqlValue(value)}'`;
-    })
-    .join(" AND ");
-
   return `SELECT ${fieldsToReturn.join(", ")} FROM ${objectApiName} WHERE ${whereClause} ORDER BY CreatedDate DESC LIMIT 1`;
 }
 
@@ -738,11 +737,11 @@ async function executeCommand(command, context, sf) {
   const type = command.type;
 
   if (type === "findOne") {
-    if (!command.objectApiName || !command.where) {
+    if (!command.objectApiName || (!command.where && !command.whereClause)) {
       throw new Error(`findOne command '${command.commandKey || "unknown"}' is missing objectApiName or where`);
     }
 
-    const resolvedWhere = resolveValue(command.where, context);
+    const resolvedWhere = command.whereClause ? context : resolveValue(command.where, context);
     const soql = buildFindOneSoql(command, resolvedWhere);
     const queryResult = await querySalesforce(instanceUrl, accessToken, soql);
     const record = queryResult.records && queryResult.records.length > 0 ? queryResult.records[0] : null;
@@ -778,15 +777,39 @@ async function executeCommand(command, context, sf) {
 
     const resolvedFields = resolveValue(command.fields, context);
     const id = command.id ? resolveValue(command.id, context) : resolvedFields.Id;
+    const shouldCreateOnMissing = command.onNotFound === "create";
 
     if (!id) {
+      if (shouldCreateOnMissing) {
+        const createResult = await createSalesforceRecord(instanceUrl, accessToken, command.objectApiName, resolvedFields);
+        return {
+          success: true,
+          type: "create",
+          objectApiName: command.objectApiName,
+          id: createResult.id
+        };
+      }
       throw new Error(`update command '${command.commandKey || "unknown"}' requires id or fields.Id`);
     }
 
     const fieldsToUpdate = { ...resolvedFields };
     delete fieldsToUpdate.Id;
 
-    const updateResult = await updateSalesforceRecord(instanceUrl, accessToken, command.objectApiName, id, fieldsToUpdate);
+    let updateResult;
+    try {
+      updateResult = await updateSalesforceRecord(instanceUrl, accessToken, command.objectApiName, id, fieldsToUpdate);
+    } catch (error) {
+      if (shouldCreateOnMissing && String(error?.message || "").includes("Status: 404")) {
+        const createResult = await createSalesforceRecord(instanceUrl, accessToken, command.objectApiName, resolvedFields);
+        return {
+          success: true,
+          type: "create",
+          objectApiName: command.objectApiName,
+          id: createResult.id
+        };
+      }
+      throw error;
+    }
 
     return {
       success: true,
@@ -826,6 +849,19 @@ async function executeCommand(command, context, sf) {
   }
 
   throw new Error(`Unsupported command type: ${type}`);
+}
+
+function interpolateWhereClause(template, context) {
+  if (!template) {
+    return "";
+  }
+  return String(template).replace(/\{([^}]+)\}/g, (_, expression) => {
+    const resolved = resolveExpression(expression, context);
+    if (resolved === undefined || resolved === null) {
+      return "";
+    }
+    return escapeSoqlValue(resolved);
+  });
 }
 
 export const handler = async (event) => {

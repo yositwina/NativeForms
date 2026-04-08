@@ -182,12 +182,14 @@
                                     onchange={handleDraftChange}>
                                 </lightning-combobox>
 
-                                <lightning-input
-                                    name="placeholder"
-                                    label="Placeholder"
-                                    value={draftElement.placeholder}
-                                    onchange={handleDraftChange}>
-                                </lightning-input>
+                                <template if:true={showsPlaceholder}>
+                                    <lightning-input
+                                        name="placeholder"
+                                        label="Placeholder"
+                                        value={draftElement.placeholder}
+                                        onchange={handleDraftChange}>
+                                    </lightning-input>
+                                </template>
 
                                 <lightning-input
                                     type="checkbox"
@@ -196,6 +198,53 @@
                                     checked={draftElement.required}
                                     onchange={handleDraftChange}>
                                 </lightning-input>
+
+                                <template if:true={isChoiceField}>
+                                    <div class="properties-section top-gap">
+                                        <h3>Choice Options</h3>
+                                        <p class="section-copy">Configure the visible options and optional default selection.</p>
+                                    </div>
+                                    <lightning-textarea
+                                        name="choiceOptionsText"
+                                        label="Options"
+                                        value={draftElement.choiceOptionsText}
+                                        onchange={handleDraftChange}>
+                                    </lightning-textarea>
+                                    <p class="inline-help">{choiceOptionsHelpText}</p>
+                                    <lightning-input
+                                        name="defaultValue"
+                                        label="Default Value"
+                                        value={draftElement.defaultValue}
+                                        onchange={handleDraftChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={isCheckboxField}>
+                                    <div class="properties-section top-gap">
+                                        <h3>Checkbox Behavior</h3>
+                                        <p class="section-copy">Choose the initial state of this checkbox when the form loads.</p>
+                                    </div>
+                                    <lightning-input
+                                        type="checkbox"
+                                        name="checked"
+                                        label="Checked by default"
+                                        checked={draftElement.checked}
+                                        onchange={handleDraftChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={isHiddenField}>
+                                    <div class="properties-section top-gap">
+                                        <h3>Hidden Value</h3>
+                                        <p class="section-copy">Set the value sent with the form without showing a visible input.</p>
+                                    </div>
+                                    <lightning-input
+                                        name="hiddenValue"
+                                        label="Hidden Value"
+                                        value={draftElement.hiddenValue}
+                                        onchange={handleDraftChange}>
+                                    </lightning-input>
+                                </template>
 
                                 <div class="properties-section top-gap">
                                     <h3>Prefill</h3>

@@ -5,6 +5,8 @@ public with sharing class NativeFormsBuilderController {
         @AuraEnabled public String publicUrl { get; set; }
         @AuraEnabled public String key { get; set; }
         @AuraEnabled public Id publicationId { get; set; }
+        @AuraEnabled public Id newDraftVersionId { get; set; }
+        @AuraEnabled public String newDraftVersionName { get; set; }
     }
 
     public class VersionOption {
@@ -20,6 +22,7 @@ public with sharing class NativeFormsBuilderController {
         @AuraEnabled public String elementId { get; set; }
         @AuraEnabled public String elementType { get; set; }
         @AuraEnabled public String fieldKey { get; set; }
+        @AuraEnabled public Integer elementIndex { get; set; }
         @AuraEnabled public String label { get; set; }
         @AuraEnabled public String configJson { get; set; }
         @AuraEnabled public String parentElementId { get; set; }
@@ -125,6 +128,7 @@ public with sharing class NativeFormsBuilderController {
                    Element_Id__c,
                    Element_Type__c,
                    Field_Key__c,
+                   Element_Index__c,
                    Label__c,
                    Config_JSON__c,
                    Parent_Element_Id__c,
@@ -147,7 +151,7 @@ public with sharing class NativeFormsBuilderController {
             PrefillAliasDetail detail = new PrefillAliasDetail();
             detail.alias = actionRecord.Store_Result_As__c;
             detail.objectApiName = actionRecord.Object_Api_Name__c;
-            detail.fieldOptions = getFieldOptions(actionRecord.Object_Api_Name__c);
+            detail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
             workspace.prefillAliases.add(detail);
         }
 
@@ -163,7 +167,7 @@ public with sharing class NativeFormsBuilderController {
             detail.actionKey = actionRecord.Command_Key__c;
             detail.objectApiName = actionRecord.Object_Api_Name__c;
             detail.commandType = actionRecord.Command_Type__c;
-            detail.fieldOptions = getFieldOptions(actionRecord.Object_Api_Name__c);
+            detail.fieldOptions = getWritableFieldOptions(actionRecord.Object_Api_Name__c);
             workspace.submitActions.add(detail);
         }
 
@@ -175,12 +179,20 @@ public with sharing class NativeFormsBuilderController {
         if (versionId == null) {
             throw new AuraHandledException('Select a form version first.');
         }
+        ensureVersionEditable(versionId);
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Element type is required.');
         }
         if (!new Set<String>{ 'text', 'input', 'textarea', 'select', 'checkbox', 'radio', 'hidden' }.contains(elementType)) {
             throw new AuraHandledException('Only basic input elements are supported in this builder version.');
         }
+
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
 
         Integer nextOrder = 10;
         AggregateResult[] maxRows = [
@@ -192,11 +204,14 @@ public with sharing class NativeFormsBuilderController {
             nextOrder = Integer.valueOf(String.valueOf(maxRows[0].get('maxOrder'))) + 10;
         }
 
+        Integer nextElementIndex = getNextElementIndex(versionRecord.Form__c);
+
         NF_Form_Element__c elementRecord = new NF_Form_Element__c(
             Form_Version__c = versionId,
             Element_Id__c = buildElementId(elementType),
             Element_Type__c = elementType,
-            Field_Key__c = defaultFieldKeyForType(elementType),
+            Field_Key__c = defaultFieldKeyForType(elementType, nextElementIndex),
+            Element_Index__c = nextElementIndex,
             Label__c = defaultLabelForType(elementType),
             Config_JSON__c = defaultConfigJsonForType(elementType),
             Order__c = nextOrder
@@ -209,6 +224,7 @@ public with sharing class NativeFormsBuilderController {
                    Element_Id__c,
                    Element_Type__c,
                    Field_Key__c,
+                   Element_Index__c,
                    Label__c,
                    Config_JSON__c,
                    Parent_Element_Id__c,
@@ -226,6 +242,7 @@ public with sharing class NativeFormsBuilderController {
         if (inputValue == null || inputValue.id == null) {
             throw new AuraHandledException('Element id is required.');
         }
+        ensureElementVersionEditable(inputValue.id);
 
         NF_Form_Element__c elementRecord = [
             SELECT Id,
@@ -233,6 +250,7 @@ public with sharing class NativeFormsBuilderController {
                    Element_Id__c,
                    Element_Type__c,
                    Field_Key__c,
+                   Element_Index__c,
                    Label__c,
                    Config_JSON__c,
                    Parent_Element_Id__c,
@@ -258,6 +276,7 @@ public with sharing class NativeFormsBuilderController {
         if (elementId == null) {
             throw new AuraHandledException('Element id is required.');
         }
+        ensureElementVersionEditable(elementId);
 
         delete [
             SELECT Id
@@ -272,6 +291,7 @@ public with sharing class NativeFormsBuilderController {
         if (elementId == null) {
             throw new AuraHandledException('Element id is required.');
         }
+        ensureElementVersionEditable(elementId);
         if (String.isBlank(direction)) {
             throw new AuraHandledException('Move direction is required.');
         }
@@ -353,6 +373,8 @@ public with sharing class NativeFormsBuilderController {
         result.publicUrl = publishResult.publicUrl;
         result.key = publishResult.key;
         result.publicationId = publishResult.publicationId;
+        result.newDraftVersionId = publishResult.newDraftVersionId;
+        result.newDraftVersionName = publishResult.newDraftVersionName;
         return result;
     }
 
@@ -363,6 +385,7 @@ public with sharing class NativeFormsBuilderController {
         dto.elementId = elementRecord.Element_Id__c;
         dto.elementType = elementRecord.Element_Type__c;
         dto.fieldKey = elementRecord.Field_Key__c;
+        dto.elementIndex = elementRecord.Element_Index__c == null ? null : Integer.valueOf(String.valueOf(elementRecord.Element_Index__c));
         dto.label = elementRecord.Label__c;
         dto.configJson = elementRecord.Config_JSON__c;
         dto.parentElementId = elementRecord.Parent_Element_Id__c;
@@ -392,14 +415,17 @@ public with sharing class NativeFormsBuilderController {
         return labelsByType.containsKey(elementType) ? labelsByType.get(elementType) : 'Form Element';
     }
 
-    private static String defaultFieldKeyForType(String elementType) {
+    private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
         Set<String> nonInputTypes = new Set<String>{ 'heading', 'image', 'section', 'columns' };
         if (nonInputTypes.contains(elementType)) {
             return null;
         }
 
         String seed = elementType == 'input' ? 'field' : elementType;
-        return seed + '_' + String.valueOf(Math.abs(Crypto.getRandomInteger())).right(6);
+        if (seed == 'select') seed = 'picklist';
+        if (seed == 'tel') seed = 'phone';
+        Integer safeIndex = elementIndex == null || elementIndex <= 0 ? 1 : elementIndex;
+        return seed + String.valueOf(safeIndex);
     }
 
     private static String defaultConfigJsonForType(String elementType) {
@@ -410,9 +436,16 @@ public with sharing class NativeFormsBuilderController {
                 new Map<String, Object>{ 'label' => 'Option 1', 'value' => 'option1' },
                 new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
             });
+            config.put('defaultValue', '');
         }
         if (elementType == 'textarea' || elementType == 'text' || elementType == 'input') {
             config.put('placeholder', 'Enter a value');
+        }
+        if (elementType == 'checkbox') {
+            config.put('checked', false);
+        }
+        if (elementType == 'hidden') {
+            config.put('value', '');
         }
         if (elementType == 'heading') {
             config.put('text', 'Add a helpful heading for this section');
@@ -428,7 +461,7 @@ public with sharing class NativeFormsBuilderController {
         return JSON.serializePretty(config);
     }
 
-    private static List<SelectOption> getFieldOptions(String objectApiName) {
+    private static List<SelectOption> getReadableFieldOptions(String objectApiName) {
         List<SelectOption> options = new List<SelectOption>();
         if (String.isBlank(objectApiName) || !Schema.getGlobalDescribe().containsKey(objectApiName)) {
             return options;
@@ -448,5 +481,70 @@ public with sharing class NativeFormsBuilderController {
             options.add(option);
         }
         return options;
+    }
+
+    private static List<SelectOption> getWritableFieldOptions(String objectApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName) || !Schema.getGlobalDescribe().containsKey(objectApiName)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(objectApiName).getDescribe().fields.getMap();
+        List<String> fieldNames = new List<String>(fieldsMap.keySet());
+        fieldNames.sort();
+        for (String fieldApiName : fieldNames) {
+            Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
+            if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            if (!fieldDescribe.isCreateable() && !fieldDescribe.isUpdateable()) {
+                continue;
+            }
+            if (fieldDescribe.isCalculated() || fieldDescribe.isAutoNumber()) {
+                continue;
+            }
+            SelectOption option = new SelectOption();
+            option.label = fieldDescribe.getLabel() + ' (' + fieldDescribe.getName() + ')';
+            option.value = fieldDescribe.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    private static void ensureVersionEditable(Id versionId) {
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Version_Status__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+        if (versionRecord.Version_Status__c == 'Published') {
+            throw new AuraHandledException('Published versions are read-only. Open the latest draft version to continue editing.');
+        }
+    }
+
+    private static void ensureElementVersionEditable(Id elementId) {
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Form_Version__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+        ensureVersionEditable(elementRecord.Form_Version__c);
+    }
+
+    private static Integer getNextElementIndex(Id formId) {
+        if (formId == null) {
+            return 1;
+        }
+        AggregateResult[] rows = [
+            SELECT MAX(Element_Index__c) maxIndex
+            FROM NF_Form_Element__c
+            WHERE Form_Version__r.Form__c = :formId
+        ];
+        if (!rows.isEmpty() && rows[0].get('maxIndex') != null) {
+            return Integer.valueOf(String.valueOf(rows[0].get('maxIndex'))) + 1;
+        }
+        return 1;
     }
 }

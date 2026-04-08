@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Debug_All_Records</fullName>
+    <columns>NAME</columns>
+    <columns>NF_Key__c</columns>
+    <columns>Status__c</columns>
+    <columns>Category__c</columns>
+    <columns>Business_Owner__c</columns>
+    <columns>Current_Draft_Version__c</columns>
+    <columns>Current_Published_Version__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>Debug - All Records</label>
+</ListView>

@@ -15,6 +15,11 @@
             <value><fullName>text</fullName><default>false</default><label>Text</label></value>
             <value><fullName>input</fullName><default>false</default><label>Input</label></value>
             <value><fullName>textarea</fullName><default>false</default><label>Textarea</label></value>
+            <value><fullName>number</fullName><default>false</default><label>Number</label></value>
+            <value><fullName>date</fullName><default>false</default><label>Date</label></value>
+            <value><fullName>email</fullName><default>false</default><label>Email</label></value>
+            <value><fullName>tel</fullName><default>false</default><label>Phone</label></value>
+            <value><fullName>url</fullName><default>false</default><label>URL</label></value>
             <value><fullName>select</fullName><default>false</default><label>Select</label></value>
             <value><fullName>checkbox</fullName><default>false</default><label>Checkbox</label></value>
             <value><fullName>radio</fullName><default>false</default><label>Radio</label></value>

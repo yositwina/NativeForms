@@ -29,6 +29,15 @@ public with sharing class NativeFormsSubmitActionsController {
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<SubmitActionRecord> actions { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
+        @AuraEnabled public List<MappingRecord> mappings { get; set; }
+    }
+
+    public class MappingRecord {
+        @AuraEnabled public Id elementId { get; set; }
+        @AuraEnabled public String elementLabel { get; set; }
+        @AuraEnabled public String fieldKey { get; set; }
+        @AuraEnabled public String actionKey { get; set; }
+        @AuraEnabled public String fieldPath { get; set; }
     }
 
     public class SubmitActionInput {
@@ -41,12 +50,13 @@ public with sharing class NativeFormsSubmitActionsController {
         @AuraEnabled public String configJson { get; set; }
     }
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static SubmitWorkspace getWorkspace(Id versionId) {
         SubmitWorkspace workspace = new SubmitWorkspace();
         workspace.versions = new List<VersionOption>();
         workspace.actions = new List<SubmitActionRecord>();
         workspace.objectOptions = getObjectOptions();
+        workspace.mappings = new List<MappingRecord>();
 
         List<NF_Form_Version__c> versions = [
             SELECT Id,
@@ -103,7 +113,36 @@ public with sharing class NativeFormsSubmitActionsController {
             workspace.actions.add(toRecord(actionRecord));
         }
 
+        for (NF_Form_Element__c elementRecord : [
+            SELECT Id, Label__c, Field_Key__c, Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :effectiveVersionId
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            if (!booleanValue(config.get('submitEnabled'))) {
+                continue;
+            }
+            String actionKey = stringValue(config.get('submitActionKey'));
+            String fieldPath = stringValue(config.get('submitFieldPath'));
+            if (String.isBlank(actionKey) || String.isBlank(fieldPath)) {
+                continue;
+            }
+            MappingRecord mapping = new MappingRecord();
+            mapping.elementId = elementRecord.Id;
+            mapping.elementLabel = elementRecord.Label__c;
+            mapping.fieldKey = elementRecord.Field_Key__c;
+            mapping.actionKey = actionKey;
+            mapping.fieldPath = fieldPath;
+            workspace.mappings.add(mapping);
+        }
+
         return workspace;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SelectOption> getFieldOptions(String objectApiName) {
+        return getReadableFieldOptions(objectApiName);
     }
 
     @AuraEnabled
@@ -111,6 +150,7 @@ public with sharing class NativeFormsSubmitActionsController {
         if (versionId == null) {
             throw new AuraHandledException('Select a form version first.');
         }
+        ensureVersionEditable(versionId);
 
         Integer nextOrder = 10;
         AggregateResult[] maxRows = [
@@ -161,6 +201,12 @@ public with sharing class NativeFormsSubmitActionsController {
         if (inputValue.id == null) {
             throw new AuraHandledException('Action id is required.');
         }
+        if (String.isBlank(inputValue.objectApiName)) {
+            throw new AuraHandledException('Choose a Salesforce object.');
+        }
+        if (String.isBlank(inputValue.commandType)) {
+            throw new AuraHandledException('Choose a submit mode.');
+        }
 
         NF_Form_Action__c actionRecord = [
             SELECT Id,
@@ -177,12 +223,13 @@ public with sharing class NativeFormsSubmitActionsController {
             WHERE Id = :inputValue.id
             LIMIT 1
         ];
+        ensureActionVersionEditable(actionRecord.Form_Version__c);
 
         actionRecord.Command_Key__c = String.isBlank(inputValue.actionKey)
             ? buildActionKey(inputValue.objectApiName, inputValue.commandType)
             : inputValue.actionKey;
         actionRecord.Command_Type__c = inputValue.commandType;
-        actionRecord.Object_Api_Name__c = inputValue.objectApiName;
+        actionRecord.Object_Api_Name__c = canonicalObjectApiName(inputValue.objectApiName);
         actionRecord.Store_Result_As__c = inputValue.storeResultAs;
         actionRecord.Config_JSON__c = String.isBlank(inputValue.configJson) ? '{}' : inputValue.configJson;
         update actionRecord;
@@ -196,12 +243,15 @@ public with sharing class NativeFormsSubmitActionsController {
             throw new AuraHandledException('Action id is required.');
         }
 
-        delete [
-            SELECT Id
+        NF_Form_Action__c actionRecord = [
+            SELECT Id, Form_Version__c
             FROM NF_Form_Action__c
             WHERE Id = :actionId
             LIMIT 1
         ];
+        ensureActionVersionEditable(actionRecord.Form_Version__c);
+
+        delete actionRecord;
     }
 
     private static SubmitActionRecord toRecord(NF_Form_Action__c actionRecord) {
@@ -248,9 +298,100 @@ public with sharing class NativeFormsSubmitActionsController {
         return options;
     }
 
+    private static List<SelectOption> getReadableFieldOptions(String objectApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName)) {
+            return options;
+        }
+
+        String canonicalObject = canonicalObjectApiName(objectApiName);
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        if (String.isBlank(canonicalObject) || !globalDescribe.containsKey(canonicalObject)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = globalDescribe.get(canonicalObject).getDescribe().fields.getMap();
+        List<String> fieldNames = new List<String>(fieldsMap.keySet());
+        fieldNames.sort();
+        for (String fieldApiName : fieldNames) {
+            Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
+            if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            SelectOption option = new SelectOption();
+            option.label = fieldDescribe.getLabel() + ' (' + fieldApiName + ')';
+            option.value = fieldDescribe.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    private static Map<String, Object> parseJsonMap(String rawJson) {
+        if (String.isBlank(rawJson)) {
+            return new Map<String, Object>();
+        }
+        try {
+            Object parsedValue = JSON.deserializeUntyped(rawJson);
+            return parsedValue instanceof Map<String, Object>
+                ? (Map<String, Object>) parsedValue
+                : new Map<String, Object>();
+        } catch (Exception e) {
+            return new Map<String, Object>();
+        }
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static Boolean booleanValue(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return String.valueOf(value).toLowerCase() == 'true';
+    }
+
     private static String buildActionKey(String objectApiName, String commandType) {
         String objectSeed = String.isBlank(objectApiName) ? 'Record' : objectApiName.replaceAll('[^a-zA-Z0-9]', '');
         String actionSeed = String.isBlank(commandType) ? 'create' : commandType.replaceAll('[^a-zA-Z0-9]', '');
         return (actionSeed + objectSeed).left(80);
+    }
+
+    private static String canonicalObjectApiName(String requestedObjectName) {
+        if (String.isBlank(requestedObjectName)) {
+            return requestedObjectName;
+        }
+
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        if (globalDescribe.containsKey(requestedObjectName)) {
+            return globalDescribe.get(requestedObjectName).getDescribe().getName();
+        }
+
+        for (String apiName : globalDescribe.keySet()) {
+            if (apiName != null && apiName.toLowerCase() == requestedObjectName.toLowerCase()) {
+                return globalDescribe.get(apiName).getDescribe().getName();
+            }
+        }
+
+        return requestedObjectName;
+    }
+
+    private static void ensureVersionEditable(Id versionId) {
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Version_Status__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+        if (versionRecord.Version_Status__c == 'Published') {
+            throw new AuraHandledException('Published versions are read-only. Open the latest draft in NativeForms Designer.');
+        }
+    }
+
+    private static void ensureActionVersionEditable(Id versionId) {
+        ensureVersionEditable(versionId);
     }
 }

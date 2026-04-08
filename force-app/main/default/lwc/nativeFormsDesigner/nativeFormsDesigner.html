@@ -1,0 +1,654 @@
+<template>
+    <lightning-card title="NativeForms Designer" icon-name="utility:brush">
+        <div class="designer-shell">
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading designer"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="designer-layout">
+                    <section class="pane pane-left">
+                        <p class="designer-version">Designer {designerVersion}</p>
+
+                        <div class="designer-picker-stack">
+                            <lightning-combobox
+                                name="formId"
+                                label="Form"
+                                value={selectedFormId}
+                                options={formOptions}
+                                onchange={handleFormChange}>
+                            </lightning-combobox>
+
+                            <lightning-combobox
+                                name="versionId"
+                                label="Version"
+                                value={selectedVersionId}
+                                options={versionOptions}
+                                onchange={handleVersionChange}>
+                            </lightning-combobox>
+
+                            <lightning-button
+                                variant="brand"
+                                label="Publish Form"
+                                disabled={isSelectedVersionReadOnly}
+                                onclick={handlePublishVersion}>
+                            </lightning-button>
+
+                            <template if:true={isSelectedVersionReadOnly}>
+                                <div class="panel-error">{readOnlyMessage}</div>
+                            </template>
+                        </div>
+
+                        <template if:true={publishResult}>
+                            <div class={publishResultClass}>
+                                <p class="result-title">{publishResultTitle}</p>
+                                <p>{publishResult.message}</p>
+                                <template if:true={publishResult.publicUrl}>
+                                    <p><a href={publishResult.publicUrl} target="_blank" rel="noopener">Open published form</a></p>
+                                </template>
+                            </div>
+                        </template>
+
+                        <div class="pane-header">
+                            <h2>Add Building Blocks</h2>
+                            <p class="pane-copy">Keep this side simple. Add one input or one display block at a time and then judge the canvas.</p>
+                        </div>
+
+                        <div class="add-block">
+                            <h3>Input Field</h3>
+                            <lightning-combobox
+                                name="inputFieldType"
+                                label="Input Type"
+                                value={inputFieldType}
+                                options={inputFieldOptions}
+                                disabled={isSelectedVersionReadOnly}
+                                onchange={handleInputTypeChange}>
+                            </lightning-combobox>
+                            <lightning-button variant="brand" label="Add Field" disabled={isSelectedVersionReadOnly} onclick={handleAddInput}></lightning-button>
+                        </div>
+
+                        <div class="add-block">
+                            <h3>Display Element</h3>
+                            <lightning-combobox
+                                name="displayElementType"
+                                label="Display Type"
+                                value={displayElementType}
+                                options={displayElementOptions}
+                                disabled={isSelectedVersionReadOnly}
+                                onchange={handleDisplayTypeChange}>
+                            </lightning-combobox>
+                            <lightning-button variant="neutral" label="Add Display" disabled={isSelectedVersionReadOnly} onclick={handleAddDisplay}></lightning-button>
+                        </div>
+                    </section>
+
+                    <section class="pane pane-center">
+                        <template if:true={elements.length}>
+                            <div class="designer-canvas-shell">
+                                <div class="designer-canvas-header">
+                                    <p class="designer-canvas-title">{canvasTitle}</p>
+                                    <p class="designer-canvas-subtitle">{canvasSummaryLine}</p>
+                                </div>
+                                <div class="designer-canvas" onclick={handleCanvasClick}>
+                                <template for:each={canvasRows} for:item="row">
+                                    <div
+                                        key={row.dropKey}
+                                        class={row.dropClass}
+                                        data-index={row.index}
+                                        ondragover={handleDragOver}
+                                        ondragleave={handleDragLeave}
+                                        ondrop={handleDrop}>
+                                    </div>
+                                    <template if:true={row.hasItem}>
+                                        <article
+                                            key={row.item.id}
+                                            class={row.item.cardClass}
+                                            data-id={row.item.id}
+                                            draggable={row.item.isTopLevelDraggable}
+                                            onclick={handleSelectElement}
+                                            ondragstart={handleDragStart}
+                                            ondragend={handleDragEnd}>
+                                        <template if:true={row.item.showHiddenBadge}>
+                                            <div class="preview-hidden-badge">Hidden</div>
+                                        </template>
+                                        <template if:true={row.item.showConditionalBadge}>
+                                            <div class="preview-conditional-badge">{row.item.conditionalSummary}</div>
+                                        </template>
+                                        <template lwc:if={row.item.isSection}>
+                                            <div class="preview-section" style={row.item.cardStyle}>
+                                                <div class="preview-section__top">
+                                                    <template if:true={row.item.showTitle}>
+                                                        <div class="preview-section__title">{row.item.label}</div>
+                                                    </template>
+                                                </div>
+                                                <div class={row.item.sectionColumnClass}>
+                                                    <template for:each={row.item.sectionSlots} for:item="column">
+                                                        <div
+                                                            key={column.key}
+                                                            class={column.dropClass}
+                                                            data-section-id={column.sectionId}
+                                                            data-column={column.columnValue}
+                                                            ondragover={handleSectionDragOver}
+                                                            ondragleave={handleSectionDragLeave}
+                                                            ondrop={handleDropIntoSection}>
+                                                            <template if:true={column.hasChildren}>
+                                                                <div
+                                                                    class="preview-column-slot__items"
+                                                                    data-section-id={column.sectionId}
+                                                                    data-column={column.columnValue}
+                                                                    ondragover={handleSectionDragOver}
+                                                                    ondragleave={handleSectionDragLeave}
+                                                                    ondrop={handleDropIntoSection}>
+                                                                    <template for:each={column.childItems} for:item="child">
+                                                                        <article
+                                                                            key={child.id}
+                                                                            class={child.cardClass}
+                                                                            data-id={child.id}
+                                                                            draggable={child.isChildDraggable}
+                                                                            onclick={handleSelectElement}
+                                                                            ondragstart={handleDragStart}
+                                                                            ondragend={handleDragEnd}>
+                                                                            <template if:true={child.showHiddenBadge}>
+                                                                                <div class="preview-hidden-badge">Hidden</div>
+                                                                            </template>
+                                                                            <template if:true={child.showConditionalBadge}>
+                                                                                <div class="preview-conditional-badge">{child.conditionalSummary}</div>
+                                                                            </template>
+                                                                            <template lwc:if={child.isCheckbox}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-checkbox__control">
+                                                                                        <input type="checkbox" disabled />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isHeading}>
+                                                                                <div class={child.previewTextClass}>
+                                                                                    <lightning-formatted-rich-text value={child.previewHtml}></lightning-formatted-rich-text>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isImage}>
+                                                                                <div class="preview-image">
+                                                                                    <div class={child.imageFrameClass}>
+                                                                                        <template if:true={child.previewImageUrl}>
+                                                                                            <img src={child.previewImageUrl} alt={child.previewImageAlt} class={child.imageClass} style={child.imageStyle} />
+                                                                                        </template>
+                                                                                        <template if:false={child.previewImageUrl}>
+                                                                                            <span>{child.previewText}</span>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isSelect}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <select disabled>
+                                                                                        <template for:each={child.previewOptions} for:item="option">
+                                                                                            <option key={option.value}>{option.label}</option>
+                                                                                        </template>
+                                                                                    </select>
+                                                                                    <template if:true={child.showExpandedPicklist}>
+                                                                                        <div class="preview-select-options">
+                                                                                            <template for:each={child.previewOptions} for:item="option">
+                                                                                                <div key={option.value} class="preview-select-options__item">{option.label}</div>
+                                                                                            </template>
+                                                                                        </div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isRadio}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-radio-group">
+                                                                                        <template for:each={child.previewOptions} for:item="option">
+                                                                                            <label key={option.value} class="preview-radio-option">
+                                                                                                <input type="radio" disabled />
+                                                                                                <span>{option.label}</span>
+                                                                                            </label>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isTextarea}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <textarea placeholder={child.previewPlaceholder} disabled></textarea>
+                                                                                    <template if:true={child.validationPattern}>
+                                                                                        <div class="preview-validation-hint">{child.validationPattern}</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:else>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <input type={child.previewInputType} placeholder={child.previewPlaceholder} disabled />
+                                                                                    <template if:true={child.validationPattern}>
+                                                                                        <div class="preview-validation-hint">{child.validationPattern}</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                        </article>
+                                                                    </template>
+                                                                </div>
+                                                            </template>
+                                                            <template if:false={column.hasChildren}>
+                                                                Column {column.label}
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isCheckbox}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                </template>
+                                                <div class="preview-checkbox__control">
+                                                    <input type="checkbox" disabled />
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isHeading}>
+                                            <div class={row.item.previewTextClass}>
+                                                <lightning-formatted-rich-text value={row.item.previewHtml}></lightning-formatted-rich-text>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isImage}>
+                                            <div class="preview-image">
+                                                <div class={row.item.imageFrameClass}>
+                                                    <template if:true={row.item.previewImageUrl}>
+                                                        <img src={row.item.previewImageUrl} alt={row.item.previewImageAlt} class={row.item.imageClass} style={row.item.imageStyle} />
+                                                    </template>
+                                                    <template if:false={row.item.previewImageUrl}>
+                                                        <span>Image placeholder</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isSelect}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                </template>
+                                                <select disabled>
+                                                    <template for:each={row.item.previewOptions} for:item="option">
+                                                        <option key={option.value}>{option.label}</option>
+                                                    </template>
+                                                </select>
+                                                <template if:true={row.item.showExpandedPicklist}>
+                                                    <div class="preview-select-options">
+                                                        <template for:each={row.item.previewOptions} for:item="option">
+                                                            <div key={option.value} class="preview-select-options__item">{option.label}</div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isRadio}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                </template>
+                                                <div class="preview-radio-group">
+                                                    <template for:each={row.item.previewOptions} for:item="option">
+                                                        <label key={option.value} class="preview-radio-option">
+                                                            <input type="radio" disabled />
+                                                            <span>{option.label}</span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isTextarea}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                </template>
+                                                <textarea placeholder={row.item.previewPlaceholder} disabled></textarea>
+                                                <template if:true={row.item.validationPattern}>
+                                                    <div class="preview-validation-hint">{row.item.validationPattern}</div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:else>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                </template>
+                                                <input type={row.item.previewInputType} placeholder={row.item.previewPlaceholder} disabled />
+                                                <template if:true={row.item.validationPattern}>
+                                                    <div class="preview-validation-hint">{row.item.validationPattern}</div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </article>
+                                    </template>
+                                </template>
+                                </div>
+                            </div>
+                        </template>
+                        <template if:false={elements.length}>
+                            <div class="empty-state">
+                                Choose a form and version, then add a Section, Text Input, or Checkbox to start shaping the new canvas.
+                            </div>
+                        </template>
+                    </section>
+
+                    <section class="pane pane-right">
+                        <div class="pane-header">
+                            <h2>Element Properties</h2>
+                        </div>
+
+                        <template if:true={isSelectedVersionReadOnly}>
+                            <div class="empty-state">
+                                This published version is locked. Use the version picker to open a draft for editing.
+                            </div>
+                        </template>
+                        <template if:false={isSelectedVersionReadOnly}>
+                        <template if:true={selectedElement}>
+                            <div class="selection-card">
+                                <p class="selection-label">Display Properties</p>
+                                <lightning-input
+                                    label="Label"
+                                    value={editorLabel}
+                                    onchange={handleEditorLabelChange}>
+                                </lightning-input>
+
+                                <lightning-input
+                                    label="Element Index"
+                                    value={selectedElementIndex}
+                                    read-only>
+                                </lightning-input>
+
+                                <lightning-input
+                                    label="Field Key"
+                                    value={selectedElementFieldKey}
+                                    read-only>
+                                </lightning-input>
+
+                                <lightning-combobox
+                                    label="Element Type"
+                                    value={editorElementType}
+                                    options={editorElementTypeOptions}
+                                    onchange={handleEditorTypeChange}>
+                                </lightning-combobox>
+
+                                <template if:true={selectedElementSupportsLabelPosition}>
+                                    <lightning-combobox
+                                        label="Label Position"
+                                        value={editorLabelPosition}
+                                        options={labelPositionOptions}
+                                        onchange={handleEditorLabelPositionChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementSupportsFieldBehavior}>
+                                    <lightning-combobox
+                                        label="Field Behavior"
+                                        value={editorFieldBehavior}
+                                        options={fieldBehaviorOptions}
+                                        onchange={handleEditorFieldBehaviorChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementSupportsConditional}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Conditional View"
+                                        checked={editorConditionalEnabled}
+                                        onchange={handleEditorConditionalEnabledChange}>
+                                    </lightning-input>
+                                    <template if:true={editorConditionalEnabled}>
+                                        <lightning-combobox
+                                            label="Source Field"
+                                            value={editorConditionalFieldKey}
+                                            options={conditionalFieldOptions}
+                                            onchange={handleEditorConditionalFieldChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            label="Operator"
+                                            value={editorConditionalOperator}
+                                            options={conditionalOperatorOptions}
+                                            onchange={handleEditorConditionalOperatorChange}>
+                                        </lightning-combobox>
+                                        <template if:true={selectedElementUsesConditionalValue}>
+                                            <lightning-input
+                                                label="Compare Value"
+                                                value={editorConditionalValue}
+                                                onchange={handleEditorConditionalValueChange}>
+                                            </lightning-input>
+                                        </template>
+                                    </template>
+                                </template>
+
+                                <template if:true={selectedElementSupportsBoldLabel}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Bold Label"
+                                        checked={editorLabelBold}
+                                        onchange={handleEditorLabelBoldChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementSupportsPlaceholder}>
+                                    <lightning-input
+                                        label="Placeholder"
+                                        value={editorPlaceholder}
+                                        onchange={handleEditorPlaceholderChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementIsNumber}>
+                                    <lightning-input
+                                        label="Min Value"
+                                        value={editorMinValue}
+                                        onchange={handleEditorMinValueChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        label="Max Value"
+                                        value={editorMaxValue}
+                                        onchange={handleEditorMaxValueChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementIsDate}>
+                                    <lightning-input
+                                        type="date"
+                                        label="From Date"
+                                        value={editorMinValue}
+                                        onchange={handleEditorMinValueChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="date"
+                                        label="To Date"
+                                        value={editorMaxValue}
+                                        onchange={handleEditorMaxValueChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementSupportsTextValidation}>
+                                    <lightning-combobox
+                                        label="Text Rule"
+                                        value={editorTextRule}
+                                        options={textRuleOptions}
+                                        onchange={handleEditorTextRuleChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsPicklist}>
+                                    <lightning-combobox
+                                        label="Salesforce Object"
+                                        value={editorPicklistObject}
+                                        options={salesforceObjectOptions}
+                                        onchange={handleEditorPicklistObjectChange}>
+                                    </lightning-combobox>
+                                    <lightning-combobox
+                                        label="Salesforce Picklist Field"
+                                        value={editorPicklistField}
+                                        options={picklistFieldOptions}
+                                        onchange={handleEditorPicklistFieldChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsRadio}>
+                                    <lightning-textarea
+                                        label="Radio Options"
+                                        value={editorRadioOptionsText}
+                                        onchange={handleEditorRadioOptionsChange}>
+                                    </lightning-textarea>
+                                </template>
+
+                                <template if:true={selectedElementIsDisplayText}>
+                                    <lightning-input-rich-text
+                                        label="Display Text"
+                                        value={editorDisplayText}
+                                        onchange={handleEditorDisplayTextChange}>
+                                    </lightning-input-rich-text>
+                                </template>
+
+                                <template if:true={selectedElementIsImage}>
+                                    <lightning-input
+                                        type="file"
+                                        label="Upload Image"
+                                        accept="image/*"
+                                        onchange={handleImageFileChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        label="Image URL"
+                                        value={editorImageUrl}
+                                        onchange={handleEditorImageUrlChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        label="Alt Text"
+                                        value={editorImageAlt}
+                                        onchange={handleEditorImageAltChange}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Image Fit"
+                                        value={editorImageFit}
+                                        options={imageFitOptions}
+                                        onchange={handleEditorImageFitChange}>
+                                    </lightning-combobox>
+                                    <lightning-input
+                                        type="number"
+                                        label="Image Size Percent"
+                                        value={editorImageWidthPercent}
+                                        min="1"
+                                        max="100"
+                                        onchange={handleEditorImageWidthPercentChange}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementIsSection}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Title"
+                                        checked={editorShowTitle}
+                                        onchange={handleEditorShowTitleChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Rectangular Box"
+                                        checked={editorBoxed}
+                                        onchange={handleEditorBoxedChange}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Columns"
+                                        value={editorColumns}
+                                        options={sectionColumnOptions}
+                                        onchange={handleEditorColumnsChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <div class="selection-actions">
+                                    <lightning-button
+                                        variant="destructive-text"
+                                        label="Delete Item"
+                                        onclick={handleDeleteSelected}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+
+                            <template if:true={selectedElementSupportsSalesforceMapping}>
+                                <div class="selection-card">
+                                    <p class="selection-label">Salesforce Mapping</p>
+
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Enable Prefill"
+                                        checked={editorPrefillEnabled}
+                                        onchange={handleEditorPrefillEnabledChange}>
+                                    </lightning-input>
+                                    <template if:true={editorPrefillEnabled}>
+                                        <lightning-combobox
+                                            label="Prefill Alias"
+                                            value={editorPrefillAlias}
+                                            options={prefillAliasOptions}
+                                            onchange={handleEditorPrefillAliasChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            label="Salesforce Field"
+                                            value={editorPrefillFieldPath}
+                                            options={prefillFieldOptions}
+                                            onchange={handleEditorPrefillFieldChange}>
+                                        </lightning-combobox>
+                                    </template>
+
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Enable Submit"
+                                        checked={editorSubmitEnabled}
+                                        onchange={handleEditorSubmitEnabledChange}>
+                                    </lightning-input>
+                                    <template if:true={editorSubmitEnabled}>
+                                        <lightning-combobox
+                                            label="Submit Action"
+                                            value={editorSubmitActionKey}
+                                            options={submitActionOptions}
+                                            onchange={handleEditorSubmitActionChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            label="Salesforce Field"
+                                            value={editorSubmitFieldPath}
+                                            options={submitFieldOptions}
+                                            onchange={handleEditorSubmitFieldChange}>
+                                        </lightning-combobox>
+                                    </template>
+                                </div>
+                            </template>
+                        </template>
+                        <template if:false={selectedElement}>
+                            <div class="empty-state">
+                                Select an element on the canvas to inspect it here.
+                            </div>
+                        </template>
+                        </template>
+                    </section>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

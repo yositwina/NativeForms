@@ -39,6 +39,7 @@ export default class NativeFormsBuilder extends LightningElement {
     submitActionDetails = [];
     submitFieldSearch = '';
     publishResult = null;
+    choiceOptionsText = '';
 
     @track elements = [];
     @track versionOptions = [];
@@ -101,6 +102,26 @@ export default class NativeFormsBuilder extends LightningElement {
         return this.publishResult?.success ? 'Publish completed' : 'Publish failed';
     }
 
+    get showsPlaceholder() {
+        return ['text', 'input', 'textarea'].includes(this.draftElement?.elementType);
+    }
+
+    get isChoiceField() {
+        return ['select', 'radio'].includes(this.draftElement?.elementType);
+    }
+
+    get isCheckboxField() {
+        return this.draftElement?.elementType === 'checkbox';
+    }
+
+    get isHiddenField() {
+        return this.draftElement?.elementType === 'hidden';
+    }
+
+    get choiceOptionsHelpText() {
+        return 'Use one option per line. Format: Label|value';
+    }
+
     get submitFieldOptions() {
         const actionKey = this.draftElement?.submitActionKey;
         if (!actionKey) {
@@ -135,7 +156,7 @@ export default class NativeFormsBuilder extends LightningElement {
             );
             this.submitActionOptions = [{ label: 'Select action', value: '' }].concat(
                 this.submitActionDetails.map((action) => ({
-                    label: `${action.actionKey} (${action.objectApiName} • ${action.commandType})`,
+                    label: `${action.actionKey} (${action.objectApiName} - ${action.commandType})`,
                     value: action.actionKey
                 }))
             );
@@ -179,6 +200,7 @@ export default class NativeFormsBuilder extends LightningElement {
             submitActionKey: config.submitActionKey || '',
             submitFieldPath: config.submitFieldPath || '',
             saveOnSubmit: !!config.submitEnabled || !!config.submitActionKey || !!config.submitFieldPath,
+            optionsText: this.optionsToText(config.options),
             cardClass: `canvas-item${selected ? ' canvas-item--selected' : ''}`
         };
     }
@@ -230,6 +252,14 @@ export default class NativeFormsBuilder extends LightningElement {
         const value = type === 'checkbox' ? event.target.checked : event.target.value;
         if (name === 'fieldKey') {
             this.fieldKeyTouched = true;
+        }
+        if (name === 'choiceOptionsText') {
+            this.choiceOptionsText = value;
+            this.draftElement = {
+                ...this.draftElement,
+                choiceOptionsText: value
+            };
+            return;
         }
         if (name === 'prefillAlias') {
             this.prefillFieldSearch = '';
@@ -374,6 +404,9 @@ export default class NativeFormsBuilder extends LightningElement {
             ...element,
             placeholder: config.placeholder || '',
             required: !!config.required,
+            defaultValue: config.defaultValue || '',
+            checked: !!config.checked,
+            hiddenValue: config.value == null ? '' : String(config.value),
             prefillEnabled: !!config.prefillEnabled,
             prefillAlias: config.prefillAlias || '',
             prefillFieldPath: config.prefillFieldPath || '',
@@ -382,8 +415,10 @@ export default class NativeFormsBuilder extends LightningElement {
             submitActionKey: config.submitActionKey || '',
             submitFieldPath: config.submitFieldPath || '',
             saveOnSubmit: !!config.submitEnabled || !!config.submitActionKey || !!config.submitFieldPath,
+            choiceOptionsText: this.optionsToText(config.options),
             configJson: element.configJson || '{}'
         };
+        this.choiceOptionsText = this.draftElement.choiceOptionsText || '';
         this.fieldKeyTouched = false;
     }
 
@@ -400,20 +435,84 @@ export default class NativeFormsBuilder extends LightningElement {
 
     buildConfigJson() {
         const existing = this.parseConfig(this.draftElement.configJson);
-        const merged = {
-            ...existing,
-            placeholder: this.draftElement.placeholder || '',
-            required: !!this.draftElement.required,
-            prefillEnabled: !!this.draftElement.prefillEnabled,
-            prefillAlias: this.draftElement.prefillAlias || '',
-            prefillFieldPath: this.draftElement.prefillFieldPath || '',
-            prefillReadOnly: !!this.draftElement.prefillReadOnly,
-            submitEnabled: !!this.draftElement.submitEnabled,
-            submitActionKey: this.draftElement.submitActionKey || '',
-            submitFieldPath: this.draftElement.submitFieldPath || '',
-            saveOnSubmit: !!this.draftElement.submitEnabled
-        };
+        const merged = { ...existing };
+
+        if (this.showsPlaceholder) {
+            merged.placeholder = this.draftElement.placeholder || '';
+        } else {
+            delete merged.placeholder;
+        }
+
+        if (this.isChoiceField) {
+            merged.options = this.parseChoiceOptions(this.choiceOptionsText);
+            merged.defaultValue = this.draftElement.defaultValue || '';
+        } else {
+            delete merged.options;
+            delete merged.defaultValue;
+        }
+
+        if (this.isCheckboxField) {
+            merged.checked = !!this.draftElement.checked;
+        } else {
+            delete merged.checked;
+        }
+
+        if (this.isHiddenField) {
+            merged.value = this.draftElement.hiddenValue || '';
+        } else {
+            delete merged.value;
+        }
+
+        merged.required = !!this.draftElement.required;
+        merged.prefillEnabled = !!this.draftElement.prefillEnabled;
+        merged.prefillAlias = this.draftElement.prefillAlias || '';
+        merged.prefillFieldPath = this.draftElement.prefillFieldPath || '';
+        merged.prefillReadOnly = !!this.draftElement.prefillReadOnly;
+        merged.submitEnabled = !!this.draftElement.submitEnabled;
+        merged.submitActionKey = this.draftElement.submitActionKey || '';
+        merged.submitFieldPath = this.draftElement.submitFieldPath || '';
+        merged.saveOnSubmit = !!this.draftElement.submitEnabled;
         return JSON.stringify(merged, null, 2);
+    }
+
+    optionsToText(options) {
+        if (!Array.isArray(options) || !options.length) {
+            return '';
+        }
+        return options
+            .map((item) => `${item?.label ?? ''}|${item?.value ?? ''}`)
+            .join('\n');
+    }
+
+    parseChoiceOptions(rawText) {
+        return String(rawText || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => !!line)
+            .map((line) => {
+                const pipeIndex = line.indexOf('|');
+                if (pipeIndex < 0) {
+                    return {
+                        label: line,
+                        value: this.slugifyOptionValue(line)
+                    };
+                }
+                const label = line.slice(0, pipeIndex).trim();
+                const value = line.slice(pipeIndex + 1).trim();
+                return {
+                    label: label || value,
+                    value: value || this.slugifyOptionValue(label)
+                };
+            });
+    }
+
+    slugifyOptionValue(label) {
+        const raw = String(label || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return raw || 'option';
     }
 
     supportsFieldKey(elementType) {

@@ -1,9 +1,12 @@
 import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsPrefillActionsController.getWorkspace';
+import getFieldOptions from '@salesforce/apex/NativeFormsPrefillActionsController.getFieldOptions';
 import addPrefillAction from '@salesforce/apex/NativeFormsPrefillActionsController.addPrefillAction';
 import savePrefillAction from '@salesforce/apex/NativeFormsPrefillActionsController.savePrefillAction';
 import deletePrefillAction from '@salesforce/apex/NativeFormsPrefillActionsController.deletePrefillAction';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsPrefillActions extends LightningElement {
     isLoading = true;
@@ -16,10 +19,27 @@ export default class NativeFormsPrefillActions extends LightningElement {
     selectedActionId;
     objectOptions = [];
     objectSearch = '';
+    fieldOptions = [];
+    conditionLogicOptions = [
+        { label: 'AND', value: 'AND' },
+        { label: 'OR', value: 'OR' }
+    ];
+    operatorOptions = [
+        { label: 'Equals', value: 'eq' },
+        { label: 'Not equals', value: 'neq' },
+        { label: 'Contains', value: 'contains' },
+        { label: 'Starts with', value: 'startsWith' },
+        { label: 'Greater than', value: 'gt' },
+        { label: 'Less than', value: 'lt' },
+        { label: 'Is blank', value: 'isBlank' },
+        { label: 'Is not blank', value: 'isNotBlank' }
+    ];
 
     @track actions = [];
     @track versionOptions = [];
     @track draftAction = {};
+    @track mappings = [];
+    boundHandlePageActivation;
 
     commandTypeOptions = [
         { label: 'findOne', value: 'findOne' },
@@ -32,7 +52,18 @@ export default class NativeFormsPrefillActions extends LightningElement {
     ];
 
     connectedCallback() {
-        this.loadWorkspace();
+        this.boundHandlePageActivation = this.handlePageActivation.bind(this);
+        window.addEventListener('focus', this.boundHandlePageActivation);
+        document.addEventListener('visibilitychange', this.boundHandlePageActivation);
+        this.selectedVersionId = this.loadStoredVersionId();
+        this.loadWorkspace(this.selectedVersionId);
+    }
+
+    disconnectedCallback() {
+        if (this.boundHandlePageActivation) {
+            window.removeEventListener('focus', this.boundHandlePageActivation);
+            document.removeEventListener('visibilitychange', this.boundHandlePageActivation);
+        }
     }
 
     get selectedAction() {
@@ -41,6 +72,22 @@ export default class NativeFormsPrefillActions extends LightningElement {
 
     get isFindMany() {
         return this.draftAction?.commandType === 'findMany';
+    }
+
+    get conditionRows() {
+        return this.draftAction?.conditions || [];
+    }
+
+    get filteredMappings() {
+        const aliasValue = this.draftAction?.storeResultAs;
+        if (!aliasValue) {
+            return [];
+        }
+        return (this.mappings || []).filter((item) => item.aliasValue === aliasValue);
+    }
+
+    get hasFilteredMappings() {
+        return this.filteredMappings.length > 0;
     }
 
     get filteredObjectOptions() {
@@ -65,6 +112,7 @@ export default class NativeFormsPrefillActions extends LightningElement {
             this.selectedVersionStatus = workspace.selectedVersionStatus;
             this.selectedFormName = workspace.selectedFormName;
             this.objectOptions = workspace.objectOptions || [];
+            this.mappings = workspace.mappings || [];
             this.versionOptions = (workspace.versions || []).map((option) => ({
                 label: `${option.label} (${option.status})`,
                 value: option.value
@@ -90,6 +138,31 @@ export default class NativeFormsPrefillActions extends LightningElement {
         }
     }
 
+    async handlePageActivation() {
+        if (document.visibilityState && document.visibilityState !== 'visible') {
+            return;
+        }
+        const storedVersionId = this.loadStoredVersionId();
+        if (storedVersionId && storedVersionId !== this.selectedVersionId) {
+            this.selectedActionId = null;
+            this.draftAction = {};
+            await this.loadWorkspace(storedVersionId);
+        }
+    }
+
+    async handleRefreshFromDesigner() {
+        const storedVersionId = this.loadStoredVersionId();
+        if (!storedVersionId) {
+            this.showToast('No Designer selection', 'Open NativeForms Designer and choose a version first.', 'warning');
+            return;
+        }
+
+        this.selectedActionId = null;
+        this.draftAction = {};
+        await this.loadWorkspace(storedVersionId);
+        this.showToast('Refreshed', 'Loaded the version currently selected in NativeForms Designer.', 'success');
+    }
+
     decorateAction(item) {
         return {
             ...item,
@@ -109,8 +182,11 @@ export default class NativeFormsPrefillActions extends LightningElement {
             whereClause: config.where || '',
             orderBy: config.orderBy || '',
             limitValue: config.limit == null ? null : config.limit,
-            onNotFound: config.onNotFound || 'ignore'
+            onNotFound: config.onNotFound || 'ignore',
+            conditionLogic: config.conditionLogic || 'AND',
+            conditions: this.normalizeConditions(config.conditions, config.where)
         };
+        this.loadFieldOptions(action.objectApiName);
     }
 
     parseConfig(rawJson) {
@@ -126,8 +202,9 @@ export default class NativeFormsPrefillActions extends LightningElement {
 
     buildConfigJson() {
         const config = {};
-        if (this.draftAction.whereClause) {
-            config.where = this.draftAction.whereClause;
+        const whereClause = this.buildWhereClause();
+        if (whereClause) {
+            config.where = whereClause;
         }
         if (this.draftAction.commandType === 'findMany' && this.draftAction.orderBy) {
             config.orderBy = this.draftAction.orderBy;
@@ -135,15 +212,10 @@ export default class NativeFormsPrefillActions extends LightningElement {
         if (this.draftAction.commandType === 'findMany' && this.draftAction.limitValue !== null && this.draftAction.limitValue !== undefined && this.draftAction.limitValue !== '') {
             config.limit = Number(this.draftAction.limitValue);
         }
+        config.conditionLogic = this.draftAction.conditionLogic || 'AND';
+        config.conditions = this.sanitizeConditions();
         config.onNotFound = this.draftAction.onNotFound || 'ignore';
         return JSON.stringify(config, null, 2);
-    }
-
-    handleVersionChange(event) {
-        this.selectedVersionId = event.detail.value;
-        this.selectedActionId = null;
-        this.draftAction = {};
-        this.loadWorkspace(this.selectedVersionId);
     }
 
     async handleAddAction() {
@@ -180,6 +252,45 @@ export default class NativeFormsPrefillActions extends LightningElement {
         this.draftAction = {
             ...this.draftAction,
             [name]: value
+        };
+        if (name === 'objectApiName') {
+            this.loadFieldOptions(value);
+        }
+    }
+
+    handleConditionChange(event) {
+        const rowIndex = Number(event.target.dataset.index);
+        const { name, value } = event.target;
+        const conditions = [...(this.draftAction.conditions || [])];
+        conditions[rowIndex] = {
+            ...conditions[rowIndex],
+            [name]: value
+        };
+        if (name === 'operator' && (value === 'isBlank' || value === 'isNotBlank')) {
+            conditions[rowIndex].paramName = '';
+        }
+        this.draftAction = {
+            ...this.draftAction,
+            conditions
+        };
+    }
+
+    handleAddCondition() {
+        const conditions = [...(this.draftAction.conditions || [])];
+        conditions.push(this.createEmptyCondition());
+        this.draftAction = {
+            ...this.draftAction,
+            conditions
+        };
+    }
+
+    handleDeleteCondition(event) {
+        const rowIndex = Number(event.target.dataset.index);
+        const conditions = [...(this.draftAction.conditions || [])];
+        conditions.splice(rowIndex, 1);
+        this.draftAction = {
+            ...this.draftAction,
+            conditions
         };
     }
 
@@ -238,6 +349,104 @@ export default class NativeFormsPrefillActions extends LightningElement {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
     }
 
+    async loadFieldOptions(objectApiName) {
+        if (!objectApiName) {
+            this.fieldOptions = [];
+            return;
+        }
+        try {
+            this.fieldOptions = await getFieldOptions({ objectApiName });
+        } catch (error) {
+            this.fieldOptions = [];
+        }
+    }
+
+    normalizeConditions(savedConditions, fallbackWhereClause) {
+        if (Array.isArray(savedConditions) && savedConditions.length) {
+            return savedConditions.map((item, index) => ({
+                id: item.id || `cond-${index}-${Date.now()}`,
+                fieldApiName: item.fieldApiName || '',
+                operator: item.operator || 'eq',
+                paramName: item.paramName || ''
+            }));
+        }
+        if (!fallbackWhereClause) {
+            return [this.createEmptyCondition()];
+        }
+        const parts = fallbackWhereClause.split(/\s+AND\s+/i);
+        return parts.map((item, index) => {
+            const split = item.split('=');
+            const fieldApiName = split.length > 1 ? split[0].trim() : '';
+            let paramName = '';
+            if (split.length > 1) {
+                const right = split[1].trim();
+                const match = right.match(/\{params\.([^}]+)\}/i);
+                paramName = match ? match[1] : '';
+            }
+            return {
+                id: `cond-${index}-${Date.now()}`,
+                fieldApiName,
+                operator: 'eq',
+                paramName
+            };
+        });
+    }
+
+    createEmptyCondition() {
+        return {
+            id: `cond-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            fieldApiName: '',
+            operator: 'eq',
+            paramName: ''
+        };
+    }
+
+    sanitizeConditions() {
+        return (this.draftAction.conditions || [])
+            .filter((item) => item.fieldApiName && item.operator)
+            .map((item) => ({
+                fieldApiName: item.fieldApiName,
+                operator: item.operator,
+                paramName: item.paramName || ''
+            }));
+    }
+
+    buildWhereClause() {
+        const clauses = this.sanitizeConditions()
+            .map((item) => this.buildConditionClause(item))
+            .filter((item) => !!item);
+        if (!clauses.length) {
+            return '';
+        }
+        const joiner = ` ${this.draftAction.conditionLogic || 'AND'} `;
+        return clauses.join(joiner);
+    }
+
+    buildConditionClause(item) {
+        const fieldName = item.fieldApiName;
+        const paramRef = item.paramName ? `{params.${item.paramName}}` : '';
+        switch (item.operator) {
+            case 'eq':
+                return paramRef ? `${fieldName} = ${paramRef}` : '';
+            case 'neq':
+                return paramRef ? `${fieldName} != ${paramRef}` : '';
+            case 'contains':
+                return paramRef ? `${fieldName} CONTAINS ${paramRef}` : '';
+            case 'startsWith':
+                return paramRef ? `${fieldName} STARTS_WITH ${paramRef}` : '';
+            case 'gt':
+                return paramRef ? `${fieldName} > ${paramRef}` : '';
+            case 'lt':
+                return paramRef ? `${fieldName} < ${paramRef}` : '';
+            case 'isBlank':
+                return `${fieldName} IS_BLANK`;
+            case 'isNotBlank':
+                return `${fieldName} IS_NOT_BLANK`;
+            default:
+                return '';
+        }
+    }
+
     normalizeError(error) {
         if (error?.body?.message) {
             return error.body.message;
@@ -246,5 +455,13 @@ export default class NativeFormsPrefillActions extends LightningElement {
             return error.message;
         }
         return 'Something went wrong while loading prefill actions.';
+    }
+
+    loadStoredVersionId() {
+        try {
+            return window.sessionStorage.getItem(DESIGNER_VERSION_KEY);
+        } catch (e) {
+            return null;
+        }
     }
 }

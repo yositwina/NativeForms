@@ -224,6 +224,13 @@
     line-height: 1.5;
 }
 
+.inline-help {
+    margin: -0.4rem 0 0;
+    color: #5f6f89;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
 .top-gap {
     margin-top: 0.35rem;
 }

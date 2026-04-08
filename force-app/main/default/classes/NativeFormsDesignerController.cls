@@ -1,0 +1,845 @@
+public with sharing class NativeFormsDesignerController {
+    public class SelectOption {
+        @AuraEnabled public String label { get; set; }
+        @AuraEnabled public String value { get; set; }
+    }
+
+    public class UploadedImageResult {
+        @AuraEnabled public Id contentDocumentId { get; set; }
+        @AuraEnabled public Id contentVersionId { get; set; }
+        @AuraEnabled public String fileName { get; set; }
+        @AuraEnabled public String previewUrl { get; set; }
+        @AuraEnabled public String altText { get; set; }
+        @AuraEnabled public ElementRecord element { get; set; }
+    }
+
+    public class VersionOption {
+        @AuraEnabled public Id value { get; set; }
+        @AuraEnabled public String label { get; set; }
+        @AuraEnabled public String status { get; set; }
+        @AuraEnabled public Boolean isPublished { get; set; }
+    }
+
+    public class PrefillAliasDetail {
+        @AuraEnabled public String alias { get; set; }
+        @AuraEnabled public String objectApiName { get; set; }
+        @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
+    }
+
+    public class SubmitActionDetail {
+        @AuraEnabled public String actionKey { get; set; }
+        @AuraEnabled public String objectApiName { get; set; }
+        @AuraEnabled public String commandType { get; set; }
+        @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
+    }
+
+    public class ElementRecord {
+        @AuraEnabled public Id id { get; set; }
+        @AuraEnabled public String elementId { get; set; }
+        @AuraEnabled public String label { get; set; }
+        @AuraEnabled public String elementType { get; set; }
+        @AuraEnabled public String fieldKey { get; set; }
+        @AuraEnabled public Integer elementIndex { get; set; }
+        @AuraEnabled public String configJson { get; set; }
+        @AuraEnabled public String parentElementId { get; set; }
+        @AuraEnabled public Integer sectionColumn { get; set; }
+        @AuraEnabled public Integer orderValue { get; set; }
+    }
+
+    public class DesignerWorkspace {
+        @AuraEnabled public Id selectedFormId { get; set; }
+        @AuraEnabled public Id selectedVersionId { get; set; }
+        @AuraEnabled public String selectedFormName { get; set; }
+        @AuraEnabled public String selectedFormKey { get; set; }
+        @AuraEnabled public String selectedFormDescription { get; set; }
+        @AuraEnabled public String selectedVersionName { get; set; }
+        @AuraEnabled public String selectedVersionStatus { get; set; }
+        @AuraEnabled public List<SelectOption> forms { get; set; }
+        @AuraEnabled public List<VersionOption> versions { get; set; }
+        @AuraEnabled public List<ElementRecord> elements { get; set; }
+        @AuraEnabled public List<PrefillAliasDetail> prefillAliases { get; set; }
+        @AuraEnabled public List<SubmitActionDetail> submitActions { get; set; }
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SelectOption> getObjectOptions() {
+        List<SelectOption> options = new List<SelectOption>();
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        List<String> apiNames = new List<String>();
+
+        for (String apiName : globalDescribe.keySet()) {
+            Schema.DescribeSObjectResult describeResult = globalDescribe.get(apiName).getDescribe();
+            if (!describeResult.isAccessible() || !describeResult.isQueryable()) {
+                continue;
+            }
+            apiNames.add(apiName);
+        }
+
+        apiNames.sort();
+        for (String apiName : apiNames) {
+            Schema.DescribeSObjectResult describeResult = globalDescribe.get(apiName).getDescribe();
+            SelectOption option = new SelectOption();
+            option.label = describeResult.getLabel() + ' (' + describeResult.getName() + ')';
+            option.value = describeResult.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SelectOption> getPicklistFieldOptions(String objectApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName)) {
+            return options;
+        }
+
+        String canonicalObjectName = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObjectName)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObjectName).getDescribe().fields.getMap();
+        List<String> fieldApiNames = new List<String>();
+        for (String fieldApiName : fieldsMap.keySet()) {
+            Schema.DescribeFieldResult describeResult = fieldsMap.get(fieldApiName).getDescribe();
+            if (!describeResult.isAccessible()) {
+                continue;
+            }
+            if (describeResult.getType() != Schema.DisplayType.Picklist) {
+                continue;
+            }
+            fieldApiNames.add(fieldApiName);
+        }
+
+        fieldApiNames.sort();
+        for (String fieldApiName : fieldApiNames) {
+            Schema.DescribeFieldResult describeResult = fieldsMap.get(fieldApiName).getDescribe();
+            SelectOption option = new SelectOption();
+            option.label = describeResult.getLabel() + ' (' + describeResult.getName() + ')';
+            option.value = describeResult.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SelectOption> getPicklistValueOptions(String objectApiName, String fieldApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName) || String.isBlank(fieldApiName)) {
+            return options;
+        }
+
+        String canonicalObjectName = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObjectName)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObjectName).getDescribe().fields.getMap();
+        String canonicalFieldName = canonicalFieldName(fieldsMap, fieldApiName);
+        if (String.isBlank(canonicalFieldName)) {
+            return options;
+        }
+
+        Schema.DescribeFieldResult describeResult = fieldsMap.get(canonicalFieldName).getDescribe();
+        if (describeResult.getType() != Schema.DisplayType.Picklist) {
+            return options;
+        }
+
+        for (Schema.PicklistEntry entry : describeResult.getPicklistValues()) {
+            SelectOption option = new SelectOption();
+            option.label = entry.getLabel();
+            option.value = entry.getValue();
+            options.add(option);
+        }
+        return options;
+    }
+
+    @AuraEnabled
+    public static DesignerWorkspace getWorkspace(Id formId, Id versionId) {
+        DesignerWorkspace workspace = new DesignerWorkspace();
+        workspace.forms = new List<SelectOption>();
+        workspace.versions = new List<VersionOption>();
+        workspace.elements = new List<ElementRecord>();
+        workspace.prefillAliases = new List<PrefillAliasDetail>();
+        workspace.submitActions = new List<SubmitActionDetail>();
+
+        List<NF_Form__c> forms = [
+            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c
+            FROM NF_Form__c
+            ORDER BY Name ASC
+            LIMIT 200
+        ];
+
+        for (NF_Form__c formRecord : forms) {
+            SelectOption option = new SelectOption();
+            option.label = formRecord.Name + (String.isNotBlank(formRecord.NF_Key__c) ? ' (' + formRecord.NF_Key__c + ')' : '');
+            option.value = (String) formRecord.Id;
+            workspace.forms.add(option);
+        }
+
+        Id effectiveFormId = formId;
+        if (effectiveFormId == null && !forms.isEmpty()) {
+            effectiveFormId = forms[0].Id;
+        }
+        if (effectiveFormId == null) {
+            return workspace;
+        }
+
+        NF_Form__c selectedForm = [
+            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c
+            FROM NF_Form__c
+            WHERE Id = :effectiveFormId
+            LIMIT 1
+        ];
+        workspace.selectedFormId = selectedForm.Id;
+        workspace.selectedFormName = selectedForm.Name;
+        workspace.selectedFormKey = selectedForm.NF_Key__c;
+        workspace.selectedFormDescription = selectedForm.Description__c;
+
+        List<NF_Form_Version__c> versionRecords = [
+            SELECT Id, Name, Version_Status__c, Publish_Status__c, LastModifiedDate
+            FROM NF_Form_Version__c
+            WHERE Form__c = :effectiveFormId
+            ORDER BY LastModifiedDate DESC
+            LIMIT 200
+        ];
+
+        versionRecords.sort(new VersionSorter(selectedForm.Current_Published_Version__c));
+        for (NF_Form_Version__c versionRecord : versionRecords) {
+            VersionOption option = new VersionOption();
+            option.value = versionRecord.Id;
+            option.label = versionRecord.Name;
+            option.status = versionRecord.Version_Status__c;
+            option.isPublished = selectedForm.Current_Published_Version__c == versionRecord.Id || versionRecord.Publish_Status__c == 'Published';
+            workspace.versions.add(option);
+        }
+
+        Id effectiveVersionId = versionId;
+        if (effectiveVersionId == null) {
+            if (selectedForm.Current_Published_Version__c != null) {
+                effectiveVersionId = selectedForm.Current_Published_Version__c;
+            } else if (!versionRecords.isEmpty()) {
+                effectiveVersionId = versionRecords[0].Id;
+            }
+        }
+        if (effectiveVersionId == null) {
+            return workspace;
+        }
+
+        NF_Form_Version__c selectedVersion = [
+            SELECT Id, Name, Version_Status__c
+            FROM NF_Form_Version__c
+            WHERE Id = :effectiveVersionId
+            LIMIT 1
+        ];
+        workspace.selectedVersionId = selectedVersion.Id;
+        workspace.selectedVersionName = selectedVersion.Name;
+        workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
+
+        for (NF_Form_Element__c elementRecord : [
+            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :effectiveVersionId
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            workspace.elements.add(toElementRecord(elementRecord));
+        }
+
+        for (NF_Form_Action__c actionRecord : [
+            SELECT Store_Result_As__c, Object_Api_Name__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :effectiveVersionId
+              AND Action_Scope__c = 'Prefill'
+              AND Store_Result_As__c != null
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            PrefillAliasDetail detail = new PrefillAliasDetail();
+            detail.alias = actionRecord.Store_Result_As__c;
+            detail.objectApiName = actionRecord.Object_Api_Name__c;
+            detail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
+            workspace.prefillAliases.add(detail);
+        }
+
+        for (NF_Form_Action__c actionRecord : [
+            SELECT Command_Key__c, Object_Api_Name__c, Command_Type__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :effectiveVersionId
+              AND Action_Scope__c = 'Submit'
+              AND Command_Key__c != null
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            SubmitActionDetail detail = new SubmitActionDetail();
+            detail.actionKey = actionRecord.Command_Key__c;
+            detail.objectApiName = actionRecord.Object_Api_Name__c;
+            detail.commandType = actionRecord.Command_Type__c;
+            detail.fieldOptions = getWritableFieldOptions(actionRecord.Object_Api_Name__c);
+            workspace.submitActions.add(detail);
+        }
+
+        return workspace;
+    }
+
+    @AuraEnabled
+    public static void deleteElement(Id elementId) {
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        ensureElementVersionEditable(elementId);
+
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Element_Id__c, Element_Type__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+
+        List<NF_Form_Element__c> recordsToDelete = new List<NF_Form_Element__c>();
+        if (elementRecord.Element_Type__c == 'section' && String.isNotBlank(elementRecord.Element_Id__c)) {
+            recordsToDelete.addAll([
+                SELECT Id
+                FROM NF_Form_Element__c
+                WHERE Parent_Element_Id__c = :elementRecord.Element_Id__c
+            ]);
+        }
+        recordsToDelete.add(elementRecord);
+        delete recordsToDelete;
+    }
+
+    @AuraEnabled
+    public static ElementRecord addElement(Id versionId, String elementType) {
+        if (versionId == null) {
+            throw new AuraHandledException('Choose a form version first.');
+        }
+        ensureVersionEditable(versionId);
+        if (String.isBlank(elementType)) {
+            throw new AuraHandledException('Choose an element type first.');
+        }
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'section', 'heading', 'image' }.contains(elementType)) {
+            throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
+        }
+
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+
+        Integer nextOrder = 10;
+        AggregateResult[] maxRows = [
+            SELECT MAX(Order__c) maxOrder
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+        ];
+        if (!maxRows.isEmpty() && maxRows[0].get('maxOrder') != null) {
+            nextOrder = Integer.valueOf(String.valueOf(maxRows[0].get('maxOrder'))) + 10;
+        }
+
+        Integer nextElementIndex = getNextElementIndex(versionRecord.Form__c);
+
+        NF_Form_Element__c elementRecord = new NF_Form_Element__c(
+            Form_Version__c = versionId,
+            Element_Id__c = buildElementId(elementType),
+            Element_Type__c = elementType,
+            Field_Key__c = defaultFieldKeyForType(elementType, nextElementIndex),
+            Element_Index__c = nextElementIndex,
+            Label__c = defaultLabelForType(elementType),
+            Config_JSON__c = defaultConfigJsonForType(elementType),
+            Order__c = nextOrder
+        );
+        insert elementRecord;
+
+        elementRecord = [
+            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementRecord.Id
+            LIMIT 1
+        ];
+        return toElementRecord(elementRecord);
+    }
+
+    @AuraEnabled
+    public static void reorderElement(Id versionId, Id elementId, Integer targetIndex) {
+        if (versionId == null) {
+            throw new AuraHandledException('Version id is required.');
+        }
+        ensureVersionEditable(versionId);
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        if (targetIndex == null) {
+            throw new AuraHandledException('Target index is required.');
+        }
+
+        NF_Form_Element__c draggedRecord = [
+            SELECT Id, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+
+        Map<String, Object> draggedConfig = parseJsonMap(draggedRecord.Config_JSON__c);
+        if (draggedConfig.containsKey('sectionColumn')) {
+            draggedConfig.remove('sectionColumn');
+            draggedRecord.Config_JSON__c = JSON.serializePretty(draggedConfig);
+        }
+        draggedRecord.Parent_Element_Id__c = null;
+
+        List<NF_Form_Element__c> siblings = [
+            SELECT Id, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+              AND Parent_Element_Id__c = null
+              AND Id != :elementId
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ];
+        if (siblings.isEmpty()) {
+            draggedRecord.Order__c = 10;
+            update draggedRecord;
+            return;
+        }
+
+        if (targetIndex < 0) {
+            targetIndex = 0;
+        }
+        if (targetIndex > siblings.size()) {
+            targetIndex = siblings.size();
+        }
+        siblings.add(targetIndex, draggedRecord);
+
+        Integer orderValue = 10;
+        for (NF_Form_Element__c sibling : siblings) {
+            sibling.Order__c = orderValue;
+            orderValue += 10;
+        }
+        update siblings;
+    }
+
+    @AuraEnabled
+    public static void placeElementInSection(Id elementId, Id sectionId, Integer columnNumber) {
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        ensureElementVersionEditable(elementId);
+        if (sectionId == null) {
+            throw new AuraHandledException('Section id is required.');
+        }
+        if (columnNumber == null || columnNumber < 1 || columnNumber > 4) {
+            throw new AuraHandledException('Column number must be between 1 and 4.');
+        }
+
+        NF_Form_Element__c sectionRecord = [
+            SELECT Id, Element_Id__c, Element_Type__c
+            FROM NF_Form_Element__c
+            WHERE Id = :sectionId
+            LIMIT 1
+        ];
+        if (sectionRecord.Element_Type__c != 'section') {
+            throw new AuraHandledException('Only sections can receive dropped elements.');
+        }
+
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Config_JSON__c, Parent_Element_Id__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+
+        Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+        config.put('sectionColumn', columnNumber);
+        elementRecord.Config_JSON__c = JSON.serializePretty(config);
+        elementRecord.Parent_Element_Id__c = sectionRecord.Element_Id__c;
+        update elementRecord;
+    }
+
+    @AuraEnabled
+    public static ElementRecord updateSectionColumns(Id elementId, Integer columns) {
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        ensureElementVersionEditable(elementId);
+        if (columns == null || columns < 1 || columns > 4) {
+            throw new AuraHandledException('Section columns must be between 1 and 4.');
+        }
+
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+
+        if (elementRecord.Element_Type__c != 'section') {
+            throw new AuraHandledException('Only sections can set column counts.');
+        }
+
+        Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+        config.put('columns', columns);
+        elementRecord.Config_JSON__c = JSON.serializePretty(config);
+        update elementRecord;
+
+        return toElementRecord(elementRecord);
+    }
+
+    @AuraEnabled
+    public static UploadedImageResult uploadImageFile(
+        Id elementId,
+        Id versionId,
+        String fileName,
+        String contentType,
+        String base64Data
+    ) {
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        if (versionId == null) {
+            throw new AuraHandledException('Version id is required.');
+        }
+        ensureVersionEditable(versionId);
+        if (String.isBlank(fileName) || String.isBlank(base64Data)) {
+            throw new AuraHandledException('Choose an image file first.');
+        }
+
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+        if (elementRecord.Element_Type__c != 'image') {
+            throw new AuraHandledException('Only image elements can receive uploaded image files.');
+        }
+
+        ContentVersion versionRecord = new ContentVersion(
+            Title = titleFromFileName(fileName),
+            PathOnClient = fileName,
+            VersionData = EncodingUtil.base64Decode(base64Data),
+            FirstPublishLocationId = versionId
+        );
+        insert versionRecord;
+
+        versionRecord = [
+            SELECT Id, ContentDocumentId, Title
+            FROM ContentVersion
+            WHERE Id = :versionRecord.Id
+            LIMIT 1
+        ];
+
+        Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+        config.put('contentDocumentId', String.valueOf(versionRecord.ContentDocumentId));
+        config.put('contentVersionId', String.valueOf(versionRecord.Id));
+        config.put('fileName', fileName);
+        config.put('imageUrl', buildContentVersionUrl(versionRecord.Id));
+        if (String.isBlank(stringValue(config.get('altText')))) {
+            config.put('altText', titleFromFileName(fileName));
+        }
+        elementRecord.Config_JSON__c = JSON.serializePretty(config);
+        update elementRecord;
+
+        UploadedImageResult result = new UploadedImageResult();
+        result.contentDocumentId = versionRecord.ContentDocumentId;
+        result.contentVersionId = versionRecord.Id;
+        result.fileName = fileName;
+        result.previewUrl = buildContentVersionUrl(versionRecord.Id);
+        result.altText = stringValue(config.get('altText'));
+        result.element = toElementRecord(elementRecord);
+        return result;
+    }
+
+    private static ElementRecord toElementRecord(NF_Form_Element__c elementRecord) {
+        ElementRecord dto = new ElementRecord();
+        dto.id = elementRecord.Id;
+        dto.elementId = elementRecord.Element_Id__c;
+        dto.label = elementRecord.Label__c;
+        dto.elementType = elementRecord.Element_Type__c;
+        dto.fieldKey = elementRecord.Field_Key__c;
+        dto.elementIndex = elementRecord.Element_Index__c == null ? null : Integer.valueOf(String.valueOf(elementRecord.Element_Index__c));
+        dto.configJson = elementRecord.Config_JSON__c;
+        dto.parentElementId = elementRecord.Parent_Element_Id__c;
+        dto.sectionColumn = readSectionColumn(elementRecord.Config_JSON__c);
+        dto.orderValue = elementRecord.Order__c == null ? null : Integer.valueOf(String.valueOf(elementRecord.Order__c));
+        return dto;
+    }
+
+    private static String buildElementId(String elementType) {
+        return elementType.toLowerCase() + '-' + String.valueOf(Datetime.now().getTime());
+    }
+
+    private static String defaultLabelForType(String elementType) {
+        if (elementType == 'section') return 'Section';
+        if (elementType == 'heading') return 'Display Text';
+        if (elementType == 'image') return 'Image';
+        if (elementType == 'checkbox') return 'Checkbox';
+        if (elementType == 'textarea') return 'Textarea';
+        if (elementType == 'number') return 'Number';
+        if (elementType == 'date') return 'Date';
+        if (elementType == 'email') return 'Email';
+        if (elementType == 'tel') return 'Phone';
+        if (elementType == 'url') return 'URL';
+        if (elementType == 'select') return 'Picklist';
+        if (elementType == 'radio') return 'Radio Group';
+        return 'Text Input';
+    }
+
+    private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio' }.contains(elementType)) {
+            return null;
+        }
+        String prefix = 'field';
+        if (elementType == 'checkbox') prefix = 'checkbox';
+        if (elementType == 'textarea') prefix = 'textarea';
+        if (elementType == 'number') prefix = 'number';
+        if (elementType == 'date') prefix = 'date';
+        if (elementType == 'email') prefix = 'email';
+        if (elementType == 'tel') prefix = 'phone';
+        if (elementType == 'url') prefix = 'url';
+        if (elementType == 'select') prefix = 'picklist';
+        if (elementType == 'radio') prefix = 'radio';
+        if (elementType == 'text') prefix = 'text';
+        Integer safeIndex = elementIndex == null || elementIndex <= 0 ? 1 : elementIndex;
+        return prefix + String.valueOf(safeIndex);
+    }
+
+    private static String defaultConfigJsonForType(String elementType) {
+        Map<String, Object> config = new Map<String, Object>();
+        if (elementType == 'text') {
+            config.put('placeholder', 'Enter text');
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'textarea') {
+            config.put('placeholder', 'Enter longer text');
+            config.put('labelPosition', 'above');
+            config.put('rows', 4);
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'number') {
+            config.put('placeholder', 'Enter number');
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'date') {
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'email') {
+            config.put('placeholder', 'name@example.com');
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'tel') {
+            config.put('placeholder', 'Phone number');
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'url') {
+            config.put('placeholder', 'https://example.com');
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'checkbox') {
+            config.put('checked', false);
+            config.put('labelPosition', 'inline');
+            config.put('fieldBehavior', 'editable');
+        }
+        if (elementType == 'select' || elementType == 'radio') {
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+            config.put('options', new List<Object>{
+                new Map<String, Object>{ 'label' => 'Option 1', 'value' => 'option1' },
+                new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
+            });
+        }
+        if (elementType == 'section') {
+            config.put('text', 'Section description');
+            config.put('columns', 2);
+            config.put('showTitle', true);
+            config.put('boxed', true);
+        }
+        if (elementType == 'heading') {
+            config.put('html', '<p>Display text</p>');
+        }
+        if (elementType == 'image') {
+            config.put('imageUrl', '');
+            config.put('altText', 'Image preview');
+        }
+        return JSON.serializePretty(config);
+    }
+
+    private static String titleFromFileName(String fileName) {
+        if (String.isBlank(fileName)) {
+            return 'NativeForms Image';
+        }
+        Integer dotIndex = fileName.lastIndexOf('.');
+        return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
+    }
+
+    private static String buildContentVersionUrl(Id contentVersionId) {
+        return '/sfc/servlet.shepherd/version/download/' + String.valueOf(contentVersionId);
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static Map<String, Object> parseJsonMap(String rawJson) {
+        if (String.isBlank(rawJson)) {
+            return new Map<String, Object>();
+        }
+        try {
+            return (Map<String, Object>) JSON.deserializeUntyped(rawJson);
+        } catch (Exception e) {
+            return new Map<String, Object>();
+        }
+    }
+
+    private static Integer readSectionColumn(String rawJson) {
+        Map<String, Object> config = parseJsonMap(rawJson);
+        if (!config.containsKey('sectionColumn')) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(String.valueOf(config.get('sectionColumn')));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String canonicalObjectName(String requestedObjectName) {
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        if (globalDescribe.containsKey(requestedObjectName)) {
+            return globalDescribe.get(requestedObjectName).getDescribe().getName();
+        }
+        for (String apiName : globalDescribe.keySet()) {
+            if (apiName.equalsIgnoreCase(requestedObjectName)) {
+                return globalDescribe.get(apiName).getDescribe().getName();
+            }
+        }
+        return null;
+    }
+
+    private static String canonicalFieldName(Map<String, Schema.SObjectField> fieldsMap, String requestedFieldName) {
+        if (fieldsMap.containsKey(requestedFieldName)) {
+            return fieldsMap.get(requestedFieldName).getDescribe().getName();
+        }
+        for (String fieldApiName : fieldsMap.keySet()) {
+            if (fieldApiName.equalsIgnoreCase(requestedFieldName)) {
+                return fieldsMap.get(fieldApiName).getDescribe().getName();
+            }
+        }
+        return null;
+    }
+
+    private static List<SelectOption> getReadableFieldOptions(String objectApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName)) {
+            return options;
+        }
+
+        String canonicalObject = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObject)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObject).getDescribe().fields.getMap();
+        List<String> fieldNames = new List<String>(fieldsMap.keySet());
+        fieldNames.sort();
+        for (String fieldApiName : fieldNames) {
+            Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
+            if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            SelectOption option = new SelectOption();
+            option.label = fieldDescribe.getLabel() + ' (' + fieldDescribe.getName() + ')';
+            option.value = fieldDescribe.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    private static List<SelectOption> getWritableFieldOptions(String objectApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName)) {
+            return options;
+        }
+
+        String canonicalObject = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObject)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObject).getDescribe().fields.getMap();
+        List<String> fieldNames = new List<String>(fieldsMap.keySet());
+        fieldNames.sort();
+        for (String fieldApiName : fieldNames) {
+            Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
+            if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            if (!fieldDescribe.isCreateable() && !fieldDescribe.isUpdateable()) {
+                continue;
+            }
+            if (fieldDescribe.isCalculated() || fieldDescribe.isAutoNumber()) {
+                continue;
+            }
+            SelectOption option = new SelectOption();
+            option.label = fieldDescribe.getLabel() + ' (' + fieldDescribe.getName() + ')';
+            option.value = fieldDescribe.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    private static void ensureVersionEditable(Id versionId) {
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Version_Status__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+        if (versionRecord.Version_Status__c == 'Published') {
+            throw new AuraHandledException('Published versions are read-only. Open the latest draft version to continue editing.');
+        }
+    }
+
+    private static void ensureElementVersionEditable(Id elementId) {
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Form_Version__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+        ensureVersionEditable(elementRecord.Form_Version__c);
+    }
+
+    private static Integer getNextElementIndex(Id formId) {
+        if (formId == null) {
+            return 1;
+        }
+        AggregateResult[] rows = [
+            SELECT MAX(Element_Index__c) maxIndex
+            FROM NF_Form_Element__c
+            WHERE Form_Version__r.Form__c = :formId
+        ];
+        if (!rows.isEmpty() && rows[0].get('maxIndex') != null) {
+            return Integer.valueOf(String.valueOf(rows[0].get('maxIndex'))) + 1;
+        }
+        return 1;
+    }
+
+    public class VersionSorter implements Comparator<NF_Form_Version__c> {
+        private Id publishedVersionId;
+
+        public VersionSorter(Id publishedVersionId) {
+            this.publishedVersionId = publishedVersionId;
+        }
+
+        public Integer compare(NF_Form_Version__c a, NF_Form_Version__c b) {
+            Boolean aPublished = publishedVersionId != null && a.Id == publishedVersionId;
+            Boolean bPublished = publishedVersionId != null && b.Id == publishedVersionId;
+            if (aPublished && !bPublished) return -1;
+            if (!aPublished && bPublished) return 1;
+            return String.valueOf(a.Name).toLowerCase().compareTo(String.valueOf(b.Name).toLowerCase());
+        }
+    }
+}

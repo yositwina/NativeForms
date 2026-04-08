@@ -29,6 +29,15 @@ public with sharing class NativeFormsPrefillActionsController {
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<PrefillActionRecord> actions { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
+        @AuraEnabled public List<MappingRecord> mappings { get; set; }
+    }
+
+    public class MappingRecord {
+        @AuraEnabled public Id elementId { get; set; }
+        @AuraEnabled public String elementLabel { get; set; }
+        @AuraEnabled public String fieldKey { get; set; }
+        @AuraEnabled public String aliasValue { get; set; }
+        @AuraEnabled public String fieldPath { get; set; }
     }
 
     public class PrefillActionInput {
@@ -41,12 +50,13 @@ public with sharing class NativeFormsPrefillActionsController {
         @AuraEnabled public String configJson { get; set; }
     }
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static PrefillWorkspace getWorkspace(Id versionId) {
         PrefillWorkspace workspace = new PrefillWorkspace();
         workspace.versions = new List<VersionOption>();
         workspace.actions = new List<PrefillActionRecord>();
         workspace.objectOptions = getObjectOptions();
+        workspace.mappings = new List<MappingRecord>();
 
         List<NF_Form_Version__c> versions = [
             SELECT Id,
@@ -103,7 +113,36 @@ public with sharing class NativeFormsPrefillActionsController {
             workspace.actions.add(toRecord(actionRecord));
         }
 
+        for (NF_Form_Element__c elementRecord : [
+            SELECT Id, Label__c, Field_Key__c, Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :effectiveVersionId
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            if (!booleanValue(config.get('prefillEnabled'))) {
+                continue;
+            }
+            String aliasValue = stringValue(config.get('prefillAlias'));
+            String fieldPath = stringValue(config.get('prefillFieldPath'));
+            if (String.isBlank(aliasValue) || String.isBlank(fieldPath)) {
+                continue;
+            }
+            MappingRecord mapping = new MappingRecord();
+            mapping.elementId = elementRecord.Id;
+            mapping.elementLabel = elementRecord.Label__c;
+            mapping.fieldKey = elementRecord.Field_Key__c;
+            mapping.aliasValue = aliasValue;
+            mapping.fieldPath = fieldPath;
+            workspace.mappings.add(mapping);
+        }
+
         return workspace;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SelectOption> getFieldOptions(String objectApiName) {
+        return getReadableFieldOptions(objectApiName);
     }
 
     @AuraEnabled
@@ -111,6 +150,7 @@ public with sharing class NativeFormsPrefillActionsController {
         if (versionId == null) {
             throw new AuraHandledException('Select a form version first.');
         }
+        ensureVersionEditable(versionId);
 
         Integer nextOrder = 10;
         AggregateResult[] maxRows = [
@@ -178,6 +218,7 @@ public with sharing class NativeFormsPrefillActionsController {
             WHERE Id = :inputValue.id
             LIMIT 1
         ];
+        ensureActionVersionEditable(actionRecord.Form_Version__c);
 
         actionRecord.Command_Key__c = String.isBlank(inputValue.actionKey)
             ? buildActionKey(inputValue.storeResultAs, inputValue.objectApiName)
@@ -197,12 +238,15 @@ public with sharing class NativeFormsPrefillActionsController {
             throw new AuraHandledException('Action id is required.');
         }
 
-        delete [
-            SELECT Id
+        NF_Form_Action__c actionRecord = [
+            SELECT Id, Form_Version__c
             FROM NF_Form_Action__c
             WHERE Id = :actionId
             LIMIT 1
         ];
+        ensureActionVersionEditable(actionRecord.Form_Version__c);
+
+        delete actionRecord;
     }
 
     private static PrefillActionRecord toRecord(NF_Form_Action__c actionRecord) {
@@ -246,6 +290,79 @@ public with sharing class NativeFormsPrefillActionsController {
         return options;
     }
 
+    private static List<SelectOption> getReadableFieldOptions(String objectApiName) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName)) {
+            return options;
+        }
+
+        String canonicalObject = canonicalObjectApiName(objectApiName);
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        if (String.isBlank(canonicalObject) || !globalDescribe.containsKey(canonicalObject)) {
+            return options;
+        }
+
+        Map<String, Schema.SObjectField> fieldsMap = globalDescribe.get(canonicalObject).getDescribe().fields.getMap();
+        List<String> fieldNames = new List<String>(fieldsMap.keySet());
+        fieldNames.sort();
+        for (String fieldApiName : fieldNames) {
+            Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
+            if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            SelectOption option = new SelectOption();
+            option.label = fieldDescribe.getLabel() + ' (' + fieldApiName + ')';
+            option.value = fieldDescribe.getName();
+            options.add(option);
+        }
+        return options;
+    }
+
+    private static String canonicalObjectApiName(String requestedObjectName) {
+        if (String.isBlank(requestedObjectName)) {
+            return requestedObjectName;
+        }
+
+        Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+        if (globalDescribe.containsKey(requestedObjectName)) {
+            return globalDescribe.get(requestedObjectName).getDescribe().getName();
+        }
+        for (String apiName : globalDescribe.keySet()) {
+            if (apiName != null && apiName.toLowerCase() == requestedObjectName.toLowerCase()) {
+                return globalDescribe.get(apiName).getDescribe().getName();
+            }
+        }
+        return requestedObjectName;
+    }
+
+    private static Map<String, Object> parseJsonMap(String rawJson) {
+        if (String.isBlank(rawJson)) {
+            return new Map<String, Object>();
+        }
+        try {
+            Object parsedValue = JSON.deserializeUntyped(rawJson);
+            return parsedValue instanceof Map<String, Object>
+                ? (Map<String, Object>) parsedValue
+                : new Map<String, Object>();
+        } catch (Exception e) {
+            return new Map<String, Object>();
+        }
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static Boolean booleanValue(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return String.valueOf(value).toLowerCase() == 'true';
+    }
+
     private static String buildActionKey(String aliasValue, String objectApiName) {
         String aliasSeed = String.isBlank(aliasValue) ? '' : aliasValue.replaceAll('[^a-zA-Z0-9]', '');
         if (!String.isBlank(aliasSeed)) {
@@ -254,5 +371,21 @@ public with sharing class NativeFormsPrefillActionsController {
 
         String objectSeed = String.isBlank(objectApiName) ? 'prefillAction' : objectApiName.replaceAll('[^a-zA-Z0-9]', '');
         return ('find' + objectSeed).left(80);
+    }
+
+    private static void ensureVersionEditable(Id versionId) {
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Version_Status__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+        if (versionRecord.Version_Status__c == 'Published') {
+            throw new AuraHandledException('Published versions are read-only. Open the latest draft in NativeForms Designer.');
+        }
+    }
+
+    private static void ensureActionVersionEditable(Id versionId) {
+        ensureVersionEditable(versionId);
     }
 }
