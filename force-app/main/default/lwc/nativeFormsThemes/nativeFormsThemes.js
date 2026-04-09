@@ -1,6 +1,8 @@
 import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsThemesController.getWorkspace';
+import ensureSampleThemes from '@salesforce/apex/NativeFormsThemesController.ensureSampleThemes';
 import createTheme from '@salesforce/apex/NativeFormsThemesController.createTheme';
+import cloneTheme from '@salesforce/apex/NativeFormsThemesController.cloneTheme';
 import saveTheme from '@salesforce/apex/NativeFormsThemesController.saveTheme';
 import deleteTheme from '@salesforce/apex/NativeFormsThemesController.deleteTheme';
 import uploadLogo from '@salesforce/apex/NativeFormsThemesController.uploadLogo';
@@ -10,6 +12,7 @@ export default class NativeFormsThemes extends LightningElement {
     isLoading = true;
     errorMessage = '';
     selectedThemeId;
+    highlightedField = '';
 
     @track themes = [];
     @track selectedTheme = null;
@@ -35,7 +38,12 @@ export default class NativeFormsThemes extends LightningElement {
         { label: 'Full Width', value: 'full' }
     ];
 
-    connectedCallback() {
+    async connectedCallback() {
+        try {
+            await ensureSampleThemes();
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        }
         this.loadWorkspace();
     }
 
@@ -48,6 +56,38 @@ export default class NativeFormsThemes extends LightningElement {
 
     get previewOuterClass() {
         return `preview-page preview-page--${this.draft?.formWidth || 'wide'}`;
+    }
+
+    get backgroundColorFieldClass() {
+        return this.fieldWrapperClass('backgroundColor');
+    }
+
+    get formBackgroundColorFieldClass() {
+        return this.fieldWrapperClass('formBackgroundColor');
+    }
+
+    get formBorderColorFieldClass() {
+        return this.fieldWrapperClass('formBorderColor');
+    }
+
+    get titleTextColorFieldClass() {
+        return this.fieldWrapperClass('titleTextColor');
+    }
+
+    get sectionTitleTextColorFieldClass() {
+        return this.fieldWrapperClass('sectionTitleTextColor');
+    }
+
+    get inputBackgroundColorFieldClass() {
+        return this.fieldWrapperClass('inputBackgroundColor');
+    }
+
+    get buttonTextColorFieldClass() {
+        return this.fieldWrapperClass('buttonTextColor');
+    }
+
+    get buttonBackgroundColorFieldClass() {
+        return this.fieldWrapperClass('buttonBackgroundColor');
     }
 
     get previewOuterStyle() {
@@ -170,6 +210,23 @@ export default class NativeFormsThemes extends LightningElement {
         }
     }
 
+    async handleCloneTheme() {
+        if (!this.selectedThemeId) {
+            return;
+        }
+        this.isLoading = true;
+        try {
+            const theme = await cloneTheme({ themeId: this.selectedThemeId });
+            this.selectedThemeId = theme.id;
+            await this.loadWorkspace(theme.id);
+            this.showToast('Theme cloned', 'A copy of the selected theme is ready to edit.', 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
     handleSelectTheme(event) {
         this.selectedThemeId = event.currentTarget.dataset.id;
         this.loadWorkspace(this.selectedThemeId);
@@ -185,6 +242,35 @@ export default class NativeFormsThemes extends LightningElement {
             ...this.draft,
             [fieldName]: value
         };
+    }
+
+    handleColorPickerChange(event) {
+        if (!this.draft) {
+            return;
+        }
+        const fieldName = event.target.dataset.field;
+        this.draft = {
+            ...this.draft,
+            [fieldName]: event.target.value
+        };
+    }
+
+    handlePreviewTargetClick(event) {
+        const fieldName = event.target?.dataset?.target;
+        if (!fieldName) {
+            return;
+        }
+        event.stopPropagation();
+        this.highlightedField = fieldName;
+        window.clearTimeout(this.highlightTimeout);
+        this.highlightTimeout = window.setTimeout(() => {
+            this.highlightedField = '';
+        }, 2200);
+
+        const fieldWrapper = this.template.querySelector(`[data-focus-field="${fieldName}"]`);
+        if (fieldWrapper) {
+            fieldWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
 
     async handleSaveTheme() {
@@ -282,5 +368,9 @@ export default class NativeFormsThemes extends LightningElement {
 
     showToast(title, message, variant) {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+    }
+
+    fieldWrapperClass(fieldName) {
+        return `field-focus-wrap${this.highlightedField === fieldName ? ' field-focus-wrap--active' : ''}`;
     }
 }

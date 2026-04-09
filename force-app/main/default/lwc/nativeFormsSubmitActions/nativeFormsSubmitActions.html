@@ -65,6 +65,10 @@
                             <p><strong>Find and update existing record</strong> first finds a row by conditions, then updates it.</p>
                             <p><strong>&#123;input.fieldKey&#125;</strong> means a value coming from the form itself.</p>
                             <p><strong>&#123;params.name&#125;</strong> means a URL query parameter from the page address.</p>
+                            <p>For condition rows, enter just the raw value:
+                                <code>email</code> for a URL parameter,
+                                choose a form field for form input,
+                                or type plain text such as <code>Web</code> for a literal.</p>
                         </div>
                     </section>
 
@@ -152,13 +156,27 @@
                                                     options={valueSourceOptions}
                                                     onchange={handleConditionChange}>
                                                 </lightning-combobox>
-                                                <lightning-input
-                                                    data-index={index}
-                                                    name="valueText"
-                                                    label="Value"
-                                                    value={row.valueText}
-                                                    onchange={handleConditionChange}>
-                                                </lightning-input>
+                                                <template if:true={row.isValueSourceField}>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="valueText"
+                                                        label={row.valueLabel}
+                                                        value={row.valueText}
+                                                        placeholder={row.valuePlaceholder}
+                                                        options={formFieldOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                </template>
+                                                <template if:false={row.isValueSourceField}>
+                                                    <lightning-input
+                                                        data-index={index}
+                                                        name="valueText"
+                                                        label={row.valueLabel}
+                                                        placeholder={row.valuePlaceholder}
+                                                        value={row.valueText}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-input>
+                                                </template>
                                                 <lightning-button-icon
                                                     data-index={index}
                                                     icon-name="utility:delete"

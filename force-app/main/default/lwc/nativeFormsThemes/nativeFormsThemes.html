@@ -17,12 +17,13 @@
                         <div class="pane-header">
                             <h2>Themes</h2>
                             <p class="pane-copy">Reusable design presets that can later be assigned to forms.</p>
+                            <p class="theme-version">Theme v0.5</p>
                         </div>
 
                         <div class="left-actions">
                             <lightning-button variant="brand" label="New Theme" onclick={handleCreateTheme}></lightning-button>
                             <template if:true={selectedThemeId}>
-                                <lightning-button variant="neutral" label="Delete Theme" onclick={handleDeleteTheme}></lightning-button>
+                                <lightning-button variant="neutral" label="Clone Theme" onclick={handleCloneTheme}></lightning-button>
                             </template>
                         </div>
 
@@ -41,75 +42,33 @@
 
                     <section class="pane pane-center">
                         <template if:true={selectedTheme}>
-                            <div class="editor-grid">
-                                <div class="editor-section">
-                                    <h3>Branding</h3>
-                                    <lightning-input label="Theme Name" value={draft.name} onchange={handleFieldChange} data-field="name"></lightning-input>
-                                    <lightning-textarea label="Description" value={draft.description} onchange={handleFieldChange} data-field="description"></lightning-textarea>
-                                    <lightning-input type="file" label="Logo Image" accept="image/*" onchange={handleLogoFileChange}></lightning-input>
-                                    <lightning-input label="Logo URL" value={draft.logoUrl} onchange={handleFieldChange} data-field="logoUrl"></lightning-input>
-                                    <div class="inline-row">
-                                        <lightning-input type="number" label="Logo Size" value={draft.logoSizePx} onchange={handleFieldChange} data-field="logoSizePx"></lightning-input>
-                                        <lightning-combobox label="Logo Position" value={draft.logoPosition} options={logoPositionOptions} onchange={handleFieldChange} data-field="logoPosition"></lightning-combobox>
-                                    </div>
-                                </div>
+                            <div class={previewOuterClass} style={previewOuterStyle} data-target="backgroundColor" onclick={handlePreviewTargetClick}>
+                                <div class="preview-form" style={previewFormStyle} data-target="formBackgroundColor" onclick={handlePreviewTargetClick}>
+                                    <template if:true={draft.logoUrl}>
+                                        <div class={previewLogoWrapClass}>
+                                            <img src={draft.logoUrl} alt="Theme logo" class="preview-logo" style={previewLogoStyle} />
+                                        </div>
+                                    </template>
+                                    <h1 class="preview-title" style={previewTitleStyle} data-target="titleTextColor" onclick={handlePreviewTargetClick}>Problem Report</h1>
+                                    <p class="preview-copy" style={previewCopyStyle}>A reusable theme preview for Starter launch scope.</p>
 
-                                <div class="editor-section">
-                                    <h3>Layout</h3>
-                                    <lightning-combobox label="Form Width" value={draft.formWidth} options={formWidthOptions} onchange={handleFieldChange} data-field="formWidth"></lightning-combobox>
-                                    <div class="inline-row">
-                                        <lightning-input label="Background Color" value={draft.backgroundColor} onchange={handleFieldChange} data-field="backgroundColor"></lightning-input>
-                                        <span class="color-swatch" style={backgroundColorStyle}></span>
+                                    <div class="preview-section" style={previewSectionStyle} data-target="formBorderColor" onclick={handlePreviewTargetClick}>
+                                        <div class="preview-section-title" style={previewSectionTitleStyle} data-target="sectionTitleTextColor" onclick={handlePreviewTargetClick}>Contact Info</div>
+                                        <div class="preview-field">
+                                            <label class="preview-label" style={previewLabelStyle} data-target="mainTextColor" onclick={handlePreviewTargetClick}>First Name</label>
+                                            <input class="preview-input" style={previewInputStyle} placeholder="Enter text" data-target="inputBackgroundColor" onclick={handlePreviewTargetClick} />
+                                        </div>
+                                        <div class="preview-field">
+                                            <label class="preview-label" style={previewLabelStyle} data-target="mainTextColor" onclick={handlePreviewTargetClick}>Country</label>
+                                            <select class="preview-input" style={previewInputStyle} data-target="inputBackgroundColor" onclick={handlePreviewTargetClick}>
+                                                <option>Web</option>
+                                                <option>Partner</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div class="inline-row">
-                                        <lightning-input label="Form Background" value={draft.formBackgroundColor} onchange={handleFieldChange} data-field="formBackgroundColor"></lightning-input>
-                                        <span class="color-swatch" style={formBackgroundColorStyle}></span>
-                                    </div>
-                                    <div class="inline-row">
-                                        <lightning-input label="Form Border" value={draft.formBorderColor} onchange={handleFieldChange} data-field="formBorderColor"></lightning-input>
-                                        <span class="color-swatch" style={formBorderColorStyle}></span>
-                                    </div>
-                                </div>
 
-                                <div class="editor-section">
-                                    <h3>Typography</h3>
-                                    <div class="inline-row">
-                                        <lightning-combobox label="Title Font" value={draft.titleFont} options={fontOptions} onchange={handleFieldChange} data-field="titleFont"></lightning-combobox>
-                                        <lightning-input type="number" label="Title Size" value={draft.titleFontSizePx} onchange={handleFieldChange} data-field="titleFontSizePx"></lightning-input>
-                                    </div>
-                                    <lightning-input label="Title Color" value={draft.titleTextColor} onchange={handleFieldChange} data-field="titleTextColor"></lightning-input>
-                                    <div class="inline-row">
-                                        <lightning-combobox label="Section Font" value={draft.sectionTitleFont} options={fontOptions} onchange={handleFieldChange} data-field="sectionTitleFont"></lightning-combobox>
-                                        <lightning-input type="number" label="Section Size" value={draft.sectionTitleFontSizePx} onchange={handleFieldChange} data-field="sectionTitleFontSizePx"></lightning-input>
-                                    </div>
-                                    <lightning-input label="Section Color" value={draft.sectionTitleTextColor} onchange={handleFieldChange} data-field="sectionTitleTextColor"></lightning-input>
-                                    <div class="inline-row">
-                                        <lightning-combobox label="Main Font" value={draft.mainFont} options={fontOptions} onchange={handleFieldChange} data-field="mainFont"></lightning-combobox>
-                                        <lightning-input type="number" label="Main Text Size" value={draft.mainTextSizePx} onchange={handleFieldChange} data-field="mainTextSizePx"></lightning-input>
-                                    </div>
-                                    <lightning-input label="Main Text Color" value={draft.mainTextColor} onchange={handleFieldChange} data-field="mainTextColor"></lightning-input>
-                                    <lightning-input label="Link Text Color" value={draft.linkTextColor} onchange={handleFieldChange} data-field="linkTextColor"></lightning-input>
-                                    <lightning-input label="Hint Text Color" value={draft.hintTextColor} onchange={handleFieldChange} data-field="hintTextColor"></lightning-input>
-                                    <lightning-input label="Error Color" value={draft.errorColor} onchange={handleFieldChange} data-field="errorColor"></lightning-input>
+                                    <button class="preview-button" style={previewButtonStyle} data-target="buttonBackgroundColor" onclick={handlePreviewTargetClick}>Submit</button>
                                 </div>
-
-                                <div class="editor-section">
-                                    <h3>Inputs & Button</h3>
-                                    <lightning-input type="number" label="Input Border Radius" value={draft.inputBorderRadiusPx} onchange={handleFieldChange} data-field="inputBorderRadiusPx"></lightning-input>
-                                    <lightning-input label="Input Background" value={draft.inputBackgroundColor} onchange={handleFieldChange} data-field="inputBackgroundColor"></lightning-input>
-                                    <lightning-input label="Input Border Color" value={draft.inputBorderColor} onchange={handleFieldChange} data-field="inputBorderColor"></lightning-input>
-                                    <div class="inline-row">
-                                        <lightning-combobox label="Button Font" value={draft.buttonFont} options={fontOptions} onchange={handleFieldChange} data-field="buttonFont"></lightning-combobox>
-                                        <lightning-input type="number" label="Button Font Size" value={draft.buttonFontSizePx} onchange={handleFieldChange} data-field="buttonFontSizePx"></lightning-input>
-                                    </div>
-                                    <lightning-input label="Button Text Color" value={draft.buttonTextColor} onchange={handleFieldChange} data-field="buttonTextColor"></lightning-input>
-                                    <lightning-input label="Button Background" value={draft.buttonBackgroundColor} onchange={handleFieldChange} data-field="buttonBackgroundColor"></lightning-input>
-                                    <lightning-input label="Button Hover Background" value={draft.buttonHoverBackgroundColor} onchange={handleFieldChange} data-field="buttonHoverBackgroundColor"></lightning-input>
-                                </div>
-                            </div>
-
-                            <div class="editor-actions">
-                                <lightning-button variant="brand" label="Save Theme" onclick={handleSaveTheme}></lightning-button>
                             </div>
                         </template>
                         <template if:false={selectedTheme}>
@@ -119,38 +78,132 @@
 
                     <section class="pane pane-right">
                         <div class="pane-header">
-                            <h2>Live Preview</h2>
-                            <p class="pane-copy">A Starter-level preview of how this theme could style a form later.</p>
+                            <h2>Theme Settings</h2>
+                            <p class="pane-copy">Edit the reusable theme here and judge the result in the live preview.</p>
                         </div>
 
                         <template if:true={selectedTheme}>
-                            <div class={previewOuterClass} style={previewOuterStyle}>
-                                <div class="preview-form" style={previewFormStyle}>
-                                    <template if:true={draft.logoUrl}>
-                                        <div class={previewLogoWrapClass}>
-                                            <img src={draft.logoUrl} alt="Theme logo" class="preview-logo" style={previewLogoStyle} />
-                                        </div>
-                                    </template>
-                                    <h1 class="preview-title" style={previewTitleStyle}>Problem Report</h1>
-                                    <p class="preview-copy" style={previewCopyStyle}>A reusable theme preview for Starter launch scope.</p>
-
-                                    <div class="preview-section" style={previewSectionStyle}>
-                                        <div class="preview-section-title" style={previewSectionTitleStyle}>Contact Info</div>
-                                        <div class="preview-field">
-                                            <label class="preview-label" style={previewLabelStyle}>First Name</label>
-                                            <input class="preview-input" style={previewInputStyle} placeholder="Enter text" />
-                                        </div>
-                                        <div class="preview-field">
-                                            <label class="preview-label" style={previewLabelStyle}>Country</label>
-                                            <select class="preview-input" style={previewInputStyle}>
-                                                <option>Web</option>
-                                                <option>Partner</option>
-                                            </select>
-                                        </div>
+                            <div class="editor-grid">
+                                <div class="editor-section">
+                                    <h3>Branding</h3>
+                                    <lightning-input label="Theme Name" value={draft.name} onchange={handleFieldChange} data-field="name"></lightning-input>
+                                    <lightning-textarea label="Description" value={draft.description} onchange={handleFieldChange} data-field="description"></lightning-textarea>
+                                    <lightning-input type="file" label="Logo Image" accept="image/*" onchange={handleLogoFileChange}></lightning-input>
+                                    <lightning-input label="Logo URL" value={draft.logoUrl} onchange={handleFieldChange} data-field="logoUrl"></lightning-input>
+                                    <div class="inline-row inline-row--two">
+                                        <lightning-input type="number" label="Logo Size" value={draft.logoSizePx} onchange={handleFieldChange} data-field="logoSizePx"></lightning-input>
+                                        <lightning-combobox label="Logo Position" value={draft.logoPosition} options={logoPositionOptions} onchange={handleFieldChange} data-field="logoPosition"></lightning-combobox>
                                     </div>
-
-                                    <button class="preview-button" style={previewButtonStyle}>Submit</button>
                                 </div>
+
+                                <div class="editor-section">
+                                    <h3>Layout</h3>
+                                    <lightning-combobox label="Form Width" value={draft.formWidth} options={formWidthOptions} onchange={handleFieldChange} data-field="formWidth"></lightning-combobox>
+                                    <div class="color-field">
+                                        <div class={backgroundColorFieldClass} data-focus-field="backgroundColor">
+                                            <lightning-input label="Background Color" value={draft.backgroundColor} onchange={handleFieldChange} data-field="backgroundColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.backgroundColor} data-field="backgroundColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={formBackgroundColorFieldClass} data-focus-field="formBackgroundColor">
+                                            <lightning-input label="Form Background" value={draft.formBackgroundColor} onchange={handleFieldChange} data-field="formBackgroundColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.formBackgroundColor} data-field="formBackgroundColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={formBorderColorFieldClass} data-focus-field="formBorderColor">
+                                            <lightning-input label="Form Border" value={draft.formBorderColor} onchange={handleFieldChange} data-field="formBorderColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.formBorderColor} data-field="formBorderColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                </div>
+
+                                <div class="editor-section">
+                                    <h3>Typography</h3>
+                                    <div class="inline-row inline-row--two">
+                                        <lightning-combobox label="Title Font" value={draft.titleFont} options={fontOptions} onchange={handleFieldChange} data-field="titleFont"></lightning-combobox>
+                                        <lightning-input type="number" label="Title Size" value={draft.titleFontSizePx} onchange={handleFieldChange} data-field="titleFontSizePx"></lightning-input>
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={titleTextColorFieldClass} data-focus-field="titleTextColor">
+                                            <lightning-input label="Title Color" value={draft.titleTextColor} onchange={handleFieldChange} data-field="titleTextColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.titleTextColor} data-field="titleTextColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="inline-row inline-row--two">
+                                        <lightning-combobox label="Section Font" value={draft.sectionTitleFont} options={fontOptions} onchange={handleFieldChange} data-field="sectionTitleFont"></lightning-combobox>
+                                        <lightning-input type="number" label="Section Size" value={draft.sectionTitleFontSizePx} onchange={handleFieldChange} data-field="sectionTitleFontSizePx"></lightning-input>
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={sectionTitleTextColorFieldClass} data-focus-field="sectionTitleTextColor">
+                                            <lightning-input label="Section Color" value={draft.sectionTitleTextColor} onchange={handleFieldChange} data-field="sectionTitleTextColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.sectionTitleTextColor} data-field="sectionTitleTextColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="inline-row inline-row--two">
+                                        <lightning-combobox label="Main Font" value={draft.mainFont} options={fontOptions} onchange={handleFieldChange} data-field="mainFont"></lightning-combobox>
+                                        <lightning-input type="number" label="Main Text Size" value={draft.mainTextSizePx} onchange={handleFieldChange} data-field="mainTextSizePx"></lightning-input>
+                                    </div>
+                                    <div class="color-field">
+                                        <lightning-input label="Main Text Color" value={draft.mainTextColor} onchange={handleFieldChange} data-field="mainTextColor"></lightning-input>
+                                        <input class="native-color-input" type="color" value={draft.mainTextColor} data-field="mainTextColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <lightning-input label="Link Text Color" value={draft.linkTextColor} onchange={handleFieldChange} data-field="linkTextColor"></lightning-input>
+                                        <input class="native-color-input" type="color" value={draft.linkTextColor} data-field="linkTextColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <lightning-input label="Hint Text Color" value={draft.hintTextColor} onchange={handleFieldChange} data-field="hintTextColor"></lightning-input>
+                                        <input class="native-color-input" type="color" value={draft.hintTextColor} data-field="hintTextColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <lightning-input label="Error Color" value={draft.errorColor} onchange={handleFieldChange} data-field="errorColor"></lightning-input>
+                                        <input class="native-color-input" type="color" value={draft.errorColor} data-field="errorColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                </div>
+
+                                <div class="editor-section">
+                                    <h3>Inputs & Button</h3>
+                                    <lightning-input type="number" label="Input Border Radius" value={draft.inputBorderRadiusPx} onchange={handleFieldChange} data-field="inputBorderRadiusPx"></lightning-input>
+                                    <div class="color-field">
+                                        <div class={inputBackgroundColorFieldClass} data-focus-field="inputBackgroundColor">
+                                            <lightning-input label="Input Background" value={draft.inputBackgroundColor} onchange={handleFieldChange} data-field="inputBackgroundColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.inputBackgroundColor} data-field="inputBackgroundColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <lightning-input label="Input Border Color" value={draft.inputBorderColor} onchange={handleFieldChange} data-field="inputBorderColor"></lightning-input>
+                                        <input class="native-color-input" type="color" value={draft.inputBorderColor} data-field="inputBorderColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="inline-row inline-row--two">
+                                        <lightning-combobox label="Button Font" value={draft.buttonFont} options={fontOptions} onchange={handleFieldChange} data-field="buttonFont"></lightning-combobox>
+                                        <lightning-input type="number" label="Button Font Size" value={draft.buttonFontSizePx} onchange={handleFieldChange} data-field="buttonFontSizePx"></lightning-input>
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={buttonTextColorFieldClass} data-focus-field="buttonTextColor">
+                                            <lightning-input label="Button Text Color" value={draft.buttonTextColor} onchange={handleFieldChange} data-field="buttonTextColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.buttonTextColor} data-field="buttonTextColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={buttonBackgroundColorFieldClass} data-focus-field="buttonBackgroundColor">
+                                            <lightning-input label="Button Background" value={draft.buttonBackgroundColor} onchange={handleFieldChange} data-field="buttonBackgroundColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.buttonBackgroundColor} data-field="buttonBackgroundColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <lightning-input label="Button Hover Background" value={draft.buttonHoverBackgroundColor} onchange={handleFieldChange} data-field="buttonHoverBackgroundColor"></lightning-input>
+                                        <input class="native-color-input" type="color" value={draft.buttonHoverBackgroundColor} data-field="buttonHoverBackgroundColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="editor-actions">
+                                <lightning-button variant="brand" label="Save Theme" onclick={handleSaveTheme}></lightning-button>
+                                <template if:true={selectedThemeId}>
+                                    <lightning-button variant="neutral" label="Delete Theme" onclick={handleDeleteTheme}></lightning-button>
+                                </template>
                             </div>
                         </template>
                     </section>

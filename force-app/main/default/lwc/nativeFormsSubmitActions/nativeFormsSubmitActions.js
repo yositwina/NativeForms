@@ -18,6 +18,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
     selectedFormName = '';
     selectedActionId;
     objectOptions = [];
+    formFieldOptions = [];
     objectSearch = '';
     fieldOptions = [];
     enableProConditionLogic = false;
@@ -37,6 +38,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
     ];
     valueSourceOptions = [
         { label: 'URL Parameter', value: 'param' },
+        { label: 'Form Field', value: 'field' },
         { label: 'Literal Value', value: 'literal' }
     ];
 
@@ -91,7 +93,10 @@ export default class NativeFormsSubmitActions extends LightningElement {
     get conditionRows() {
         return (this.draftAction?.conditions || []).map((row, index) => ({
             ...row,
-            displayIndex: index + 1
+            displayIndex: index + 1,
+            isValueSourceField: row.valueSource === 'field',
+            valueLabel: this.getConditionValueLabel(row.valueSource || 'param'),
+            valuePlaceholder: this.getConditionValuePlaceholder(row.valueSource || 'param')
         }));
     }
 
@@ -145,7 +150,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
             return 'Use a hidden field, prefilled id, or prior result alias expression such as {foundContact.Id}.';
         }
         if (this.draftAction?.commandType === 'findAndUpdate') {
-            return 'Build conditions with Salesforce fields on the left, then choose either a URL parameter or a literal value on the right.';
+            return 'Build conditions with Salesforce fields on the left, then choose a URL parameter, form field, or literal value on the right.';
         }
         return 'Create adds a new record using the fields mapped from the Builder.';
     }
@@ -180,6 +185,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
             this.selectedVersionStatus = workspace.selectedVersionStatus;
             this.selectedFormName = workspace.selectedFormName;
             this.objectOptions = workspace.objectOptions || [];
+            this.formFieldOptions = workspace.formFieldOptions || [];
             this.mappings = workspace.mappings || [];
             this.enableProConditionLogic = !!workspace.enableProConditionLogic;
             this.versionOptions = (workspace.versions || []).map((option) => ({
@@ -253,9 +259,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
             recordIdSource: config.recordIdSource || '',
             whereClause: config.where || '',
             onNotFound: config.onNotFound || (action.commandType === 'findAndUpdate' ? 'create' : 'error'),
-            conditionLogic: config.conditionLogic || 'AND',
+            conditionLogic: config.conditionLogic || '',
             conditions: this.normalizeConditions(config.conditions, config.where),
-            conditionExpression: config.conditionExpression || this.defaultConditionExpression((config.conditions || []).length)
+            conditionExpression: config.conditionExpression || config.conditionLogic || this.defaultConditionExpression((config.conditions || []).length)
         };
         this.loadFieldOptions(action.objectApiName);
     }
@@ -290,11 +296,11 @@ export default class NativeFormsSubmitActions extends LightningElement {
                 config.where = whereClause;
             }
             config.onNotFound = this.draftAction.onNotFound || 'create';
-            config.conditionLogic = this.draftAction.conditionLogic || 'AND';
             config.conditions = this.sanitizeConditions();
-            config.conditionExpression = this.enableProConditionLogic
+            config.conditionLogic = this.enableProConditionLogic
                 ? (this.draftAction.conditionExpression || this.defaultConditionExpression(config.conditions.length))
-                : null;
+                : this.defaultConditionExpression(config.conditions.length);
+            config.conditionExpression = config.conditionLogic;
         }
         return JSON.stringify(config, null, 2);
     }
@@ -345,13 +351,15 @@ export default class NativeFormsSubmitActions extends LightningElement {
         const conditions = [...(this.draftAction.conditions || [])];
         conditions[rowIndex] = {
             ...conditions[rowIndex],
-            [name]: value
+            [name]: name === 'valueText'
+                ? this.normalizeConditionValueInput(conditions[rowIndex]?.valueSource, value)
+                : value
         };
         if (name === 'operator' && (value === 'isBlank' || value === 'isNotBlank')) {
             conditions[rowIndex].valueText = '';
         }
         if (name === 'valueSource') {
-            conditions[rowIndex].valueText = conditions[rowIndex].valueText || '';
+            conditions[rowIndex].valueText = this.normalizeConditionValueInput(value, conditions[rowIndex].valueText || '');
         }
         this.draftAction = {
             ...this.draftAction,
@@ -468,7 +476,10 @@ export default class NativeFormsSubmitActions extends LightningElement {
                 fieldApiName: item.fieldApiName || '',
                 operator: item.operator || 'eq',
                 valueSource: item.valueSource || (item.paramName ? 'param' : 'literal'),
-                valueText: item.valueText != null ? item.valueText : (item.paramName || '')
+                valueText: this.normalizeConditionValueInput(
+                    item.valueSource || (item.paramName ? 'param' : 'literal'),
+                    item.valueText != null ? item.valueText : (item.paramName || '')
+                )
             }));
         }
         if (!fallbackWhereClause) {
@@ -482,7 +493,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
                 fieldApiName: match ? match[1].trim() : '',
                 operator: match ? this.operatorFromToken(match[2]) : 'eq',
                 valueSource: match ? 'param' : 'literal',
-                valueText: match ? match[3] : ''
+                valueText: this.normalizeConditionValueInput(match ? 'param' : 'literal', match ? match[3] : '')
             };
         });
     }
@@ -562,17 +573,56 @@ export default class NativeFormsSubmitActions extends LightningElement {
     }
 
     buildConditionValueExpression(item) {
-        const rawValue = item?.valueText || '';
+        const rawValue = this.normalizeConditionValueInput(item?.valueSource || 'param', item?.valueText || '');
         if (!rawValue) {
             return '';
         }
         if ((item?.valueSource || 'param') === 'param') {
             return `{params.${rawValue}}`;
         }
+        if (item?.valueSource === 'field') {
+            return `{input.${rawValue}}`;
+        }
         if (/^-?\d+(\.\d+)?$/.test(rawValue)) {
             return rawValue;
         }
         return `'${rawValue.replace(/'/g, "\\'")}'`;
+    }
+
+    getConditionValueLabel(valueSource) {
+        if (valueSource === 'field') {
+            return 'Form Field';
+        }
+        if (valueSource === 'literal') {
+            return 'Literal Value';
+        }
+        return 'Parameter Name';
+    }
+
+    getConditionValuePlaceholder(valueSource) {
+        if (valueSource === 'field') {
+            return 'Choose a form field';
+        }
+        if (valueSource === 'literal') {
+            return 'Example: Web';
+        }
+        return 'Example: email';
+    }
+
+    normalizeConditionValueInput(valueSource, rawValue) {
+        const value = rawValue == null ? '' : String(rawValue).trim();
+        if (!value) {
+            return '';
+        }
+        if (valueSource === 'param') {
+            const wrappedMatch = value.match(/^\{params\.([^}]+)\}$/i);
+            return wrappedMatch ? wrappedMatch[1] : value.replace(/^params\./i, '');
+        }
+        if (valueSource === 'field') {
+            const wrappedMatch = value.match(/^\{input\.([^}]+)\}$/i);
+            return wrappedMatch ? wrappedMatch[1] : value.replace(/^input\./i, '');
+        }
+        return value;
     }
 
     defaultConditionExpression(count) {

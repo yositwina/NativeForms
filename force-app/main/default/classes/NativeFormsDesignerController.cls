@@ -35,6 +35,35 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
     }
 
+    public class ThemeRecord {
+        @AuraEnabled public Id id { get; set; }
+        @AuraEnabled public String name { get; set; }
+        @AuraEnabled public String logoUrl { get; set; }
+        @AuraEnabled public Decimal logoSizePx { get; set; }
+        @AuraEnabled public String logoPosition { get; set; }
+        @AuraEnabled public String formWidth { get; set; }
+        @AuraEnabled public String backgroundColor { get; set; }
+        @AuraEnabled public String formBackgroundColor { get; set; }
+        @AuraEnabled public String formBorderColor { get; set; }
+        @AuraEnabled public String titleFont { get; set; }
+        @AuraEnabled public Decimal titleFontSizePx { get; set; }
+        @AuraEnabled public String titleTextColor { get; set; }
+        @AuraEnabled public String sectionTitleFont { get; set; }
+        @AuraEnabled public Decimal sectionTitleFontSizePx { get; set; }
+        @AuraEnabled public String sectionTitleTextColor { get; set; }
+        @AuraEnabled public String mainFont { get; set; }
+        @AuraEnabled public Decimal mainTextSizePx { get; set; }
+        @AuraEnabled public String mainTextColor { get; set; }
+        @AuraEnabled public String hintTextColor { get; set; }
+        @AuraEnabled public Decimal inputBorderRadiusPx { get; set; }
+        @AuraEnabled public String inputBackgroundColor { get; set; }
+        @AuraEnabled public String inputBorderColor { get; set; }
+        @AuraEnabled public String buttonFont { get; set; }
+        @AuraEnabled public Decimal buttonFontSizePx { get; set; }
+        @AuraEnabled public String buttonTextColor { get; set; }
+        @AuraEnabled public String buttonBackgroundColor { get; set; }
+    }
+
     public class ElementRecord {
         @AuraEnabled public Id id { get; set; }
         @AuraEnabled public String elementId { get; set; }
@@ -51,6 +80,7 @@ public with sharing class NativeFormsDesignerController {
     public class DesignerWorkspace {
         @AuraEnabled public Id selectedFormId { get; set; }
         @AuraEnabled public Id selectedVersionId { get; set; }
+        @AuraEnabled public Id selectedThemeId { get; set; }
         @AuraEnabled public String selectedFormName { get; set; }
         @AuraEnabled public String selectedFormKey { get; set; }
         @AuraEnabled public String selectedFormDescription { get; set; }
@@ -58,6 +88,8 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedVersionStatus { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
+        @AuraEnabled public List<SelectOption> themes { get; set; }
+        @AuraEnabled public ThemeRecord selectedTheme { get; set; }
         @AuraEnabled public List<ElementRecord> elements { get; set; }
         @AuraEnabled public List<PrefillAliasDetail> prefillAliases { get; set; }
         @AuraEnabled public List<SubmitActionDetail> submitActions { get; set; }
@@ -161,12 +193,13 @@ public with sharing class NativeFormsDesignerController {
         DesignerWorkspace workspace = new DesignerWorkspace();
         workspace.forms = new List<SelectOption>();
         workspace.versions = new List<VersionOption>();
+        workspace.themes = new List<SelectOption>();
         workspace.elements = new List<ElementRecord>();
         workspace.prefillAliases = new List<PrefillAliasDetail>();
         workspace.submitActions = new List<SubmitActionDetail>();
 
         List<NF_Form__c> forms = [
-            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c
+            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c
             FROM NF_Form__c
             ORDER BY Name ASC
             LIMIT 200
@@ -188,7 +221,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form__c selectedForm = [
-            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c
+            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c
             FROM NF_Form__c
             WHERE Id = :effectiveFormId
             LIMIT 1
@@ -197,6 +230,34 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedFormName = selectedForm.Name;
         workspace.selectedFormKey = selectedForm.NF_Key__c;
         workspace.selectedFormDescription = selectedForm.Description__c;
+        workspace.selectedThemeId = selectedForm.Theme__c;
+
+        for (NF_Theme__c themeRecord : [
+            SELECT Id, Name
+            FROM NF_Theme__c
+            ORDER BY Name ASC
+            LIMIT 200
+        ]) {
+            SelectOption option = new SelectOption();
+            option.label = themeRecord.Name;
+            option.value = (String) themeRecord.Id;
+            workspace.themes.add(option);
+        }
+
+        if (selectedForm.Theme__c != null) {
+            workspace.selectedTheme = toThemeRecord([
+                SELECT Id, Name, Logo_URL__c, Logo_Size_Px__c, Logo_Position__c,
+                       Form_Width__c, Background_Color__c, Form_Background_Color__c, Form_Border_Color__c,
+                       Title_Font__c, Title_Font_Size_Px__c, Title_Text_Color__c,
+                       Section_Title_Font__c, Section_Title_Font_Size_Px__c, Section_Title_Text_Color__c,
+                       Main_Font__c, Main_Text_Size_Px__c, Main_Text_Color__c, Hint_Text_Color__c,
+                       Input_Border_Radius_Px__c, Input_Background_Color__c, Input_Border_Color__c,
+                       Button_Font__c, Button_Font_Size_Px__c, Button_Text_Color__c, Button_Background_Color__c
+                FROM NF_Theme__c
+                WHERE Id = :selectedForm.Theme__c
+                LIMIT 1
+            ]);
+        }
 
         List<NF_Form_Version__c> versionRecords = [
             SELECT Id, Name, Version_Status__c, Publish_Status__c, LastModifiedDate
@@ -281,6 +342,23 @@ public with sharing class NativeFormsDesignerController {
         }
 
         return workspace;
+    }
+
+    @AuraEnabled
+    public static Id updateFormTheme(Id formId, Id themeId) {
+        if (formId == null) {
+            throw new AuraHandledException('Form id is required.');
+        }
+
+        NF_Form__c formRecord = [
+            SELECT Id, Theme__c
+            FROM NF_Form__c
+            WHERE Id = :formId
+            LIMIT 1
+        ];
+        formRecord.Theme__c = themeId;
+        update formRecord;
+        return formRecord.Theme__c;
     }
 
     @AuraEnabled
@@ -565,6 +643,37 @@ public with sharing class NativeFormsDesignerController {
         return dto;
     }
 
+    private static ThemeRecord toThemeRecord(NF_Theme__c row) {
+        ThemeRecord dto = new ThemeRecord();
+        dto.id = row.Id;
+        dto.name = row.Name;
+        dto.logoUrl = row.Logo_URL__c;
+        dto.logoSizePx = row.Logo_Size_Px__c;
+        dto.logoPosition = row.Logo_Position__c;
+        dto.formWidth = row.Form_Width__c;
+        dto.backgroundColor = row.Background_Color__c;
+        dto.formBackgroundColor = row.Form_Background_Color__c;
+        dto.formBorderColor = row.Form_Border_Color__c;
+        dto.titleFont = row.Title_Font__c;
+        dto.titleFontSizePx = row.Title_Font_Size_Px__c;
+        dto.titleTextColor = row.Title_Text_Color__c;
+        dto.sectionTitleFont = row.Section_Title_Font__c;
+        dto.sectionTitleFontSizePx = row.Section_Title_Font_Size_Px__c;
+        dto.sectionTitleTextColor = row.Section_Title_Text_Color__c;
+        dto.mainFont = row.Main_Font__c;
+        dto.mainTextSizePx = row.Main_Text_Size_Px__c;
+        dto.mainTextColor = row.Main_Text_Color__c;
+        dto.hintTextColor = row.Hint_Text_Color__c;
+        dto.inputBorderRadiusPx = row.Input_Border_Radius_Px__c;
+        dto.inputBackgroundColor = row.Input_Background_Color__c;
+        dto.inputBorderColor = row.Input_Border_Color__c;
+        dto.buttonFont = row.Button_Font__c;
+        dto.buttonFontSizePx = row.Button_Font_Size_Px__c;
+        dto.buttonTextColor = row.Button_Text_Color__c;
+        dto.buttonBackgroundColor = row.Button_Background_Color__c;
+        return dto;
+    }
+
     private static String buildElementId(String elementType) {
         return elementType.toLowerCase() + '-' + String.valueOf(Datetime.now().getTime());
     }
@@ -839,11 +948,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         public Integer compare(NF_Form_Version__c a, NF_Form_Version__c b) {
-            Boolean aPublished = publishedVersionId != null && a.Id == publishedVersionId;
-            Boolean bPublished = publishedVersionId != null && b.Id == publishedVersionId;
-            if (aPublished && !bPublished) return -1;
-            if (!aPublished && bPublished) return 1;
-            return String.valueOf(a.Name).toLowerCase().compareTo(String.valueOf(b.Name).toLowerCase());
+            return String.valueOf(b.Name).toLowerCase().compareTo(String.valueOf(a.Name).toLowerCase());
         }
     }
 }

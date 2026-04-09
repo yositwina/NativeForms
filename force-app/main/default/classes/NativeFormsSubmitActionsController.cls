@@ -29,6 +29,7 @@ public with sharing class NativeFormsSubmitActionsController {
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<SubmitActionRecord> actions { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
+        @AuraEnabled public List<SelectOption> formFieldOptions { get; set; }
         @AuraEnabled public List<MappingRecord> mappings { get; set; }
         @AuraEnabled public Boolean enableProConditionLogic { get; set; }
     }
@@ -57,6 +58,7 @@ public with sharing class NativeFormsSubmitActionsController {
         workspace.versions = new List<VersionOption>();
         workspace.actions = new List<SubmitActionRecord>();
         workspace.objectOptions = getObjectOptions();
+        workspace.formFieldOptions = new List<SelectOption>();
         workspace.mappings = new List<MappingRecord>();
         workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
 
@@ -121,6 +123,14 @@ public with sharing class NativeFormsSubmitActionsController {
             WHERE Form_Version__c = :effectiveVersionId
             ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
+            if (String.isNotBlank(elementRecord.Field_Key__c)) {
+                SelectOption fieldOption = new SelectOption();
+                fieldOption.label = String.isBlank(elementRecord.Label__c)
+                    ? elementRecord.Field_Key__c
+                    : elementRecord.Label__c + ' (' + elementRecord.Field_Key__c + ')';
+                fieldOption.value = elementRecord.Field_Key__c;
+                workspace.formFieldOptions.add(fieldOption);
+            }
             Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
             if (!booleanValue(config.get('submitEnabled'))) {
                 continue;

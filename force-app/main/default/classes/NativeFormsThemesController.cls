@@ -51,7 +51,7 @@ public with sharing class NativeFormsThemesController {
         @AuraEnabled public ThemeRecord theme { get; set; }
     }
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static ThemeWorkspace getWorkspace(Id themeId) {
         ThemeWorkspace workspace = new ThemeWorkspace();
         workspace.themes = new List<ThemeOption>();
@@ -93,6 +93,11 @@ public with sharing class NativeFormsThemesController {
     }
 
     @AuraEnabled
+    public static void ensureSampleThemes() {
+        ensureStarterSampleThemes();
+    }
+
+    @AuraEnabled
     public static ThemeRecord createTheme() {
         NF_Theme__c row = new NF_Theme__c(
             Name = 'New Theme',
@@ -126,6 +131,31 @@ public with sharing class NativeFormsThemesController {
         );
         insert row;
         return getWorkspace(row.Id).selectedTheme;
+    }
+
+    @AuraEnabled
+    public static ThemeRecord cloneTheme(Id themeId) {
+        if (themeId == null) {
+            throw new AuraHandledException('Select a theme to clone first.');
+        }
+
+        NF_Theme__c sourceRow = [
+            SELECT Id, Name, Description__c, Logo_URL__c, Logo_Content_Document_Id__c, Logo_Size_Px__c, Logo_Position__c,
+                   Form_Width__c, Background_Color__c, Form_Background_Color__c, Form_Border_Color__c,
+                   Title_Font__c, Title_Font_Size_Px__c, Title_Text_Color__c,
+                   Section_Title_Font__c, Section_Title_Font_Size_Px__c, Section_Title_Text_Color__c,
+                   Main_Font__c, Main_Text_Size_Px__c, Main_Text_Color__c, Link_Text_Color__c, Hint_Text_Color__c, Error_Color__c,
+                   Input_Border_Radius_Px__c, Input_Background_Color__c, Input_Border_Color__c,
+                   Button_Font__c, Button_Font_Size_Px__c, Button_Text_Color__c, Button_Background_Color__c, Button_Hover_Background_Color__c
+            FROM NF_Theme__c
+            WHERE Id = :themeId
+            LIMIT 1
+        ];
+
+        NF_Theme__c clonedRow = sourceRow.clone(false, true, false, false);
+        clonedRow.Name = sourceRow.Name + ' Copy';
+        insert clonedRow;
+        return getWorkspace(clonedRow.Id).selectedTheme;
     }
 
     @AuraEnabled
@@ -282,5 +312,154 @@ public with sharing class NativeFormsThemesController {
 
     private static String blankToDefault(String value, String fallbackValue) {
         return String.isBlank(value) ? fallbackValue : value;
+    }
+
+    private static void ensureStarterSampleThemes() {
+        Set<String> expectedNames = new Set<String>{ 'Ocean Blue', 'ColorFull', 'Official' };
+        Map<String, NF_Theme__c> existingByName = new Map<String, NF_Theme__c>();
+        for (NF_Theme__c row : [
+            SELECT Id, Name
+            FROM NF_Theme__c
+            WHERE Name IN :expectedNames
+        ]) {
+            existingByName.put(row.Name, row);
+        }
+
+        List<NF_Theme__c> toUpsert = new List<NF_Theme__c>();
+
+        NF_Theme__c oceanBlueTheme = new NF_Theme__c(
+            Name = 'Ocean Blue',
+            Description__c = 'Clean blue starter theme with calm tones and rounded fields.',
+            Logo_Size_Px__c = 120,
+            Logo_Position__c = 'left',
+            Form_Width__c = 'wide',
+            Background_Color__c = '#0061C2',
+            Form_Background_Color__c = '#FFFFFF',
+            Form_Border_Color__c = '#D5DFEA',
+            Title_Font__c = 'Roboto Slab',
+            Title_Font_Size_Px__c = 23.04,
+            Title_Text_Color__c = '#0061C2',
+            Section_Title_Font__c = 'Roboto Slab',
+            Section_Title_Font_Size_Px__c = 14.40,
+            Section_Title_Text_Color__c = '#0061C2',
+            Main_Font__c = 'Inter',
+            Main_Text_Size_Px__c = 14.40,
+            Main_Text_Color__c = '#0061C2',
+            Link_Text_Color__c = '#0061C2',
+            Hint_Text_Color__c = '#5F6F89',
+            Error_Color__c = '#B42318',
+            Input_Border_Radius_Px__c = 14,
+            Input_Background_Color__c = '#F6FAFE',
+            Input_Border_Color__c = '#C8D6E5',
+            Button_Font__c = 'Inter',
+            Button_Font_Size_Px__c = 14,
+            Button_Text_Color__c = '#FFFFFF',
+            Button_Background_Color__c = '#0F6CBD',
+            Button_Hover_Background_Color__c = '#0C5EA6'
+        );
+        if (!existingByName.containsKey('Ocean Blue')) {
+            toUpsert.add(oceanBlueTheme);
+        } else {
+            NF_Theme__c existingOceanBlue = existingByName.get('Ocean Blue');
+            existingOceanBlue.Name = oceanBlueTheme.Name;
+            existingOceanBlue.Description__c = oceanBlueTheme.Description__c;
+            existingOceanBlue.Logo_Size_Px__c = oceanBlueTheme.Logo_Size_Px__c;
+            existingOceanBlue.Logo_Position__c = oceanBlueTheme.Logo_Position__c;
+            existingOceanBlue.Form_Width__c = oceanBlueTheme.Form_Width__c;
+            existingOceanBlue.Background_Color__c = oceanBlueTheme.Background_Color__c;
+            existingOceanBlue.Form_Background_Color__c = oceanBlueTheme.Form_Background_Color__c;
+            existingOceanBlue.Form_Border_Color__c = oceanBlueTheme.Form_Border_Color__c;
+            existingOceanBlue.Title_Font__c = oceanBlueTheme.Title_Font__c;
+            existingOceanBlue.Title_Font_Size_Px__c = oceanBlueTheme.Title_Font_Size_Px__c;
+            existingOceanBlue.Title_Text_Color__c = oceanBlueTheme.Title_Text_Color__c;
+            existingOceanBlue.Section_Title_Font__c = oceanBlueTheme.Section_Title_Font__c;
+            existingOceanBlue.Section_Title_Font_Size_Px__c = oceanBlueTheme.Section_Title_Font_Size_Px__c;
+            existingOceanBlue.Section_Title_Text_Color__c = oceanBlueTheme.Section_Title_Text_Color__c;
+            existingOceanBlue.Main_Font__c = oceanBlueTheme.Main_Font__c;
+            existingOceanBlue.Main_Text_Size_Px__c = oceanBlueTheme.Main_Text_Size_Px__c;
+            existingOceanBlue.Main_Text_Color__c = oceanBlueTheme.Main_Text_Color__c;
+            existingOceanBlue.Link_Text_Color__c = oceanBlueTheme.Link_Text_Color__c;
+            existingOceanBlue.Hint_Text_Color__c = oceanBlueTheme.Hint_Text_Color__c;
+            existingOceanBlue.Error_Color__c = oceanBlueTheme.Error_Color__c;
+            existingOceanBlue.Input_Border_Radius_Px__c = oceanBlueTheme.Input_Border_Radius_Px__c;
+            existingOceanBlue.Input_Background_Color__c = oceanBlueTheme.Input_Background_Color__c;
+            existingOceanBlue.Input_Border_Color__c = oceanBlueTheme.Input_Border_Color__c;
+            existingOceanBlue.Button_Font__c = oceanBlueTheme.Button_Font__c;
+            existingOceanBlue.Button_Font_Size_Px__c = oceanBlueTheme.Button_Font_Size_Px__c;
+            existingOceanBlue.Button_Text_Color__c = oceanBlueTheme.Button_Text_Color__c;
+            existingOceanBlue.Button_Background_Color__c = oceanBlueTheme.Button_Background_Color__c;
+            existingOceanBlue.Button_Hover_Background_Color__c = oceanBlueTheme.Button_Hover_Background_Color__c;
+            toUpsert.add(existingOceanBlue);
+        }
+
+        if (!existingByName.containsKey('ColorFull')) {
+            toUpsert.add(new NF_Theme__c(
+                Name = 'ColorFull',
+                Description__c = 'Brighter theme with stronger section accents and playful button colors.',
+                Logo_Size_Px__c = 120,
+                Logo_Position__c = 'center',
+                Form_Width__c = 'wide',
+                Background_Color__c = '#FFF4E8',
+                Form_Background_Color__c = '#FFFFFF',
+                Form_Border_Color__c = '#F3C47E',
+                Title_Font__c = 'Roboto Slab',
+                Title_Font_Size_Px__c = 24,
+                Title_Text_Color__c = '#8D3A00',
+                Section_Title_Font__c = 'Roboto Slab',
+                Section_Title_Font_Size_Px__c = 15,
+                Section_Title_Text_Color__c = '#D94841',
+                Main_Font__c = 'Inter',
+                Main_Text_Size_Px__c = 14.40,
+                Main_Text_Color__c = '#513C2C',
+                Link_Text_Color__c = '#0061C2',
+                Hint_Text_Color__c = '#7A6A5A',
+                Error_Color__c = '#C81E1E',
+                Input_Border_Radius_Px__c = 18,
+                Input_Background_Color__c = '#FFF9F2',
+                Input_Border_Color__c = '#F3C47E',
+                Button_Font__c = 'Inter',
+                Button_Font_Size_Px__c = 14,
+                Button_Text_Color__c = '#FFFFFF',
+                Button_Background_Color__c = '#FF7A00',
+                Button_Hover_Background_Color__c = '#E96800'
+            ));
+        }
+
+        if (!existingByName.containsKey('Official')) {
+            toUpsert.add(new NF_Theme__c(
+                Name = 'Official',
+                Description__c = 'Conservative business theme for formal customer-facing forms.',
+                Logo_Size_Px__c = 110,
+                Logo_Position__c = 'left',
+                Form_Width__c = 'standard',
+                Background_Color__c = '#F5F7FA',
+                Form_Background_Color__c = '#FFFFFF',
+                Form_Border_Color__c = '#C9D3DF',
+                Title_Font__c = 'Georgia',
+                Title_Font_Size_Px__c = 22,
+                Title_Text_Color__c = '#1D2B3A',
+                Section_Title_Font__c = 'Georgia',
+                Section_Title_Font_Size_Px__c = 14,
+                Section_Title_Text_Color__c = '#1D2B3A',
+                Main_Font__c = 'Inter',
+                Main_Text_Size_Px__c = 14,
+                Main_Text_Color__c = '#253548',
+                Link_Text_Color__c = '#0F4C81',
+                Hint_Text_Color__c = '#6B7888',
+                Error_Color__c = '#A61B1B',
+                Input_Border_Radius_Px__c = 10,
+                Input_Background_Color__c = '#FFFFFF',
+                Input_Border_Color__c = '#C9D3DF',
+                Button_Font__c = 'Inter',
+                Button_Font_Size_Px__c = 13.5,
+                Button_Text_Color__c = '#FFFFFF',
+                Button_Background_Color__c = '#17324D',
+                Button_Hover_Background_Color__c = '#10263A'
+            ));
+        }
+
+        if (!toUpsert.isEmpty()) {
+            upsert toUpsert;
+        }
     }
 }

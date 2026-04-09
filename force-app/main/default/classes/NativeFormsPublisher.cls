@@ -1,4 +1,5 @@
 public with sharing class NativeFormsPublisher {
+    private static final String TEMP_PREFILL_URL = 'https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_SUBMIT_URL = 'https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/';
 
     public class PublishResult {
@@ -22,6 +23,37 @@ public with sharing class NativeFormsPublisher {
                    Form__r.Id,
                    Form__r.NF_Key__c,
                    Form__r.Status__c,
+                   Form__r.Theme__c,
+                   Form__r.Theme__r.Id,
+                   Form__r.Theme__r.Name,
+                   Form__r.Theme__r.Logo_URL__c,
+                   Form__r.Theme__r.Logo_Content_Document_Id__c,
+                   Form__r.Theme__r.Logo_Size_Px__c,
+                   Form__r.Theme__r.Logo_Position__c,
+                   Form__r.Theme__r.Form_Width__c,
+                   Form__r.Theme__r.Background_Color__c,
+                   Form__r.Theme__r.Form_Background_Color__c,
+                   Form__r.Theme__r.Form_Border_Color__c,
+                   Form__r.Theme__r.Title_Font__c,
+                   Form__r.Theme__r.Title_Font_Size_Px__c,
+                   Form__r.Theme__r.Title_Text_Color__c,
+                   Form__r.Theme__r.Section_Title_Font__c,
+                   Form__r.Theme__r.Section_Title_Font_Size_Px__c,
+                   Form__r.Theme__r.Section_Title_Text_Color__c,
+                   Form__r.Theme__r.Main_Font__c,
+                   Form__r.Theme__r.Main_Text_Size_Px__c,
+                   Form__r.Theme__r.Main_Text_Color__c,
+                   Form__r.Theme__r.Link_Text_Color__c,
+                   Form__r.Theme__r.Hint_Text_Color__c,
+                   Form__r.Theme__r.Error_Color__c,
+                   Form__r.Theme__r.Input_Border_Radius_Px__c,
+                   Form__r.Theme__r.Input_Background_Color__c,
+                   Form__r.Theme__r.Input_Border_Color__c,
+                   Form__r.Theme__r.Button_Font__c,
+                   Form__r.Theme__r.Button_Font_Size_Px__c,
+                   Form__r.Theme__r.Button_Text_Color__c,
+                   Form__r.Theme__r.Button_Background_Color__c,
+                   Form__r.Theme__r.Button_Hover_Background_Color__c,
                    Form_Id__c,
                    Version_Number__c,
                    Publish_Token__c,
@@ -87,13 +119,13 @@ public with sharing class NativeFormsPublisher {
 
         List<NF_Form_Element__c> publishElements = prepareElementsForPublish(elements);
         String html = buildHtml(versionRecord, publishElements, formId, publishToken);
-        String fileName = 'index.v' + String.valueOf(Datetime.now().getTime()) + '.html';
+        String fileName = 'index.html';
 
         try {
             NativeFormsAwsClient.PresignRequest presignRequest = new NativeFormsAwsClient.PresignRequest();
             presignRequest.orgId = orgId;
             presignRequest.formId = formId;
-            presignRequest.versionId = (String) versionRecord.Id;
+            presignRequest.versionId = 'current';
             presignRequest.fileName = fileName;
             presignRequest.contentType = 'text/html; charset=utf-8';
             presignRequest.expires = 900;
@@ -107,7 +139,7 @@ public with sharing class NativeFormsPublisher {
                 'publishedVersionId' => (String) versionRecord.Id,
                 'publishToken' => publishToken,
                 'status' => 'published',
-                'securityMode' => String.isNotBlank(versionRecord.Security_Mode__c) ? versionRecord.Security_Mode__c : 'public-create',
+                'securityMode' => determineSecurityMode(versionRecord.Security_Mode__c, actions, publishElements),
                 'rateLimitProfile' => String.isNotBlank(versionRecord.Rate_Limit_Profile__c) ? versionRecord.Rate_Limit_Profile__c : 'standard',
                 'generatedHtmlRef' => presignResponse.key,
                 'publicUrl' => presignResponse.publicUrl,
@@ -383,6 +415,36 @@ public with sharing class NativeFormsPublisher {
         return urlsByVersionId;
     }
 
+    private static String buildPublishedThemeLogoUrl(NF_Form_Version__c versionRecord) {
+        if (versionRecord == null || versionRecord.Form__r == null || versionRecord.Form__r.Theme__r == null) {
+            return null;
+        }
+
+        String contentDocumentId = versionRecord.Form__r.Theme__r.Logo_Content_Document_Id__c;
+        if (String.isBlank(contentDocumentId)) {
+            return versionRecord.Form__r.Theme__r.Logo_URL__c;
+        }
+
+        List<ContentVersion> versions = [
+            SELECT Id, PathOnClient, VersionData
+            FROM ContentVersion
+            WHERE ContentDocumentId = :contentDocumentId
+            ORDER BY VersionNumber DESC
+            LIMIT 1
+        ];
+        if (versions.isEmpty()) {
+            return versionRecord.Form__r.Theme__r.Logo_URL__c;
+        }
+
+        ContentVersion versionData = versions[0];
+        String mimeType = mimeTypeFromFileName(versionData.PathOnClient);
+        if (String.isBlank(mimeType) || versionData.VersionData == null) {
+            return versionRecord.Form__r.Theme__r.Logo_URL__c;
+        }
+
+        return 'data:' + mimeType + ';base64,' + EncodingUtil.base64Encode(versionData.VersionData);
+    }
+
     private static Map<String, Object> buildPolicy(List<NF_Form_Action__c> actions, List<NF_Form_Element__c> elements, Boolean isPrefill) {
         Set<String> commands = new Set<String>();
         Set<String> objects = new Set<String>();
@@ -449,6 +511,10 @@ public with sharing class NativeFormsPublisher {
                 if (String.isNotBlank(whereClause)) {
                     commandConfig.put('whereClause', whereClause);
                 }
+                List<String> fieldsToReturn = mergePrefillResponseMappings(response, actionRecord, canonicalObject, elements);
+                if (!fieldsToReturn.isEmpty()) {
+                    commandConfig.put('fieldsToReturn', fieldsToReturn);
+                }
                 commands.add(commandConfig);
                 continue;
             }
@@ -467,6 +533,57 @@ public with sharing class NativeFormsPublisher {
         return new Map<String, Object>{
             'commands' => commands
         };
+    }
+
+    private static List<String> mergePrefillResponseMappings(
+        Map<String, Object> response,
+        NF_Form_Action__c actionRecord,
+        String canonicalObjectApiName,
+        List<NF_Form_Element__c> elements
+    ) {
+        Set<String> collectedFields = new Set<String>{ 'Id' };
+        if (response == null || actionRecord == null || elements == null || elements.isEmpty()) {
+            return new List<String>(collectedFields);
+        }
+        String aliasValue = actionRecord.Store_Result_As__c;
+        if (String.isBlank(aliasValue)) {
+            return new List<String>(collectedFields);
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || String.isBlank(elementRecord.Field_Key__c) || String.isBlank(elementRecord.Config_JSON__c)) {
+                continue;
+            }
+
+            Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
+            if (!booleanValue(elementConfig.get('prefillEnabled'))) {
+                continue;
+            }
+
+            String prefillAlias = stringValue(elementConfig.get('prefillAlias'));
+            String prefillFieldPath = stringValue(elementConfig.get('prefillFieldPath'));
+            if (String.isBlank(prefillAlias) || String.isBlank(prefillFieldPath) || prefillAlias != aliasValue) {
+                continue;
+            }
+
+            String sourcePath = canonicalFieldApiName(canonicalObjectApiName, prefillFieldPath);
+            if (String.isBlank(sourcePath)) {
+                continue;
+            }
+
+            String fieldBehavior = stringValue(elementConfig.get('fieldBehavior'));
+            String targetGroup = fieldBehavior == 'hidden' || elementRecord.Element_Type__c == 'hidden'
+                ? 'hidden'
+                : 'input';
+
+            response.put(
+                targetGroup + '.' + elementRecord.Field_Key__c,
+                '{' + aliasValue + '.' + sourcePath + '}'
+            );
+            collectedFields.add(sourcePath);
+        }
+
+        return new List<String>(collectedFields);
     }
 
     private static List<Object> buildSubmitCommandsForAction(NF_Form_Action__c actionRecord, List<NF_Form_Element__c> elements) {
@@ -651,6 +768,48 @@ public with sharing class NativeFormsPublisher {
         return new List<String>{ normalized };
     }
 
+    private static String determineSecurityMode(String explicitSecurityMode, List<NF_Form_Action__c> actions, List<NF_Form_Element__c> elements) {
+        List<NF_Form_Action__c> referencedSubmitActions = filterReferencedActions(actions, 'Submit', elements);
+        Boolean needsFindUpdateCreate = false;
+        Boolean needsSecureEdit = false;
+
+        for (NF_Form_Action__c actionRecord : referencedSubmitActions) {
+            Map<String, Object> config = parseJsonMap(actionRecord.Config_JSON__c);
+            String commandType = actionRecord.Command_Type__c;
+            String onNotFound = stringValue(config.get('onNotFound'));
+
+            if (commandType == 'findAndUpdate' && onNotFound == 'create') {
+                needsFindUpdateCreate = true;
+                continue;
+            }
+            if (commandType == 'findAndUpdate' || commandType == 'updateById') {
+                needsSecureEdit = true;
+            }
+        }
+
+        if (needsFindUpdateCreate) {
+            if (String.isBlank(explicitSecurityMode) || explicitSecurityMode == 'public-create' || explicitSecurityMode == 'public-find-update-create') {
+                return 'public-find-update-create';
+            }
+            return explicitSecurityMode;
+        }
+        if (needsSecureEdit) {
+            if (String.isBlank(explicitSecurityMode) || explicitSecurityMode == 'public-create' || explicitSecurityMode == 'secure-edit') {
+                return 'secure-edit';
+            }
+            return explicitSecurityMode;
+        }
+
+        if (String.isNotBlank(explicitSecurityMode)) {
+            return explicitSecurityMode;
+        }
+
+        if (needsFindUpdateCreate) {
+            return 'public-find-update-create';
+        }
+        return 'public-create';
+    }
+
     private static String buildConditionWhereClause(Map<String, Object> config, String objectApiName) {
         if (config == null) {
             return null;
@@ -681,12 +840,17 @@ public with sharing class NativeFormsPublisher {
         }
 
         if (!clauses.isEmpty()) {
-            String logic = stringValue(config.get('conditionLogic'));
-            logic = logic == 'OR' ? 'OR' : 'AND';
-            return String.join(clauses, ' ' + logic + ' ');
+            String logic = normalizeConditionLogicExpression(stringValue(config.get('conditionLogic')), clauses.size());
+            if (String.isBlank(logic)) {
+                return String.join(clauses, ' AND ');
+            }
+            for (Integer i = 0; i < clauses.size(); i++) {
+                logic = logic.replaceAll('\\b' + String.valueOf(i + 1) + '\\b', '(' + clauses[i] + ')');
+            }
+            return logic;
         }
 
-        return stringValue(config.get('where'));
+        return normalizeLegacyWhereClause(stringValue(config.get('where')));
     }
 
     private static String buildConditionClause(String fieldApiName, String operator, String valueSource, String valueText) {
@@ -704,23 +868,24 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(expression)) {
             return null;
         }
+        String soqlValue = formatConditionValueForSoql(expression, operator);
         if (operator == 'eq') {
-            return fieldApiName + ' = \'' + expression + '\'';
+            return fieldApiName + ' = ' + soqlValue;
         }
         if (operator == 'neq') {
-            return fieldApiName + ' != \'' + expression + '\'';
+            return fieldApiName + ' != ' + soqlValue;
         }
         if (operator == 'contains') {
-            return fieldApiName + ' LIKE \'%' + expression + '%\'';
+            return fieldApiName + ' LIKE ' + formatConditionLikeValue(expression, true, true);
         }
         if (operator == 'startsWith') {
-            return fieldApiName + ' LIKE \'' + expression + '%\'';
+            return fieldApiName + ' LIKE ' + formatConditionLikeValue(expression, false, true);
         }
         if (operator == 'gt') {
-            return fieldApiName + ' > \'' + expression + '\'';
+            return fieldApiName + ' > ' + soqlValue;
         }
         if (operator == 'lt') {
-            return fieldApiName + ' < \'' + expression + '\'';
+            return fieldApiName + ' < ' + soqlValue;
         }
         return null;
     }
@@ -730,12 +895,100 @@ public with sharing class NativeFormsPublisher {
             return null;
         }
         if (String.isBlank(valueSource) || valueSource == 'param') {
-            return '{params.' + valueText + '}';
+            String paramName = valueText.trim();
+            if (paramName.startsWith('{params.') && paramName.endsWith('}')) {
+                paramName = paramName.substring(8, paramName.length() - 1);
+            } else if (paramName.toLowerCase().startsWith('params.')) {
+                paramName = paramName.substring(7);
+            }
+            return String.isBlank(paramName) ? null : '{params.' + paramName + '}';
         }
-        if (Pattern.matches('^-?\\d+(\\.\\d+)?$', valueText)) {
+        if (valueSource == 'field') {
+            String fieldKey = valueText.trim();
+            if (fieldKey.startsWith('{input.') && fieldKey.endsWith('}')) {
+                fieldKey = fieldKey.substring(7, fieldKey.length() - 1);
+            } else if (fieldKey.toLowerCase().startsWith('input.')) {
+                fieldKey = fieldKey.substring(6);
+            }
+            return String.isBlank(fieldKey) ? null : '{input.' + fieldKey + '}';
+        }
+        if (Pattern.matches('^-?\\d+(\\.\\d+)?$', valueText) || valueText == 'true' || valueText == 'false') {
             return valueText;
         }
-        return '\'' + valueText.replace('\'', '\\\'') + '\'';
+        return valueText.replace('\'', '\\\'');
+    }
+
+    private static String formatConditionValueForSoql(String expression, String operator) {
+        if (String.isBlank(expression)) {
+            return 'null';
+        }
+        if (expression.startsWith('{') && expression.endsWith('}')) {
+            return '\'' + expression + '\'';
+        }
+        if (Pattern.matches('^-?\\d+(\\.\\d+)?$', expression) || expression == 'true' || expression == 'false') {
+            return expression;
+        }
+        return '\'' + expression + '\'';
+    }
+
+    private static String formatConditionLikeValue(String expression, Boolean prefixWildcard, Boolean suffixWildcard) {
+        String resolvedExpression = expression;
+        if (expression.startsWith('{') && expression.endsWith('}')) {
+            resolvedExpression = expression;
+        }
+        String value = '';
+        if (prefixWildcard) {
+            value += '%';
+        }
+        value += resolvedExpression;
+        if (suffixWildcard) {
+            value += '%';
+        }
+        return '\'' + value + '\'';
+    }
+
+    private static String normalizeLegacyWhereClause(String rawWhereClause) {
+        if (String.isBlank(rawWhereClause)) {
+            return null;
+        }
+
+        String normalized = rawWhereClause;
+        normalized = normalized.replace('{param.', '{params.');
+        normalized = normalized.replaceAll('"\\s*(input\\.[A-Za-z0-9_\\.]+)\\s*"', '{$1}');
+        normalized = normalized.replaceAll('\'\\s*(input\\.[A-Za-z0-9_\\.]+)\\s*\'', '{$1}');
+        normalized = normalized.replaceAll('"\\s*(params\\.[A-Za-z0-9_\\.]+)\\s*"', '{$1}');
+        normalized = normalized.replaceAll('\'\\s*(params\\.[A-Za-z0-9_\\.]+)\\s*\'', '{$1}');
+        return normalized;
+    }
+
+    private static String normalizeConditionLogicExpression(String rawLogic, Integer clauseCount) {
+        if (clauseCount == null || clauseCount <= 0) {
+            return null;
+        }
+        if (clauseCount == 1) {
+            return '1';
+        }
+        if (String.isBlank(rawLogic)) {
+            return null;
+        }
+
+        String logic = rawLogic.trim().toUpperCase();
+        if (!Pattern.matches('^[0-9()\\sANDOR]+$', logic)) {
+            return null;
+        }
+        if (!Pattern.matches('.*\\d+.*', logic)) {
+            return null;
+        }
+
+        for (Integer i = 1; i <= clauseCount; i++) {
+            logic = logic.replaceAll('\\b' + String.valueOf(i) + '\\b', '@' + String.valueOf(i) + '@');
+        }
+
+        if (Pattern.matches('.*\\b\\d+\\b.*', logic)) {
+            return null;
+        }
+
+        return logic.replace('@', '');
     }
 
     private static Map<String, Object> parseWhereClause(String rawWhereClause, String objectApiName) {
@@ -817,13 +1070,12 @@ public with sharing class NativeFormsPublisher {
     }
 
     private static String buildHtml(NF_Form_Version__c versionRecord, List<NF_Form_Element__c> elements, String formId, String publishToken) {
-        Map<String, Object> theme = parseJsonMap(versionRecord.Theme_JSON__c);
+        Map<String, Object> theme = buildPublishedTheme(versionRecord);
         Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        String themeLogoUrl = buildPublishedThemeLogoUrl(versionRecord);
         String titleText = firstNonBlank(
             stringValue(uiSettings.get('title')),
-            stringValue(uiSettings.get('formTitle')),
-            versionRecord.Form_Id__c,
-            'NativeForms Form'
+            stringValue(uiSettings.get('formTitle'))
         );
         String introText = firstNonBlank(
             stringValue(uiSettings.get('description')),
@@ -841,23 +1093,32 @@ public with sharing class NativeFormsPublisher {
         html += '<title>' + escapeHtml(titleText) + '</title>';
         html += '<style>';
         html += ':root{';
-        html += '--nf-bg:' + cssColor(theme, 'pageBackground', '#f4f7fb') + ';';
-        html += '--nf-surface:' + cssColor(theme, 'cardBackground', '#ffffff') + ';';
-        html += '--nf-text:' + cssColor(theme, 'textColor', '#16325c') + ';';
-        html += '--nf-border:' + cssColor(theme, 'borderColor', '#d8dde6') + ';';
-        html += '--nf-muted:' + cssColor(theme, 'mutedTextColor', '#5f6f89') + ';';
-        html += '--nf-accent:' + cssColor(theme, 'primaryColor', '#0f6cbd') + ';';
-        html += '--nf-accent-contrast:' + cssColor(theme, 'primaryTextColor', '#ffffff') + ';';
-        html += '--nf-radius:' + cssLength(theme, 'borderRadius', '16px') + ';';
-        html += '--nf-field-radius:' + cssLength(theme, 'fieldBorderRadius', '10px') + ';';
-        html += '--nf-font:' + cssFontFamily(theme, 'fontFamily', '\'Segoe UI\', Arial, sans-serif') + ';';
+        html += '--nf-bg:' + cssColor(theme, 'backgroundColor', '#f4f7fb') + ';';
+        html += '--nf-surface:' + cssColor(theme, 'formBackgroundColor', '#ffffff') + ';';
+        html += '--nf-text:' + cssColor(theme, 'mainTextColor', '#16325c') + ';';
+        html += '--nf-border:' + cssColor(theme, 'formBorderColor', '#d8dde6') + ';';
+        html += '--nf-muted:' + cssColor(theme, 'hintTextColor', '#5f6f89') + ';';
+        html += '--nf-accent:' + cssColor(theme, 'buttonBackgroundColor', '#0f6cbd') + ';';
+        html += '--nf-accent-contrast:' + cssColor(theme, 'buttonTextColor', '#ffffff') + ';';
+        html += '--nf-radius:' + cssLength(theme, 'inputBorderRadiusPx', '16px') + ';';
+        html += '--nf-field-radius:' + cssLength(theme, 'inputBorderRadiusPx', '10px') + ';';
+        html += '--nf-font:' + cssFontFamily(theme, 'mainFont', '\'Segoe UI\', Arial, sans-serif') + ';';
+        html += '--nf-title-font:' + cssFontFamily(theme, 'titleFont', '\'Segoe UI\', Arial, sans-serif') + ';';
+        html += '--nf-title-size:' + cssLength(theme, 'titleFontSizePx', '22px') + ';';
+        html += '--nf-title-color:' + cssColor(theme, 'titleTextColor', '#16325c') + ';';
+        html += '--nf-section-font:' + cssFontFamily(theme, 'sectionTitleFont', '\'Segoe UI\', Arial, sans-serif') + ';';
+        html += '--nf-section-size:' + cssLength(theme, 'sectionTitleFontSizePx', '16px') + ';';
+        html += '--nf-section-color:' + cssColor(theme, 'sectionTitleTextColor', '#16325c') + ';';
+        html += '--nf-input-bg:' + cssColor(theme, 'inputBackgroundColor', '#ffffff') + ';';
+        html += '--nf-input-border:' + cssColor(theme, 'inputBorderColor', '#c9d3df') + ';';
+        html += '--nf-form-width:' + cssFormWidth(theme, 'formWidth', '880px') + ';';
         html += '}';
         html += 'body{font-family:var(--nf-font);background:linear-gradient(180deg,var(--nf-bg),#edf2f8);color:var(--nf-text);margin:0;padding:24px;}';
-        html += '.nf-shell{max-width:880px;margin:0 auto;background:var(--nf-surface);border:1px solid var(--nf-border);border-radius:var(--nf-radius);padding:32px;box-shadow:0 16px 44px rgba(22,50,92,.10);}';
+        html += '.nf-shell{max-width:var(--nf-form-width);margin:0 auto;background:var(--nf-surface);border:1px solid var(--nf-border);border-radius:var(--nf-radius);padding:32px;box-shadow:0 16px 44px rgba(22,50,92,.10);}';
         html += '.nf-grid{display:grid;gap:16px;}';
         html += '.nf-section{padding:18px 20px;border:1px solid var(--nf-border);border-radius:calc(var(--nf-radius) - 4px);background:rgba(255,255,255,.65);}';
         html += '.nf-section--plain{padding:0;border:0;background:transparent;border-radius:0;}';
-        html += '.nf-section h2{margin:0 0 8px;font-size:20px;}';
+        html += '.nf-section h2{margin:0 0 8px;font-size:var(--nf-section-size);font-family:var(--nf-section-font);color:var(--nf-section-color);}';
         html += '.nf-section__grid{display:grid;gap:18px;}';
         html += '.nf-section__grid--1{grid-template-columns:1fr;}';
         html += '.nf-section__grid--2{grid-template-columns:repeat(2,minmax(0,1fr));}';
@@ -875,7 +1136,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-image-wrap--stretch{justify-content:stretch;}';
         html += '.nf-image--stretch{width:100%;max-width:100%;object-fit:cover;}';
         html += '.nf-field{display:grid;gap:6px;align-items:start;}';
-        html += '.nf-field label{display:block;font-weight:400;}';
+        html += '.nf-field label{display:block;font-weight:400;color:var(--nf-text);}';
         html += '.nf-field label.nf-label--bold{font-weight:700;}';
         html += '.nf-field--above{grid-template-columns:minmax(0,1fr);}';
         html += '.nf-field--left{grid-template-columns:140px minmax(0,1fr);column-gap:12px;}';
@@ -883,7 +1144,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-field--right{grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center;}';
         html += '.nf-field--right label{word-break:break-word;text-align:left;}';
         html += '.nf-field--hidden label{display:none;}';
-        html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid #c9d3df;border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:#fff;color:var(--nf-text);}';
+        html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:var(--nf-input-bg);color:var(--nf-text);}';
         html += '.nf-field textarea{min-height:120px;resize:vertical;}';
         html += '.nf-field--checkbox label{display:flex;gap:10px;align-items:center;font-weight:400;}';
         html += '.nf-field--checkbox input{width:auto;}';
@@ -896,6 +1157,13 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-actions{margin-top:28px;display:flex;justify-content:flex-end;}';
         html += '.nf-actions button{background:var(--nf-accent);color:var(--nf-accent-contrast);border:0;border-radius:999px;padding:12px 20px;font-weight:700;cursor:pointer;box-shadow:0 10px 20px rgba(15,108,189,.18);}';
         html += '.nf-meta{display:none;}';
+        html += '.nf-logo-wrap{display:flex;margin-bottom:20px;}';
+        html += '.nf-logo-wrap--left{justify-content:flex-start;}';
+        html += '.nf-logo-wrap--center{justify-content:center;}';
+        html += '.nf-logo-wrap--right{justify-content:flex-end;}';
+        html += '.nf-logo{display:block;max-width:100%;}';
+        html += '.nf-title{margin:0;color:var(--nf-title-color);font-family:var(--nf-title-font);font-size:var(--nf-title-size);}';
+        html += '.nf-intro{margin:8px 0 0;color:var(--nf-muted);}';
         if (String.isNotBlank(versionRecord.Custom_CSS__c)) {
             html += versionRecord.Custom_CSS__c;
         }
@@ -903,6 +1171,21 @@ public with sharing class NativeFormsPublisher {
         html += '<div class="nf-shell">';
         html += '<form class="nf-grid" data-nativeforms-version="' + escapeHtml(String.valueOf(versionRecord.Id)) + '">';
         html += '<input class="nf-meta" type="hidden" name="nativeformsVersionId" value="' + escapeHtml(String.valueOf(versionRecord.Id)) + '">';
+        if (String.isNotBlank(themeLogoUrl)) {
+            String logoPosition = firstNonBlank(stringValue(theme.get('logoPosition')), 'left').toLowerCase();
+            String logoSize = cssLength(theme, 'logoSizePx', '120px');
+            html += '<div class="nf-logo-wrap nf-logo-wrap--' + escapeHtml(logoPosition) + '"><img class="nf-logo" src="' + escapeHtml(themeLogoUrl) + '" alt="Theme logo" style="max-height:' + escapeHtml(logoSize) + ';"></div>';
+        }
+        if (String.isNotBlank(titleText) || String.isNotBlank(introText)) {
+            html += '<div class="nf-header">';
+            if (String.isNotBlank(titleText)) {
+                html += '<h1 class="nf-title">' + escapeHtml(titleText) + '</h1>';
+            }
+            if (String.isNotBlank(introText)) {
+                html += '<p class="nf-intro">' + escapeHtml(introText) + '</p>';
+            }
+            html += '</div>';
+        }
 
         Map<String, List<NF_Form_Element__c>> childrenByParent = new Map<String, List<NF_Form_Element__c>>();
         Set<String> sectionElementIds = new Set<String>();
@@ -944,6 +1227,7 @@ public with sharing class NativeFormsPublisher {
             'versionId' => (String) versionRecord.Id,
             'formId' => formId,
             'publishToken' => publishToken,
+            'prefillUrl' => TEMP_PREFILL_URL,
             'submitUrl' => TEMP_SUBMIT_URL,
             'theme' => theme,
             'uiSettings' => uiSettings
@@ -956,6 +1240,9 @@ public with sharing class NativeFormsPublisher {
         html += 'function setStatus(kind,message){if(!statusEl){return;}statusEl.className="nf-status nf-status--"+kind;statusEl.textContent=message||"";}';
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
+        html += 'function setFieldValue(fieldKey,value){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else{el.value=value==null?"":value;}});}';
+        html += 'function applyPrefillPayload(payload){if(!payload){return;}const input=payload.input||{};const hidden=payload.hidden||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});evaluateConditions();}';
+        html += 'async function runPrefill(){if(!config.prefillUrl){return;}const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Prefill failed");}applyPrefillPayload(data);}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("input[type=\'date\']").forEach(function(el){const now=new Date();let minDate=null;let maxDate=null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.min=isoDate(minDate);}if(maxDate){el.max=isoDate(maxDate);}});}';
         html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
@@ -965,6 +1252,7 @@ public with sharing class NativeFormsPublisher {
         html += 'wireLiveValidation();';
         html += 'form.addEventListener("change",evaluateConditions);';
         html += 'evaluateConditions();';
+        html += 'runPrefill().catch(function(error){setStatus("error",error&&error.message?error.message:"Prefill failed.");});';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'if(!form.reportValidity()){return;}';
         html += 'const submitButton=form.querySelector("button[type=\'submit\']");if(submitButton){submitButton.disabled=true;}';
@@ -1304,6 +1592,53 @@ public with sharing class NativeFormsPublisher {
             .replace('\'', '&#39;');
     }
 
+    private static Map<String, Object> buildPublishedTheme(NF_Form_Version__c versionRecord) {
+        Map<String, Object> fallbackTheme = parseJsonMap(versionRecord.Theme_JSON__c);
+        if (versionRecord == null || versionRecord.Form__r == null || versionRecord.Form__r.Theme__r == null) {
+            return fallbackTheme;
+        }
+
+        Map<String, Object> theme = new Map<String, Object>{
+            'logoUrl' => versionRecord.Form__r.Theme__r.Logo_URL__c,
+            'logoSizePx' => versionRecord.Form__r.Theme__r.Logo_Size_Px__c,
+            'logoPosition' => versionRecord.Form__r.Theme__r.Logo_Position__c,
+            'formWidth' => versionRecord.Form__r.Theme__r.Form_Width__c,
+            'backgroundColor' => versionRecord.Form__r.Theme__r.Background_Color__c,
+            'formBackgroundColor' => versionRecord.Form__r.Theme__r.Form_Background_Color__c,
+            'formBorderColor' => versionRecord.Form__r.Theme__r.Form_Border_Color__c,
+            'titleFont' => versionRecord.Form__r.Theme__r.Title_Font__c,
+            'titleFontSizePx' => versionRecord.Form__r.Theme__r.Title_Font_Size_Px__c,
+            'titleTextColor' => versionRecord.Form__r.Theme__r.Title_Text_Color__c,
+            'sectionTitleFont' => versionRecord.Form__r.Theme__r.Section_Title_Font__c,
+            'sectionTitleFontSizePx' => versionRecord.Form__r.Theme__r.Section_Title_Font_Size_Px__c,
+            'sectionTitleTextColor' => versionRecord.Form__r.Theme__r.Section_Title_Text_Color__c,
+            'mainFont' => versionRecord.Form__r.Theme__r.Main_Font__c,
+            'mainTextSizePx' => versionRecord.Form__r.Theme__r.Main_Text_Size_Px__c,
+            'mainTextColor' => versionRecord.Form__r.Theme__r.Main_Text_Color__c,
+            'linkTextColor' => versionRecord.Form__r.Theme__r.Link_Text_Color__c,
+            'hintTextColor' => versionRecord.Form__r.Theme__r.Hint_Text_Color__c,
+            'errorColor' => versionRecord.Form__r.Theme__r.Error_Color__c,
+            'inputBorderRadiusPx' => versionRecord.Form__r.Theme__r.Input_Border_Radius_Px__c,
+            'inputBackgroundColor' => versionRecord.Form__r.Theme__r.Input_Background_Color__c,
+            'inputBorderColor' => versionRecord.Form__r.Theme__r.Input_Border_Color__c,
+            'buttonFont' => versionRecord.Form__r.Theme__r.Button_Font__c,
+            'buttonFontSizePx' => versionRecord.Form__r.Theme__r.Button_Font_Size_Px__c,
+            'buttonTextColor' => versionRecord.Form__r.Theme__r.Button_Text_Color__c,
+            'buttonBackgroundColor' => versionRecord.Form__r.Theme__r.Button_Background_Color__c,
+            'buttonHoverBackgroundColor' => versionRecord.Form__r.Theme__r.Button_Hover_Background_Color__c
+        };
+
+        if (fallbackTheme != null) {
+            for (String key : fallbackTheme.keySet()) {
+                if (!theme.containsKey(key) || theme.get(key) == null) {
+                    theme.put(key, fallbackTheme.get(key));
+                }
+            }
+        }
+
+        return theme;
+    }
+
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
@@ -1406,6 +1741,15 @@ public with sharing class NativeFormsPublisher {
     private static String cssFontFamily(Map<String, Object> source, String key, String fallbackValue) {
         String value = stringValue(source.get(key));
         return String.isNotBlank(value) ? escapeHtml(value) : fallbackValue;
+    }
+
+    private static String cssFormWidth(Map<String, Object> source, String key, String fallbackValue) {
+        String value = stringValue(source.get(key)).toLowerCase();
+        if (value == 'narrow') return '640px';
+        if (value == 'standard') return '760px';
+        if (value == 'wide') return '880px';
+        if (value == 'full') return '100%';
+        return fallbackValue;
     }
 
     private static String formatException(Exception e) {

@@ -1,5 +1,6 @@
 import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
+import updateFormTheme from '@salesforce/apex/NativeFormsDesignerController.updateFormTheme';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPicklistFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistFieldOptions';
 import getPicklistValueOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistValueOptions';
@@ -16,17 +17,19 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v5.0';
+    designerVersion = 'v6.4';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
     selectedVersionId;
+    selectedThemeId;
     selectedElementId;
     selectedFormName = '';
     selectedFormKey = '';
     selectedFormDescription = '';
     selectedVersionName = '';
     selectedVersionStatus = '';
+    selectedTheme = null;
     draggedElementId = null;
     dragTargetIndex = null;
     dragSectionTarget = null;
@@ -35,6 +38,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     @track formOptions = [];
     @track versionOptions = [];
+    @track themeOptions = [];
     @track elements = [];
     @track canvasElements = [];
     @track salesforceObjectOptions = [];
@@ -80,16 +84,16 @@ export default class NativeFormsDesigner extends LightningElement {
     editorSubmitFieldPath = '';
 
     inputFieldOptions = [
-        { label: 'Text Input', value: 'text' },
-        { label: 'Textarea', value: 'textarea' },
+        { label: 'Text', value: 'text' },
         { label: 'Number', value: 'number' },
         { label: 'Date', value: 'date' },
         { label: 'Email', value: 'email' },
         { label: 'Phone', value: 'tel' },
-        { label: 'URL', value: 'url' },
-        { label: 'Checkbox', value: 'checkbox' },
         { label: 'Picklist', value: 'select' },
-        { label: 'Radio Group', value: 'radio' }
+        { label: 'Radio groups', value: 'radio' },
+        { label: 'Checkbox', value: 'checkbox' },
+        { label: 'Text Area', value: 'textarea' },
+        { label: 'URL', value: 'url' }
     ];
 
     displayElementOptions = [
@@ -179,6 +183,56 @@ export default class NativeFormsDesigner extends LightningElement {
         return parts.join(' - ');
     }
 
+    get designerCanvasThemeStyle() {
+        const theme = this.selectedTheme || {};
+        const titleFont = this.safeFont(theme.titleFont, 'Roboto Slab');
+        const mainFont = this.safeFont(theme.mainFont, 'Inter');
+        const sectionFont = this.safeFont(theme.sectionTitleFont, titleFont);
+        const buttonFont = this.safeFont(theme.buttonFont, mainFont);
+        const formWidth = this.themeFormMaxWidth(theme.formWidth);
+        return [
+            `--nf-theme-page-bg:${this.safeValue(theme.backgroundColor, '#f3f7fb')}`,
+            `--nf-theme-form-bg:${this.safeValue(theme.formBackgroundColor, '#ffffff')}`,
+            `--nf-theme-form-border:${this.safeValue(theme.formBorderColor, '#dbe5ef')}`,
+            `--nf-theme-form-max-width:${formWidth}`,
+            `--nf-theme-title-font:${titleFont}`,
+            `--nf-theme-title-size:${this.safeNumber(theme.titleFontSizePx, 17.6)}px`,
+            `--nf-theme-title-color:${this.safeValue(theme.titleTextColor, '#17324d')}`,
+            `--nf-theme-section-font:${sectionFont}`,
+            `--nf-theme-section-size:${this.safeNumber(theme.sectionTitleFontSizePx, 16)}px`,
+            `--nf-theme-section-color:${this.safeValue(theme.sectionTitleTextColor, '#17324d')}`,
+            `--nf-theme-main-font:${mainFont}`,
+            `--nf-theme-main-size:${this.safeNumber(theme.mainTextSizePx, 14.4)}px`,
+            `--nf-theme-main-color:${this.safeValue(theme.mainTextColor, '#17324d')}`,
+            `--nf-theme-hint-color:${this.safeValue(theme.hintTextColor, '#5f6f89')}`,
+            `--nf-theme-input-bg:${this.safeValue(theme.inputBackgroundColor, '#ffffff')}`,
+            `--nf-theme-input-border:${this.safeValue(theme.inputBorderColor, '#c9d3df')}`,
+            `--nf-theme-input-radius:${this.safeNumber(theme.inputBorderRadiusPx, 14)}px`,
+            `--nf-theme-button-font:${buttonFont}`,
+            `--nf-theme-button-size:${this.safeNumber(theme.buttonFontSizePx, 14)}px`,
+            `--nf-theme-button-text:${this.safeValue(theme.buttonTextColor, '#ffffff')}`,
+            `--nf-theme-button-bg:${this.safeValue(theme.buttonBackgroundColor, '#0f6cbd')}`
+        ].join(';');
+    }
+
+    get themeLogoUrl() {
+        return this.selectedTheme?.logoUrl || '';
+    }
+
+    get showThemeLogo() {
+        return Boolean(this.themeLogoUrl);
+    }
+
+    get themeLogoWrapClass() {
+        const position = (this.selectedTheme?.logoPosition || 'left').toLowerCase();
+        return `designer-logo-wrap designer-logo-wrap--${position}`;
+    }
+
+    get themeLogoStyle() {
+        const size = this.safeNumber(this.selectedTheme?.logoSizePx, 120);
+        return `max-height:${size}px;`;
+    }
+
     get publishResultClass() {
         return this.publishResult?.success ? 'panel-success' : 'panel-error';
     }
@@ -266,6 +320,13 @@ export default class NativeFormsDesigner extends LightningElement {
         }));
     }
 
+    get labelPositionRadioOptions() {
+        return this.labelPositionOptions.map((option) => ({
+            ...option,
+            checked: option.value === this.editorLabelPosition
+        }));
+    }
+
     get conditionalFieldOptions() {
         return this.elements
             .filter((item) =>
@@ -325,6 +386,8 @@ export default class NativeFormsDesigner extends LightningElement {
             const workspace = await getWorkspace({ formId, versionId });
             this.selectedFormId = workspace.selectedFormId;
             this.selectedVersionId = workspace.selectedVersionId;
+            this.selectedThemeId = workspace.selectedThemeId || '';
+            this.selectedTheme = workspace.selectedTheme || null;
             this.selectedFormName = workspace.selectedFormName;
             this.selectedFormKey = workspace.selectedFormKey;
             this.selectedFormDescription = workspace.selectedFormDescription;
@@ -343,6 +406,12 @@ export default class NativeFormsDesigner extends LightningElement {
                 label: option.isPublished ? `${option.label} (Published)` : `${option.label} (${option.status})`,
                 value: option.value
             }));
+            this.themeOptions = [{ label: 'Select Theme', value: '' }].concat(
+                (workspace.themes || []).map((option) => ({
+                    label: option.label,
+                    value: option.value
+                }))
+            );
             this.elements = (workspace.elements || []).map((item) => this.decorateBaseElement(item));
             this.canvasElements = this.buildCanvasElements(this.elements);
             if (!this.elements.some((item) => item.id === this.selectedElementId)) {
@@ -708,6 +777,25 @@ export default class NativeFormsDesigner extends LightningElement {
         this.loadWorkspace(this.selectedFormId, this.selectedVersionId);
     }
 
+    async handleThemeChange(event) {
+        const nextThemeId = event.detail.value || null;
+        if (!this.selectedFormId) {
+            return;
+        }
+        this.isLoading = true;
+        this.errorMessage = '';
+        try {
+            const savedThemeId = await updateFormTheme({ formId: this.selectedFormId, themeId: nextThemeId });
+            this.selectedThemeId = savedThemeId || '';
+            await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
+            this.showToast('Theme assigned', 'Form theme updated.', 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
     handleInputTypeChange(event) {
         this.inputFieldType = event.detail.value;
     }
@@ -722,6 +810,14 @@ export default class NativeFormsDesigner extends LightningElement {
 
     async handleAddDisplay() {
         await this.addElementType(this.displayElementType);
+    }
+
+    async handleQuickAddField(event) {
+        const elementType = event.currentTarget?.dataset?.type;
+        if (!elementType) {
+            return;
+        }
+        await this.addElementType(elementType);
     }
 
     async addElementType(elementType) {
@@ -793,7 +889,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     handleEditorLabelPositionChange(event) {
-        this.editorLabelPosition = event.detail.value;
+        this.editorLabelPosition = event.target.value;
         this.applyEditorDraft();
     }
 
@@ -1562,6 +1658,32 @@ export default class NativeFormsDesigner extends LightningElement {
 
     showToast(title, message, variant) {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+    }
+
+    safeValue(value, fallbackValue) {
+        return value || fallbackValue;
+    }
+
+    safeNumber(value, fallbackValue) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackValue;
+    }
+
+    safeFont(value, fallbackValue) {
+        return value ? `"${value}", Arial, sans-serif` : fallbackValue;
+    }
+
+    themeFormMaxWidth(value) {
+        if (value === 'narrow') {
+            return '42rem';
+        }
+        if (value === 'standard') {
+            return '56rem';
+        }
+        if (value === 'full') {
+            return '100%';
+        }
+        return '72rem';
     }
 
     normalizeError(error) {

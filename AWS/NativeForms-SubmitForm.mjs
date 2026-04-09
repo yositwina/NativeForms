@@ -289,6 +289,20 @@ function isRiskySubmitCommand(commandType) {
   return ["update", "delete", "upsertMany"].includes(commandType);
 }
 
+function allowsCommandForSecurityMode(commandType, securityMode) {
+  const mode = securityMode || "public-create";
+  if (!isRiskySubmitCommand(commandType)) {
+    return true;
+  }
+  if (mode === "secure-edit") {
+    return true;
+  }
+  if (mode === "public-find-update-create" && (commandType === "update" || commandType === "create" || commandType === "findOne")) {
+    return true;
+  }
+  return false;
+}
+
 function validateFieldsForObject(objectApiName, fields, allowedWriteFields) {
   if (!fields || typeof fields !== "object") {
     return;
@@ -316,7 +330,7 @@ function validateSubmitCommandAgainstPolicy(command, formSecurity) {
     throw new Error(`Object '${command.objectApiName}' is not allowed for submit on form '${formSecurity.formId}'`);
   }
 
-  if (isRiskySubmitCommand(command.type) && formSecurity.securityMode !== "secure-edit") {
+  if (!allowsCommandForSecurityMode(command.type, formSecurity.securityMode)) {
     throw new Error(`Security mode '${formSecurity.securityMode}' does not allow command '${command.type}'`);
   }
 
