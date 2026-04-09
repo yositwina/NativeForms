@@ -18,8 +18,33 @@
 
                     <lightning-input
                         type="checkbox"
+                        name="enableProConditionLogic"
                         label="Enable Pro Condition Logic"
                         checked={enableProConditionLogic}
+                        onchange={handleToggle}>
+                    </lightning-input>
+
+                    <lightning-input
+                        type="checkbox"
+                        name="enableProRepeatGroups"
+                        label="Enable Pro Repeat Groups"
+                        checked={enableProRepeatGroups}
+                        onchange={handleToggle}>
+                    </lightning-input>
+
+                    <lightning-input
+                        type="checkbox"
+                        name="enableProPrefillAliasReferences"
+                        label="Enable Pro Prefill Alias References"
+                        checked={enableProPrefillAliasReferences}
+                        onchange={handleToggle}>
+                    </lightning-input>
+
+                    <lightning-input
+                        type="checkbox"
+                        name="enableProAdvancedSubmitModes"
+                        label="Enable Pro Advanced Submit Modes"
+                        checked={enableProAdvancedSubmitModes}
                         onchange={handleToggle}>
                     </lightning-input>
 

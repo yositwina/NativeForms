@@ -9,10 +9,10 @@
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
     <label>NativeForms Admin</label>
     <navType>Standard</navType>
+    <tabs>NativeForms_Setup</tabs>
     <tabs>standard-home</tabs>
     <tabs>NativeForms_Admin_Features</tabs>
     <tabs>NativeForms_Guided_Setup</tabs>
-    <tabs>NativeForms_Setup</tabs>
     <tabs>NF_Form__c</tabs>
     <tabs>NF_Form_Version__c</tabs>
     <tabs>NF_Form_Element__c</tabs>

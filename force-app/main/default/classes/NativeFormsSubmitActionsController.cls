@@ -28,10 +28,21 @@ public with sharing class NativeFormsSubmitActionsController {
         @AuraEnabled public String selectedFormName { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<SubmitActionRecord> actions { get; set; }
+        @AuraEnabled public List<PrefillAliasDetail> prefillAliasDetails { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
         @AuraEnabled public List<SelectOption> formFieldOptions { get; set; }
+        @AuraEnabled public List<SelectOption> repeatGroupOptions { get; set; }
         @AuraEnabled public List<MappingRecord> mappings { get; set; }
         @AuraEnabled public Boolean enableProConditionLogic { get; set; }
+        @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
+        @AuraEnabled public Boolean enableProPrefillAliasReferences { get; set; }
+        @AuraEnabled public Boolean enableProAdvancedSubmitModes { get; set; }
+    }
+
+    public class PrefillAliasDetail {
+        @AuraEnabled public String alias { get; set; }
+        @AuraEnabled public String objectApiName { get; set; }
+        @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
     }
 
     public class MappingRecord {
@@ -57,10 +68,15 @@ public with sharing class NativeFormsSubmitActionsController {
         SubmitWorkspace workspace = new SubmitWorkspace();
         workspace.versions = new List<VersionOption>();
         workspace.actions = new List<SubmitActionRecord>();
+        workspace.prefillAliasDetails = new List<PrefillAliasDetail>();
         workspace.objectOptions = getObjectOptions();
         workspace.formFieldOptions = new List<SelectOption>();
+        workspace.repeatGroupOptions = new List<SelectOption>();
         workspace.mappings = new List<MappingRecord>();
         workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
+        workspace.enableProRepeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
+        workspace.enableProPrefillAliasReferences = NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled();
+        workspace.enableProAdvancedSubmitModes = NativeFormsFeatureFlags.isProAdvancedSubmitModesEnabled();
 
         List<NF_Form_Version__c> versions = [
             SELECT Id,
@@ -101,6 +117,23 @@ public with sharing class NativeFormsSubmitActionsController {
         workspace.selectedFormName = selectedVersion.Form__r.Name;
 
         for (NF_Form_Action__c actionRecord : [
+            SELECT Store_Result_As__c, Object_Api_Name__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :effectiveVersionId
+              AND Action_Scope__c = 'Prefill'
+              AND Store_Result_As__c != null
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            if (String.isNotBlank(actionRecord.Store_Result_As__c) && String.isNotBlank(actionRecord.Object_Api_Name__c)) {
+                PrefillAliasDetail aliasDetail = new PrefillAliasDetail();
+                aliasDetail.alias = actionRecord.Store_Result_As__c;
+                aliasDetail.objectApiName = actionRecord.Object_Api_Name__c;
+                aliasDetail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
+                workspace.prefillAliasDetails.add(aliasDetail);
+            }
+        }
+
+        for (NF_Form_Action__c actionRecord : [
             SELECT Id,
                    Name,
                    Command_Key__c,
@@ -118,11 +151,19 @@ public with sharing class NativeFormsSubmitActionsController {
         }
 
         for (NF_Form_Element__c elementRecord : [
-            SELECT Id, Label__c, Field_Key__c, Config_JSON__c
+            SELECT Id, Label__c, Field_Key__c, Element_Type__c, Config_JSON__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :effectiveVersionId
             ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
+            if (elementRecord.Element_Type__c == 'repeatGroup' && String.isNotBlank(elementRecord.Field_Key__c)) {
+                SelectOption groupOption = new SelectOption();
+                groupOption.label = String.isBlank(elementRecord.Label__c)
+                    ? elementRecord.Field_Key__c
+                    : elementRecord.Label__c + ' (' + elementRecord.Field_Key__c + ')';
+                groupOption.value = elementRecord.Field_Key__c;
+                workspace.repeatGroupOptions.add(groupOption);
+            }
             if (String.isNotBlank(elementRecord.Field_Key__c)) {
                 SelectOption fieldOption = new SelectOption();
                 fieldOption.label = String.isBlank(elementRecord.Label__c)

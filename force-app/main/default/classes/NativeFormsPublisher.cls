@@ -277,6 +277,30 @@ public with sharing class NativeFormsPublisher {
         return filtered;
     }
 
+    private static Map<String, NF_Form_Element__c> elementsByElementId(List<NF_Form_Element__c> elements) {
+        Map<String, NF_Form_Element__c> recordsByElementId = new Map<String, NF_Form_Element__c>();
+        if (elements == null) {
+            return recordsByElementId;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null && String.isNotBlank(elementRecord.Element_Id__c)) {
+                recordsByElementId.put(elementRecord.Element_Id__c, elementRecord);
+            }
+        }
+        return recordsByElementId;
+    }
+
+    private static NF_Form_Element__c repeatGroupParentForElement(
+        NF_Form_Element__c elementRecord,
+        Map<String, NF_Form_Element__c> recordsByElementId
+    ) {
+        if (elementRecord == null || String.isBlank(elementRecord.Parent_Element_Id__c) || recordsByElementId == null) {
+            return null;
+        }
+        NF_Form_Element__c parentRecord = recordsByElementId.get(elementRecord.Parent_Element_Id__c);
+        return parentRecord != null && parentRecord.Element_Type__c == 'repeatGroup' ? parentRecord : null;
+    }
+
     private static NF_Form_Version__c createSuccessorDraft(
         NF_Form_Version__c publishedVersion,
         List<NF_Form_Element__c> elements,
@@ -344,14 +368,14 @@ public with sharing class NativeFormsPublisher {
             return new List<NF_Form_Element__c>();
         }
 
-        Map<String, NF_Form_Element__c> sectionsByElementId = new Map<String, NF_Form_Element__c>();
+        Map<String, NF_Form_Element__c> containersByElementId = new Map<String, NF_Form_Element__c>();
         Set<String> imageVersionIds = new Set<String>();
         for (NF_Form_Element__c elementRecord : elements) {
             if (elementRecord == null) {
                 continue;
             }
-            if (elementRecord.Element_Type__c == 'section' && String.isNotBlank(elementRecord.Element_Id__c)) {
-                sectionsByElementId.put(elementRecord.Element_Id__c, elementRecord);
+            if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup') && String.isNotBlank(elementRecord.Element_Id__c)) {
+                containersByElementId.put(elementRecord.Element_Id__c, elementRecord);
             }
             Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
             String contentVersionId = stringValue(config.get('contentVersionId'));
@@ -371,7 +395,7 @@ public with sharing class NativeFormsPublisher {
             Boolean isValidSectionChild =
                 String.isNotBlank(sourceRecord.Parent_Element_Id__c) &&
                 sourceRecord.Parent_Element_Id__c != sourceRecord.Element_Id__c &&
-                sectionsByElementId.containsKey(sourceRecord.Parent_Element_Id__c);
+                containersByElementId.containsKey(sourceRecord.Parent_Element_Id__c);
 
             if (!isValidTopLevel && !isValidSectionChild) {
                 continue;
@@ -501,8 +525,15 @@ public with sharing class NativeFormsPublisher {
                     commandConfig.put('commandKey', actionRecord.Command_Key__c);
                 }
                 String canonicalObject = canonicalObjectApiName(actionRecord.Object_Api_Name__c);
-                if (String.isNotBlank(canonicalObject)) {
-                    commandConfig.put('objectApiName', canonicalObject);
+                if (String.isBlank(canonicalObject)) {
+                    continue;
+                }
+                commandConfig.put('objectApiName', canonicalObject);
+                if (normalizedType == 'findMany') {
+                    Integer limitValue = integerValue(commandConfig.get('limit'));
+                    if (limitValue == null || limitValue < 1) {
+                        commandConfig.put('limit', 25);
+                    }
                 }
                 if (String.isNotBlank(actionRecord.Store_Result_As__c)) {
                     commandConfig.put('storeResultAs', actionRecord.Store_Result_As__c);
@@ -550,6 +581,18 @@ public with sharing class NativeFormsPublisher {
             return new List<String>(collectedFields);
         }
 
+        Map<String, NF_Form_Element__c> recordsByElementId = elementsByElementId(elements);
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'repeatGroup' || String.isBlank(elementRecord.Field_Key__c)) {
+                continue;
+            }
+            Map<String, Object> groupConfig = parseJsonMap(elementRecord.Config_JSON__c);
+            if (stringValue(groupConfig.get('repeatSourceAlias')) == aliasValue) {
+                response.put('repeatGroups.' + elementRecord.Field_Key__c + '.rows', '{' + aliasValue + '}');
+            }
+        }
+
         for (NF_Form_Element__c elementRecord : elements) {
             if (elementRecord == null || String.isBlank(elementRecord.Field_Key__c) || String.isBlank(elementRecord.Config_JSON__c)) {
                 continue;
@@ -569,6 +612,15 @@ public with sharing class NativeFormsPublisher {
             String sourcePath = canonicalFieldApiName(canonicalObjectApiName, prefillFieldPath);
             if (String.isBlank(sourcePath)) {
                 continue;
+            }
+
+            NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
+            if (repeatGroupParent != null) {
+                Map<String, Object> repeatConfig = parseJsonMap(repeatGroupParent.Config_JSON__c);
+                if (stringValue(repeatConfig.get('repeatSourceAlias')) == aliasValue) {
+                    collectedFields.add(sourcePath);
+                    continue;
+                }
             }
 
             String fieldBehavior = stringValue(elementConfig.get('fieldBehavior'));
@@ -596,6 +648,14 @@ public with sharing class NativeFormsPublisher {
         String canonicalObject = canonicalObjectApiName(actionRecord.Object_Api_Name__c);
         String actionKey = actionRecord.Command_Key__c;
         String commandType = actionRecord.Command_Type__c;
+
+        if (commandType == 'upsertMany') {
+            Map<String, Object> upsertManyCommand = buildUpsertManyCommand(actionRecord, commandConfig, canonicalObject, elements);
+            if (!upsertManyCommand.isEmpty()) {
+                commands.add(upsertManyCommand);
+            }
+            return commands;
+        }
 
         if (commandType == 'findAndUpdate') {
             String whereClause = buildConditionWhereClause(commandConfig, canonicalObject);
@@ -671,6 +731,49 @@ public with sharing class NativeFormsPublisher {
         return commands;
     }
 
+    private static Map<String, Object> buildUpsertManyCommand(
+        NF_Form_Action__c actionRecord,
+        Map<String, Object> commandConfig,
+        String canonicalObjectApiName,
+        List<NF_Form_Element__c> elements
+    ) {
+        Map<String, Object> command = new Map<String, Object>();
+        if (actionRecord == null || String.isBlank(canonicalObjectApiName) || elements == null || elements.isEmpty()) {
+            return command;
+        }
+
+        String repeatGroupKey = stringValue(commandConfig.get('repeatGroupKey'));
+        if (String.isBlank(repeatGroupKey)) {
+            return command;
+        }
+
+        command.put('type', 'upsertMany');
+        command.put('commandKey', actionRecord.Command_Key__c);
+        command.put('objectApiName', canonicalObjectApiName);
+        if (String.isNotBlank(actionRecord.Store_Result_As__c)) {
+            command.put('storeResultAs', actionRecord.Store_Result_As__c);
+        }
+        command.put('rows', '{input.repeatGroups.' + repeatGroupKey + '.rows}');
+        command.put('deleteIds', '{input.repeatGroups.' + repeatGroupKey + '.deletedIds}');
+        command.put('allowDelete', booleanValue(commandConfig.get('allowDelete')));
+
+        String relationshipField = canonicalFieldApiName(canonicalObjectApiName, stringValue(commandConfig.get('relationshipField')));
+        String relationshipValue = buildConditionValueExpression(
+            stringValue(commandConfig.get('relationshipValueSource')),
+            stringValue(commandConfig.get('relationshipValueText'))
+        );
+        if (String.isNotBlank(relationshipField) && String.isNotBlank(relationshipValue)) {
+            command.put('relationshipField', relationshipField);
+            command.put('relationshipValue', relationshipValue);
+        }
+
+        applySubmitFieldMappings(command, actionRecord, canonicalObjectApiName, elements);
+        if (!command.containsKey('fields')) {
+            return new Map<String, Object>();
+        }
+        return command;
+    }
+
     private static void applySubmitFieldMappings(
         Map<String, Object> commandConfig,
         NF_Form_Action__c actionRecord,
@@ -686,6 +789,10 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(actionKey)) {
             return;
         }
+        String normalizedType = stringValue(commandConfig.get('type'));
+        Map<String, NF_Form_Element__c> recordsByElementId = elementsByElementId(elements);
+        String repeatGroupKey = stringValue(commandConfig.get('repeatGroupKey'));
+        String idFieldKey;
 
         for (NF_Form_Element__c elementRecord : elements) {
             if (elementRecord == null || String.isBlank(elementRecord.Field_Key__c) || String.isBlank(elementRecord.Config_JSON__c)) {
@@ -709,7 +816,20 @@ public with sharing class NativeFormsPublisher {
                 continue;
             }
 
-            String inputExpression = '{input.' + elementRecord.Field_Key__c + '}';
+            if (normalizedType == 'upsertMany') {
+                NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
+                if (repeatGroupParent == null || repeatGroupParent.Field_Key__c != repeatGroupKey) {
+                    continue;
+                }
+                if (submitFieldPath == 'Id') {
+                    idFieldKey = elementRecord.Field_Key__c;
+                    continue;
+                }
+            }
+
+            String inputExpression = normalizedType == 'upsertMany'
+                ? '{row.' + elementRecord.Field_Key__c + '}'
+                : '{input.' + elementRecord.Field_Key__c + '}';
             if (String.isBlank(submitFieldPath) || String.isBlank(inputExpression)) {
                 continue;
             }
@@ -721,12 +841,14 @@ public with sharing class NativeFormsPublisher {
             commandConfig.put('fields', fields);
         }
 
-        String normalizedType = stringValue(commandConfig.get('type'));
         if (normalizedType == 'update') {
             String recordIdSource = stringValue(commandConfig.get('recordIdSource'));
             if (String.isNotBlank(recordIdSource)) {
                 commandConfig.put('id', recordIdSource);
             }
+        }
+        if (normalizedType == 'upsertMany' && String.isNotBlank(idFieldKey)) {
+            commandConfig.put('idField', idFieldKey);
         }
     }
 
@@ -762,6 +884,9 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(normalized)) {
             return new List<String>();
         }
+        if (commandType == 'upsertMany') {
+            return new List<String>{ 'upsertMany' };
+        }
         if (commandType == 'updateById' && stringValue(config.get('onNotFound')) == 'create') {
             return new List<String>{ normalized, 'create' };
         }
@@ -782,7 +907,7 @@ public with sharing class NativeFormsPublisher {
                 needsFindUpdateCreate = true;
                 continue;
             }
-            if (commandType == 'findAndUpdate' || commandType == 'updateById') {
+            if (commandType == 'findAndUpdate' || commandType == 'updateById' || commandType == 'upsertMany') {
                 needsSecureEdit = true;
             }
         }
@@ -912,6 +1037,13 @@ public with sharing class NativeFormsPublisher {
             }
             return String.isBlank(fieldKey) ? null : '{input.' + fieldKey + '}';
         }
+        if (valueSource == 'alias') {
+            String aliasPath = valueText.trim();
+            if (aliasPath.startsWith('{') && aliasPath.endsWith('}')) {
+                aliasPath = aliasPath.substring(1, aliasPath.length() - 1);
+            }
+            return String.isBlank(aliasPath) ? null : '{' + aliasPath + '}';
+        }
         if (Pattern.matches('^-?\\d+(\\.\\d+)?$', valueText) || valueText == 'true' || valueText == 'false') {
             return valueText;
         }
@@ -1037,6 +1169,19 @@ public with sharing class NativeFormsPublisher {
             return;
         }
 
+        for (NF_Form_Action__c actionRecord : [
+            SELECT Config_JSON__c
+            FROM NF_Form_Action__c
+            WHERE Command_Key__c = :actionKey
+            LIMIT 1
+        ]) {
+            Map<String, Object> actionConfig = parseJsonMap(actionRecord.Config_JSON__c);
+            String relationshipField = canonicalFieldApiName(objectApiName, stringValue(actionConfig.get('relationshipField')));
+            if (String.isNotBlank(relationshipField)) {
+                fieldNames.add(relationshipField);
+            }
+        }
+
         for (NF_Form_Element__c elementRecord : elements) {
             if (elementRecord == null || String.isBlank(elementRecord.Config_JSON__c)) {
                 continue;
@@ -1102,6 +1247,7 @@ public with sharing class NativeFormsPublisher {
         html += '--nf-accent-contrast:' + cssColor(theme, 'buttonTextColor', '#ffffff') + ';';
         html += '--nf-radius:' + cssLength(theme, 'inputBorderRadiusPx', '16px') + ';';
         html += '--nf-field-radius:' + cssLength(theme, 'inputBorderRadiusPx', '10px') + ';';
+        html += '--nf-form-bg:' + cssColor(theme, 'formBackgroundColor', '#ffffff') + ';';
         html += '--nf-font:' + cssFontFamily(theme, 'mainFont', '\'Segoe UI\', Arial, sans-serif') + ';';
         html += '--nf-title-font:' + cssFontFamily(theme, 'titleFont', '\'Segoe UI\', Arial, sans-serif') + ';';
         html += '--nf-title-size:' + cssLength(theme, 'titleFontSizePx', '22px') + ';';
@@ -1113,18 +1259,35 @@ public with sharing class NativeFormsPublisher {
         html += '--nf-input-border:' + cssColor(theme, 'inputBorderColor', '#c9d3df') + ';';
         html += '--nf-form-width:' + cssFormWidth(theme, 'formWidth', '880px') + ';';
         html += '}';
-        html += 'body{font-family:var(--nf-font);background:linear-gradient(180deg,var(--nf-bg),#edf2f8);color:var(--nf-text);margin:0;padding:24px;}';
-        html += '.nf-shell{max-width:var(--nf-form-width);margin:0 auto;background:var(--nf-surface);border:1px solid var(--nf-border);border-radius:var(--nf-radius);padding:32px;box-shadow:0 16px 44px rgba(22,50,92,.10);}';
+        html += 'body{font-family:var(--nf-font);background:linear-gradient(180deg,var(--nf-bg) 0%, #8fb5de 38%, #dce9f7 72%, #f8fbff 100%);color:var(--nf-text);margin:0;padding:28px 24px;min-height:100vh;box-sizing:border-box;}';
+        html += '.nf-shell{max-width:var(--nf-form-width);min-height:calc(100vh - 56px);margin:0 auto;background:var(--nf-surface);border:1px solid var(--nf-border);border-radius:calc(var(--nf-radius) + 6px);padding:32px;box-shadow:0 16px 44px rgba(22,50,92,.08);box-sizing:border-box;}';
         html += '.nf-grid{display:grid;gap:16px;}';
-        html += '.nf-section{padding:18px 20px;border:1px solid var(--nf-border);border-radius:calc(var(--nf-radius) - 4px);background:rgba(255,255,255,.65);}';
-        html += '.nf-section--plain{padding:0;border:0;background:transparent;border-radius:0;}';
-        html += '.nf-section h2{margin:0 0 8px;font-size:var(--nf-section-size);font-family:var(--nf-section-font);color:var(--nf-section-color);}';
-        html += '.nf-section__grid{display:grid;gap:18px;}';
+        html += '.nf-section{position:relative;padding:1.5rem 1.25rem 1.25rem;border:1px solid var(--nf-input-border);border-radius:calc(var(--nf-radius) + 2px);background:var(--nf-form-bg);margin-top:0.95rem;box-shadow:0 8px 24px rgba(15,35,65,.04);}';
+        html += '.nf-section--plain{padding:0;border:0;background:transparent;border-radius:0;margin-top:0;}';
+        html += '.nf-section__top{position:absolute;top:0;left:1.1rem;transform:translateY(-50%);background:var(--nf-form-bg,#ffffff);padding:0 0.4rem;line-height:1;}';
+        html += '.nf-section__top h2{margin:0;font-size:var(--nf-section-size);font-family:var(--nf-section-font);color:var(--nf-section-color);line-height:1;white-space:nowrap;}';
+        html += '.nf-section__grid{display:grid;gap:16px;}';
         html += '.nf-section__grid--1{grid-template-columns:1fr;}';
         html += '.nf-section__grid--2{grid-template-columns:repeat(2,minmax(0,1fr));}';
         html += '.nf-section__grid--3{grid-template-columns:repeat(3,minmax(0,1fr));}';
         html += '.nf-section__grid--4{grid-template-columns:repeat(4,minmax(0,1fr));}';
-        html += '.nf-section__column{display:grid;gap:16px;align-content:start;}';
+        html += '.nf-section__column{display:grid;gap:14px;align-content:start;}';
+        html += '.nf-repeat{display:grid;gap:16px;}';
+        html += '.nf-repeat__meta{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;color:var(--nf-muted);font-size:12px;}';
+        html += '.nf-repeat__meta span{padding:4px 10px;border-radius:999px;background:rgba(15,108,189,.08);}';
+        html += '.nf-repeat__rows{display:grid;gap:0;overflow:hidden;border-radius:calc(var(--nf-radius) - 4px);}';
+        html += '.nf-repeat__row{padding:12px 14px;border:none;border-radius:0;background:var(--nf-input-bg);display:flex;gap:12px;align-items:flex-start;}';
+        html += '.nf-repeat__row:nth-child(even){background:#eef3f8;}';
+        html += '.nf-repeat__row .nf-field input,.nf-repeat__row .nf-field textarea,.nf-repeat__row .nf-field select{background:var(--nf-input-bg);padding:12px 14px;}';
+        html += '.nf-repeat__row-delete{flex:0 0 32px;width:32px;display:flex;align-items:center;}';
+        html += '.nf-repeat__row-delete button{border:1px solid #d5e6f8;background:#fff;color:#9aa8ba;border-radius:10px;padding:4px 7px;font-size:11px;line-height:1;cursor:pointer;white-space:nowrap;}';
+        html += '.nf-repeat__row-delete button:hover{border-color:#f5c2c7;color:#b42318;background:#fde7e9;}';
+        html += '.nf-repeat__row-body{flex:1 1 auto;min-width:0;display:grid;gap:14px;}';
+        html += '.nf-repeat__header-row{display:flex;gap:12px;align-items:flex-end;padding:10px 12px 10px;margin-bottom:0;background:#e7edf5;border-radius:calc(var(--nf-radius) - 6px) calc(var(--nf-radius) - 6px) 0 0;font-weight:700;color:#355070;}';
+        html += '.nf-repeat__header-spacer{flex:0 0 auto;width:32px;}';
+        html += '.nf-repeat__header-body{flex:1 1 auto;min-width:0;}';
+        html += '.nf-repeat__actions button{border:1px solid var(--nf-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:8px 14px;font:inherit;cursor:pointer;}';
+        html += '.nf-repeat__actions{display:flex;justify-content:flex-start;}';
         html += '.nf-copy{margin:0;color:var(--nf-muted);line-height:1.6;}';
         html += '.nf-richtext{color:var(--nf-text);line-height:1.6;}';
         html += '.nf-richtext a{color:var(--nf-accent);text-decoration:underline;}';
@@ -1135,7 +1298,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-image-wrap--right{justify-content:flex-end;}';
         html += '.nf-image-wrap--stretch{justify-content:stretch;}';
         html += '.nf-image--stretch{width:100%;max-width:100%;object-fit:cover;}';
-        html += '.nf-field{display:grid;gap:6px;align-items:start;}';
+        html += '.nf-field{display:grid;gap:8px;align-items:start;}';
         html += '.nf-field label{display:block;font-weight:400;color:var(--nf-text);}';
         html += '.nf-field label.nf-label--bold{font-weight:700;}';
         html += '.nf-field--above{grid-template-columns:minmax(0,1fr);}';
@@ -1144,7 +1307,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-field--right{grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center;}';
         html += '.nf-field--right label{word-break:break-word;text-align:left;}';
         html += '.nf-field--hidden label{display:none;}';
-        html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:var(--nf-input-bg);color:var(--nf-text);}';
+        html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:var(--nf-input-bg);color:var(--nf-text);box-shadow:none;}';
         html += '.nf-field textarea{min-height:120px;resize:vertical;}';
         html += '.nf-field--checkbox label{display:flex;gap:10px;align-items:center;font-weight:400;}';
         html += '.nf-field--checkbox input{width:auto;}';
@@ -1164,6 +1327,30 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-logo{display:block;max-width:100%;}';
         html += '.nf-title{margin:0;color:var(--nf-title-color);font-family:var(--nf-title-font);font-size:var(--nf-title-size);}';
         html += '.nf-intro{margin:8px 0 0;color:var(--nf-muted);}';
+        html += '@media (max-width: 768px){';
+        html += 'body{padding:16px;background:linear-gradient(180deg,var(--nf-bg) 0%, #97bbdf 38%, #dce9f7 72%, #f8fbff 100%);}';
+        html += '.nf-shell{min-height:0;padding:18px 16px 20px;border-radius:20px;}';
+        html += '.nf-section{padding:1.2rem 0.95rem 1rem;border-radius:18px;}';
+        html += '.nf-section__top{left:0.85rem;padding:0 0.35rem;}';
+        html += '.nf-section__top h2{font-size:calc(var(--nf-section-size) * 0.95);}';
+        html += '.nf-section__grid--2,.nf-section__grid--3,.nf-section__grid--4{grid-template-columns:1fr;}';
+        html += '.nf-field--left,.nf-field--right{grid-template-columns:1fr;row-gap:8px;}';
+        html += '.nf-field--left label,.nf-field--right label{padding-top:0;text-align:left;}';
+        html += '.nf-repeat__header-row{display:none;}';
+        html += '.nf-repeat__rows{gap:8px;overflow:visible;border-radius:0;}';
+        html += '.nf-repeat__row{display:block;padding:12px;border:1px solid var(--nf-input-border);border-radius:16px;background:var(--nf-input-bg);}';
+        html += '.nf-repeat__row:nth-child(even){background:#eef3f8;}';
+        html += '.nf-repeat__row-delete{width:auto;display:flex;justify-content:flex-end;align-items:center;margin-top:10px;}';
+        html += '.nf-repeat__row-body{display:grid;gap:12px;}';
+        html += '.nf-repeat__row-body .nf-section__grid{grid-template-columns:1fr;}';
+        html += '.nf-repeat__row .nf-field{gap:6px;}';
+        html += '.nf-repeat__row .nf-field label{display:block;}';
+        html += '.nf-repeat__row .nf-field--hidden{grid-template-columns:1fr;}';
+        html += '.nf-repeat__row .nf-field--hidden label{display:block;}';
+        html += '.nf-repeat__actions,.nf-actions{display:grid;justify-content:stretch;}';
+        html += '.nf-repeat__actions button,.nf-actions button{width:100%;}';
+        html += '.nf-logo{max-height:4rem !important;}';
+        html += '}';
         if (String.isNotBlank(versionRecord.Custom_CSS__c)) {
             html += versionRecord.Custom_CSS__c;
         }
@@ -1188,10 +1375,10 @@ public with sharing class NativeFormsPublisher {
         }
 
         Map<String, List<NF_Form_Element__c>> childrenByParent = new Map<String, List<NF_Form_Element__c>>();
-        Set<String> sectionElementIds = new Set<String>();
+        Set<String> containerElementIds = new Set<String>();
         for (NF_Form_Element__c elementRecord : elements) {
-            if (elementRecord.Element_Type__c == 'section' && String.isNotBlank(elementRecord.Element_Id__c)) {
-                sectionElementIds.add(elementRecord.Element_Id__c);
+            if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup') && String.isNotBlank(elementRecord.Element_Id__c)) {
+                containerElementIds.add(elementRecord.Element_Id__c);
             }
         }
 
@@ -1200,7 +1387,7 @@ public with sharing class NativeFormsPublisher {
             Boolean isValidChild =
                 String.isNotBlank(elementRecord.Parent_Element_Id__c) &&
                 elementRecord.Parent_Element_Id__c != elementRecord.Element_Id__c &&
-                sectionElementIds.contains(elementRecord.Parent_Element_Id__c);
+                containerElementIds.contains(elementRecord.Parent_Element_Id__c);
             if (String.isBlank(elementRecord.Parent_Element_Id__c)) {
                 topLevelElements.add(elementRecord);
             } else if (isValidChild) {
@@ -1241,7 +1428,16 @@ public with sharing class NativeFormsPublisher {
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
         html += 'function setFieldValue(fieldKey,value){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else{el.value=value==null?"":value;}});}';
-        html += 'function applyPrefillPayload(payload){if(!payload){return;}const input=payload.input||{};const hidden=payload.hidden||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});evaluateConditions();}';
+        html += 'const repeatDeleteState={};';
+        html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}return first.value||"";}';
+        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}field.value=value==null?"":value;}';
+        html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:"";if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
+        html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);});}';
+        html += 'function clearRepeatGroups(){form.querySelectorAll("[data-repeat-rows]").forEach(function(host){host.innerHTML="";});Object.keys(repeatDeleteState).forEach(function(key){repeatDeleteState[key]=[];});}';
+        html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);}';
+        html += 'function collectRepeatGroups(){const groups={};form.querySelectorAll("[data-repeat-group]").forEach(function(groupEl){const groupKey=groupEl.dataset.repeatGroup;const rows=[];groupEl.querySelectorAll("[data-repeat-row]").forEach(function(rowEl){const row={};const seen={};rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;if(seen[fieldKey]){return;}row[fieldKey]=readRepeatFieldValueByKey(rowEl,fieldKey);seen[fieldKey]=true;});rows.push(row);});groups[groupKey]={rows:rows,deletedIds:repeatDeleteState[groupKey]||[]};});return groups;}';
+        html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
+        html += 'function applyPrefillPayload(payload){if(!payload){return;}const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});evaluateConditions();}';
         html += 'async function runPrefill(){if(!config.prefillUrl){return;}const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Prefill failed");}applyPrefillPayload(data);}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("input[type=\'date\']").forEach(function(el){const now=new Date();let minDate=null;let maxDate=null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.min=isoDate(minDate);}if(maxDate){el.max=isoDate(maxDate);}});}';
@@ -1258,10 +1454,11 @@ public with sharing class NativeFormsPublisher {
         html += 'const submitButton=form.querySelector("button[type=\'submit\']");if(submitButton){submitButton.disabled=true;}';
         html += 'try{const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){input[key]=value;}';
         html += 'form.querySelectorAll("input[type=\'checkbox\'][name]").forEach(function(el){input[el.name]=!!el.checked;});';
+        html += 'input.repeatGroups=collectRepeatGroups();';
         html += 'const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input})});';
         html += 'const data=await response.json();';
         html += 'if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Submit failed");}';
-        html += 'setStatus("success","Form submitted successfully.");form.reset();';
+        html += 'setStatus("success","Form submitted successfully.");form.reset();clearRepeatGroups();';
         html += '}catch(error){setStatus("error",error&&error.message?error.message:"Submit failed.");}finally{if(submitButton){submitButton.disabled=false;}}';
         html += '});';
         html += '})();</script>';
@@ -1300,6 +1497,74 @@ public with sharing class NativeFormsPublisher {
         Boolean labelBold = booleanValue(config.get('labelBold'));
         String labelClassAttr = labelBold ? ' class="nf-label--bold"' : '';
 
+        if (typeValue == 'repeatGroup') {
+            List<NF_Form_Element__c> childElements = childrenByParent != null && String.isNotBlank(elementRecord.Element_Id__c)
+                ? childrenByParent.get(elementRecord.Element_Id__c)
+                : null;
+            String repeatGroupKey = String.isNotBlank(elementRecord.Field_Key__c) ? elementRecord.Field_Key__c : safeName;
+            String repeatAlias = stringValue(config.get('repeatSourceAlias'));
+            Boolean showTitle = !config.containsKey('showTitle') || booleanValue(config.get('showTitle'));
+            Boolean boxed = !config.containsKey('boxed') || booleanValue(config.get('boxed'));
+            Boolean allowAddRows = !config.containsKey('allowAddRows') || booleanValue(config.get('allowAddRows'));
+            Boolean allowDeleteRows = !config.containsKey('allowDeleteRows') || booleanValue(config.get('allowDeleteRows'));
+            Boolean showLabelsOnEachRow = !config.containsKey('showLabelsOnEachRow') || booleanValue(config.get('showLabelsOnEachRow'));
+            Integer columnCount = safeSectionColumnCount(config);
+            String idFieldKey = repeatGroupIdFieldKey(childElements);
+            Boolean hasHeader = !showLabelsOnEachRow && childElements != null && !childElements.isEmpty();
+            String repeatHtml = '<div class="nf-section nf-repeat' + (boxed ? '' : ' nf-section--plain') + (hasHeader ? ' nf-repeat--has-header' : '') + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + ' data-repeat-group="' + escapeHtml(repeatGroupKey) + '" data-repeat-id-field="' + escapeHtml(firstNonBlank(idFieldKey, '')) + '">';
+            if (showTitle) {
+                repeatHtml += '<div class="nf-section__top"><h2>' + safeLabel + '</h2></div>';
+            }
+            // Header row (column labels) — only shown when showLabelsOnEachRow is false
+            if (hasHeader) {
+                repeatHtml += '<div class="nf-repeat__header-row">';
+                if (allowDeleteRows) {
+                    repeatHtml += '<div class="nf-repeat__header-spacer"></div>';
+                }
+                repeatHtml += '<div class="nf-repeat__header-body"><div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+                    repeatHtml += '<div class="nf-section__column">';
+                    for (NF_Form_Element__c childElement : childElements) {
+                        if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
+                            Map<String, Object> childConfig = parseJsonMap(childElement.Config_JSON__c);
+                            String childLabel = String.isNotBlank(childElement.Label__c) ? childElement.Label__c : childElement.Field_Key__c;
+                            Boolean childLabelBold = booleanValue(childConfig.get('labelBold'));
+                            repeatHtml += '<div class="nf-field"><label' + (childLabelBold ? ' class="nf-label--bold"' : '') + '>' + escapeHtml(childLabel) + '</label></div>';
+                        }
+                    }
+                    repeatHtml += '</div>';
+                }
+                repeatHtml += '</div></div></div>';
+            }
+            repeatHtml += '<div class="nf-repeat__rows" data-repeat-rows="' + escapeHtml(repeatGroupKey) + '"></div>';
+            if (allowAddRows) {
+                repeatHtml += '<div class="nf-repeat__actions"><button type="button" data-repeat-add="' + escapeHtml(repeatGroupKey) + '">Add Row</button></div>';
+            }
+            repeatHtml += '</div>';
+            repeatHtml += '<template data-repeat-template="' + escapeHtml(repeatGroupKey) + '">';
+            repeatHtml += '<div class="nf-repeat__row" data-repeat-row>';
+            if (allowDeleteRows) {
+                repeatHtml += '<div class="nf-repeat__row-delete"><button type="button" data-repeat-delete-row="' + escapeHtml(repeatGroupKey) + '" title="Delete row">&#x2715;</button></div>';
+            }
+            repeatHtml += '<div class="nf-repeat__row-body">';
+            if (childElements != null) {
+                repeatHtml += '<div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+                    repeatHtml += '<div class="nf-section__column">';
+                    for (NF_Form_Element__c childElement : childElements) {
+                        if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
+                            repeatHtml += renderRepeatGroupChildElement(childElement, repeatAlias, showLabelsOnEachRow);
+                        }
+                    }
+                    repeatHtml += '</div>';
+                }
+                repeatHtml += '</div>';
+            }
+            repeatHtml += '</div>';
+            repeatHtml += '</div></template>';
+            return repeatHtml;
+        }
+
         if (typeValue == 'section' || typeValue == 'sectionBreak') {
             String bodyText = config.containsKey('text') ? escapeHtml(String.valueOf(config.get('text'))) : '';
             Boolean showTitle = !config.containsKey('showTitle') || booleanValue(config.get('showTitle'));
@@ -1310,7 +1575,7 @@ public with sharing class NativeFormsPublisher {
                 : null;
             String sectionHtml = '<div class="nf-section' + (boxed ? '' : ' nf-section--plain') + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + '>';
             if (showTitle) {
-                sectionHtml += '<h2>' + safeLabel + '</h2>';
+                sectionHtml += '<div class="nf-section__top"><h2>' + safeLabel + '</h2></div>';
             }
             if (String.isNotBlank(bodyText) && bodyText != 'Section description') {
                 sectionHtml += '<p class="nf-copy">' + bodyText + '</p>';
@@ -1429,6 +1694,100 @@ public with sharing class NativeFormsPublisher {
         String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabel + '</label>';
         String controlHtml = '<input type="' + escapeHtml(htmlType) + '" id="' + safeName + '" name="' + safeName + '"' + placeholderAttr + valueAttr + requiredAttr + minAttr + maxAttr + dateRangeAttrs + patternAttr + '>';
         return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml);
+    }
+
+    private static String renderRepeatGroupChildElement(NF_Form_Element__c elementRecord, String repeatAlias, Boolean showLabels) {
+        Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+        String typeValue = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
+        String fieldKey = String.isNotBlank(elementRecord.Field_Key__c) ? elementRecord.Field_Key__c : String.valueOf(elementRecord.Id);
+        String sourceField = stringValue(config.get('prefillFieldPath'));
+        if (stringValue(config.get('prefillAlias')) != repeatAlias) {
+            sourceField = fieldKey;
+        }
+        sourceField = String.isBlank(sourceField) ? fieldKey : sourceField;
+        String label = String.isNotBlank(elementRecord.Label__c) ? elementRecord.Label__c : fieldKey;
+        String placeholder = stringValue(config.get('placeholder'));
+        String labelPosition = showLabels ? normalizedLabelPosition(config) : 'hidden';
+        String labelClassAttr = booleanValue(config.get('labelBold')) ? ' class="nf-label--bold"' : '';
+        String repeatLabelClassAttr = labelPosition == 'hidden'
+            ? ' class="nf-repeat-mobile-label' + (booleanValue(config.get('labelBold')) ? ' nf-label--bold' : '') + '"'
+            : labelClassAttr;
+        String sourceAttr = ' data-repeat-source-field="' + escapeHtml(sourceField) + '"';
+        String keyAttr = ' data-repeat-field-key="' + escapeHtml(fieldKey) + '"';
+        String baseId = escapeHtml(fieldKey);
+
+        if (typeValue == 'heading') {
+            String richHtml = config.containsKey('html') ? String.valueOf(config.get('html')) : '<p>' + escapeHtml(label) + '</p>';
+            return '<div class="nf-richtext">' + richHtml + '</div>';
+        }
+
+        if (typeValue == 'image') {
+            return '';
+        }
+
+        if (typeValue == 'checkbox') {
+            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '"><label' + labelClassAttr + '><input type="checkbox" id="' + baseId + '"' + keyAttr + sourceAttr + '> ' + escapeHtml(label) + '</label></div>';
+        }
+
+        if (typeValue == 'textarea') {
+            String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
+            String controlHtml = '<textarea id="' + baseId + '"' + keyAttr + sourceAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '></textarea>';
+            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
+        }
+
+        if (typeValue == 'select' && config.containsKey('options')) {
+            String optionsHtml = '<option value="">Select...</option>';
+            for (Object rawOption : (List<Object>) config.get('options')) {
+                if (rawOption instanceof Map<String, Object>) {
+                    Map<String, Object> option = (Map<String, Object>) rawOption;
+                    optionsHtml += '<option value="' + escapeHtml(String.valueOf(option.get('value'))) + '">' + escapeHtml(String.valueOf(option.get('label'))) + '</option>';
+                }
+            }
+            String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
+            String controlHtml = '<select id="' + baseId + '"' + keyAttr + sourceAttr + '>' + optionsHtml + '</select>';
+            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
+        }
+
+        if (typeValue == 'radio' && config.containsKey('options')) {
+            String html = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '">';
+            html += '<label' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
+            html += '<div class="nf-field--radio-group">';
+            Integer optionIndex = 0;
+            for (Object rawOption : (List<Object>) config.get('options')) {
+                if (rawOption instanceof Map<String, Object>) {
+                    Map<String, Object> option = (Map<String, Object>) rawOption;
+                    String optionId = baseId + '-' + String.valueOf(optionIndex);
+                    html += '<label class="nf-radio-option" for="' + escapeHtml(optionId) + '">';
+                    html += '<input type="radio" id="' + escapeHtml(optionId) + '" value="' + escapeHtml(String.valueOf(option.get('value'))) + '"' + keyAttr + sourceAttr + '>';
+                    html += '<span>' + escapeHtml(String.valueOf(option.get('label'))) + '</span></label>';
+                    optionIndex += 1;
+                }
+            }
+            html += '</div></div>';
+            return html;
+        }
+
+        if (typeValue == 'hidden') {
+            return '<input type="hidden" id="' + baseId + '"' + keyAttr + sourceAttr + '>';
+        }
+
+        String htmlType = normalizeInputType(typeValue);
+        String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
+        String controlHtml = '<input type="' + escapeHtml(htmlType) + '" id="' + baseId + '"' + keyAttr + sourceAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '>';
+        return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
+    }
+
+    private static String repeatGroupIdFieldKey(List<NF_Form_Element__c> childElements) {
+        if (childElements == null) {
+            return null;
+        }
+        for (NF_Form_Element__c childElement : childElements) {
+            Map<String, Object> config = parseJsonMap(childElement.Config_JSON__c);
+            if (stringValue(config.get('submitFieldPath')) == 'Id' || stringValue(config.get('prefillFieldPath')) == 'Id') {
+                return childElement.Field_Key__c;
+            }
+        }
+        return null;
     }
 
     private static String renderFieldWrapper(String safeElementId, String wrapperAttrs, String labelPosition, String labelHtml, String controlHtml) {
@@ -1735,7 +2094,17 @@ public with sharing class NativeFormsPublisher {
 
     private static String cssLength(Map<String, Object> source, String key, String fallbackValue) {
         String value = stringValue(source.get(key));
-        return String.isNotBlank(value) ? escapeHtml(value) : fallbackValue;
+        if (String.isBlank(value)) {
+            return fallbackValue;
+        }
+        String trimmed = value.trim();
+        if (trimmed.endsWith('px') || trimmed.endsWith('rem') || trimmed.endsWith('em') || trimmed.endsWith('%')) {
+            return escapeHtml(trimmed);
+        }
+        if (Pattern.matches('^-?\\d+(\\.\\d+)?$', trimmed)) {
+            return escapeHtml(trimmed + 'px');
+        }
+        return escapeHtml(trimmed);
     }
 
     private static String cssFontFamily(Map<String, Object> source, String key, String fallbackValue) {

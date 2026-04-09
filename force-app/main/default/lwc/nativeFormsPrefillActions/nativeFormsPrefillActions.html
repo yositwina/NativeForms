@@ -59,15 +59,14 @@
 
                         <div class="help-inline-panel">
                             <h3>How It Works</h3>
-                            <p><strong>Salesforce Field</strong> is a field on the selected object, such as <code>Email</code>.</p>
-                            <p><strong>&#123;params.name&#125;</strong> means a URL query parameter, for example <code>?email=test@example.com</code>.</p>
-                            <p><strong>&#123;input.fieldKey&#125;</strong> means a value already on the form.</p>
-                            <p><strong>Literal Value</strong> lets you match directly against text or number values.</p>
-                            <p>For condition rows, enter just the raw value:
-                                <code>email</code> for a URL parameter,
-                                choose a form field for form input,
-                                or type plain text such as <code>Web</code> for a literal.</p>
-                            <p><strong>On Not Found = Ignore</strong> means the form continues without prefilling. <strong>Error</strong> means the runtime should stop and show a failure.</p>
+                            <p><strong>Salesforce Field</strong> is the field on the selected object that you want to search, such as <code>Email</code> or <code>ContactId</code>.</p>
+                            <p><strong>Value Source</strong> controls where the right side comes from:</p>
+                            <p><strong>URL Parameter</strong> uses a value from the page address, such as <code>?email=test@example.com</code>.</p>
+                            <p><strong>Form Field</strong> uses a value already on the form.</p>
+                            <p><strong>Literal Value</strong> compares against fixed text or a number.</p>
+                            <p><strong>Prefill Alias Field</strong> is a Pro feature. Choose a previous prefill alias first, then choose one of that alias's Salesforce fields, such as <code>Contact</code> + <code>Id</code>.</p>
+                            <p><strong>findOne</strong> returns one record. <strong>findMany</strong> returns multiple records and needs a <strong>Limit</strong>.</p>
+                            <p><strong>On Not Found = Ignore</strong> means the form continues without prefilling. <strong>Error</strong> means the hosted form should stop and show a failure.</p>
                         </div>
                     </section>
 
@@ -154,14 +153,34 @@
                                                 </lightning-combobox>
                                             </template>
                                             <template if:false={row.isValueSourceField}>
-                                                <lightning-input
-                                                    data-index={index}
-                                                    name="valueText"
-                                                    label={row.valueLabel}
-                                                    placeholder={row.valuePlaceholder}
-                                                    value={row.valueText}
-                                                    onchange={handleConditionChange}>
-                                                </lightning-input>
+                                                <template if:true={row.isValueSourceAlias}>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="aliasName"
+                                                        label="Prefill Alias"
+                                                        value={row.selectedAliasName}
+                                                        options={row.aliasOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="aliasField"
+                                                        label="Alias Field"
+                                                        value={row.selectedAliasField}
+                                                        options={row.aliasFieldOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                </template>
+                                                <template if:false={row.isValueSourceAlias}>
+                                                    <lightning-input
+                                                        data-index={index}
+                                                        name="valueText"
+                                                        label={row.valueLabel}
+                                                        placeholder={row.valuePlaceholder}
+                                                        value={row.valueText}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-input>
+                                                </template>
                                             </template>
                                             <lightning-button-icon
                                                 data-index={index}
@@ -216,7 +235,7 @@
                                             name="configJson"
                                             label="Config JSON"
                                             value={draftAction.configJson}
-                                            onchange={handleDraftChange}>
+                                            read-only>
                                         </lightning-textarea>
                                         <p class="help-inline">
                                             Queried Salesforce fields are derived from the builder field mappings for this alias.

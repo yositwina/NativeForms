@@ -7,6 +7,9 @@ export default class NativeFormsAdminFeatures extends LightningElement {
     isLoading = true;
     errorMessage = '';
     enableProConditionLogic = false;
+    enableProRepeatGroups = false;
+    enableProPrefillAliasReferences = false;
+    enableProAdvancedSubmitModes = false;
 
     connectedCallback() {
         this.loadSettings();
@@ -18,6 +21,9 @@ export default class NativeFormsAdminFeatures extends LightningElement {
         try {
             const settings = await getFeatureSettings();
             this.enableProConditionLogic = !!settings?.enableProConditionLogic;
+            this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;
+            this.enableProPrefillAliasReferences = !!settings?.enableProPrefillAliasReferences;
+            this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -26,6 +32,19 @@ export default class NativeFormsAdminFeatures extends LightningElement {
     }
 
     handleToggle(event) {
+        const fieldName = event.target.name;
+        if (fieldName === 'enableProRepeatGroups') {
+            this.enableProRepeatGroups = event.target.checked;
+            return;
+        }
+        if (fieldName === 'enableProPrefillAliasReferences') {
+            this.enableProPrefillAliasReferences = event.target.checked;
+            return;
+        }
+        if (fieldName === 'enableProAdvancedSubmitModes') {
+            this.enableProAdvancedSubmitModes = event.target.checked;
+            return;
+        }
         this.enableProConditionLogic = event.target.checked;
     }
 
@@ -35,10 +54,16 @@ export default class NativeFormsAdminFeatures extends LightningElement {
         try {
             const settings = await saveFeatureSettings({
                 inputValue: {
-                    enableProConditionLogic: this.enableProConditionLogic
+                    enableProConditionLogic: this.enableProConditionLogic,
+                    enableProRepeatGroups: this.enableProRepeatGroups,
+                    enableProPrefillAliasReferences: this.enableProPrefillAliasReferences,
+                    enableProAdvancedSubmitModes: this.enableProAdvancedSubmitModes
                 }
             });
             this.enableProConditionLogic = !!settings?.enableProConditionLogic;
+            this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;
+            this.enableProPrefillAliasReferences = !!settings?.enableProPrefillAliasReferences;
+            this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Settings saved',
                 message: 'NativeForms feature flags were updated.',

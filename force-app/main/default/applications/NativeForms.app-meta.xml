@@ -9,16 +9,12 @@
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
     <label>NativeForms</label>
     <navType>Standard</navType>
-    <tabs>NativeForms_Guided_Setup</tabs>
-    <tabs>NativeForms_Designer</tabs>
     <tabs>NativeForms_Themes</tabs>
+    <tabs>NF_Form__c</tabs>
+    <tabs>NativeForms_Designer</tabs>
     <tabs>NativeForms_Prefill_Actions</tabs>
     <tabs>NativeForms_Submit_Actions</tabs>
-    <tabs>NF_Form__c</tabs>
-    <tabs>NF_Form_Version__c</tabs>
-    <tabs>NF_Form_Element__c</tabs>
-    <tabs>NF_Form_Action__c</tabs>
     <tabs>NF_Form_Publication__c</tabs>
-    <tabs>standard-home</tabs>
+    <tabs>standard-Contact</tabs>
     <uiType>Lightning</uiType>
 </CustomApplication>

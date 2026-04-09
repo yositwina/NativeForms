@@ -61,14 +61,12 @@
                         <div class="help-inline-panel">
                             <h3>How It Works</h3>
                             <p><strong>Create record</strong> always creates a new row.</p>
-                            <p><strong>Update by record Id</strong> updates one row using an Id from the form, such as <code>&#123;input.contactid&#125;</code>.</p>
-                            <p><strong>Find and update existing record</strong> first finds a row by conditions, then updates it.</p>
-                            <p><strong>&#123;input.fieldKey&#125;</strong> means a value coming from the form itself.</p>
-                            <p><strong>&#123;params.name&#125;</strong> means a URL query parameter from the page address.</p>
-                            <p>For condition rows, enter just the raw value:
-                                <code>email</code> for a URL parameter,
-                                choose a form field for form input,
-                                or type plain text such as <code>Web</code> for a literal.</p>
+                            <p><strong>Update by record Id</strong> updates one row using an Id already available on the form.</p>
+                            <p><strong>Find and update existing record</strong> first searches by your match conditions, then updates the record if found.</p>
+                            <p><strong>If no matching record is found</strong> controls whether the hosted form should show an error or create a new record instead.</p>
+                            <p><strong>Value Source</strong> can come from a URL parameter, a form field, a literal value, or a previous <strong>Prefill Alias Field</strong>.</p>
+                            <p><strong>Prefill Alias Field</strong> is a Pro feature. Choose a prefill alias first, then choose one of that alias's Salesforce fields, such as <code>Contact</code> + <code>Id</code>.</p>
+                            <p><strong>Upsert repeat group</strong> is a Pro feature for repeatable rows. Existing rows with an Id update, and rows without an Id create new records.</p>
                         </div>
                     </section>
 
@@ -168,14 +166,34 @@
                                                     </lightning-combobox>
                                                 </template>
                                                 <template if:false={row.isValueSourceField}>
-                                                    <lightning-input
-                                                        data-index={index}
-                                                        name="valueText"
-                                                        label={row.valueLabel}
-                                                        placeholder={row.valuePlaceholder}
-                                                        value={row.valueText}
-                                                        onchange={handleConditionChange}>
-                                                    </lightning-input>
+                                                    <template if:true={row.isValueSourceAlias}>
+                                                        <lightning-combobox
+                                                            data-index={index}
+                                                            name="aliasName"
+                                                            label="Prefill Alias"
+                                                            value={row.selectedAliasName}
+                                                            options={row.aliasOptions}
+                                                            onchange={handleConditionChange}>
+                                                        </lightning-combobox>
+                                                        <lightning-combobox
+                                                            data-index={index}
+                                                            name="aliasField"
+                                                            label="Alias Field"
+                                                            value={row.selectedAliasField}
+                                                            options={row.aliasFieldOptions}
+                                                            onchange={handleConditionChange}>
+                                                        </lightning-combobox>
+                                                    </template>
+                                                    <template if:false={row.isValueSourceAlias}>
+                                                        <lightning-input
+                                                            data-index={index}
+                                                            name="valueText"
+                                                            label={row.valueLabel}
+                                                            placeholder={row.valuePlaceholder}
+                                                            value={row.valueText}
+                                                            onchange={handleConditionChange}>
+                                                        </lightning-input>
+                                                    </template>
                                                 </template>
                                                 <lightning-button-icon
                                                     data-index={index}
@@ -202,6 +220,79 @@
                                     </div>
                                 </template>
 
+                                <template if:true={showRepeatGroupConfig}>
+                                    <div class="condition-builder">
+                                        <div class="condition-builder__header">
+                                            <span class="condition-builder__title">Repeat Group Settings</span>
+                                        </div>
+                                        <lightning-combobox
+                                            name="repeatGroupKey"
+                                            label="Repeat Group"
+                                            value={draftAction.repeatGroupKey}
+                                            options={repeatGroupOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            name="relationshipField"
+                                            label="Parent Relationship Field"
+                                            value={draftAction.relationshipField}
+                                            options={fieldOptions}
+                                            onchange={handleRepeatRelationshipChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            name="relationshipValueSource"
+                                            label="Relationship Value Source"
+                                            value={draftAction.relationshipValueSource}
+                                            options={valueSourceOptions}
+                                            onchange={handleRepeatRelationshipSourceChange}>
+                                        </lightning-combobox>
+                                        <template if:true={draftAction.relationshipValueSource}>
+                                            <template if:true={isRepeatRelationshipValueField}>
+                                                <lightning-combobox
+                                                    name="relationshipValueText"
+                                                    label="Relationship Value"
+                                                    value={draftAction.relationshipValueText}
+                                                    options={formFieldOptions}
+                                                    onchange={handleRepeatRelationshipChange}>
+                                                </lightning-combobox>
+                                            </template>
+                                            <template if:false={isRepeatRelationshipValueField}>
+                                                <template if:true={isRepeatRelationshipValueAlias}>
+                                                    <lightning-combobox
+                                                        name="relationshipAliasName"
+                                                        label="Prefill Alias"
+                                                        value={selectedRelationshipAliasName}
+                                                        options={prefillAliasOptions}
+                                                        onchange={handleRepeatRelationshipChange}>
+                                                    </lightning-combobox>
+                                                    <lightning-combobox
+                                                        name="relationshipAliasField"
+                                                        label="Alias Field"
+                                                        value={selectedRelationshipAliasField}
+                                                        options={relationshipAliasFieldOptions}
+                                                        onchange={handleRepeatRelationshipChange}>
+                                                    </lightning-combobox>
+                                                </template>
+                                                <template if:false={isRepeatRelationshipValueAlias}>
+                                                    <lightning-input
+                                                        name="relationshipValueText"
+                                                        label="Relationship Value"
+                                                        value={draftAction.relationshipValueText}
+                                                        onchange={handleRepeatRelationshipChange}>
+                                                    </lightning-input>
+                                                </template>
+                                            </template>
+                                        </template>
+                                        <lightning-input
+                                            type="checkbox"
+                                            name="allowDelete"
+                                            label="Allow deleting rows on submit"
+                                            checked={draftAction.allowDelete}
+                                            onchange={handleRepeatRelationshipChange}>
+                                        </lightning-input>
+                                    </div>
+                                </template>
+
                                 <lightning-accordion allow-multiple-sections-open>
                                     <lightning-accordion-section name="advanced" label="Advanced">
                                         <lightning-input
@@ -214,7 +305,7 @@
                                             name="configJson"
                                             label="Config JSON"
                                             value={draftAction.configJson}
-                                            onchange={handleDraftChange}>
+                                            read-only>
                                         </lightning-textarea>
                                     </lightning-accordion-section>
                                 </lightning-accordion>

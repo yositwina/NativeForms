@@ -1,39 +1,38 @@
 .theme-shell {
-    min-height: calc(100vh - 10rem);
-    height: calc(100vh - 10rem);
-    overflow: hidden;
+    min-height: 42rem;
+    --theme-workspace-height: calc(100vh - 13rem);
 }
 
 .theme-layout {
     display: grid;
     gap: 1rem;
     grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr) minmax(23rem, 28rem);
-    align-items: start;
-    min-height: calc(100vh - 14rem);
-    height: 100%;
-    overflow: hidden;
+    align-items: stretch;
+    min-height: 42rem;
+    height: var(--theme-workspace-height);
 }
 
 .pane {
-    min-height: calc(100vh - 14rem);
-    height: calc(100vh - 14rem);
+    min-height: 34rem;
     padding: 1rem;
     border: 1px solid #d8dde6;
     border-radius: 1rem;
     background: #fff;
     box-shadow: 0 8px 24px rgba(15, 35, 65, 0.04);
-    box-sizing: border-box;
 }
 
 .pane-left,
-.pane-center {
+.pane-right {
     position: sticky;
     top: 0;
-    overflow: hidden;
+    align-self: start;
+    max-height: var(--theme-workspace-height);
+    overflow-y: auto;
 }
 
-.pane-right {
-    height: calc(100vh - 14rem);
+.pane-center {
+    min-height: 0;
+    height: var(--theme-workspace-height);
     overflow-y: auto;
 }
 
@@ -41,15 +40,22 @@
     margin-bottom: 1rem;
 }
 
-.pane-header h2,
-.editor-section h3 {
+.pane-header h2 {
     margin: 0;
+    font-size: 1.2rem;
     color: #17324d;
 }
 
 .pane-copy {
     margin: 0.35rem 0 0;
     color: #5f6f89;
+}
+
+.theme-version {
+    margin: 0.35rem 0 0;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #0f6cbd;
 }
 
 .left-actions {
@@ -84,14 +90,23 @@
 }
 
 .editor-section {
-    padding: 1rem;
-    border: 1px solid #e2e9f0;
-    border-radius: 1rem;
+    padding: 0.95rem;
+    border: 1px solid #c9def4;
+    border-radius: 0.95rem;
     background: linear-gradient(180deg, #ffffff, #f9fbfd);
+    --slds-c-input-color-border: #b6d4f3;
+    --slds-c-input-text-color: #17324d;
+    --slds-c-textarea-color-border: #b6d4f3;
+    --slds-c-textarea-text-color: #17324d;
+    --slds-c-combobox-sizing-border: #b6d4f3;
+    --slds-c-combobox-input-text-color: #17324d;
 }
 
 .editor-section h3 {
-    margin-bottom: 0.85rem;
+    margin: 0 0 0.85rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #17324d;
 }
 
 .inline-row {
@@ -140,8 +155,10 @@
 }
 
 .preview-page {
-    padding: 1.1rem;
-    border-radius: 1rem;
+    padding: 1.15rem;
+    border: 1px solid var(--nf-theme-form-border, #dbe5ef);
+    border-radius: 1.1rem;
+    background: var(--nf-theme-page-bg, #f3f7fb);
     min-height: 100%;
 }
 
@@ -166,6 +183,7 @@
     padding: 1.4rem;
     border: 1px solid;
     border-radius: 1.25rem;
+    background: var(--nf-theme-form-bg, #ffffff);
 }
 
 .preview-logo-wrap {
@@ -238,19 +256,30 @@
     cursor: pointer;
 }
 
-.panel-error,
-.empty-state {
-    padding: 1rem;
-    border-radius: 0.9rem;
+.panel-error {
+    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 0.8rem;
     background: #fde7e9;
     color: #7f1d1d;
     border: 1px solid #f5c2c7;
 }
 
+.panel-success {
+    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 0.8rem;
+    background: #e8f6ee;
+    color: #165b33;
+    border: 1px solid #b8e0c7;
+}
+
 .empty-state {
+    padding: 1rem;
+    border-radius: 0.9rem;
     background: #f8fbfd;
     color: #5f6f89;
-    border-style: dashed;
+    border: 1px dashed #c9d3df;
 }
 
 .loading-wrap {
@@ -259,27 +288,25 @@
 }
 
 @media (max-width: 1200px) {
+    .theme-shell {
+        --theme-workspace-height: auto;
+    }
+
     .theme-layout {
         grid-template-columns: 1fr;
-        min-height: auto;
         height: auto;
-        overflow: visible;
     }
 
-    .theme-shell {
-        min-height: auto;
-        height: auto;
-        overflow: visible;
-    }
-
-    .pane,
     .pane-left,
-    .pane-center,
     .pane-right {
         position: static;
-        min-height: auto;
         max-height: none;
-        overflow: visible;
+        overflow-y: visible;
+    }
+
+    .pane-center {
+        height: auto;
+        overflow-y: visible;
     }
 
     .inline-row--two,

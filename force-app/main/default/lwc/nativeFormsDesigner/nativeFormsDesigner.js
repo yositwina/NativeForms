@@ -17,7 +17,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v6.4';
+    designerVersion = 'v7.1';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -45,6 +45,7 @@ export default class NativeFormsDesigner extends LightningElement {
     @track picklistFieldOptions = [];
     @track prefillAliasDetails = [];
     @track submitActionDetails = [];
+    enableProRepeatGroups = false;
 
     inputFieldType = 'text';
     displayElementType = 'section';
@@ -60,6 +61,10 @@ export default class NativeFormsDesigner extends LightningElement {
     editorShowTitle = true;
     editorBoxed = true;
     editorColumns = '2';
+    editorRepeatSourceAlias = '';
+    editorAllowAddRows = true;
+    editorAllowDeleteRows = true;
+    editorShowLabelsOnEachRow = true;
     editorPicklistObject = '';
     editorPicklistField = '';
     editorRadioOptionsText = '';
@@ -98,6 +103,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     displayElementOptions = [
         { label: 'Section', value: 'section' },
+        { label: 'Repeat Group', value: 'repeatGroup' },
         { label: 'Display Text', value: 'heading' },
         { label: 'Image', value: 'image' }
     ];
@@ -253,6 +259,20 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.selectedElement?.elementType === 'section';
     }
 
+    get selectedElementIsRepeatGroup() {
+        return this.selectedElement?.elementType === 'repeatGroup';
+    }
+
+    get selectedElementIsContainer() {
+        return this.selectedElementIsSection || this.selectedElementIsRepeatGroup;
+    }
+
+    get availableDisplayElementOptions() {
+        return this.enableProRepeatGroups
+            ? this.displayElementOptions
+            : this.displayElementOptions.filter((option) => option.value !== 'repeatGroup');
+    }
+
     get selectedElementSupportsLabelPosition() {
         return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
     }
@@ -286,11 +306,35 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsConditional() {
-        return this.editorElementType !== 'section';
+        return !['section', 'repeatGroup'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsSalesforceMapping() {
         return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+    }
+
+    get selectedRepeatGroupParent() {
+        const selected = this.selectedElement;
+        if (!selected?.parentElementId) {
+            return null;
+        }
+        return this.elements.find((item) => item.elementId === selected.parentElementId && item.elementType === 'repeatGroup') || null;
+    }
+
+    get selectedElementIsInsideRepeatGroup() {
+        return !!this.selectedRepeatGroupParent;
+    }
+
+    get selectedRepeatGroupHint() {
+        const parent = this.selectedRepeatGroupParent;
+        if (!parent) {
+            return '';
+        }
+        const parentConfig = this.parseConfig(parent.configJson);
+        const aliasText = parentConfig.repeatSourceAlias
+            ? `Current repeat source: ${parentConfig.repeatSourceAlias}.`
+            : 'No repeat source is set on the parent group yet.';
+        return `This field belongs to repeat group "${parent.label}". ${aliasText}`;
     }
 
     get selectedElementSupportsRangeValidation() {
@@ -395,6 +439,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedVersionStatus = workspace.selectedVersionStatus;
             this.prefillAliasDetails = workspace.prefillAliases || [];
             this.submitActionDetails = workspace.submitActions || [];
+            this.enableProRepeatGroups = !!workspace.enableProRepeatGroups;
             if (this.selectedVersionId) {
                 this.storeSelectedVersion(this.selectedVersionId);
             }
@@ -507,10 +552,10 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     buildCanvasElements(elements) {
-        const sectionElementIds = new Set();
+        const containerElementIds = new Set();
         elements.forEach((item) => {
-            if (item.elementId && item.elementType === 'section') {
-                sectionElementIds.add(item.elementId);
+            if (item.elementId && ['section', 'repeatGroup'].includes(item.elementType)) {
+                containerElementIds.add(item.elementId);
             }
         });
 
@@ -518,7 +563,7 @@ export default class NativeFormsDesigner extends LightningElement {
         const topLevel = [];
 
         elements.forEach((item) => {
-            const hasValidParent = item.parentElementId && item.parentElementId !== item.elementId && sectionElementIds.has(item.parentElementId);
+            const hasValidParent = item.parentElementId && item.parentElementId !== item.elementId && containerElementIds.has(item.parentElementId);
             if (hasValidParent) {
                 const siblings = byParent.get(item.parentElementId) || [];
                 siblings.push(item);
@@ -542,6 +587,7 @@ export default class NativeFormsDesigner extends LightningElement {
             effectiveElementType: effectiveType,
             sectionColumns: this.sectionColumns(item.configJson),
             isSection: item.elementType === 'section',
+            isRepeatGroup: item.elementType === 'repeatGroup',
             isCheckbox: effectiveType === 'checkbox',
             isTextInput: effectiveType === 'text',
             isTextarea: effectiveType === 'textarea',
@@ -569,7 +615,10 @@ export default class NativeFormsDesigner extends LightningElement {
             validationPattern: this.validationPattern(item),
             conditionalSummary: this.conditionalSummary(item),
             showTitle: this.sectionShowTitle(item),
-            showSectionBox: this.sectionBoxed(item)
+            showSectionBox: this.sectionBoxed(item),
+            repeatSourceAlias: this.repeatSourceAlias(item),
+            allowAddRows: this.repeatAllowAddRows(item),
+            allowDeleteRows: this.repeatAllowDeleteRows(item)
         };
         const selected = normalized.id === this.selectedElementId;
         return {
@@ -582,7 +631,7 @@ export default class NativeFormsDesigner extends LightningElement {
             showConditionalBadge: !!normalized.conditionalSummary,
             labelClass: `preview-field__label${this.labelBold(item) ? ' preview-field__label--bold' : ''}`,
             cardStyle: this.elementCardStyle(normalized),
-            cardClass: `designer-node ${!normalized.isSection ? 'designer-node--field ' : ''}${isChild ? 'designer-node--child ' : ''}designer-node--${normalized.elementType}${normalized.isSection && !normalized.showSectionBox ? ' designer-node--section-unboxed' : ''}${selected ? ' designer-node--selected' : ''}`,
+            cardClass: `designer-node ${!(normalized.isSection || normalized.isRepeatGroup) ? 'designer-node--field ' : ''}${isChild ? 'designer-node--child ' : ''}designer-node--${normalized.elementType}${(normalized.isSection || normalized.isRepeatGroup) && !normalized.showSectionBox ? ' designer-node--section-unboxed' : ''}${selected ? ' designer-node--selected' : ''}`,
             fieldPreviewClass: `preview-field preview-field--${normalized.labelPosition || 'above'}`,
             previewTextClass: `preview-heading${selected ? ' preview-heading--selected' : ''}`,
             imageFrameClass: `preview-image__frame preview-image__frame--${normalized.previewImageFit || 'original'}`,
@@ -594,13 +643,14 @@ export default class NativeFormsDesigner extends LightningElement {
     decorateCanvasElement(item, byParent) {
         const base = this.decorateRenderableElement(item, false);
 
-        if (!base.isSection) {
+        if (!base.isSection && !base.isRepeatGroup) {
             return base;
         }
 
         const sectionChildren = byParent.get(base.elementId) || [];
+        const slotCount = base.sectionColumns;
         const sectionColumnClass = this.sectionColumnClass(base.configJson);
-        const sectionSlots = Array.from({ length: base.sectionColumns }, (_, index) => {
+        const sectionSlots = Array.from({ length: slotCount }, (_, index) => {
             const columnValue = index + 1;
             const targetKey = `${base.id}:${columnValue}`;
             const childItems = sectionChildren
@@ -639,6 +689,21 @@ export default class NativeFormsDesigner extends LightningElement {
     sectionBoxed(item) {
         const config = this.parseConfig(item.configJson);
         return config.boxed !== false;
+    }
+
+    repeatSourceAlias(item) {
+        const config = this.parseConfig(item.configJson);
+        return config.repeatSourceAlias || '';
+    }
+
+    repeatAllowAddRows(item) {
+        const config = this.parseConfig(item.configJson);
+        return config.allowAddRows !== false;
+    }
+
+    repeatAllowDeleteRows(item) {
+        const config = this.parseConfig(item.configJson);
+        return config.allowDeleteRows !== false;
     }
 
     labelPosition(item) {
@@ -817,6 +882,10 @@ export default class NativeFormsDesigner extends LightningElement {
         if (!elementType) {
             return;
         }
+        if (elementType === 'repeatGroup' && !this.enableProRepeatGroups) {
+            this.showToast('Pro feature', 'Enable Pro Repeat Groups in NativeForms Admin Features first.', 'warning');
+            return;
+        }
         await this.addElementType(elementType);
     }
 
@@ -826,12 +895,25 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         try {
             const created = await addElement({ versionId: this.selectedVersionId, elementType });
+            const selectedContainer = this.selectedElementIsContainer ? this.selectedElement : null;
+            const shouldPlaceInContainer = selectedContainer && elementType !== 'section' && elementType !== 'repeatGroup';
+
             this.elements = [
                 ...this.elements,
                 this.decorateBaseElement(created)
             ];
             this.selectedElementId = created.id;
             this.syncSelectedState();
+
+            if (shouldPlaceInContainer) {
+                const targetColumn = 1;
+                this.optimisticPlaceInSection(created.id, selectedContainer.id, targetColumn);
+                await placeElementInSection({
+                    elementId: created.id,
+                    sectionId: selectedContainer.id,
+                    columnNumber: targetColumn
+                });
+            }
             this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
@@ -1038,12 +1120,13 @@ export default class NativeFormsDesigner extends LightningElement {
         this.applyEditorDraft();
     }
 
-    handleEditorPrefillAliasChange(event) {
+    async handleEditorPrefillAliasChange(event) {
         this.editorPrefillAlias = event.detail.value;
         if (!this.editorPrefillAlias) {
             this.editorPrefillFieldPath = '';
         }
         this.applyEditorDraft();
+        await this.ensureParentRepeatGroupAlias(this.editorPrefillAlias);
     }
 
     handleEditorPrefillFieldChange(event) {
@@ -1081,6 +1164,26 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorColumnsChange(event) {
         this.editorColumns = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorRepeatSourceAliasChange(event) {
+        this.editorRepeatSourceAlias = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorAllowAddRowsChange(event) {
+        this.editorAllowAddRows = event.target.checked;
+        this.applyEditorDraft();
+    }
+
+    handleEditorAllowDeleteRowsChange(event) {
+        this.editorAllowDeleteRows = event.target.checked;
+        this.applyEditorDraft();
+    }
+
+    handleEditorShowLabelsOnEachRowChange(event) {
+        this.editorShowLabelsOnEachRow = event.target.checked;
         this.applyEditorDraft();
     }
 
@@ -1256,6 +1359,10 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorShowTitle = true;
             this.editorBoxed = true;
             this.editorColumns = '2';
+            this.editorRepeatSourceAlias = '';
+            this.editorAllowAddRows = true;
+            this.editorAllowDeleteRows = true;
+            this.editorShowLabelsOnEachRow = true;
             this.editorPicklistObject = '';
             this.editorPicklistField = '';
             this.editorRadioOptionsText = '';
@@ -1295,6 +1402,10 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorShowTitle = config.showTitle !== false;
         this.editorBoxed = config.boxed !== false;
         this.editorColumns = String(config.columns || 2);
+        this.editorRepeatSourceAlias = config.repeatSourceAlias || '';
+        this.editorAllowAddRows = config.allowAddRows !== false;
+        this.editorAllowDeleteRows = config.allowDeleteRows !== false;
+        this.editorShowLabelsOnEachRow = config.showLabelsOnEachRow !== false;
         this.editorPicklistObject = config.sourceObjectApiName || '';
         this.editorPicklistField = config.sourcePicklistFieldApiName || '';
         this.editorRadioOptionsText = this.radioOptionsText(config.options);
@@ -1434,6 +1545,17 @@ export default class NativeFormsDesigner extends LightningElement {
             nextConfig.columns = Number(this.editorColumns || 2);
         }
 
+        if (this.selectedElementIsRepeatGroup) {
+            nextConfig.showTitle = this.editorShowTitle;
+            nextConfig.boxed = this.editorBoxed;
+            nextConfig.columns = Number(this.editorColumns || 2);
+            nextConfig.repeatSourceAlias = this.editorRepeatSourceAlias || '';
+            nextConfig.allowAddRows = this.editorAllowAddRows;
+            nextConfig.allowDeleteRows = this.editorAllowDeleteRows;
+            nextConfig.showLabelsOnEachRow = this.editorShowLabelsOnEachRow;
+            delete nextConfig.text;
+        }
+
         return nextConfig;
     }
 
@@ -1461,7 +1583,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 return item;
             }
 
-            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType)
+            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup'].includes(this.editorElementType)
                 ? (item.fieldKey || this.generatedFieldKey(this.editorElementType))
                 : null;
 
@@ -1517,6 +1639,45 @@ export default class NativeFormsDesigner extends LightningElement {
             }
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
+        }
+    }
+
+    async ensureParentRepeatGroupAlias(aliasValue) {
+        if (!aliasValue || this.isSelectedVersionReadOnly) {
+            return;
+        }
+        const parent = this.selectedRepeatGroupParent;
+        if (!parent) {
+            return;
+        }
+
+        const parentConfig = this.parseConfig(parent.configJson);
+        if (parentConfig.repeatSourceAlias) {
+            return;
+        }
+
+        parentConfig.repeatSourceAlias = aliasValue;
+        const updatedParent = this.decorateBaseElement({
+            ...parent,
+            configJson: JSON.stringify(parentConfig)
+        });
+
+        this.elements = this.elements.map((item) => (item.id === parent.id ? updatedParent : item));
+        this.syncSelectedState();
+
+        try {
+            await updateElement({
+                inputValue: {
+                    id: updatedParent.id,
+                    label: updatedParent.label,
+                    fieldKey: updatedParent.fieldKey,
+                    configJson: updatedParent.configJson,
+                    elementType: updatedParent.elementType
+                }
+            });
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+            await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
         }
     }
 
@@ -1611,7 +1772,7 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
 
-        if (target.isSection && target.elementId) {
+        if ((target.elementType === 'section' || target.elementType === 'repeatGroup') && target.elementId) {
             this.elements = this.elements.filter((item) => item.id !== elementId && item.parentElementId !== target.elementId);
         } else {
             this.elements = this.elements.filter((item) => item.id !== elementId);

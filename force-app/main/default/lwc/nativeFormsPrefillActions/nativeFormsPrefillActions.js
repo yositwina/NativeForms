@@ -22,6 +22,8 @@ export default class NativeFormsPrefillActions extends LightningElement {
     objectSearch = '';
     fieldOptions = [];
     enableProConditionLogic = false;
+    enableProPrefillAliasReferences = false;
+    prefillAliasDetails = [];
     conditionLogicOptions = [
         { label: 'AND', value: 'AND' },
         { label: 'OR', value: 'OR' }
@@ -36,12 +38,6 @@ export default class NativeFormsPrefillActions extends LightningElement {
         { label: 'Is blank', value: 'isBlank' },
         { label: 'Is not blank', value: 'isNotBlank' }
     ];
-    valueSourceOptions = [
-        { label: 'URL Parameter', value: 'param' },
-        { label: 'Form Field', value: 'field' },
-        { label: 'Literal Value', value: 'literal' }
-    ];
-
     @track actions = [];
     @track versionOptions = [];
     @track draftAction = {};
@@ -86,9 +82,35 @@ export default class NativeFormsPrefillActions extends LightningElement {
             ...row,
             displayIndex: index + 1,
             isValueSourceField: row.valueSource === 'field',
+            isValueSourceAlias: row.valueSource === 'alias',
+            selectedAliasName: row.valueSource === 'alias' ? this.aliasNameFromValue(row.valueText) : '',
+            selectedAliasField: row.valueSource === 'alias' ? this.aliasFieldFromValue(row.valueText) : '',
+            aliasOptions: this.prefillAliasOptions,
+            aliasFieldOptions: this.getPrefillAliasFieldOptions(row.valueSource === 'alias' ? this.aliasNameFromValue(row.valueText) : ''),
             valueLabel: this.getConditionValueLabel(row.valueSource || 'param'),
             valuePlaceholder: this.getConditionValuePlaceholder(row.valueSource || 'param')
         }));
+    }
+
+    get prefillAliasOptions() {
+        return [{ label: 'Select alias', value: '' }].concat(
+            (this.prefillAliasDetails || []).map((item) => ({
+                label: item.alias,
+                value: item.alias
+            }))
+        );
+    }
+
+    get valueSourceOptions() {
+        const options = [
+            { label: 'URL Parameter', value: 'param' },
+            { label: 'Form Field', value: 'field' },
+            { label: 'Literal Value', value: 'literal' }
+        ];
+        if (this.enableProPrefillAliasReferences) {
+            options.splice(2, 0, { label: 'Prefill Alias Field', value: 'alias' });
+        }
+        return options;
     }
 
     get showConditionExpression() {
@@ -161,6 +183,8 @@ export default class NativeFormsPrefillActions extends LightningElement {
             this.formFieldOptions = workspace.formFieldOptions || [];
             this.mappings = workspace.mappings || [];
             this.enableProConditionLogic = !!workspace.enableProConditionLogic;
+            this.enableProPrefillAliasReferences = !!workspace.enableProPrefillAliasReferences;
+            this.prefillAliasDetails = workspace.prefillAliasDetails || [];
             this.versionOptions = (workspace.versions || []).map((option) => ({
                 label: `${option.label} (${option.status})`,
                 value: option.value
@@ -230,7 +254,7 @@ export default class NativeFormsPrefillActions extends LightningElement {
             objectApiName: this.matchObjectOptionValue(action.objectApiName),
             whereClause: config.where || '',
             orderBy: config.orderBy || '',
-            limitValue: config.limit == null ? null : config.limit,
+            limitValue: config.limit == null ? (action.commandType === 'findMany' ? 25 : null) : config.limit,
             onNotFound: config.onNotFound || 'ignore',
             conditionLogic: config.conditionLogic || '',
             conditions: this.normalizeConditions(config.conditions, config.where),
@@ -302,10 +326,20 @@ export default class NativeFormsPrefillActions extends LightningElement {
 
     handleDraftChange(event) {
         const { name, value } = event.target;
-        this.draftAction = {
+        const nextDraft = {
             ...this.draftAction,
             [name]: value
         };
+        if (name === 'commandType') {
+            if (value === 'findMany' && (nextDraft.limitValue === null || nextDraft.limitValue === undefined || nextDraft.limitValue === '')) {
+                nextDraft.limitValue = 25;
+            }
+            if (value !== 'findMany') {
+                nextDraft.limitValue = null;
+                nextDraft.orderBy = '';
+            }
+        }
+        this.draftAction = nextDraft;
         if (name === 'objectApiName') {
             this.loadFieldOptions(value);
         }
@@ -315,6 +349,21 @@ export default class NativeFormsPrefillActions extends LightningElement {
         const rowIndex = Number(event.target.dataset.index);
         const { name, value } = event.target;
         const conditions = [...(this.draftAction.conditions || [])];
+        if (name === 'aliasName' || name === 'aliasField') {
+            const currentAlias = this.aliasNameFromValue(conditions[rowIndex]?.valueText || '');
+            const currentField = this.aliasFieldFromValue(conditions[rowIndex]?.valueText || '');
+            const nextAlias = name === 'aliasName' ? value : currentAlias;
+            const nextField = name === 'aliasField' ? value : currentField;
+            conditions[rowIndex] = {
+                ...conditions[rowIndex],
+                valueText: this.composeAliasValue(nextAlias, nextField)
+            };
+            this.draftAction = {
+                ...this.draftAction,
+                conditions
+            };
+            return;
+        }
         conditions[rowIndex] = {
             ...conditions[rowIndex],
             [name]: name === 'valueText'
@@ -368,6 +417,19 @@ export default class NativeFormsPrefillActions extends LightningElement {
     async handleSaveAction() {
         this.isLoading = true;
         try {
+            if (!this.draftAction.objectApiName) {
+                this.errorMessage = 'Choose a Salesforce Object before saving the prefill action.';
+                this.isLoading = false;
+                return;
+            }
+            if (this.draftAction.commandType === 'findMany') {
+                const limitValue = Number(this.draftAction.limitValue);
+                if (!Number.isFinite(limitValue) || limitValue < 1) {
+                    this.errorMessage = 'Enter a valid Limit greater than 0 for a findMany prefill action.';
+                    this.isLoading = false;
+                    return;
+                }
+            }
             const conditionValidationMessage = this.validateConditionExpression();
             if (conditionValidationMessage) {
                 this.errorMessage = conditionValidationMessage;
@@ -542,6 +604,9 @@ export default class NativeFormsPrefillActions extends LightningElement {
         if (item?.valueSource === 'field') {
             return `{input.${rawValue}}`;
         }
+        if (item?.valueSource === 'alias') {
+            return `{${rawValue}}`;
+        }
         if (/^-?\d+(\.\d+)?$/.test(rawValue)) {
             return rawValue;
         }
@@ -552,6 +617,9 @@ export default class NativeFormsPrefillActions extends LightningElement {
         if (valueSource === 'field') {
             return 'Form Field';
         }
+        if (valueSource === 'alias') {
+            return 'Alias.Field';
+        }
         if (valueSource === 'literal') {
             return 'Literal Value';
         }
@@ -561,6 +629,9 @@ export default class NativeFormsPrefillActions extends LightningElement {
     getConditionValuePlaceholder(valueSource) {
         if (valueSource === 'field') {
             return 'Choose a form field';
+        }
+        if (valueSource === 'alias') {
+            return 'Choose an alias and field';
         }
         if (valueSource === 'literal') {
             return 'Example: Web';
@@ -581,7 +652,42 @@ export default class NativeFormsPrefillActions extends LightningElement {
             const wrappedMatch = value.match(/^\{input\.([^}]+)\}$/i);
             return wrappedMatch ? wrappedMatch[1] : value.replace(/^input\./i, '');
         }
+        if (valueSource === 'alias') {
+            const wrappedMatch = value.match(/^\{([^}]+)\}$/);
+            return wrappedMatch ? wrappedMatch[1] : value;
+        }
         return value;
+    }
+
+    aliasNameFromValue(rawValue) {
+        const value = this.normalizeConditionValueInput('alias', rawValue || '');
+        if (!value || !value.includes('.')) {
+            return '';
+        }
+        return value.split('.')[0];
+    }
+
+    aliasFieldFromValue(rawValue) {
+        const value = this.normalizeConditionValueInput('alias', rawValue || '');
+        if (!value || !value.includes('.')) {
+            return '';
+        }
+        return value.split('.').slice(1).join('.');
+    }
+
+    composeAliasValue(aliasName, fieldName) {
+        if (!aliasName || !fieldName) {
+            return '';
+        }
+        return `${aliasName}.${fieldName}`;
+    }
+
+    getPrefillAliasFieldOptions(aliasName) {
+        if (!aliasName) {
+            return [{ label: 'Select field', value: '' }];
+        }
+        const match = (this.prefillAliasDetails || []).find((item) => item.alias === aliasName);
+        return [{ label: 'Select field', value: '' }].concat(match?.fieldOptions || []);
     }
 
     defaultConditionExpression(count) {

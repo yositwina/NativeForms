@@ -28,10 +28,18 @@ public with sharing class NativeFormsPrefillActionsController {
         @AuraEnabled public String selectedFormName { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<PrefillActionRecord> actions { get; set; }
+        @AuraEnabled public List<PrefillAliasDetail> prefillAliasDetails { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
         @AuraEnabled public List<SelectOption> formFieldOptions { get; set; }
         @AuraEnabled public List<MappingRecord> mappings { get; set; }
         @AuraEnabled public Boolean enableProConditionLogic { get; set; }
+        @AuraEnabled public Boolean enableProPrefillAliasReferences { get; set; }
+    }
+
+    public class PrefillAliasDetail {
+        @AuraEnabled public String alias { get; set; }
+        @AuraEnabled public String objectApiName { get; set; }
+        @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
     }
 
     public class MappingRecord {
@@ -57,10 +65,12 @@ public with sharing class NativeFormsPrefillActionsController {
         PrefillWorkspace workspace = new PrefillWorkspace();
         workspace.versions = new List<VersionOption>();
         workspace.actions = new List<PrefillActionRecord>();
+        workspace.prefillAliasDetails = new List<PrefillAliasDetail>();
         workspace.objectOptions = getObjectOptions();
         workspace.formFieldOptions = new List<SelectOption>();
         workspace.mappings = new List<MappingRecord>();
         workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
+        workspace.enableProPrefillAliasReferences = NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled();
 
         List<NF_Form_Version__c> versions = [
             SELECT Id,
@@ -115,6 +125,13 @@ public with sharing class NativeFormsPrefillActionsController {
             ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             workspace.actions.add(toRecord(actionRecord));
+            if (String.isNotBlank(actionRecord.Store_Result_As__c) && String.isNotBlank(actionRecord.Object_Api_Name__c)) {
+                PrefillAliasDetail aliasDetail = new PrefillAliasDetail();
+                aliasDetail.alias = actionRecord.Store_Result_As__c;
+                aliasDetail.objectApiName = actionRecord.Object_Api_Name__c;
+                aliasDetail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
+                workspace.prefillAliasDetails.add(aliasDetail);
+            }
         }
 
         for (NF_Form_Element__c elementRecord : [

@@ -22,6 +22,11 @@ export default class NativeFormsSubmitActions extends LightningElement {
     objectSearch = '';
     fieldOptions = [];
     enableProConditionLogic = false;
+    enableProRepeatGroups = false;
+    enableProPrefillAliasReferences = false;
+    enableProAdvancedSubmitModes = false;
+    repeatGroupOptions = [];
+    prefillAliasDetails = [];
     conditionLogicOptions = [
         { label: 'AND', value: 'AND' },
         { label: 'OR', value: 'OR' }
@@ -36,28 +41,32 @@ export default class NativeFormsSubmitActions extends LightningElement {
         { label: 'Is blank', value: 'isBlank' },
         { label: 'Is not blank', value: 'isNotBlank' }
     ];
-    valueSourceOptions = [
-        { label: 'URL Parameter', value: 'param' },
-        { label: 'Form Field', value: 'field' },
-        { label: 'Literal Value', value: 'literal' }
-    ];
-
     @track actions = [];
     @track versionOptions = [];
     @track draftAction = {};
     @track mappings = [];
     boundHandlePageActivation;
 
-    commandTypeOptions = [
-        { label: 'Create record', value: 'create' },
-        { label: 'Update by record Id', value: 'updateById' },
-        { label: 'Find and update existing record', value: 'findAndUpdate' }
-    ];
-
     notFoundOptions = [
         { label: 'Show error', value: 'error' },
         { label: 'Create new record', value: 'create' }
     ];
+
+    get commandTypeOptions() {
+        const options = [
+            { label: 'Create record', value: 'create' }
+        ];
+        if (this.enableProAdvancedSubmitModes || ['updateById', 'findAndUpdate'].includes(this.draftAction?.commandType)) {
+            options.push(
+                { label: 'Update by record Id', value: 'updateById' },
+                { label: 'Find and update existing record', value: 'findAndUpdate' }
+            );
+        }
+        if (this.enableProRepeatGroups) {
+            options.push({ label: 'Upsert repeat group', value: 'upsertMany' });
+        }
+        return options;
+    }
 
     connectedCallback() {
         this.boundHandlePageActivation = this.handlePageActivation.bind(this);
@@ -86,8 +95,36 @@ export default class NativeFormsSubmitActions extends LightningElement {
         return this.draftAction?.commandType === 'findAndUpdate';
     }
 
+    get isUpsertMany() {
+        return this.draftAction?.commandType === 'upsertMany';
+    }
+
     get showNotFoundChoice() {
         return this.isUpdateById || this.isFindAndUpdate;
+    }
+
+    get showRepeatGroupConfig() {
+        return this.isUpsertMany;
+    }
+
+    get isRepeatRelationshipValueField() {
+        return this.draftAction?.relationshipValueSource === 'field';
+    }
+
+    get isRepeatRelationshipValueAlias() {
+        return this.draftAction?.relationshipValueSource === 'alias';
+    }
+
+    get selectedRelationshipAliasName() {
+        return this.aliasNameFromValue(this.draftAction?.relationshipValueText || '');
+    }
+
+    get selectedRelationshipAliasField() {
+        return this.aliasFieldFromValue(this.draftAction?.relationshipValueText || '');
+    }
+
+    get relationshipAliasFieldOptions() {
+        return this.getPrefillAliasFieldOptions(this.selectedRelationshipAliasName);
     }
 
     get conditionRows() {
@@ -95,9 +132,35 @@ export default class NativeFormsSubmitActions extends LightningElement {
             ...row,
             displayIndex: index + 1,
             isValueSourceField: row.valueSource === 'field',
+            isValueSourceAlias: row.valueSource === 'alias',
+            selectedAliasName: row.valueSource === 'alias' ? this.aliasNameFromValue(row.valueText) : '',
+            selectedAliasField: row.valueSource === 'alias' ? this.aliasFieldFromValue(row.valueText) : '',
+            aliasOptions: this.prefillAliasOptions,
+            aliasFieldOptions: this.getPrefillAliasFieldOptions(row.valueSource === 'alias' ? this.aliasNameFromValue(row.valueText) : ''),
             valueLabel: this.getConditionValueLabel(row.valueSource || 'param'),
             valuePlaceholder: this.getConditionValuePlaceholder(row.valueSource || 'param')
         }));
+    }
+
+    get prefillAliasOptions() {
+        return [{ label: 'Select alias', value: '' }].concat(
+            (this.prefillAliasDetails || []).map((item) => ({
+                label: item.alias,
+                value: item.alias
+            }))
+        );
+    }
+
+    get valueSourceOptions() {
+        const options = [
+            { label: 'URL Parameter', value: 'param' },
+            { label: 'Form Field', value: 'field' },
+            { label: 'Literal Value', value: 'literal' }
+        ];
+        if (this.enableProPrefillAliasReferences) {
+            options.splice(2, 0, { label: 'Prefill Alias Field', value: 'alias' });
+        }
+        return options;
     }
 
     get showConditionExpression() {
@@ -150,7 +213,10 @@ export default class NativeFormsSubmitActions extends LightningElement {
             return 'Use a hidden field, prefilled id, or prior result alias expression such as {foundContact.Id}.';
         }
         if (this.draftAction?.commandType === 'findAndUpdate') {
-            return 'Build conditions with Salesforce fields on the left, then choose a URL parameter, form field, or literal value on the right.';
+            return 'Build conditions with Salesforce fields on the left, then choose a URL parameter, form field, prefill alias field, or literal value on the right.';
+        }
+        if (this.draftAction?.commandType === 'upsertMany') {
+            return 'Use this Pro mode to save rows from one Repeat Group. Existing rows with an Id update, and rows without an Id create new records.';
         }
         return 'Create adds a new record using the fields mapped from the Builder.';
     }
@@ -186,8 +252,13 @@ export default class NativeFormsSubmitActions extends LightningElement {
             this.selectedFormName = workspace.selectedFormName;
             this.objectOptions = workspace.objectOptions || [];
             this.formFieldOptions = workspace.formFieldOptions || [];
+            this.repeatGroupOptions = workspace.repeatGroupOptions || [];
             this.mappings = workspace.mappings || [];
             this.enableProConditionLogic = !!workspace.enableProConditionLogic;
+            this.enableProRepeatGroups = !!workspace.enableProRepeatGroups;
+            this.enableProPrefillAliasReferences = !!workspace.enableProPrefillAliasReferences;
+            this.enableProAdvancedSubmitModes = !!workspace.enableProAdvancedSubmitModes;
+            this.prefillAliasDetails = workspace.prefillAliasDetails || [];
             this.versionOptions = (workspace.versions || []).map((option) => ({
                 label: `${option.label} (${option.status})`,
                 value: option.value
@@ -261,7 +332,12 @@ export default class NativeFormsSubmitActions extends LightningElement {
             onNotFound: config.onNotFound || (action.commandType === 'findAndUpdate' ? 'create' : 'error'),
             conditionLogic: config.conditionLogic || '',
             conditions: this.normalizeConditions(config.conditions, config.where),
-            conditionExpression: config.conditionExpression || config.conditionLogic || this.defaultConditionExpression((config.conditions || []).length)
+            conditionExpression: config.conditionExpression || config.conditionLogic || this.defaultConditionExpression((config.conditions || []).length),
+            repeatGroupKey: config.repeatGroupKey || '',
+            relationshipField: config.relationshipField || '',
+            relationshipValueSource: config.relationshipValueSource || 'alias',
+            relationshipValueText: this.normalizeConditionValueInput(config.relationshipValueSource || 'alias', config.relationshipValueText || ''),
+            allowDelete: config.allowDelete === true
         };
         this.loadFieldOptions(action.objectApiName);
     }
@@ -301,6 +377,16 @@ export default class NativeFormsSubmitActions extends LightningElement {
                 ? (this.draftAction.conditionExpression || this.defaultConditionExpression(config.conditions.length))
                 : this.defaultConditionExpression(config.conditions.length);
             config.conditionExpression = config.conditionLogic;
+        }
+        if (this.draftAction.commandType === 'upsertMany') {
+            config.repeatGroupKey = this.draftAction.repeatGroupKey || '';
+            config.relationshipField = this.draftAction.relationshipField || '';
+            config.relationshipValueSource = this.draftAction.relationshipValueSource || 'alias';
+            config.relationshipValueText = this.normalizeConditionValueInput(
+                config.relationshipValueSource,
+                this.draftAction.relationshipValueText || ''
+            );
+            config.allowDelete = this.draftAction.allowDelete === true;
         }
         return JSON.stringify(config, null, 2);
     }
@@ -345,10 +431,57 @@ export default class NativeFormsSubmitActions extends LightningElement {
         }
     }
 
+    handleRepeatRelationshipChange(event) {
+        const { name, value, checked, type } = event.target;
+        if (name === 'relationshipAliasName' || name === 'relationshipAliasField') {
+            const currentAlias = this.aliasNameFromValue(this.draftAction.relationshipValueText || '');
+            const currentField = this.aliasFieldFromValue(this.draftAction.relationshipValueText || '');
+            const nextAlias = name === 'relationshipAliasName' ? value : currentAlias;
+            const nextField = name === 'relationshipAliasField' ? value : currentField;
+            this.draftAction = {
+                ...this.draftAction,
+                relationshipValueText: this.composeAliasValue(nextAlias, nextField)
+            };
+            return;
+        }
+        this.draftAction = {
+            ...this.draftAction,
+            [name]: type === 'checkbox' ? checked : (
+                name === 'relationshipValueText'
+                    ? this.normalizeConditionValueInput(this.draftAction.relationshipValueSource || 'alias', value)
+                    : value
+            )
+        };
+    }
+
+    handleRepeatRelationshipSourceChange(event) {
+        const value = event.target.value;
+        this.draftAction = {
+            ...this.draftAction,
+            relationshipValueSource: value,
+            relationshipValueText: this.normalizeConditionValueInput(value, this.draftAction.relationshipValueText || '')
+        };
+    }
+
     handleConditionChange(event) {
         const rowIndex = Number(event.target.dataset.index);
         const { name, value } = event.target;
         const conditions = [...(this.draftAction.conditions || [])];
+        if (name === 'aliasName' || name === 'aliasField') {
+            const currentAlias = this.aliasNameFromValue(conditions[rowIndex]?.valueText || '');
+            const currentField = this.aliasFieldFromValue(conditions[rowIndex]?.valueText || '');
+            const nextAlias = name === 'aliasName' ? value : currentAlias;
+            const nextField = name === 'aliasField' ? value : currentField;
+            conditions[rowIndex] = {
+                ...conditions[rowIndex],
+                valueText: this.composeAliasValue(nextAlias, nextField)
+            };
+            this.draftAction = {
+                ...this.draftAction,
+                conditions
+            };
+            return;
+        }
         conditions[rowIndex] = {
             ...conditions[rowIndex],
             [name]: name === 'valueText'
@@ -583,6 +716,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
         if (item?.valueSource === 'field') {
             return `{input.${rawValue}}`;
         }
+        if (item?.valueSource === 'alias') {
+            return `{${rawValue}}`;
+        }
         if (/^-?\d+(\.\d+)?$/.test(rawValue)) {
             return rawValue;
         }
@@ -593,6 +729,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
         if (valueSource === 'field') {
             return 'Form Field';
         }
+        if (valueSource === 'alias') {
+            return 'Alias.Field';
+        }
         if (valueSource === 'literal') {
             return 'Literal Value';
         }
@@ -602,6 +741,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
     getConditionValuePlaceholder(valueSource) {
         if (valueSource === 'field') {
             return 'Choose a form field';
+        }
+        if (valueSource === 'alias') {
+            return 'Choose an alias and field';
         }
         if (valueSource === 'literal') {
             return 'Example: Web';
@@ -622,7 +764,42 @@ export default class NativeFormsSubmitActions extends LightningElement {
             const wrappedMatch = value.match(/^\{input\.([^}]+)\}$/i);
             return wrappedMatch ? wrappedMatch[1] : value.replace(/^input\./i, '');
         }
+        if (valueSource === 'alias') {
+            const wrappedMatch = value.match(/^\{([^}]+)\}$/);
+            return wrappedMatch ? wrappedMatch[1] : value;
+        }
         return value;
+    }
+
+    aliasNameFromValue(rawValue) {
+        const value = this.normalizeConditionValueInput('alias', rawValue || '');
+        if (!value || !value.includes('.')) {
+            return '';
+        }
+        return value.split('.')[0];
+    }
+
+    aliasFieldFromValue(rawValue) {
+        const value = this.normalizeConditionValueInput('alias', rawValue || '');
+        if (!value || !value.includes('.')) {
+            return '';
+        }
+        return value.split('.').slice(1).join('.');
+    }
+
+    composeAliasValue(aliasName, fieldName) {
+        if (!aliasName || !fieldName) {
+            return '';
+        }
+        return `${aliasName}.${fieldName}`;
+    }
+
+    getPrefillAliasFieldOptions(aliasName) {
+        if (!aliasName) {
+            return [{ label: 'Select field', value: '' }];
+        }
+        const match = (this.prefillAliasDetails || []).find((item) => item.alias === aliasName);
+        return [{ label: 'Select field', value: '' }].concat(match?.fieldOptions || []);
     }
 
     defaultConditionExpression(count) {

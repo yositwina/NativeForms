@@ -93,6 +93,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public List<ElementRecord> elements { get; set; }
         @AuraEnabled public List<PrefillAliasDetail> prefillAliases { get; set; }
         @AuraEnabled public List<SubmitActionDetail> submitActions { get; set; }
+        @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
     }
 
     @AuraEnabled(cacheable=true)
@@ -197,6 +198,7 @@ public with sharing class NativeFormsDesignerController {
         workspace.elements = new List<ElementRecord>();
         workspace.prefillAliases = new List<PrefillAliasDetail>();
         workspace.submitActions = new List<SubmitActionDetail>();
+        workspace.enableProRepeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
 
         List<NF_Form__c> forms = [
             SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c
@@ -396,8 +398,11 @@ public with sharing class NativeFormsDesignerController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Choose an element type first.');
         }
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'section', 'heading', 'image' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'section', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
+        }
+        if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
+            throw new AuraHandledException('Repeat Group is a Pro-only feature. Enable it first in NativeForms Admin Features.');
         }
 
         NF_Form_Version__c versionRecord = [
@@ -516,16 +521,23 @@ public with sharing class NativeFormsDesignerController {
             WHERE Id = :sectionId
             LIMIT 1
         ];
-        if (sectionRecord.Element_Type__c != 'section') {
-            throw new AuraHandledException('Only sections can receive dropped elements.');
+        if (sectionRecord.Element_Type__c != 'section' && sectionRecord.Element_Type__c != 'repeatGroup') {
+            throw new AuraHandledException('Only sections or repeat groups can receive dropped elements.');
         }
 
         NF_Form_Element__c elementRecord = [
-            SELECT Id, Config_JSON__c, Parent_Element_Id__c
+            SELECT Id, Element_Type__c, Config_JSON__c, Parent_Element_Id__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
             LIMIT 1
         ];
+
+        if (elementRecord.Element_Type__c == 'repeatGroup') {
+            throw new AuraHandledException('Repeat groups cannot be nested inside another container in this version.');
+        }
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup')) {
+            throw new AuraHandledException('Repeat groups can contain fields and display elements, but not other containers.');
+        }
 
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         config.put('sectionColumn', columnNumber);
@@ -680,6 +692,7 @@ public with sharing class NativeFormsDesignerController {
 
     private static String defaultLabelForType(String elementType) {
         if (elementType == 'section') return 'Section';
+        if (elementType == 'repeatGroup') return 'Repeat Group';
         if (elementType == 'heading') return 'Display Text';
         if (elementType == 'image') return 'Image';
         if (elementType == 'checkbox') return 'Checkbox';
@@ -695,7 +708,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup' }.contains(elementType)) {
             return null;
         }
         String prefix = 'field';
@@ -709,6 +722,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'select') prefix = 'picklist';
         if (elementType == 'radio') prefix = 'radio';
         if (elementType == 'text') prefix = 'text';
+        if (elementType == 'repeatGroup') prefix = 'repeatGroup';
         Integer safeIndex = elementIndex == null || elementIndex <= 0 ? 1 : elementIndex;
         return prefix + String.valueOf(safeIndex);
     }
@@ -768,6 +782,14 @@ public with sharing class NativeFormsDesignerController {
             config.put('columns', 2);
             config.put('showTitle', true);
             config.put('boxed', true);
+        }
+        if (elementType == 'repeatGroup') {
+            config.put('showTitle', true);
+            config.put('boxed', true);
+            config.put('columns', 2);
+            config.put('repeatSourceAlias', '');
+            config.put('allowAddRows', true);
+            config.put('allowDeleteRows', true);
         }
         if (elementType == 'heading') {
             config.put('html', '<p>Display text</p>');

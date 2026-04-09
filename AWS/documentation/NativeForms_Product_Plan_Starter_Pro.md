@@ -24,6 +24,7 @@ The current recommendation is:
 - designer users: `1`
 - prefill and submit engine: included
 - repeatable prefill: not included
+- repeat groups / repeatable sections: not included
 - submission logs: included
 - file uploads: not included
 - advanced logic: one condition
@@ -37,6 +38,7 @@ The current recommendation is:
 - designer users: up to `5` users, with future paid extra-user option
 - prefill and submit engine: included
 - repeatable prefill: included
+- repeat groups / repeatable sections: included
 - submission logs: included
 - file uploads: included
 - advanced logic: multiple conditions
@@ -155,6 +157,9 @@ Pro should build on Starter and add:
 
 ### Runtime / designer power
 - repeatable prefill
+- repeat groups bound to `findMany` prefill aliases
+- repeat-group add/remove rows
+- repeat-group submit via multi-row upsert behavior
 - file uploads
 - multi-condition logic
 - AND/OR logic
@@ -247,6 +252,7 @@ Pro:
 ### 6. Mobile responsiveness
 Status:
 - direction is good, but not finished productized behavior
+- recommended as the next highest-priority Starter item
 
 Still missing:
 - explicit responsive runtime behavior review
@@ -436,8 +442,8 @@ The current architecture can grow into production, but Starter launch still need
 2. clean app UX
 3. theme/basic styling support
 4. prefill/submit UX cleanup
-5. submission logs
-6. mobile runtime polish
+5. mobile runtime polish
+6. submission logs
 7. thank-you page/message
 8. AWS plan/log/domain setup
 9. trust/security hardening pass
@@ -451,6 +457,7 @@ At launch:
 ### Phase C: Expand Pro
 After launch:
 - repeatable prefill
+- repeat groups / repeatable sections
 - file uploads
 - AND/OR multi-condition builder
 - post-submit redirect
@@ -476,4 +483,3 @@ So the next execution focus should be:
 1. finish Starter completely
 2. enforce plans in AWS
 3. then finish remaining Pro-only features
-

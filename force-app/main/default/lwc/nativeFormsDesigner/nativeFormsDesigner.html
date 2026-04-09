@@ -93,7 +93,7 @@
                         <div class="add-block">
                             <h3>Display Element</h3>
                             <div class="builder-list" role="list">
-                                <template for:each={displayElementOptions} for:item="option">
+                                <template for:each={availableDisplayElementOptions} for:item="option">
                                     <div key={option.value} class="builder-list__row" role="listitem">
                                         <span class="builder-list__label">{option.label}</span>
                                         <button
@@ -273,6 +273,135 @@
                                                             </template>
                                                             <template if:false={column.hasChildren}>
                                                                 Column {column.label}
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isRepeatGroup}>
+                                            <div class="preview-section preview-repeat-group" style={row.item.cardStyle}>
+                                                <div class="preview-section__top">
+                                                    <template if:true={row.item.showTitle}>
+                                                        <div class="preview-section__title">{row.item.label}</div>
+                                                    </template>
+                                                    <div class="preview-repeat-group__meta">
+                                                        <span>Repeat Group</span>
+                                                        <template if:true={row.item.repeatSourceAlias}>
+                                                            <span>Source: {row.item.repeatSourceAlias}</span>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                                <div class={row.item.sectionColumnClass}>
+                                                    <template for:each={row.item.sectionSlots} for:item="column">
+                                                        <div
+                                                            key={column.key}
+                                                            class={column.dropClass}
+                                                            data-section-id={column.sectionId}
+                                                            data-column={column.columnValue}
+                                                            ondragover={handleSectionDragOver}
+                                                            ondragleave={handleSectionDragLeave}
+                                                            ondrop={handleDropIntoSection}>
+                                                            <template if:true={column.hasChildren}>
+                                                                <div
+                                                                    class="preview-column-slot__items"
+                                                                    data-section-id={column.sectionId}
+                                                                    data-column={column.columnValue}
+                                                                    ondragover={handleSectionDragOver}
+                                                                    ondragleave={handleSectionDragLeave}
+                                                                    ondrop={handleDropIntoSection}>
+                                                                    <template for:each={column.childItems} for:item="child">
+                                                                        <article
+                                                                            key={child.id}
+                                                                            class={child.cardClass}
+                                                                            data-id={child.id}
+                                                                            draggable={child.isChildDraggable}
+                                                                            onclick={handleSelectElement}
+                                                                            ondragstart={handleDragStart}
+                                                                            ondragend={handleDragEnd}>
+                                                                            <template if:true={child.showHiddenBadge}>
+                                                                                <div class="preview-hidden-badge">Hidden</div>
+                                                                            </template>
+                                                                            <template if:true={child.showConditionalBadge}>
+                                                                                <div class="preview-conditional-badge">{child.conditionalSummary}</div>
+                                                                            </template>
+                                                                            <template lwc:if={child.isCheckbox}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-checkbox__control">
+                                                                                        <input type="checkbox" disabled />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isHeading}>
+                                                                                <div class={child.previewTextClass}>
+                                                                                    <lightning-formatted-rich-text value={child.previewHtml}></lightning-formatted-rich-text>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isImage}>
+                                                                                <div class="preview-image">
+                                                                                    <div class={child.imageFrameClass}>
+                                                                                        <template if:true={child.previewImageUrl}>
+                                                                                            <img src={child.previewImageUrl} alt={child.previewImageAlt} class={child.imageClass} style={child.imageStyle} />
+                                                                                        </template>
+                                                                                        <template if:false={child.previewImageUrl}>
+                                                                                            <span>{child.previewText}</span>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isSelect}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <select disabled>
+                                                                                        <template for:each={child.previewOptions} for:item="option">
+                                                                                            <option key={option.value}>{option.label}</option>
+                                                                                        </template>
+                                                                                    </select>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isRadio}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-radio-group">
+                                                                                        <template for:each={child.previewOptions} for:item="option">
+                                                                                            <label key={option.value} class="preview-radio-option">
+                                                                                                <input type="radio" disabled />
+                                                                                                <span>{option.label}</span>
+                                                                                            </label>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isTextarea}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <textarea placeholder={child.previewPlaceholder} disabled></textarea>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:else>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                    </template>
+                                                                                    <input type={child.previewInputType} placeholder={child.previewPlaceholder} disabled />
+                                                                                </div>
+                                                                            </template>
+                                                                        </article>
+                                                                    </template>
+                                                                </div>
+                                                            </template>
+                                                            <template if:false={column.hasChildren}>
+                                                                Add fields here
                                                             </template>
                                                         </div>
                                                     </template>
@@ -644,6 +773,51 @@
                                     </lightning-combobox>
                                 </template>
 
+                                <template if:true={selectedElementIsRepeatGroup}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Title"
+                                        checked={editorShowTitle}
+                                        onchange={handleEditorShowTitleChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Rectangular Box"
+                                        checked={editorBoxed}
+                                        onchange={handleEditorBoxedChange}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Columns"
+                                        value={editorColumns}
+                                        options={sectionColumnOptions}
+                                        onchange={handleEditorColumnsChange}>
+                                    </lightning-combobox>
+                                    <lightning-combobox
+                                        label="Source Prefill Alias"
+                                        value={editorRepeatSourceAlias}
+                                        options={prefillAliasOptions}
+                                        onchange={handleEditorRepeatSourceAliasChange}>
+                                    </lightning-combobox>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Allow Add Rows"
+                                        checked={editorAllowAddRows}
+                                        onchange={handleEditorAllowAddRowsChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Allow Delete Rows"
+                                        checked={editorAllowDeleteRows}
+                                        onchange={handleEditorAllowDeleteRowsChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Labels on Each Row"
+                                        checked={editorShowLabelsOnEachRow}
+                                        onchange={handleEditorShowLabelsOnEachRowChange}>
+                                    </lightning-input>
+                                </template>
+
                                 <div class="selection-actions">
                                     <lightning-button
                                         variant="destructive-text"
@@ -664,6 +838,9 @@
                                         onchange={handleEditorPrefillEnabledChange}>
                                     </lightning-input>
                                     <template if:true={editorPrefillEnabled}>
+                                        <template if:true={selectedElementIsInsideRepeatGroup}>
+                                            <p class="selection-hint">{selectedRepeatGroupHint}</p>
+                                        </template>
                                         <lightning-combobox
                                             label="Prefill Alias"
                                             value={editorPrefillAlias}
