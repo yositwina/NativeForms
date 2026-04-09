@@ -666,8 +666,14 @@ public with sharing class NativeFormsPublisher {
                 Map<String, Object> condition = (Map<String, Object>) rawItem;
                 String fieldApiName = canonicalFieldApiName(objectApiName, stringValue(condition.get('fieldApiName')));
                 String operator = stringValue(condition.get('operator'));
+                String valueSource = stringValue(condition.get('valueSource'));
+                String valueText = stringValue(condition.get('valueText'));
                 String paramName = stringValue(condition.get('paramName'));
-                String clause = buildConditionClause(fieldApiName, operator, paramName);
+                if (String.isBlank(valueText) && String.isNotBlank(paramName)) {
+                    valueSource = 'param';
+                    valueText = paramName;
+                }
+                String clause = buildConditionClause(fieldApiName, operator, valueSource, valueText);
                 if (String.isNotBlank(clause)) {
                     clauses.add(clause);
                 }
@@ -683,12 +689,12 @@ public with sharing class NativeFormsPublisher {
         return stringValue(config.get('where'));
     }
 
-    private static String buildConditionClause(String fieldApiName, String operator, String paramName) {
+    private static String buildConditionClause(String fieldApiName, String operator, String valueSource, String valueText) {
         if (String.isBlank(fieldApiName) || String.isBlank(operator)) {
             return null;
         }
 
-        String expression = String.isBlank(paramName) ? null : '{params.' + paramName + '}';
+        String expression = buildConditionValueExpression(valueSource, valueText);
         if (operator == 'isBlank') {
             return '(' + fieldApiName + ' = null OR ' + fieldApiName + ' = \'\')';
         }
@@ -717,6 +723,19 @@ public with sharing class NativeFormsPublisher {
             return fieldApiName + ' < \'' + expression + '\'';
         }
         return null;
+    }
+
+    private static String buildConditionValueExpression(String valueSource, String valueText) {
+        if (String.isBlank(valueText)) {
+            return null;
+        }
+        if (String.isBlank(valueSource) || valueSource == 'param') {
+            return '{params.' + valueText + '}';
+        }
+        if (Pattern.matches('^-?\\d+(\\.\\d+)?$', valueText)) {
+            return valueText;
+        }
+        return '\'' + valueText.replace('\'', '\\\'') + '\'';
     }
 
     private static Map<String, Object> parseWhereClause(String rawWhereClause, String objectApiName) {

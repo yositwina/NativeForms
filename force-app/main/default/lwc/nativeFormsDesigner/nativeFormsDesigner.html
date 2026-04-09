@@ -371,30 +371,32 @@
                         <template if:true={selectedElement}>
                             <div class="selection-card">
                                 <p class="selection-label">Display Properties</p>
-                                <lightning-input
-                                    label="Label"
-                                    value={editorLabel}
-                                    onchange={handleEditorLabelChange}>
-                                </lightning-input>
-
-                                <lightning-input
-                                    label="Element Index"
-                                    value={selectedElementIndex}
-                                    read-only>
-                                </lightning-input>
-
-                                <lightning-input
-                                    label="Field Key"
-                                    value={selectedElementFieldKey}
-                                    read-only>
-                                </lightning-input>
-
                                 <lightning-combobox
                                     label="Element Type"
                                     value={editorElementType}
                                     options={editorElementTypeOptions}
                                     onchange={handleEditorTypeChange}>
                                 </lightning-combobox>
+
+                                <div class="property-inline-row property-inline-row--label">
+                                    <div class="property-inline-row__grow">
+                                        <lightning-input
+                                            label="Label"
+                                            value={editorLabel}
+                                            onchange={handleEditorLabelChange}>
+                                        </lightning-input>
+                                    </div>
+                                    <template if:true={selectedElementSupportsBoldLabel}>
+                                        <div class="property-inline-row__checkbox">
+                                            <lightning-input
+                                                type="checkbox"
+                                                label="Bold Label"
+                                                checked={editorLabelBold}
+                                                onchange={handleEditorLabelBoldChange}>
+                                            </lightning-input>
+                                        </div>
+                                    </template>
+                                </div>
 
                                 <template if:true={selectedElementSupportsLabelPosition}>
                                     <lightning-combobox
@@ -405,60 +407,39 @@
                                     </lightning-combobox>
                                 </template>
 
-                                <template if:true={selectedElementSupportsFieldBehavior}>
-                                    <lightning-combobox
-                                        label="Field Behavior"
-                                        value={editorFieldBehavior}
-                                        options={fieldBehaviorOptions}
-                                        onchange={handleEditorFieldBehaviorChange}>
-                                    </lightning-combobox>
-                                </template>
-
-                                <template if:true={selectedElementSupportsConditional}>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Conditional View"
-                                        checked={editorConditionalEnabled}
-                                        onchange={handleEditorConditionalEnabledChange}>
-                                    </lightning-input>
-                                    <template if:true={editorConditionalEnabled}>
-                                        <lightning-combobox
-                                            label="Source Field"
-                                            value={editorConditionalFieldKey}
-                                            options={conditionalFieldOptions}
-                                            onchange={handleEditorConditionalFieldChange}>
-                                        </lightning-combobox>
-                                        <lightning-combobox
-                                            label="Operator"
-                                            value={editorConditionalOperator}
-                                            options={conditionalOperatorOptions}
-                                            onchange={handleEditorConditionalOperatorChange}>
-                                        </lightning-combobox>
-                                        <template if:true={selectedElementUsesConditionalValue}>
-                                            <lightning-input
-                                                label="Compare Value"
-                                                value={editorConditionalValue}
-                                                onchange={handleEditorConditionalValueChange}>
-                                            </lightning-input>
-                                        </template>
-                                    </template>
-                                </template>
-
-                                <template if:true={selectedElementSupportsBoldLabel}>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Bold Label"
-                                        checked={editorLabelBold}
-                                        onchange={handleEditorLabelBoldChange}>
-                                    </lightning-input>
-                                </template>
-
                                 <template if:true={selectedElementSupportsPlaceholder}>
                                     <lightning-input
                                         label="Placeholder"
                                         value={editorPlaceholder}
                                         onchange={handleEditorPlaceholderChange}>
                                     </lightning-input>
+                                </template>
+
+                                <p class="property-inline-text">
+                                    <span class="property-inline-text__label">Field Key:</span>
+                                    <span class="property-inline-text__value">{selectedElementFieldKey}</span>
+                                </p>
+
+                                <template if:true={selectedElementSupportsFieldBehavior}>
+                                    <div class="behavior-radio-group">
+                                        <div class="behavior-radio-group__label-row">
+                                            <label class="slds-form-element__label">Field Behavior</label>
+                                            <lightning-helptext content="Locked means the field becomes read-only only when it already has a value, such as from prefill."></lightning-helptext>
+                                        </div>
+                                        <div class="behavior-radio-group__options" role="radiogroup" aria-label="Field Behavior">
+                                            <template for:each={fieldBehaviorRadioOptions} for:item="option">
+                                                <label key={option.value} class="behavior-radio-option">
+                                                    <input
+                                                        type="radio"
+                                                        name="fieldBehavior"
+                                                        value={option.value}
+                                                        checked={option.checked}
+                                                        onchange={handleEditorFieldBehaviorChange} />
+                                                    <span>{option.label}</span>
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </div>
                                 </template>
 
                                 <template if:true={selectedElementIsNumber}>
@@ -496,6 +477,36 @@
                                         options={textRuleOptions}
                                         onchange={handleEditorTextRuleChange}>
                                     </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementSupportsConditional}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Conditional View"
+                                        checked={editorConditionalEnabled}
+                                        onchange={handleEditorConditionalEnabledChange}>
+                                    </lightning-input>
+                                    <template if:true={editorConditionalEnabled}>
+                                        <lightning-combobox
+                                            label="Source Field"
+                                            value={editorConditionalFieldKey}
+                                            options={conditionalFieldOptions}
+                                            onchange={handleEditorConditionalFieldChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            label="Operator"
+                                            value={editorConditionalOperator}
+                                            options={conditionalOperatorOptions}
+                                            onchange={handleEditorConditionalOperatorChange}>
+                                        </lightning-combobox>
+                                        <template if:true={selectedElementUsesConditionalValue}>
+                                            <lightning-input
+                                                label="Compare Value"
+                                                value={editorConditionalValue}
+                                                onchange={handleEditorConditionalValueChange}>
+                                            </lightning-input>
+                                        </template>
+                                    </template>
                                 </template>
 
                                 <template if:true={selectedElementIsPicklist}>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Button_Font_Size_Px__c</fullName>
+    <label>Button Font Size Px</label>
+    <precision>6</precision>
+    <scale>2</scale>
+    <type>Number</type>
+</CustomField>

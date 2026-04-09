@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Enable_Pro_Condition_Logic__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Enables the Pro condition builder with numbered rows and custom logic expressions.</description>
+    <externalId>false</externalId>
+    <label>Enable Pro Condition Logic</label>
+    <type>Checkbox</type>
+</CustomField>

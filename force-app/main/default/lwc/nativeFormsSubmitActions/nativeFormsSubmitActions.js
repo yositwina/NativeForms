@@ -20,6 +20,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
     objectOptions = [];
     objectSearch = '';
     fieldOptions = [];
+    enableProConditionLogic = false;
     conditionLogicOptions = [
         { label: 'AND', value: 'AND' },
         { label: 'OR', value: 'OR' }
@@ -33,6 +34,10 @@ export default class NativeFormsSubmitActions extends LightningElement {
         { label: 'Less than', value: 'lt' },
         { label: 'Is blank', value: 'isBlank' },
         { label: 'Is not blank', value: 'isNotBlank' }
+    ];
+    valueSourceOptions = [
+        { label: 'URL Parameter', value: 'param' },
+        { label: 'Literal Value', value: 'literal' }
     ];
 
     @track actions = [];
@@ -84,7 +89,18 @@ export default class NativeFormsSubmitActions extends LightningElement {
     }
 
     get conditionRows() {
-        return this.draftAction?.conditions || [];
+        return (this.draftAction?.conditions || []).map((row, index) => ({
+            ...row,
+            displayIndex: index + 1
+        }));
+    }
+
+    get showConditionExpression() {
+        return this.enableProConditionLogic && this.conditionRows.length > 1;
+    }
+
+    get canAddCondition() {
+        return this.enableProConditionLogic || this.conditionRows.length === 0;
     }
 
     get filteredMappings() {
@@ -99,12 +115,37 @@ export default class NativeFormsSubmitActions extends LightningElement {
         return this.filteredMappings.length > 0;
     }
 
+    get mappingGroups() {
+        const actions = this.actions || [];
+        const mappings = this.mappings || [];
+        return actions.map((action) => {
+            const fields = mappings.filter((item) => item.actionKey === action.actionKey);
+            return {
+                key: action.id,
+                title: action.storeResultAs || action.actionKey,
+                objectApiName: action.objectApiName,
+                isSelected: action.id === this.selectedActionId,
+                groupClass: `mapping-group${action.id === this.selectedActionId ? ' mapping-group--selected' : ''}`,
+                fields: fields.map((item) => ({
+                    key: item.elementId,
+                    label: item.elementLabel,
+                    fieldPath: item.fieldPath
+                })),
+                hasFields: fields.length > 0
+            };
+        });
+    }
+
+    get hasMappingGroups() {
+        return this.mappingGroups.length > 0;
+    }
+
     get modeHelpText() {
         if (this.draftAction?.commandType === 'updateById') {
             return 'Use a hidden field, prefilled id, or prior result alias expression such as {foundContact.Id}.';
         }
         if (this.draftAction?.commandType === 'findAndUpdate') {
-            return 'Use simple equality conditions joined by AND, for example: Email = \'{input.email}\'';
+            return 'Build conditions with Salesforce fields on the left, then choose either a URL parameter or a literal value on the right.';
         }
         return 'Create adds a new record using the fields mapped from the Builder.';
     }
@@ -140,6 +181,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
             this.selectedFormName = workspace.selectedFormName;
             this.objectOptions = workspace.objectOptions || [];
             this.mappings = workspace.mappings || [];
+            this.enableProConditionLogic = !!workspace.enableProConditionLogic;
             this.versionOptions = (workspace.versions || []).map((option) => ({
                 label: `${option.label} (${option.status})`,
                 value: option.value
@@ -206,12 +248,14 @@ export default class NativeFormsSubmitActions extends LightningElement {
         const config = this.parseConfig(action.configJson);
         this.draftAction = {
             ...action,
+            objectApiName: this.matchObjectOptionValue(action.objectApiName),
             targetBy: config.targetBy || (action.commandType === 'create' ? 'create' : ''),
             recordIdSource: config.recordIdSource || '',
             whereClause: config.where || '',
             onNotFound: config.onNotFound || (action.commandType === 'findAndUpdate' ? 'create' : 'error'),
             conditionLogic: config.conditionLogic || 'AND',
-            conditions: this.normalizeConditions(config.conditions, config.where)
+            conditions: this.normalizeConditions(config.conditions, config.where),
+            conditionExpression: config.conditionExpression || this.defaultConditionExpression((config.conditions || []).length)
         };
         this.loadFieldOptions(action.objectApiName);
     }
@@ -248,6 +292,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
             config.onNotFound = this.draftAction.onNotFound || 'create';
             config.conditionLogic = this.draftAction.conditionLogic || 'AND';
             config.conditions = this.sanitizeConditions();
+            config.conditionExpression = this.enableProConditionLogic
+                ? (this.draftAction.conditionExpression || this.defaultConditionExpression(config.conditions.length))
+                : null;
         }
         return JSON.stringify(config, null, 2);
     }
@@ -301,11 +348,21 @@ export default class NativeFormsSubmitActions extends LightningElement {
             [name]: value
         };
         if (name === 'operator' && (value === 'isBlank' || value === 'isNotBlank')) {
-            conditions[rowIndex].paramName = '';
+            conditions[rowIndex].valueText = '';
+        }
+        if (name === 'valueSource') {
+            conditions[rowIndex].valueText = conditions[rowIndex].valueText || '';
         }
         this.draftAction = {
             ...this.draftAction,
             conditions
+        };
+    }
+
+    handleConditionExpressionChange(event) {
+        this.draftAction = {
+            ...this.draftAction,
+            conditionExpression: event.target.value || ''
         };
     }
 
@@ -314,7 +371,8 @@ export default class NativeFormsSubmitActions extends LightningElement {
         conditions.push(this.createEmptyCondition());
         this.draftAction = {
             ...this.draftAction,
-            conditions
+            conditions,
+            conditionExpression: this.defaultConditionExpression(conditions.length)
         };
     }
 
@@ -324,7 +382,8 @@ export default class NativeFormsSubmitActions extends LightningElement {
         conditions.splice(rowIndex, 1);
         this.draftAction = {
             ...this.draftAction,
-            conditions
+            conditions,
+            conditionExpression: this.defaultConditionExpression(conditions.length)
         };
     }
 
@@ -336,6 +395,12 @@ export default class NativeFormsSubmitActions extends LightningElement {
         this.isLoading = true;
         this.errorMessage = '';
         try {
+            const conditionValidationMessage = this.validateConditionExpression();
+            if (conditionValidationMessage) {
+                this.errorMessage = conditionValidationMessage;
+                this.isLoading = false;
+                return;
+            }
             const configJson = this.buildConfigJson();
             await saveSubmitAction({
                 inputValue: {
@@ -402,7 +467,8 @@ export default class NativeFormsSubmitActions extends LightningElement {
                 id: item.id || `cond-${index}-${Date.now()}`,
                 fieldApiName: item.fieldApiName || '',
                 operator: item.operator || 'eq',
-                paramName: item.paramName || ''
+                valueSource: item.valueSource || (item.paramName ? 'param' : 'literal'),
+                valueText: item.valueText != null ? item.valueText : (item.paramName || '')
             }));
         }
         if (!fallbackWhereClause) {
@@ -415,7 +481,8 @@ export default class NativeFormsSubmitActions extends LightningElement {
                 id: `cond-${index}-${Date.now()}`,
                 fieldApiName: match ? match[1].trim() : '',
                 operator: match ? this.operatorFromToken(match[2]) : 'eq',
-                paramName: match ? match[3] : ''
+                valueSource: match ? 'param' : 'literal',
+                valueText: match ? match[3] : ''
             };
         });
     }
@@ -438,7 +505,8 @@ export default class NativeFormsSubmitActions extends LightningElement {
             id: `cond-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             fieldApiName: '',
             operator: 'eq',
-            paramName: ''
+            valueSource: 'param',
+            valueText: ''
         };
     }
 
@@ -448,37 +516,42 @@ export default class NativeFormsSubmitActions extends LightningElement {
             .map((item) => ({
                 fieldApiName: item.fieldApiName,
                 operator: item.operator,
-                paramName: item.paramName || ''
+                valueSource: item.valueSource || 'param',
+                valueText: item.valueText || ''
             }));
     }
 
     buildWhereClause() {
-        const clauses = this.sanitizeConditions()
+        const sanitized = this.sanitizeConditions();
+        const clauses = sanitized
             .map((item) => this.buildConditionClause(item))
             .filter((item) => !!item);
         if (!clauses.length) {
             return '';
         }
-        const joiner = ` ${this.draftAction.conditionLogic || 'AND'} `;
-        return clauses.join(joiner);
+        if (!this.enableProConditionLogic || clauses.length === 1) {
+            return clauses.join(' AND ');
+        }
+        const expression = (this.draftAction.conditionExpression || this.defaultConditionExpression(clauses.length)).trim();
+        return this.expandConditionExpression(expression, clauses);
     }
 
     buildConditionClause(item) {
         const fieldName = item.fieldApiName;
-        const paramRef = item.paramName ? `{params.${item.paramName}}` : '';
+        const expression = this.buildConditionValueExpression(item);
         switch (item.operator) {
             case 'eq':
-                return paramRef ? `${fieldName} = ${paramRef}` : '';
+                return expression ? `${fieldName} = ${expression}` : '';
             case 'neq':
-                return paramRef ? `${fieldName} != ${paramRef}` : '';
+                return expression ? `${fieldName} != ${expression}` : '';
             case 'contains':
-                return paramRef ? `${fieldName} CONTAINS ${paramRef}` : '';
+                return expression ? `${fieldName} CONTAINS ${expression}` : '';
             case 'startsWith':
-                return paramRef ? `${fieldName} STARTS_WITH ${paramRef}` : '';
+                return expression ? `${fieldName} STARTS_WITH ${expression}` : '';
             case 'gt':
-                return paramRef ? `${fieldName} > ${paramRef}` : '';
+                return expression ? `${fieldName} > ${expression}` : '';
             case 'lt':
-                return paramRef ? `${fieldName} < ${paramRef}` : '';
+                return expression ? `${fieldName} < ${expression}` : '';
             case 'isBlank':
                 return `${fieldName} IS_BLANK`;
             case 'isNotBlank':
@@ -486,6 +559,91 @@ export default class NativeFormsSubmitActions extends LightningElement {
             default:
                 return '';
         }
+    }
+
+    buildConditionValueExpression(item) {
+        const rawValue = item?.valueText || '';
+        if (!rawValue) {
+            return '';
+        }
+        if ((item?.valueSource || 'param') === 'param') {
+            return `{params.${rawValue}}`;
+        }
+        if (/^-?\d+(\.\d+)?$/.test(rawValue)) {
+            return rawValue;
+        }
+        return `'${rawValue.replace(/'/g, "\\'")}'`;
+    }
+
+    defaultConditionExpression(count) {
+        if (!count || count < 1) {
+            return '';
+        }
+        return Array.from({ length: count }, (_, index) => String(index + 1)).join(' AND ');
+    }
+
+    validateConditionExpression() {
+        const clauses = this.sanitizeConditions();
+        if (!this.enableProConditionLogic || clauses.length <= 1) {
+            return '';
+        }
+        const expression = (this.draftAction.conditionExpression || '').trim();
+        if (!expression) {
+            return 'Enter condition logic such as 1 AND (2 OR 3).';
+        }
+        const normalized = expression.replace(/\(/g, ' ( ').replace(/\)/g, ' ) ').replace(/\s+/g, ' ').trim();
+        const tokens = normalized.split(' ');
+        let depth = 0;
+        let expectOperand = true;
+        const maxNumber = clauses.length;
+        for (const token of tokens) {
+            if (!token) {
+                continue;
+            }
+            if (token === '(') {
+                if (!expectOperand) return 'Condition logic has invalid syntax.';
+                depth += 1;
+                continue;
+            }
+            if (token === ')') {
+                if (expectOperand || depth < 1) return 'Condition logic has invalid syntax.';
+                depth -= 1;
+                continue;
+            }
+            if (token === 'AND' || token === 'OR') {
+                if (expectOperand) return 'Condition logic has invalid syntax.';
+                expectOperand = true;
+                continue;
+            }
+            if (!/^\d+$/.test(token)) {
+                return 'Condition logic can contain only numbers, AND, OR, and parentheses.';
+            }
+            const numericValue = Number(token);
+            if (numericValue < 1 || numericValue > maxNumber) {
+                return `Condition logic can only reference rows 1 to ${maxNumber}.`;
+            }
+            if (!expectOperand) {
+                return 'Condition logic has invalid syntax.';
+            }
+            expectOperand = false;
+        }
+        if (depth !== 0 || expectOperand) {
+            return 'Condition logic has invalid syntax.';
+        }
+        return '';
+    }
+
+    expandConditionExpression(expression, clauses) {
+        const normalized = expression.replace(/\(/g, ' ( ').replace(/\)/g, ' ) ').replace(/\s+/g, ' ').trim();
+        return normalized
+            .split(' ')
+            .map((token) => {
+                if (/^\d+$/.test(token)) {
+                    return `(${clauses[Number(token) - 1]})`;
+                }
+                return token;
+            })
+            .join(' ');
     }
 
     normalizeError(error) {
@@ -518,5 +676,17 @@ export default class NativeFormsSubmitActions extends LightningElement {
         } catch (e) {
             return null;
         }
+    }
+
+    matchObjectOptionValue(rawValue) {
+        if (!rawValue) {
+            return rawValue;
+        }
+        const exact = (this.objectOptions || []).find((item) => item.value === rawValue);
+        if (exact) {
+            return exact.value;
+        }
+        const loose = (this.objectOptions || []).find((item) => (item.value || '').toLowerCase() === String(rawValue).toLowerCase());
+        return loose ? loose.value : rawValue;
     }
 }

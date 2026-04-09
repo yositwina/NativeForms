@@ -1,5 +1,6 @@
 .designer-shell {
     min-height: 42rem;
+    --designer-workspace-height: calc(100vh - 13rem);
 }
 
 .designer-picker-stack {
@@ -12,7 +13,9 @@
     display: grid;
     gap: 1rem;
     grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr) minmax(16rem, 20rem);
-    align-items: start;
+    align-items: stretch;
+    min-height: 42rem;
+    height: var(--designer-workspace-height);
 }
 
 .pane {
@@ -22,6 +25,21 @@
     border-radius: 1rem;
     background: #fff;
     box-shadow: 0 8px 24px rgba(15, 35, 65, 0.04);
+}
+
+.pane-left,
+.pane-right {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    max-height: var(--designer-workspace-height);
+    overflow-y: auto;
+}
+
+.pane-center {
+    min-height: 0;
+    height: var(--designer-workspace-height);
+    overflow-y: auto;
 }
 
 .pane-header {
@@ -312,6 +330,66 @@
     gap: 0.55rem;
 }
 
+.property-inline-row {
+    display: grid;
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.property-inline-row--label {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.property-inline-row__grow {
+    min-width: 0;
+}
+
+.property-inline-row__checkbox {
+    padding-bottom: 0.2rem;
+}
+
+.behavior-radio-group {
+    margin-top: 0.2rem;
+}
+
+.property-inline-text {
+    margin: 0.75rem 0 0;
+    color: #17324d;
+}
+
+.property-inline-text__label {
+    font-weight: 400;
+    margin-right: 0.35rem;
+}
+
+.property-inline-text__value {
+    font-weight: 400;
+}
+
+.behavior-radio-group__label-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.behavior-radio-group__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-top: 0.4rem;
+}
+
+.behavior-radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #17324d;
+}
+
+.behavior-radio-option input {
+    margin: 0;
+}
+
 .panel-error {
     margin-bottom: 1rem;
     padding: 0.9rem 1rem;
@@ -341,8 +419,25 @@
 }
 
 @media (max-width: 1200px) {
+    .designer-shell {
+        --designer-workspace-height: auto;
+    }
+
     .designer-layout {
         grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    .pane-left,
+    .pane-right {
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .pane-center {
+        height: auto;
+        overflow-y: visible;
     }
 }
 

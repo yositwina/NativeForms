@@ -16,7 +16,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v4.5';
+    designerVersion = 'v5.0';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -119,7 +119,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     fieldBehaviorOptions = [
         { label: 'Editable', value: 'editable' },
-        { label: 'Read only when prefilled', value: 'readonlyWhenPrefilled' },
+        { label: 'Locked', value: 'readonlyWhenPrefilled' },
         { label: 'Hidden', value: 'hidden' }
     ];
 
@@ -259,6 +259,13 @@ export default class NativeFormsDesigner extends LightningElement {
         return !['isTrue', 'isFalse', 'isBlank', 'isNotBlank'].includes(this.editorConditionalOperator);
     }
 
+    get fieldBehaviorRadioOptions() {
+        return this.fieldBehaviorOptions.map((option) => ({
+            ...option,
+            checked: option.value === this.editorFieldBehavior
+        }));
+    }
+
     get conditionalFieldOptions() {
         return this.elements
             .filter((item) =>
@@ -274,7 +281,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get prefillAliasOptions() {
         return [{ label: 'Select alias', value: '' }].concat(
-            (this.prefillAliasDetails || []).map((alias) => ({ label: alias.alias, value: alias.alias }))
+            (this.prefillAliasDetails || []).map((alias) => ({
+                label: `${alias.alias} (${alias.actionKey || alias.objectApiName})`,
+                value: alias.alias
+            }))
         );
     }
 
@@ -290,7 +300,7 @@ export default class NativeFormsDesigner extends LightningElement {
     get submitActionOptions() {
         return [{ label: 'Select action', value: '' }].concat(
             (this.submitActionDetails || []).map((action) => ({
-                label: `${action.actionKey} (${action.objectApiName} - ${action.commandType})`,
+                label: `${action.storeResultAs || action.actionKey} (${action.actionKey})`,
                 value: action.actionKey
             }))
         );
@@ -868,7 +878,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     handleEditorFieldBehaviorChange(event) {
-        this.editorFieldBehavior = event.detail.value;
+        this.editorFieldBehavior = event.detail?.value || event.target?.value || 'editable';
         this.applyEditorDraft();
     }
 

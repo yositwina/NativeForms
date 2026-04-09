@@ -30,6 +30,7 @@ public with sharing class NativeFormsPrefillActionsController {
         @AuraEnabled public List<PrefillActionRecord> actions { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
         @AuraEnabled public List<MappingRecord> mappings { get; set; }
+        @AuraEnabled public Boolean enableProConditionLogic { get; set; }
     }
 
     public class MappingRecord {
@@ -57,6 +58,7 @@ public with sharing class NativeFormsPrefillActionsController {
         workspace.actions = new List<PrefillActionRecord>();
         workspace.objectOptions = getObjectOptions();
         workspace.mappings = new List<MappingRecord>();
+        workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
 
         List<NF_Form_Version__c> versions = [
             SELECT Id,

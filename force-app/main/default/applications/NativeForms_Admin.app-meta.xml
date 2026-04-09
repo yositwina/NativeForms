@@ -10,6 +10,7 @@
     <label>NativeForms Admin</label>
     <navType>Standard</navType>
     <tabs>standard-home</tabs>
+    <tabs>NativeForms_Admin_Features</tabs>
     <tabs>NativeForms_Guided_Setup</tabs>
     <tabs>NativeForms_Setup</tabs>
     <tabs>NF_Form__c</tabs>

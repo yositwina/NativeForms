@@ -52,10 +52,20 @@
                                         <span class="action-title">{item.objectApiName}</span>
                                         <span class="action-meta">{item.commandType}</span>
                                         <span class="action-meta">Result alias: {item.storeResultAs}</span>
+                                        <span class="action-meta">Action Key: {item.actionKey}</span>
                                     </button>
                                 </template>
                             </div>
                         </template>
+
+                        <div class="help-inline-panel">
+                            <h3>How It Works</h3>
+                            <p><strong>Create record</strong> always creates a new row.</p>
+                            <p><strong>Update by record Id</strong> updates one row using an Id from the form, such as <code>&#123;input.contactid&#125;</code>.</p>
+                            <p><strong>Find and update existing record</strong> first finds a row by conditions, then updates it.</p>
+                            <p><strong>&#123;input.fieldKey&#125;</strong> means a value coming from the form itself.</p>
+                            <p><strong>&#123;params.name&#125;</strong> means a URL query parameter from the page address.</p>
+                        </div>
                     </section>
 
                     <section class="pane pane-editor">
@@ -65,36 +75,40 @@
 
                         <template if:true={selectedAction}>
                             <div class="editor-grid">
-                                <lightning-input
-                                    name="storeResultAs"
-                                    label="Store Result As"
-                                    value={draftAction.storeResultAs}
-                                    onchange={handleDraftChange}>
-                                </lightning-input>
+                                <div class="editor-grid-top">
+                                    <lightning-input
+                                        name="storeResultAs"
+                                        label="Store Result As"
+                                        value={draftAction.storeResultAs}
+                                        onchange={handleDraftChange}>
+                                    </lightning-input>
 
-                                <lightning-input
-                                    type="search"
-                                    name="objectSearch"
-                                    label="Search Objects"
-                                    value={objectSearch}
-                                    onchange={handleObjectSearch}>
-                                </lightning-input>
+                                    <lightning-combobox
+                                        name="objectApiName"
+                                        label="Salesforce Object"
+                                        value={draftAction.objectApiName}
+                                        options={filteredObjectOptions}
+                                        onchange={handleDraftChange}>
+                                    </lightning-combobox>
 
-                                <lightning-combobox
-                                    name="objectApiName"
-                                    label="Salesforce Object"
-                                    value={draftAction.objectApiName}
-                                    options={filteredObjectOptions}
-                                    onchange={handleDraftChange}>
-                                </lightning-combobox>
+                                    <lightning-combobox
+                                        name="commandType"
+                                        label="Submit Mode"
+                                        value={draftAction.commandType}
+                                        options={commandTypeOptions}
+                                        onchange={handleDraftChange}>
+                                    </lightning-combobox>
 
-                                <lightning-combobox
-                                    name="commandType"
-                                    label="Submit Mode"
-                                    value={draftAction.commandType}
-                                    options={commandTypeOptions}
-                                    onchange={handleDraftChange}>
-                                </lightning-combobox>
+                                    <template if:true={showNotFoundChoice}>
+                                        <lightning-combobox
+                                            name="onNotFound"
+                                            label="If no matching record is found"
+                                            value={draftAction.onNotFound}
+                                            options={notFoundOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </template>
+                                </div>
                                 <p class="mode-help">{modeHelpText}</p>
 
                                 <template if:true={isUpdateById}>
@@ -110,16 +124,10 @@
                                     <div class="condition-builder">
                                         <div class="condition-builder__header">
                                             <span class="condition-builder__title">Match Conditions</span>
-                                            <lightning-combobox
-                                                name="conditionLogic"
-                                                label="Join Conditions With"
-                                                value={draftAction.conditionLogic}
-                                                options={conditionLogicOptions}
-                                                onchange={handleDraftChange}>
-                                            </lightning-combobox>
                                         </div>
                                         <template for:each={conditionRows} for:item="row" for:index="index">
                                             <div key={row.id} class="condition-row">
+                                                <div class="condition-index">{row.displayIndex}</div>
                                                 <lightning-combobox
                                                     data-index={index}
                                                     name="fieldApiName"
@@ -136,11 +144,19 @@
                                                     options={operatorOptions}
                                                     onchange={handleConditionChange}>
                                                 </lightning-combobox>
+                                                <lightning-combobox
+                                                    data-index={index}
+                                                    name="valueSource"
+                                                    label="Value Source"
+                                                    value={row.valueSource}
+                                                    options={valueSourceOptions}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-combobox>
                                                 <lightning-input
                                                     data-index={index}
-                                                    name="paramName"
-                                                    label="URL Parameter"
-                                                    value={row.paramName}
+                                                    name="valueText"
+                                                    label="Value"
+                                                    value={row.valueText}
                                                     onchange={handleConditionChange}>
                                                 </lightning-input>
                                                 <lightning-button-icon
@@ -151,21 +167,21 @@
                                                 </lightning-button-icon>
                                             </div>
                                         </template>
-                                        <lightning-button
-                                            label="Add Condition"
-                                            onclick={handleAddCondition}>
-                                        </lightning-button>
+                                        <template if:true={showConditionExpression}>
+                                            <lightning-input
+                                                name="conditionExpression"
+                                                label="Condition Logic"
+                                                value={draftAction.conditionExpression}
+                                                onchange={handleConditionExpressionChange}>
+                                            </lightning-input>
+                                        </template>
+                                        <template if:true={canAddCondition}>
+                                            <lightning-button
+                                                label="Add Condition"
+                                                onclick={handleAddCondition}>
+                                            </lightning-button>
+                                        </template>
                                     </div>
-                                </template>
-
-                                <template if:true={showNotFoundChoice}>
-                                    <lightning-combobox
-                                        name="onNotFound"
-                                        label="If no matching record is found"
-                                        value={draftAction.onNotFound}
-                                        options={notFoundOptions}
-                                        onchange={handleDraftChange}>
-                                    </lightning-combobox>
                                 </template>
 
                                 <lightning-accordion allow-multiple-sections-open>
@@ -203,28 +219,36 @@
 
                     <section class="pane pane-help">
                         <div class="pane-header">
-                            <h2>Fields Writing To This Action</h2>
+                            <h2>Form Mapping Summary</h2>
                         </div>
                         <div class="help-copy">
-                            <template if:true={hasFilteredMappings}>
-                                <template for:each={filteredMappings} for:item="mapping">
-                                    <div key={mapping.elementId} class="mapping-card">
-                                        <p><strong>{mapping.elementLabel}</strong></p>
-                                        <p>Field Key: <code>{mapping.fieldKey}</code></p>
-                                        <p>Salesforce Field: <code>{mapping.fieldPath}</code></p>
-                                    </div>
-                                </template>
+                            <template if:true={hasMappingGroups}>
+                                <div class="mapping-groups">
+                                    <template for:each={mappingGroups} for:item="group">
+                                        <div key={group.key} class={group.groupClass}>
+                                            <p><strong>Action:</strong> <code>{group.title}</code></p>
+                                            <p><strong>Salesforce Object:</strong> <code>{group.objectApiName}</code></p>
+                                            <template if:true={group.hasFields}>
+                                                <div class="mapping-list">
+                                                    <template for:each={group.fields} for:item="field">
+                                                        <div key={field.key} class="mapping-row">
+                                                            <span class="mapping-row__label">{field.label}</span>
+                                                            <span class="mapping-row__arrow">&#8594;</span>
+                                                            <span class="mapping-row__field">{field.fieldPath}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <template if:false={group.hasFields}>
+                                                <p>No form fields are mapped to this submit action yet.</p>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
                             </template>
-                            <template if:false={hasFilteredMappings}>
-                                <p>No form fields are mapped to this submit action yet.</p>
+                            <template if:false={hasMappingGroups}>
+                                <p>No submit actions exist for this form yet.</p>
                             </template>
-                            <hr />
-                            <p><strong>How It Works</strong></p>
-                            <p><strong>Create record</strong> always creates a new row.</p>
-                            <p><strong>Update by record Id</strong> updates one row using an Id from the form, such as <code>&#123;input.contactid&#125;</code>.</p>
-                            <p><strong>Find and update existing record</strong> first finds a row by conditions, then updates it.</p>
-                            <p><strong>&#123;input.fieldKey&#125;</strong> means a value coming from the form itself.</p>
-                            <p><strong>&#123;params.name&#125;</strong> means a URL query parameter from the page address.</p>
                         </div>
                     </section>
                 </div>

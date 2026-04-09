@@ -1,0 +1,38 @@
+.shell {
+    min-height: 20rem;
+}
+
+.feature-panel {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.feature-panel h2 {
+    margin: 0;
+    color: #17324d;
+}
+
+.feature-copy {
+    margin: 0;
+    color: #5f6f89;
+}
+
+.actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.panel-error {
+    margin: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 0.8rem;
+    background: #fde7e9;
+    color: #7f1d1d;
+    border: 1px solid #f5c2c7;
+}
+
+.loading-wrap {
+    min-height: 12rem;
+    position: relative;
+}

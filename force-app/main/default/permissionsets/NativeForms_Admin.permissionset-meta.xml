@@ -14,6 +14,14 @@
     </applicationVisibilities>
 
     <classAccesses>
+        <apexClass>NativeFormsAdminController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsFeatureFlags</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
         <apexClass>NativeFormsDesignerController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -42,6 +50,15 @@
         <enabled>true</enabled>
     </classAccesses>
 
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>NativeForms_Config__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
     <objectPermissions>
         <allowCreate>true</allowCreate>
         <allowDelete>true</allowDelete>
@@ -88,6 +105,11 @@
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
 
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NativeForms_Config__c.Enable_Pro_Condition_Logic__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
         <field>NF_Form__c.Business_Owner__c</field>
@@ -323,6 +345,10 @@
         <readable>true</readable>
     </fieldPermissions>
 
+    <tabSettings>
+        <tab>NativeForms_Admin_Features</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <tabSettings>
         <tab>NativeForms_Designer</tab>
         <visibility>Visible</visibility>

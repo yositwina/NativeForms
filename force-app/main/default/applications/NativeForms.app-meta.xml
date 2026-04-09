@@ -11,7 +11,7 @@
     <navType>Standard</navType>
     <tabs>NativeForms_Guided_Setup</tabs>
     <tabs>NativeForms_Designer</tabs>
-    <tabs>NativeForms_Builder</tabs>
+    <tabs>NativeForms_Themes</tabs>
     <tabs>NativeForms_Prefill_Actions</tabs>
     <tabs>NativeForms_Submit_Actions</tabs>
     <tabs>NF_Form__c</tabs>

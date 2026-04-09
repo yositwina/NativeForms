@@ -30,6 +30,7 @@ public with sharing class NativeFormsSubmitActionsController {
         @AuraEnabled public List<SubmitActionRecord> actions { get; set; }
         @AuraEnabled public List<SelectOption> objectOptions { get; set; }
         @AuraEnabled public List<MappingRecord> mappings { get; set; }
+        @AuraEnabled public Boolean enableProConditionLogic { get; set; }
     }
 
     public class MappingRecord {
@@ -57,6 +58,7 @@ public with sharing class NativeFormsSubmitActionsController {
         workspace.actions = new List<SubmitActionRecord>();
         workspace.objectOptions = getObjectOptions();
         workspace.mappings = new List<MappingRecord>();
+        workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
 
         List<NF_Form_Version__c> versions = [
             SELECT Id,

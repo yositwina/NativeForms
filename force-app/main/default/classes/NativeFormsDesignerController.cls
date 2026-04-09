@@ -22,12 +22,14 @@ public with sharing class NativeFormsDesignerController {
 
     public class PrefillAliasDetail {
         @AuraEnabled public String alias { get; set; }
+        @AuraEnabled public String actionKey { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
         @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
     }
 
     public class SubmitActionDetail {
         @AuraEnabled public String actionKey { get; set; }
+        @AuraEnabled public String storeResultAs { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
         @AuraEnabled public String commandType { get; set; }
         @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
@@ -246,7 +248,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         for (NF_Form_Action__c actionRecord : [
-            SELECT Store_Result_As__c, Object_Api_Name__c
+            SELECT Command_Key__c, Store_Result_As__c, Object_Api_Name__c
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Prefill'
@@ -255,13 +257,14 @@ public with sharing class NativeFormsDesignerController {
         ]) {
             PrefillAliasDetail detail = new PrefillAliasDetail();
             detail.alias = actionRecord.Store_Result_As__c;
+            detail.actionKey = actionRecord.Command_Key__c;
             detail.objectApiName = actionRecord.Object_Api_Name__c;
             detail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
             workspace.prefillAliases.add(detail);
         }
 
         for (NF_Form_Action__c actionRecord : [
-            SELECT Command_Key__c, Object_Api_Name__c, Command_Type__c
+            SELECT Command_Key__c, Store_Result_As__c, Object_Api_Name__c, Command_Type__c
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Submit'
@@ -270,6 +273,7 @@ public with sharing class NativeFormsDesignerController {
         ]) {
             SubmitActionDetail detail = new SubmitActionDetail();
             detail.actionKey = actionRecord.Command_Key__c;
+            detail.storeResultAs = actionRecord.Store_Result_As__c;
             detail.objectApiName = actionRecord.Object_Api_Name__c;
             detail.commandType = actionRecord.Command_Type__c;
             detail.fieldOptions = getWritableFieldOptions(actionRecord.Object_Api_Name__c);

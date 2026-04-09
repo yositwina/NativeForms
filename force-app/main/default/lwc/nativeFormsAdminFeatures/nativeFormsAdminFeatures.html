@@ -1,0 +1,37 @@
+<template>
+    <lightning-card title="NativeForms Admin Features" icon-name="utility:settings">
+        <div class="shell">
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading feature settings"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="feature-panel">
+                    <h2>Pro Feature Flags</h2>
+                    <p class="feature-copy">Use this page to turn Pro-only features on or off while testing in the org.</p>
+
+                    <lightning-input
+                        type="checkbox"
+                        label="Enable Pro Condition Logic"
+                        checked={enableProConditionLogic}
+                        onchange={handleToggle}>
+                    </lightning-input>
+
+                    <div class="actions">
+                        <lightning-button
+                            variant="brand"
+                            label="Save Settings"
+                            onclick={handleSave}>
+                        </lightning-button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>
