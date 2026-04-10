@@ -6,7 +6,7 @@
 .theme-layout {
     display: grid;
     gap: 1rem;
-    grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr) minmax(23rem, 28rem);
+    grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr) minmax(21rem, 24rem);
     align-items: stretch;
     min-height: 42rem;
     height: var(--theme-workspace-height);

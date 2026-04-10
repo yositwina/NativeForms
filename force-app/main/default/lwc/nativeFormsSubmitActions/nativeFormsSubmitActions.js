@@ -7,6 +7,7 @@ import deleteSubmitAction from '@salesforce/apex/NativeFormsSubmitActionsControl
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
+const PAGE_VERSION = 'Submit v0.2';
 
 export default class NativeFormsSubmitActions extends LightningElement {
     isLoading = true;
@@ -47,6 +48,10 @@ export default class NativeFormsSubmitActions extends LightningElement {
     @track mappings = [];
     boundHandlePageActivation;
 
+    get pageVersion() {
+        return PAGE_VERSION;
+    }
+
     notFoundOptions = [
         { label: 'Show error', value: 'error' },
         { label: 'Create new record', value: 'create' }
@@ -56,11 +61,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
         const options = [
             { label: 'Create record', value: 'create' }
         ];
-        if (this.enableProAdvancedSubmitModes || ['updateById', 'findAndUpdate'].includes(this.draftAction?.commandType)) {
-            options.push(
-                { label: 'Update by record Id', value: 'updateById' },
-                { label: 'Find and update existing record', value: 'findAndUpdate' }
-            );
+        if (this.enableProAdvancedSubmitModes || this.draftAction?.commandType === 'updateById') {
+            options.push({ label: 'Update by record Id', value: 'updateById' });
+            options.push({ label: 'Find and update existing record', value: 'findAndUpdate' });
         }
         if (this.enableProRepeatGroups) {
             options.push({ label: 'Upsert repeat group', value: 'upsertMany' });
@@ -116,11 +119,11 @@ export default class NativeFormsSubmitActions extends LightningElement {
     }
 
     get selectedRelationshipAliasName() {
-        return this.aliasNameFromValue(this.draftAction?.relationshipValueText || '');
+        return this.draftAction?.relationshipAliasName || this.aliasNameFromValue(this.draftAction?.relationshipValueText || '');
     }
 
     get selectedRelationshipAliasField() {
-        return this.aliasFieldFromValue(this.draftAction?.relationshipValueText || '');
+        return this.draftAction?.relationshipAliasField || this.aliasFieldFromValue(this.draftAction?.relationshipValueText || '');
     }
 
     get relationshipAliasFieldOptions() {
@@ -152,15 +155,11 @@ export default class NativeFormsSubmitActions extends LightningElement {
     }
 
     get valueSourceOptions() {
-        const options = [
+        return [
             { label: 'URL Parameter', value: 'param' },
             { label: 'Form Field', value: 'field' },
             { label: 'Literal Value', value: 'literal' }
         ];
-        if (this.enableProPrefillAliasReferences) {
-            options.splice(2, 0, { label: 'Prefill Alias Field', value: 'alias' });
-        }
-        return options;
     }
 
     get showConditionExpression() {
@@ -337,6 +336,8 @@ export default class NativeFormsSubmitActions extends LightningElement {
             relationshipField: config.relationshipField || '',
             relationshipValueSource: config.relationshipValueSource || 'alias',
             relationshipValueText: this.normalizeConditionValueInput(config.relationshipValueSource || 'alias', config.relationshipValueText || ''),
+            relationshipAliasName: this.aliasNameFromValue(config.relationshipValueText || ''),
+            relationshipAliasField: this.aliasFieldFromValue(config.relationshipValueText || ''),
             allowDelete: config.allowDelete === true
         };
         this.loadFieldOptions(action.objectApiName);
@@ -382,9 +383,15 @@ export default class NativeFormsSubmitActions extends LightningElement {
             config.repeatGroupKey = this.draftAction.repeatGroupKey || '';
             config.relationshipField = this.draftAction.relationshipField || '';
             config.relationshipValueSource = this.draftAction.relationshipValueSource || 'alias';
+            const relationshipValueText = config.relationshipValueSource === 'alias'
+                ? this.composeAliasValue(
+                    this.draftAction.relationshipAliasName || this.aliasNameFromValue(this.draftAction.relationshipValueText || ''),
+                    this.draftAction.relationshipAliasField || this.aliasFieldFromValue(this.draftAction.relationshipValueText || '')
+                )
+                : (this.draftAction.relationshipValueText || '');
             config.relationshipValueText = this.normalizeConditionValueInput(
                 config.relationshipValueSource,
-                this.draftAction.relationshipValueText || ''
+                relationshipValueText
             );
             config.allowDelete = this.draftAction.allowDelete === true;
         }
@@ -434,12 +441,14 @@ export default class NativeFormsSubmitActions extends LightningElement {
     handleRepeatRelationshipChange(event) {
         const { name, value, checked, type } = event.target;
         if (name === 'relationshipAliasName' || name === 'relationshipAliasField') {
-            const currentAlias = this.aliasNameFromValue(this.draftAction.relationshipValueText || '');
-            const currentField = this.aliasFieldFromValue(this.draftAction.relationshipValueText || '');
+            const currentAlias = this.draftAction.relationshipAliasName || this.aliasNameFromValue(this.draftAction.relationshipValueText || '');
+            const currentField = this.draftAction.relationshipAliasField || this.aliasFieldFromValue(this.draftAction.relationshipValueText || '');
             const nextAlias = name === 'relationshipAliasName' ? value : currentAlias;
             const nextField = name === 'relationshipAliasField' ? value : currentField;
             this.draftAction = {
                 ...this.draftAction,
+                relationshipAliasName: nextAlias,
+                relationshipAliasField: nextField,
                 relationshipValueText: this.composeAliasValue(nextAlias, nextField)
             };
             return;
@@ -459,7 +468,13 @@ export default class NativeFormsSubmitActions extends LightningElement {
         this.draftAction = {
             ...this.draftAction,
             relationshipValueSource: value,
-            relationshipValueText: this.normalizeConditionValueInput(value, this.draftAction.relationshipValueText || '')
+            relationshipValueText: this.normalizeConditionValueInput(value, this.draftAction.relationshipValueText || ''),
+            relationshipAliasName: value === 'alias'
+                ? (this.draftAction.relationshipAliasName || this.aliasNameFromValue(this.draftAction.relationshipValueText || ''))
+                : '',
+            relationshipAliasField: value === 'alias'
+                ? (this.draftAction.relationshipAliasField || this.aliasFieldFromValue(this.draftAction.relationshipValueText || ''))
+                : ''
         };
     }
 

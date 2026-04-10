@@ -4,6 +4,27 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String value { get; set; }
     }
 
+    private static void sortOptionsByLabel(List<SelectOption> options) {
+        if (options == null || options.size() < 2) {
+            return;
+        }
+        Map<String, List<SelectOption>> bucket = new Map<String, List<SelectOption>>();
+        List<String> keys = new List<String>();
+        for (SelectOption o : options) {
+            String key = (o.label == null ? '' : o.label.toLowerCase());
+            if (!bucket.containsKey(key)) {
+                bucket.put(key, new List<SelectOption>());
+                keys.add(key);
+            }
+            bucket.get(key).add(o);
+        }
+        keys.sort();
+        options.clear();
+        for (String k : keys) {
+            options.addAll(bucket.get(k));
+        }
+    }
+
     public class UploadedImageResult {
         @AuraEnabled public Id contentDocumentId { get; set; }
         @AuraEnabled public Id contentVersionId { get; set; }
@@ -28,6 +49,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     public class SubmitActionDetail {
+        @AuraEnabled public Integer displayNumber { get; set; }
         @AuraEnabled public String actionKey { get; set; }
         @AuraEnabled public String storeResultAs { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
@@ -110,7 +132,6 @@ public with sharing class NativeFormsDesignerController {
             apiNames.add(apiName);
         }
 
-        apiNames.sort();
         for (String apiName : apiNames) {
             Schema.DescribeSObjectResult describeResult = globalDescribe.get(apiName).getDescribe();
             SelectOption option = new SelectOption();
@@ -118,6 +139,7 @@ public with sharing class NativeFormsDesignerController {
             option.value = describeResult.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
     }
 
@@ -146,7 +168,6 @@ public with sharing class NativeFormsDesignerController {
             fieldApiNames.add(fieldApiName);
         }
 
-        fieldApiNames.sort();
         for (String fieldApiName : fieldApiNames) {
             Schema.DescribeFieldResult describeResult = fieldsMap.get(fieldApiName).getDescribe();
             SelectOption option = new SelectOption();
@@ -154,6 +175,7 @@ public with sharing class NativeFormsDesignerController {
             option.value = describeResult.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
     }
 
@@ -262,7 +284,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         List<NF_Form_Version__c> versionRecords = [
-            SELECT Id, Name, Version_Status__c, Publish_Status__c, LastModifiedDate
+            SELECT Id, Name, Version_Number__c, Version_Status__c, Publish_Status__c, LastModifiedDate
             FROM NF_Form_Version__c
             WHERE Form__c = :effectiveFormId
             ORDER BY LastModifiedDate DESC
@@ -273,7 +295,7 @@ public with sharing class NativeFormsDesignerController {
         for (NF_Form_Version__c versionRecord : versionRecords) {
             VersionOption option = new VersionOption();
             option.value = versionRecord.Id;
-            option.label = versionRecord.Name;
+            option.label = formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
             option.status = versionRecord.Version_Status__c;
             option.isPublished = selectedForm.Current_Published_Version__c == versionRecord.Id || versionRecord.Publish_Status__c == 'Published';
             workspace.versions.add(option);
@@ -292,13 +314,13 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form_Version__c selectedVersion = [
-            SELECT Id, Name, Version_Status__c
+            SELECT Id, Name, Version_Number__c, Version_Status__c
             FROM NF_Form_Version__c
             WHERE Id = :effectiveVersionId
             LIMIT 1
         ];
         workspace.selectedVersionId = selectedVersion.Id;
-        workspace.selectedVersionName = selectedVersion.Name;
+        workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
 
         for (NF_Form_Element__c elementRecord : [
@@ -326,6 +348,7 @@ public with sharing class NativeFormsDesignerController {
             workspace.prefillAliases.add(detail);
         }
 
+        Integer submitActionNumber = 1;
         for (NF_Form_Action__c actionRecord : [
             SELECT Command_Key__c, Store_Result_As__c, Object_Api_Name__c, Command_Type__c
             FROM NF_Form_Action__c
@@ -335,12 +358,14 @@ public with sharing class NativeFormsDesignerController {
             ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             SubmitActionDetail detail = new SubmitActionDetail();
+            detail.displayNumber = submitActionNumber;
             detail.actionKey = actionRecord.Command_Key__c;
             detail.storeResultAs = actionRecord.Store_Result_As__c;
             detail.objectApiName = actionRecord.Object_Api_Name__c;
             detail.commandType = actionRecord.Command_Type__c;
             detail.fieldOptions = getWritableFieldOptions(actionRecord.Object_Api_Name__c);
             workspace.submitActions.add(detail);
+            submitActionNumber += 1;
         }
 
         return workspace;
@@ -378,7 +403,7 @@ public with sharing class NativeFormsDesignerController {
         ];
 
         List<NF_Form_Element__c> recordsToDelete = new List<NF_Form_Element__c>();
-        if (elementRecord.Element_Type__c == 'section' && String.isNotBlank(elementRecord.Element_Id__c)) {
+        if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group') && String.isNotBlank(elementRecord.Element_Id__c)) {
             recordsToDelete.addAll([
                 SELECT Id
                 FROM NF_Form_Element__c
@@ -398,7 +423,7 @@ public with sharing class NativeFormsDesignerController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Choose an element type first.');
         }
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'section', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
@@ -521,8 +546,8 @@ public with sharing class NativeFormsDesignerController {
             WHERE Id = :sectionId
             LIMIT 1
         ];
-        if (sectionRecord.Element_Type__c != 'section' && sectionRecord.Element_Type__c != 'repeatGroup') {
-            throw new AuraHandledException('Only sections or repeat groups can receive dropped elements.');
+        if (sectionRecord.Element_Type__c != 'section' && sectionRecord.Element_Type__c != 'repeatGroup' && sectionRecord.Element_Type__c != 'group') {
+            throw new AuraHandledException('Only sections, groups, or repeat groups can receive dropped elements.');
         }
 
         NF_Form_Element__c elementRecord = [
@@ -535,8 +560,14 @@ public with sharing class NativeFormsDesignerController {
         if (elementRecord.Element_Type__c == 'repeatGroup') {
             throw new AuraHandledException('Repeat groups cannot be nested inside another container in this version.');
         }
+        if (elementRecord.Element_Type__c == 'group') {
+            throw new AuraHandledException('Groups cannot be nested inside another container in this version.');
+        }
         if (sectionRecord.Element_Type__c == 'repeatGroup' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup')) {
             throw new AuraHandledException('Repeat groups can contain fields and display elements, but not other containers.');
+        }
+        if (sectionRecord.Element_Type__c == 'group' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group')) {
+            throw new AuraHandledException('Groups can contain fields and display elements, but not other containers.');
         }
 
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
@@ -563,8 +594,8 @@ public with sharing class NativeFormsDesignerController {
             LIMIT 1
         ];
 
-        if (elementRecord.Element_Type__c != 'section') {
-            throw new AuraHandledException('Only sections can set column counts.');
+        if (elementRecord.Element_Type__c != 'section' && elementRecord.Element_Type__c != 'group') {
+            throw new AuraHandledException('Only sections and groups can set column counts.');
         }
 
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
@@ -693,6 +724,7 @@ public with sharing class NativeFormsDesignerController {
     private static String defaultLabelForType(String elementType) {
         if (elementType == 'section') return 'Section';
         if (elementType == 'repeatGroup') return 'Repeat Group';
+        if (elementType == 'group') return 'Group';
         if (elementType == 'heading') return 'Display Text';
         if (elementType == 'image') return 'Image';
         if (elementType == 'checkbox') return 'Checkbox';
@@ -730,48 +762,51 @@ public with sharing class NativeFormsDesignerController {
     private static String defaultConfigJsonForType(String elementType) {
         Map<String, Object> config = new Map<String, Object>();
         if (elementType == 'text') {
-            config.put('placeholder', 'Enter text');
+            config.put('defaultValue', 'Enter text');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'textarea') {
-            config.put('placeholder', 'Enter longer text');
+            config.put('defaultValue', 'Enter longer text');
             config.put('labelPosition', 'above');
             config.put('rows', 4);
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'number') {
-            config.put('placeholder', 'Enter number');
+            config.put('defaultValue', 'Enter number');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'date') {
+            config.put('defaultValue', '');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'email') {
-            config.put('placeholder', 'name@example.com');
+            config.put('defaultValue', 'name@example.com');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'tel') {
-            config.put('placeholder', 'Phone number');
+            config.put('defaultValue', 'Phone number');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'url') {
-            config.put('placeholder', 'https://example.com');
+            config.put('defaultValue', 'https://example.com');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'checkbox') {
             config.put('checked', false);
+            config.put('defaultValue', 'false');
             config.put('labelPosition', 'inline');
             config.put('fieldBehavior', 'editable');
         }
         if (elementType == 'select' || elementType == 'radio') {
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('defaultValue', 'option1');
             config.put('options', new List<Object>{
                 new Map<String, Object>{ 'label' => 'Option 1', 'value' => 'option1' },
                 new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
@@ -782,6 +817,10 @@ public with sharing class NativeFormsDesignerController {
             config.put('columns', 2);
             config.put('showTitle', true);
             config.put('boxed', true);
+        }
+        if (elementType == 'group') {
+            config.put('columns', 1);
+            config.put('boxed', false);
         }
         if (elementType == 'repeatGroup') {
             config.put('showTitle', true);
@@ -877,9 +916,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObject).getDescribe().fields.getMap();
-        List<String> fieldNames = new List<String>(fieldsMap.keySet());
-        fieldNames.sort();
-        for (String fieldApiName : fieldNames) {
+        for (String fieldApiName : fieldsMap.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
             if (!fieldDescribe.isAccessible()) {
                 continue;
@@ -889,6 +926,7 @@ public with sharing class NativeFormsDesignerController {
             option.value = fieldDescribe.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
     }
 
@@ -904,11 +942,16 @@ public with sharing class NativeFormsDesignerController {
         }
 
         Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObject).getDescribe().fields.getMap();
-        List<String> fieldNames = new List<String>(fieldsMap.keySet());
-        fieldNames.sort();
-        for (String fieldApiName : fieldNames) {
+        for (String fieldApiName : fieldsMap.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
             if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            if (fieldDescribe.getName() == 'Id') {
+                SelectOption idOption = new SelectOption();
+                idOption.label = fieldDescribe.getLabel() + ' (' + fieldDescribe.getName() + ')';
+                idOption.value = fieldDescribe.getName();
+                options.add(idOption);
                 continue;
             }
             if (!fieldDescribe.isCreateable() && !fieldDescribe.isUpdateable()) {
@@ -922,7 +965,15 @@ public with sharing class NativeFormsDesignerController {
             option.value = fieldDescribe.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
+    }
+
+    private static String formatVersionDisplay(Decimal versionNumber, String fallbackName) {
+        if (versionNumber != null) {
+            return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
+        }
+        return fallbackName;
     }
 
     private static void ensureVersionEditable(Id versionId) {

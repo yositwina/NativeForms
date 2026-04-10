@@ -4,12 +4,15 @@ import saveFeatureSettings from '@salesforce/apex/NativeFormsAdminController.sav
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 export default class NativeFormsAdminFeatures extends LightningElement {
+    adminFeaturesVersion = 'v0.3';
     isLoading = true;
     errorMessage = '';
     enableProConditionLogic = false;
     enableProRepeatGroups = false;
     enableProPrefillAliasReferences = false;
     enableProAdvancedSubmitModes = false;
+    enableProFormulaFields = false;
+    enableProPostSubmitAutoLink = false;
 
     connectedCallback() {
         this.loadSettings();
@@ -24,6 +27,8 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;
             this.enableProPrefillAliasReferences = !!settings?.enableProPrefillAliasReferences;
             this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
+            this.enableProFormulaFields = !!settings?.enableProFormulaFields;
+            this.enableProPostSubmitAutoLink = !!settings?.enableProPostSubmitAutoLink;
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -45,6 +50,14 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             this.enableProAdvancedSubmitModes = event.target.checked;
             return;
         }
+        if (fieldName === 'enableProFormulaFields') {
+            this.enableProFormulaFields = event.target.checked;
+            return;
+        }
+        if (fieldName === 'enableProPostSubmitAutoLink') {
+            this.enableProPostSubmitAutoLink = event.target.checked;
+            return;
+        }
         this.enableProConditionLogic = event.target.checked;
     }
 
@@ -57,13 +70,17 @@ export default class NativeFormsAdminFeatures extends LightningElement {
                     enableProConditionLogic: this.enableProConditionLogic,
                     enableProRepeatGroups: this.enableProRepeatGroups,
                     enableProPrefillAliasReferences: this.enableProPrefillAliasReferences,
-                    enableProAdvancedSubmitModes: this.enableProAdvancedSubmitModes
+                    enableProAdvancedSubmitModes: this.enableProAdvancedSubmitModes,
+                    enableProFormulaFields: this.enableProFormulaFields,
+                    enableProPostSubmitAutoLink: this.enableProPostSubmitAutoLink
                 }
             });
             this.enableProConditionLogic = !!settings?.enableProConditionLogic;
             this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;
             this.enableProPrefillAliasReferences = !!settings?.enableProPrefillAliasReferences;
             this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
+            this.enableProFormulaFields = !!settings?.enableProFormulaFields;
+            this.enableProPostSubmitAutoLink = !!settings?.enableProPostSubmitAutoLink;
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Settings saved',
                 message: 'NativeForms feature flags were updated.',

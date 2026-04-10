@@ -17,7 +17,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v7.1';
+    designerVersion = 'v7.3';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -103,6 +103,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     displayElementOptions = [
         { label: 'Section', value: 'section' },
+        { label: 'Group', value: 'group' },
         { label: 'Repeat Group', value: 'repeatGroup' },
         { label: 'Display Text', value: 'heading' },
         { label: 'Image', value: 'image' }
@@ -116,7 +117,8 @@ export default class NativeFormsDesigner extends LightningElement {
     labelPositionOptions = [
         { label: 'Above', value: 'above' },
         { label: 'Left', value: 'left' },
-        { label: 'Right', value: 'right' }
+        { label: 'Right', value: 'right' },
+        { label: 'None', value: 'hidden' }
     ];
 
     imageFitOptions = [
@@ -259,12 +261,16 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.selectedElement?.elementType === 'section';
     }
 
+    get selectedElementIsGroup() {
+        return this.selectedElement?.elementType === 'group';
+    }
+
     get selectedElementIsRepeatGroup() {
         return this.selectedElement?.elementType === 'repeatGroup';
     }
 
     get selectedElementIsContainer() {
-        return this.selectedElementIsSection || this.selectedElementIsRepeatGroup;
+        return this.selectedElementIsSection || this.selectedElementIsGroup || this.selectedElementIsRepeatGroup;
     }
 
     get availableDisplayElementOptions() {
@@ -277,8 +283,8 @@ export default class NativeFormsDesigner extends LightningElement {
         return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
     }
 
-    get selectedElementSupportsPlaceholder() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url'].includes(this.editorElementType);
+    get selectedElementSupportsDefaultValue() {
+        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsBoldLabel() {
@@ -554,7 +560,7 @@ export default class NativeFormsDesigner extends LightningElement {
     buildCanvasElements(elements) {
         const containerElementIds = new Set();
         elements.forEach((item) => {
-            if (item.elementId && ['section', 'repeatGroup'].includes(item.elementType)) {
+            if (item.elementId && ['section', 'group', 'repeatGroup'].includes(item.elementType)) {
                 containerElementIds.add(item.elementId);
             }
         });
@@ -587,6 +593,8 @@ export default class NativeFormsDesigner extends LightningElement {
             effectiveElementType: effectiveType,
             sectionColumns: this.sectionColumns(item.configJson),
             isSection: item.elementType === 'section',
+            isGroup: item.elementType === 'group',
+            isSectionLike: item.elementType === 'section' || item.elementType === 'group',
             isRepeatGroup: item.elementType === 'repeatGroup',
             isCheckbox: effectiveType === 'checkbox',
             isTextInput: effectiveType === 'text',
@@ -606,6 +614,7 @@ export default class NativeFormsDesigner extends LightningElement {
             previewText: this.previewText(item),
             previewHtml: this.previewHtml(item),
             previewPlaceholder: this.previewPlaceholder(item),
+            previewChecked: this.previewChecked(item),
             previewOptions: this.previewOptions(item),
             previewImageUrl: this.previewImageUrl(item),
             previewImageAlt: this.previewImageAlt(item),
@@ -631,7 +640,7 @@ export default class NativeFormsDesigner extends LightningElement {
             showConditionalBadge: !!normalized.conditionalSummary,
             labelClass: `preview-field__label${this.labelBold(item) ? ' preview-field__label--bold' : ''}`,
             cardStyle: this.elementCardStyle(normalized),
-            cardClass: `designer-node ${!(normalized.isSection || normalized.isRepeatGroup) ? 'designer-node--field ' : ''}${isChild ? 'designer-node--child ' : ''}designer-node--${normalized.elementType}${(normalized.isSection || normalized.isRepeatGroup) && !normalized.showSectionBox ? ' designer-node--section-unboxed' : ''}${selected ? ' designer-node--selected' : ''}`,
+            cardClass: `designer-node ${!(normalized.isSectionLike || normalized.isRepeatGroup) ? 'designer-node--field ' : ''}${isChild ? 'designer-node--child ' : ''}designer-node--${normalized.elementType}${(normalized.isSectionLike || normalized.isRepeatGroup) && !normalized.showSectionBox ? ' designer-node--section-unboxed' : ''}${selected ? ' designer-node--selected' : ''}`,
             fieldPreviewClass: `preview-field preview-field--${normalized.labelPosition || 'above'}`,
             previewTextClass: `preview-heading${selected ? ' preview-heading--selected' : ''}`,
             imageFrameClass: `preview-image__frame preview-image__frame--${normalized.previewImageFit || 'original'}`,
@@ -643,7 +652,7 @@ export default class NativeFormsDesigner extends LightningElement {
     decorateCanvasElement(item, byParent) {
         const base = this.decorateRenderableElement(item, false);
 
-        if (!base.isSection && !base.isRepeatGroup) {
+        if (!base.isSectionLike && !base.isRepeatGroup) {
             return base;
         }
 
@@ -709,7 +718,7 @@ export default class NativeFormsDesigner extends LightningElement {
     labelPosition(item) {
         const config = this.parseConfig(item.configJson);
         if (config.labelPosition) {
-            if (config.labelPosition === 'inline' || config.labelPosition === 'hidden') {
+            if (config.labelPosition === 'inline') {
                 return 'above';
             }
             return config.labelPosition;
@@ -734,12 +743,27 @@ export default class NativeFormsDesigner extends LightningElement {
 
     previewPlaceholder(item) {
         const config = this.parseConfig(item.configJson);
-        return config.placeholder || '';
+        return config.defaultValue || config.placeholder || '';
+    }
+
+    previewChecked(item) {
+        const config = this.parseConfig(item.configJson);
+        if (config.checked === true || config.checked === 'true') {
+            return true;
+        }
+        const defaultValue = String(config.defaultValue || '').toLowerCase();
+        return ['true', '1', 'yes', 'checked'].includes(defaultValue);
     }
 
     previewOptions(item) {
         const config = this.parseConfig(item.configJson);
-        return Array.isArray(config.options) ? config.options : [];
+        const defaultValue = config.defaultValue;
+        return Array.isArray(config.options)
+            ? config.options.map((option) => ({
+                ...option,
+                checked: option?.value === defaultValue
+            }))
+            : [];
     }
 
     previewImageUrl(item) {
@@ -896,25 +920,19 @@ export default class NativeFormsDesigner extends LightningElement {
         try {
             const created = await addElement({ versionId: this.selectedVersionId, elementType });
             const selectedContainer = this.selectedElementIsContainer ? this.selectedElement : null;
-            const shouldPlaceInContainer = selectedContainer && elementType !== 'section' && elementType !== 'repeatGroup';
-
-            this.elements = [
-                ...this.elements,
-                this.decorateBaseElement(created)
-            ];
-            this.selectedElementId = created.id;
-            this.syncSelectedState();
+            const shouldPlaceInContainer = selectedContainer && !['section', 'group', 'repeatGroup'].includes(elementType);
 
             if (shouldPlaceInContainer) {
                 const targetColumn = 1;
-                this.optimisticPlaceInSection(created.id, selectedContainer.id, targetColumn);
                 await placeElementInSection({
                     elementId: created.id,
                     sectionId: selectedContainer.id,
                     columnNumber: targetColumn
                 });
             }
-            this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
+            await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
+            this.selectedElementId = created.id;
+            this.syncSelectedState();
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         }
@@ -1393,7 +1411,7 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorLabel = selected.label || '';
         this.editorElementType = selected.elementType === 'hidden' ? 'text' : (selected.elementType || 'text');
         this.editorLabelPosition = config.labelPosition === 'inline' ? 'above' : (config.labelPosition || 'above');
-        this.editorPlaceholder = config.placeholder || '';
+        this.editorPlaceholder = config.defaultValue || config.placeholder || '';
         this.editorDisplayText = config.html || config.text || '';
         this.editorImageUrl = config.imageUrl || '';
         this.editorImageAlt = config.altText || '';
@@ -1401,7 +1419,7 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorImageWidthPercent = config.imageWidthPercent == null ? '100' : String(config.imageWidthPercent);
         this.editorShowTitle = config.showTitle !== false;
         this.editorBoxed = config.boxed !== false;
-        this.editorColumns = String(config.columns || 2);
+        this.editorColumns = String(config.columns || (selected.elementType === 'group' ? 1 : 2));
         this.editorRepeatSourceAlias = config.repeatSourceAlias || '';
         this.editorAllowAddRows = config.allowAddRows !== false;
         this.editorAllowDeleteRows = config.allowDeleteRows !== false;
@@ -1446,9 +1464,14 @@ export default class NativeFormsDesigner extends LightningElement {
             delete nextConfig.labelPosition;
         }
 
-        if (this.selectedElementSupportsPlaceholder) {
-            nextConfig.placeholder = this.editorPlaceholder || '';
+        if (this.selectedElementSupportsDefaultValue) {
+            nextConfig.defaultValue = this.editorPlaceholder || '';
+            delete nextConfig.placeholder;
+            if (this.editorElementType === 'checkbox') {
+                nextConfig.checked = ['true', '1', 'yes', 'checked'].includes(String(this.editorPlaceholder || '').toLowerCase());
+            }
         } else {
+            delete nextConfig.defaultValue;
             delete nextConfig.placeholder;
         }
 
@@ -1543,6 +1566,17 @@ export default class NativeFormsDesigner extends LightningElement {
             nextConfig.showTitle = this.editorShowTitle;
             nextConfig.boxed = this.editorBoxed;
             nextConfig.columns = Number(this.editorColumns || 2);
+        }
+
+        if (this.selectedElementIsGroup) {
+            nextConfig.columns = Number(this.editorColumns || 1);
+            nextConfig.boxed = false;
+            delete nextConfig.text;
+            delete nextConfig.showTitle;
+            delete nextConfig.repeatSourceAlias;
+            delete nextConfig.allowAddRows;
+            delete nextConfig.allowDeleteRows;
+            delete nextConfig.showLabelsOnEachRow;
         }
 
         if (this.selectedElementIsRepeatGroup) {
@@ -1772,7 +1806,7 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
 
-        if ((target.elementType === 'section' || target.elementType === 'repeatGroup') && target.elementId) {
+        if ((target.elementType === 'section' || target.elementType === 'group' || target.elementType === 'repeatGroup') && target.elementId) {
             this.elements = this.elements.filter((item) => item.id !== elementId && item.parentElementId !== target.elementId);
         } else {
             this.elements = this.elements.filter((item) => item.id !== elementId);

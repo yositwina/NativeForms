@@ -12,7 +12,7 @@
 .designer-layout {
     display: grid;
     gap: 1rem;
-    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr) minmax(16rem, 20rem);
+    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr) minmax(21rem, 24rem);
     align-items: stretch;
     min-height: 42rem;
     height: var(--designer-workspace-height);

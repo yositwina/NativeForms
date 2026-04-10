@@ -4,6 +4,8 @@ public with sharing class NativeFormsAdminController {
         @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
         @AuraEnabled public Boolean enableProPrefillAliasReferences { get; set; }
         @AuraEnabled public Boolean enableProAdvancedSubmitModes { get; set; }
+        @AuraEnabled public Boolean enableProFormulaFields { get; set; }
+        @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
     }
 
     @AuraEnabled(cacheable=true)
@@ -14,6 +16,8 @@ public with sharing class NativeFormsAdminController {
         settings.enableProRepeatGroups = config != null && config.Enable_Pro_Repeat_Groups__c;
         settings.enableProPrefillAliasReferences = config != null && config.Enable_Pro_Prefill_Alias_References__c;
         settings.enableProAdvancedSubmitModes = config != null && config.Enable_Pro_Advanced_Submit_Modes__c;
+        settings.enableProFormulaFields = config != null && config.Enable_Pro_Formula_Fields__c;
+        settings.enableProPostSubmitAutoLink = config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
         return settings;
     }
 
@@ -29,6 +33,8 @@ public with sharing class NativeFormsAdminController {
         config.Enable_Pro_Repeat_Groups__c = inputValue != null && inputValue.enableProRepeatGroups;
         config.Enable_Pro_Prefill_Alias_References__c = inputValue != null && inputValue.enableProPrefillAliasReferences;
         config.Enable_Pro_Advanced_Submit_Modes__c = inputValue != null && inputValue.enableProAdvancedSubmitModes;
+        config.Enable_Pro_Formula_Fields__c = inputValue != null && inputValue.enableProFormulaFields;
+        config.Enable_Pro_Post_Submit_Auto_Link__c = inputValue != null && inputValue.enableProPostSubmitAutoLink;
         if (config.Id == null) {
             insert config;
         } else {

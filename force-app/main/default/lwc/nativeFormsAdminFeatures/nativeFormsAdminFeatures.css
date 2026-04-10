@@ -18,6 +18,13 @@
     color: #5f6f89;
 }
 
+.feature-version {
+    margin: -0.5rem 0 0;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #0f6cbd;
+}
+
 .actions {
     display: flex;
     gap: 0.75rem;

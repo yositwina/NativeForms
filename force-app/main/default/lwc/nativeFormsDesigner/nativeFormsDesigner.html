@@ -144,7 +144,7 @@
                                         <template if:true={row.item.showConditionalBadge}>
                                             <div class="preview-conditional-badge">{row.item.conditionalSummary}</div>
                                         </template>
-                                        <template lwc:if={row.item.isSection}>
+                                        <template lwc:if={row.item.isSectionLike}>
                                             <div class="preview-section" style={row.item.cardStyle}>
                                                 <div class="preview-section__top">
                                                     <template if:true={row.item.showTitle}>
@@ -238,7 +238,7 @@
                                                                                     <div class="preview-radio-group">
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <label key={option.value} class="preview-radio-option">
-                                                                                                <input type="radio" disabled />
+                                                                                                <input type="radio" checked={option.checked} disabled />
                                                                                                 <span>{option.label}</span>
                                                                                             </label>
                                                                                         </template>
@@ -250,7 +250,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.label}</label>
                                                                                     </template>
-                                                                                    <textarea placeholder={child.previewPlaceholder} disabled></textarea>
+                                                                                    <textarea disabled>{child.previewPlaceholder}</textarea>
                                                                                     <template if:true={child.validationPattern}>
                                                                                         <div class="preview-validation-hint">{child.validationPattern}</div>
                                                                                     </template>
@@ -261,7 +261,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.label}</label>
                                                                                     </template>
-                                                                                    <input type={child.previewInputType} placeholder={child.previewPlaceholder} disabled />
+                                                                                    <input type={child.previewInputType} value={child.previewPlaceholder} disabled />
                                                                                     <template if:true={child.validationPattern}>
                                                                                         <div class="preview-validation-hint">{child.validationPattern}</div>
                                                                                     </template>
@@ -332,7 +332,7 @@
                                                                                         <label class={child.labelClass}>{child.label}</label>
                                                                                     </template>
                                                                                     <div class="preview-checkbox__control">
-                                                                                        <input type="checkbox" disabled />
+                                                                                        <input type="checkbox" checked={child.previewChecked} disabled />
                                                                                     </div>
                                                                                 </div>
                                                                             </template>
@@ -358,7 +358,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.label}</label>
                                                                                     </template>
-                                                                                    <select disabled>
+                                                                                    <select value={child.previewPlaceholder} disabled>
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <option key={option.value}>{option.label}</option>
                                                                                         </template>
@@ -373,7 +373,7 @@
                                                                                     <div class="preview-radio-group">
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <label key={option.value} class="preview-radio-option">
-                                                                                                <input type="radio" disabled />
+                                                                                                <input type="radio" checked={option.checked} disabled />
                                                                                                 <span>{option.label}</span>
                                                                                             </label>
                                                                                         </template>
@@ -385,7 +385,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.label}</label>
                                                                                     </template>
-                                                                                    <textarea placeholder={child.previewPlaceholder} disabled></textarea>
+                                                                                    <textarea disabled>{child.previewPlaceholder}</textarea>
                                                                                 </div>
                                                                             </template>
                                                                             <template lwc:else>
@@ -393,7 +393,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.label}</label>
                                                                                     </template>
-                                                                                    <input type={child.previewInputType} placeholder={child.previewPlaceholder} disabled />
+                                                                                    <input type={child.previewInputType} value={child.previewPlaceholder} disabled />
                                                                                 </div>
                                                                             </template>
                                                                         </article>
@@ -415,7 +415,7 @@
                                                     <label class={row.item.labelClass}>{row.item.label}</label>
                                                 </template>
                                                 <div class="preview-checkbox__control">
-                                                    <input type="checkbox" disabled />
+                                                    <input type="checkbox" checked={row.item.previewChecked} disabled />
                                                 </div>
                                             </div>
                                         </template>
@@ -444,7 +444,7 @@
                                                 <template if:true={row.item.showLabel}>
                                                     <label class={row.item.labelClass}>{row.item.label}</label>
                                                 </template>
-                                                <select disabled>
+                                                <select value={row.item.previewPlaceholder} disabled>
                                                     <template for:each={row.item.previewOptions} for:item="option">
                                                         <option key={option.value}>{option.label}</option>
                                                     </template>
@@ -467,7 +467,7 @@
                                                 <div class="preview-radio-group">
                                                     <template for:each={row.item.previewOptions} for:item="option">
                                                         <label key={option.value} class="preview-radio-option">
-                                                            <input type="radio" disabled />
+                                                            <input type="radio" checked={option.checked} disabled />
                                                             <span>{option.label}</span>
                                                         </label>
                                                     </template>
@@ -480,7 +480,7 @@
                                                 <template if:true={row.item.showLabel}>
                                                     <label class={row.item.labelClass}>{row.item.label}</label>
                                                 </template>
-                                                <textarea placeholder={row.item.previewPlaceholder} disabled></textarea>
+                                                <textarea disabled>{row.item.previewPlaceholder}</textarea>
                                                 <template if:true={row.item.validationPattern}>
                                                     <div class="preview-validation-hint">{row.item.validationPattern}</div>
                                                 </template>
@@ -492,7 +492,7 @@
                                                 <template if:true={row.item.showLabel}>
                                                     <label class={row.item.labelClass}>{row.item.label}</label>
                                                 </template>
-                                                <input type={row.item.previewInputType} placeholder={row.item.previewPlaceholder} disabled />
+                                                <input type={row.item.previewInputType} value={row.item.previewPlaceholder} disabled />
                                                 <template if:true={row.item.validationPattern}>
                                                     <div class="preview-validation-hint">{row.item.validationPattern}</div>
                                                 </template>
@@ -542,25 +542,20 @@
                             <div class="selection-card">
                                 <p class="selection-label">Display Settings</p>
 
-                                <div class="property-inline-row property-inline-row--label">
-                                    <div class="property-inline-row__grow">
-                                        <lightning-input
-                                            label="Field Label"
-                                            value={editorLabel}
-                                            onchange={handleEditorLabelChange}>
-                                        </lightning-input>
-                                    </div>
-                                    <template if:true={selectedElementSupportsBoldLabel}>
-                                        <div class="property-inline-row__checkbox">
-                                            <lightning-input
-                                                type="checkbox"
-                                                label="Bold Label"
-                                                checked={editorLabelBold}
-                                                onchange={handleEditorLabelBoldChange}>
-                                            </lightning-input>
-                                        </div>
-                                    </template>
-                                </div>
+                                <lightning-input
+                                    label="Field Label"
+                                    value={editorLabel}
+                                    onchange={handleEditorLabelChange}>
+                                </lightning-input>
+
+                                <template if:true={selectedElementSupportsBoldLabel}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Bold Label"
+                                        checked={editorLabelBold}
+                                        onchange={handleEditorLabelBoldChange}>
+                                    </lightning-input>
+                                </template>
 
                                 <template if:true={selectedElementSupportsLabelPosition}>
                                     <div class="behavior-radio-group">
@@ -583,9 +578,9 @@
                                     </div>
                                 </template>
 
-                                <template if:true={selectedElementSupportsPlaceholder}>
+                                <template if:true={selectedElementSupportsDefaultValue}>
                                     <lightning-input
-                                        label="Placeholder Text"
+                                        label="Default Value"
                                         value={editorPlaceholder}
                                         onchange={handleEditorPlaceholderChange}>
                                     </lightning-input>
@@ -765,6 +760,15 @@
                                         checked={editorBoxed}
                                         onchange={handleEditorBoxedChange}>
                                     </lightning-input>
+                                    <lightning-combobox
+                                        label="Columns"
+                                        value={editorColumns}
+                                        options={sectionColumnOptions}
+                                        onchange={handleEditorColumnsChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsGroup}>
                                     <lightning-combobox
                                         label="Columns"
                                         value={editorColumns}

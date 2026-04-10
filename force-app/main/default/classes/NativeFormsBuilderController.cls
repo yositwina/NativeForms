@@ -34,6 +34,27 @@ public with sharing class NativeFormsBuilderController {
         @AuraEnabled public String value { get; set; }
     }
 
+    private static void sortOptionsByLabel(List<SelectOption> options) {
+        if (options == null || options.size() < 2) {
+            return;
+        }
+        Map<String, List<SelectOption>> bucket = new Map<String, List<SelectOption>>();
+        List<String> keys = new List<String>();
+        for (SelectOption o : options) {
+            String key = (o.label == null ? '' : o.label.toLowerCase());
+            if (!bucket.containsKey(key)) {
+                bucket.put(key, new List<SelectOption>());
+                keys.add(key);
+            }
+            bucket.get(key).add(o);
+        }
+        keys.sort();
+        options.clear();
+        for (String k : keys) {
+            options.addAll(bucket.get(k));
+        }
+    }
+
     public class PrefillAliasDetail {
         @AuraEnabled public String alias { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
@@ -78,6 +99,7 @@ public with sharing class NativeFormsBuilderController {
         List<NF_Form_Version__c> versions = [
             SELECT Id,
                    Name,
+                   Version_Number__c,
                    Version_Status__c,
                    Form__r.Name,
                    Form__r.NF_Key__c,
@@ -90,7 +112,7 @@ public with sharing class NativeFormsBuilderController {
         for (NF_Form_Version__c versionRecord : versions) {
             VersionOption option = new VersionOption();
             option.value = versionRecord.Id;
-            option.label = versionRecord.Form__r.Name + ' - ' + versionRecord.Name;
+            option.label = versionRecord.Form__r.Name + ' - ' + formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
             option.status = versionRecord.Version_Status__c;
             option.formName = versionRecord.Form__r.Name;
             workspace.versions.add(option);
@@ -108,6 +130,7 @@ public with sharing class NativeFormsBuilderController {
         NF_Form_Version__c selectedVersion = [
             SELECT Id,
                    Name,
+                   Version_Number__c,
                    Version_Status__c,
                    Form__r.Name,
                    Form__r.NF_Key__c
@@ -117,7 +140,7 @@ public with sharing class NativeFormsBuilderController {
         ];
 
         workspace.selectedVersionId = selectedVersion.Id;
-        workspace.selectedVersionName = selectedVersion.Name;
+        workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
         workspace.selectedFormName = selectedVersion.Form__r.Name;
         workspace.selectedFormKey = selectedVersion.Form__r.NF_Key__c;
@@ -468,9 +491,7 @@ public with sharing class NativeFormsBuilderController {
         }
 
         Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(objectApiName).getDescribe().fields.getMap();
-        List<String> fieldNames = new List<String>(fieldsMap.keySet());
-        fieldNames.sort();
-        for (String fieldApiName : fieldNames) {
+        for (String fieldApiName : fieldsMap.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
             if (!fieldDescribe.isAccessible()) {
                 continue;
@@ -480,6 +501,7 @@ public with sharing class NativeFormsBuilderController {
             option.value = fieldDescribe.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
     }
 
@@ -490,9 +512,7 @@ public with sharing class NativeFormsBuilderController {
         }
 
         Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(objectApiName).getDescribe().fields.getMap();
-        List<String> fieldNames = new List<String>(fieldsMap.keySet());
-        fieldNames.sort();
-        for (String fieldApiName : fieldNames) {
+        for (String fieldApiName : fieldsMap.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
             if (!fieldDescribe.isAccessible()) {
                 continue;
@@ -508,6 +528,7 @@ public with sharing class NativeFormsBuilderController {
             option.value = fieldDescribe.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
     }
 
@@ -546,5 +567,12 @@ public with sharing class NativeFormsBuilderController {
             return Integer.valueOf(String.valueOf(rows[0].get('maxIndex'))) + 1;
         }
         return 1;
+    }
+
+    private static String formatVersionDisplay(Decimal versionNumber, String fallbackName) {
+        if (versionNumber != null) {
+            return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
+        }
+        return fallbackName;
     }
 }

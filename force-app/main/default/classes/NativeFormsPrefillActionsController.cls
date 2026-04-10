@@ -4,6 +4,27 @@ public with sharing class NativeFormsPrefillActionsController {
         @AuraEnabled public String value { get; set; }
     }
 
+    private static void sortOptionsByLabel(List<SelectOption> options) {
+        if (options == null || options.size() < 2) {
+            return;
+        }
+        Map<String, List<SelectOption>> bucket = new Map<String, List<SelectOption>>();
+        List<String> keys = new List<String>();
+        for (SelectOption o : options) {
+            String key = (o.label == null ? '' : o.label.toLowerCase());
+            if (!bucket.containsKey(key)) {
+                bucket.put(key, new List<SelectOption>());
+                keys.add(key);
+            }
+            bucket.get(key).add(o);
+        }
+        keys.sort();
+        options.clear();
+        for (String k : keys) {
+            options.addAll(bucket.get(k));
+        }
+    }
+
     public class VersionOption {
         @AuraEnabled public Id value { get; set; }
         @AuraEnabled public String label { get; set; }
@@ -13,6 +34,7 @@ public with sharing class NativeFormsPrefillActionsController {
     public class PrefillActionRecord {
         @AuraEnabled public Id id { get; set; }
         @AuraEnabled public String name { get; set; }
+        @AuraEnabled public Integer displayNumber { get; set; }
         @AuraEnabled public String actionKey { get; set; }
         @AuraEnabled public String commandType { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
@@ -75,6 +97,7 @@ public with sharing class NativeFormsPrefillActionsController {
         List<NF_Form_Version__c> versions = [
             SELECT Id,
                    Name,
+                   Version_Number__c,
                    Version_Status__c,
                    Form__r.Name,
                    LastModifiedDate
@@ -86,7 +109,7 @@ public with sharing class NativeFormsPrefillActionsController {
         for (NF_Form_Version__c versionRecord : versions) {
             VersionOption option = new VersionOption();
             option.value = versionRecord.Id;
-            option.label = versionRecord.Form__r.Name + ' - ' + versionRecord.Name;
+            option.label = versionRecord.Form__r.Name + ' - ' + formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
             option.status = versionRecord.Version_Status__c;
             workspace.versions.add(option);
         }
@@ -100,16 +123,17 @@ public with sharing class NativeFormsPrefillActionsController {
         }
 
         NF_Form_Version__c selectedVersion = [
-            SELECT Id, Name, Version_Status__c, Form__r.Name
+            SELECT Id, Name, Version_Number__c, Version_Status__c, Form__r.Name
             FROM NF_Form_Version__c
             WHERE Id = :effectiveVersionId
             LIMIT 1
         ];
         workspace.selectedVersionId = selectedVersion.Id;
-        workspace.selectedVersionName = selectedVersion.Name;
+        workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
         workspace.selectedFormName = selectedVersion.Form__r.Name;
 
+        Integer actionNumber = 1;
         for (NF_Form_Action__c actionRecord : [
             SELECT Id,
                    Name,
@@ -124,7 +148,8 @@ public with sharing class NativeFormsPrefillActionsController {
               AND Action_Scope__c = 'Prefill'
             ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
-            workspace.actions.add(toRecord(actionRecord));
+            workspace.actions.add(toRecord(actionRecord, actionNumber));
+            actionNumber += 1;
             if (String.isNotBlank(actionRecord.Store_Result_As__c) && String.isNotBlank(actionRecord.Object_Api_Name__c)) {
                 PrefillAliasDetail aliasDetail = new PrefillAliasDetail();
                 aliasDetail.alias = actionRecord.Store_Result_As__c;
@@ -220,7 +245,7 @@ public with sharing class NativeFormsPrefillActionsController {
             WHERE Id = :actionRecord.Id
             LIMIT 1
         ];
-        return toRecord(actionRecord);
+        return toRecord(actionRecord, null);
     }
 
     @AuraEnabled
@@ -258,7 +283,7 @@ public with sharing class NativeFormsPrefillActionsController {
         actionRecord.Config_JSON__c = String.isBlank(inputValue.configJson) ? '{}' : inputValue.configJson;
         update actionRecord;
 
-        return toRecord(actionRecord);
+        return toRecord(actionRecord, null);
     }
 
     @AuraEnabled
@@ -278,10 +303,11 @@ public with sharing class NativeFormsPrefillActionsController {
         delete actionRecord;
     }
 
-    private static PrefillActionRecord toRecord(NF_Form_Action__c actionRecord) {
+    private static PrefillActionRecord toRecord(NF_Form_Action__c actionRecord, Integer displayNumber) {
         PrefillActionRecord dto = new PrefillActionRecord();
         dto.id = actionRecord.Id;
         dto.name = actionRecord.Name;
+        dto.displayNumber = displayNumber;
         dto.actionKey = actionRecord.Command_Key__c;
         dto.commandType = actionRecord.Command_Type__c;
         dto.objectApiName = actionRecord.Object_Api_Name__c;
@@ -289,6 +315,13 @@ public with sharing class NativeFormsPrefillActionsController {
         dto.orderValue = actionRecord.Order__c == null ? null : Integer.valueOf(String.valueOf(actionRecord.Order__c));
         dto.configJson = actionRecord.Config_JSON__c;
         return dto;
+    }
+
+    private static String formatVersionDisplay(Decimal versionNumber, String fallbackName) {
+        if (versionNumber != null) {
+            return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
+        }
+        return fallbackName;
     }
 
     private static List<SelectOption> getObjectOptions() {
@@ -307,7 +340,6 @@ public with sharing class NativeFormsPrefillActionsController {
             objectNames.add(apiName);
         }
 
-        objectNames.sort();
         for (String apiName : objectNames) {
             Schema.DescribeSObjectResult describeResult = globalDescribe.get(apiName).getDescribe();
             SelectOption option = new SelectOption();
@@ -316,6 +348,7 @@ public with sharing class NativeFormsPrefillActionsController {
             options.add(option);
         }
 
+        sortOptionsByLabel(options);
         return options;
     }
 
@@ -332,9 +365,7 @@ public with sharing class NativeFormsPrefillActionsController {
         }
 
         Map<String, Schema.SObjectField> fieldsMap = globalDescribe.get(canonicalObject).getDescribe().fields.getMap();
-        List<String> fieldNames = new List<String>(fieldsMap.keySet());
-        fieldNames.sort();
-        for (String fieldApiName : fieldNames) {
+        for (String fieldApiName : fieldsMap.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(fieldApiName).getDescribe();
             if (!fieldDescribe.isAccessible()) {
                 continue;
@@ -344,6 +375,7 @@ public with sharing class NativeFormsPrefillActionsController {
             option.value = fieldDescribe.getName();
             options.add(option);
         }
+        sortOptionsByLabel(options);
         return options;
     }
 

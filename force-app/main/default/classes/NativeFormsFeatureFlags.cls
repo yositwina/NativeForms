@@ -18,4 +18,14 @@ public with sharing class NativeFormsFeatureFlags {
         NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
         return config != null && config.Enable_Pro_Advanced_Submit_Modes__c;
     }
+
+    public static Boolean isProFormulaFieldsEnabled() {
+        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
+        return config != null && config.Enable_Pro_Formula_Fields__c;
+    }
+
+    public static Boolean isProPostSubmitAutoLinkEnabled() {
+        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
+        return config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
+    }
 }

@@ -298,7 +298,16 @@ public with sharing class NativeFormsPublisher {
             return null;
         }
         NF_Form_Element__c parentRecord = recordsByElementId.get(elementRecord.Parent_Element_Id__c);
-        return parentRecord != null && parentRecord.Element_Type__c == 'repeatGroup' ? parentRecord : null;
+        while (parentRecord != null) {
+            if (parentRecord.Element_Type__c == 'repeatGroup') {
+                return parentRecord;
+            }
+            if (String.isBlank(parentRecord.Parent_Element_Id__c)) {
+                return null;
+            }
+            parentRecord = recordsByElementId.get(parentRecord.Parent_Element_Id__c);
+        }
+        return null;
     }
 
     private static NF_Form_Version__c createSuccessorDraft(
@@ -374,7 +383,7 @@ public with sharing class NativeFormsPublisher {
             if (elementRecord == null) {
                 continue;
             }
-            if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup') && String.isNotBlank(elementRecord.Element_Id__c)) {
+            if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'group' || elementRecord.Element_Type__c == 'repeatGroup') && String.isNotBlank(elementRecord.Element_Id__c)) {
                 containersByElementId.put(elementRecord.Element_Id__c, elementRecord);
             }
             Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
@@ -769,6 +778,9 @@ public with sharing class NativeFormsPublisher {
 
         applySubmitFieldMappings(command, actionRecord, canonicalObjectApiName, elements);
         if (!command.containsKey('fields')) {
+            applyUpsertManyFallbackFieldMappings(command, actionRecord, canonicalObjectApiName, elements);
+        }
+        if (!command.containsKey('fields')) {
             return new Map<String, Object>();
         }
         return command;
@@ -848,6 +860,55 @@ public with sharing class NativeFormsPublisher {
             }
         }
         if (normalizedType == 'upsertMany' && String.isNotBlank(idFieldKey)) {
+            commandConfig.put('idField', idFieldKey);
+        }
+    }
+
+    private static void applyUpsertManyFallbackFieldMappings(
+        Map<String, Object> commandConfig,
+        NF_Form_Action__c actionRecord,
+        String canonicalObjectApiName,
+        List<NF_Form_Element__c> elements
+    ) {
+        if (commandConfig == null || actionRecord == null || String.isBlank(canonicalObjectApiName) || elements == null || elements.isEmpty()) {
+            return;
+        }
+
+        String actionKey = actionRecord.Command_Key__c;
+        if (String.isBlank(actionKey)) {
+            return;
+        }
+
+        Map<String, Object> fields = new Map<String, Object>();
+        String idFieldKey;
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || String.isBlank(elementRecord.Field_Key__c) || String.isBlank(elementRecord.Config_JSON__c)) {
+                continue;
+            }
+            Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
+            if (!booleanValue(elementConfig.get('submitEnabled'))) {
+                continue;
+            }
+            if (stringValue(elementConfig.get('submitActionKey')) != actionKey) {
+                continue;
+            }
+
+            String submitFieldPath = canonicalFieldApiName(canonicalObjectApiName, stringValue(elementConfig.get('submitFieldPath')));
+            if (String.isBlank(submitFieldPath)) {
+                continue;
+            }
+            if (submitFieldPath == 'Id') {
+                idFieldKey = elementRecord.Field_Key__c;
+                continue;
+            }
+            fields.put(submitFieldPath, '{row.' + elementRecord.Field_Key__c + '}');
+        }
+
+        if (!fields.isEmpty()) {
+            commandConfig.put('fields', fields);
+        }
+        if (String.isNotBlank(idFieldKey)) {
             commandConfig.put('idField', idFieldKey);
         }
     }
@@ -1377,7 +1438,7 @@ public with sharing class NativeFormsPublisher {
         Map<String, List<NF_Form_Element__c>> childrenByParent = new Map<String, List<NF_Form_Element__c>>();
         Set<String> containerElementIds = new Set<String>();
         for (NF_Form_Element__c elementRecord : elements) {
-            if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup') && String.isNotBlank(elementRecord.Element_Id__c)) {
+            if ((elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'group' || elementRecord.Element_Type__c == 'repeatGroup') && String.isNotBlank(elementRecord.Element_Id__c)) {
                 containerElementIds.add(elementRecord.Element_Id__c);
             }
         }
@@ -1437,7 +1498,9 @@ public with sharing class NativeFormsPublisher {
         html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);}';
         html += 'function collectRepeatGroups(){const groups={};form.querySelectorAll("[data-repeat-group]").forEach(function(groupEl){const groupKey=groupEl.dataset.repeatGroup;const rows=[];groupEl.querySelectorAll("[data-repeat-row]").forEach(function(rowEl){const row={};const seen={};rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;if(seen[fieldKey]){return;}row[fieldKey]=readRepeatFieldValueByKey(rowEl,fieldKey);seen[fieldKey]=true;});rows.push(row);});groups[groupKey]={rows:rows,deletedIds:repeatDeleteState[groupKey]||[]};});return groups;}';
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
-        html += 'function applyPrefillPayload(payload){if(!payload){return;}const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});evaluateConditions();}';
+        html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let hasValue=false;if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
+        html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
+        html += 'function applyPrefillPayload(payload){if(!payload){return;}const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});applyLockedFields();evaluateConditions();}';
         html += 'async function runPrefill(){if(!config.prefillUrl){return;}const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Prefill failed");}applyPrefillPayload(data);}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("input[type=\'date\']").forEach(function(el){const now=new Date();let minDate=null;let maxDate=null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.min=isoDate(minDate);}if(maxDate){el.max=isoDate(maxDate);}});}';
@@ -1493,9 +1556,19 @@ public with sharing class NativeFormsPublisher {
         String safeLabel = escapeHtml(label);
         String safeElementId = escapeHtml(String.isNotBlank(elementRecord.Element_Id__c) ? elementRecord.Element_Id__c : String.valueOf(elementRecord.Id));
         String wrapperAttrs = conditionalDataAttrs(config) + hiddenBehaviorStyle(config);
+        String lockOnPrefillAttr = lockOnPrefillDataAttr(config);
+        if (String.isNotBlank(lockOnPrefillAttr)) {
+            wrapperAttrs += lockOnPrefillAttr;
+        }
         String labelPosition = normalizedLabelPosition(config);
         Boolean labelBold = booleanValue(config.get('labelBold'));
         String labelClassAttr = labelBold ? ' class="nf-label--bold"' : '';
+        Boolean hiddenByBehavior = isHiddenBehavior(config);
+
+        if (hiddenByBehavior && typeValue != 'repeatGroup' && typeValue != 'group' && typeValue != 'section' && typeValue != 'sectionBreak') {
+            String hiddenDefaultValue = String.isNotBlank(hiddenValue) ? hiddenValue : defaultValue;
+            return '<input type="hidden" data-element-id="' + safeElementId + '" name="' + safeName + '" value="' + escapeHtml(hiddenDefaultValue) + '"' + lockOnPrefillAttr + '>';
+        }
 
         if (typeValue == 'repeatGroup') {
             List<NF_Form_Element__c> childElements = childrenByParent != null && String.isNotBlank(elementRecord.Element_Id__c)
@@ -1527,6 +1600,9 @@ public with sharing class NativeFormsPublisher {
                     for (NF_Form_Element__c childElement : childElements) {
                         if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
                             Map<String, Object> childConfig = parseJsonMap(childElement.Config_JSON__c);
+                            if (isHiddenBehavior(childConfig) || childElement.Element_Type__c == 'hidden') {
+                                continue;
+                            }
                             String childLabel = String.isNotBlank(childElement.Label__c) ? childElement.Label__c : childElement.Field_Key__c;
                             Boolean childLabelBold = booleanValue(childConfig.get('labelBold'));
                             repeatHtml += '<div class="nf-field"><label' + (childLabelBold ? ' class="nf-label--bold"' : '') + '>' + escapeHtml(childLabel) + '</label></div>';
@@ -1563,6 +1639,35 @@ public with sharing class NativeFormsPublisher {
             repeatHtml += '</div>';
             repeatHtml += '</div></template>';
             return repeatHtml;
+        }
+
+        if (typeValue == 'group') {
+            List<NF_Form_Element__c> childElements = childrenByParent != null && String.isNotBlank(elementRecord.Element_Id__c)
+                ? childrenByParent.get(elementRecord.Element_Id__c)
+                : null;
+            Integer columnCount = safeSectionColumnCount(config);
+            String groupHtml = '<div data-element-id="' + safeElementId + '"' + wrapperAttrs + '>';
+            if (childElements != null && !childElements.isEmpty()) {
+                if (columnCount <= 1) {
+                    for (NF_Form_Element__c childElement : childElements) {
+                        groupHtml += renderElement(childElement, childrenByParent);
+                    }
+                } else {
+                    groupHtml += '<div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                    for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
+                        groupHtml += '<div class="nf-section__column">';
+                        for (NF_Form_Element__c childElement : childElements) {
+                            if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
+                                groupHtml += renderElement(childElement, childrenByParent);
+                            }
+                        }
+                        groupHtml += '</div>';
+                    }
+                    groupHtml += '</div>';
+                }
+            }
+            groupHtml += '</div>';
+            return groupHtml;
         }
 
         if (typeValue == 'section' || typeValue == 'sectionBreak') {
@@ -1637,7 +1742,7 @@ public with sharing class NativeFormsPublisher {
 
         if (typeValue == 'textarea') {
             String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabel + '</label>';
-            String controlHtml = '<textarea id="' + safeName + '" name="' + safeName + '"' + placeholderAttr + requiredAttr + patternAttr + '></textarea>';
+            String controlHtml = '<textarea id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + placeholderAttr + requiredAttr + patternAttr + '></textarea>';
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml);
         }
         if (typeValue == 'select' && config.containsKey('options')) {
@@ -1652,7 +1757,7 @@ public with sharing class NativeFormsPublisher {
                 }
             }
             String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabel + '</label>';
-            String controlHtml = '<select id="' + safeName + '" name="' + safeName + '"' + requiredAttr + '>' + optionsHtml + '</select>';
+            String controlHtml = '<select id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + requiredAttr + '>' + optionsHtml + '</select>';
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml);
         }
         if (typeValue == 'radio' && config.containsKey('options')) {
@@ -1669,7 +1774,7 @@ public with sharing class NativeFormsPublisher {
                     String optionId = safeName + '-' + String.valueOf(optionIndex);
                     String checkedAttr = optionValue == defaultValue ? ' checked' : '';
                     radiosHtml += '<label class="nf-radio-option" for="' + escapeHtml(optionId) + '">';
-                    radiosHtml += '<input type="radio" id="' + escapeHtml(optionId) + '" name="' + safeName + '" value="' + escapeHtml(optionValue) + '"' + checkedAttr + requiredAttr + '>';
+                    radiosHtml += '<input type="radio" id="' + escapeHtml(optionId) + '" name="' + safeName + '" value="' + escapeHtml(optionValue) + '"' + lockOnPrefillAttr + checkedAttr + requiredAttr + '>';
                     radiosHtml += '<span>' + escapeHtml(String.valueOf(option.get('label'))) + '</span>';
                     radiosHtml += '</label>';
                     optionIndex += 1;
@@ -1681,9 +1786,9 @@ public with sharing class NativeFormsPublisher {
         if (typeValue == 'checkbox') {
             String checkedAttr = checkedByDefault ? ' checked' : '';
             if (labelPosition == 'hidden') {
-                return '<div class="nf-field nf-field--checkbox" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><label><input type="checkbox" name="' + safeName + '"' + checkedAttr + requiredAttr + '></label></div>';
+                return '<div class="nf-field nf-field--checkbox" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><label><input type="checkbox" name="' + safeName + '"' + lockOnPrefillAttr + checkedAttr + requiredAttr + '></label></div>';
             }
-            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><label' + labelClassAttr + '><input type="checkbox" name="' + safeName + '"' + checkedAttr + requiredAttr + '> ' + safeLabel + '</label></div>';
+            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><label' + labelClassAttr + '><input type="checkbox" name="' + safeName + '"' + lockOnPrefillAttr + checkedAttr + requiredAttr + '> ' + safeLabel + '</label></div>';
         }
         if (typeValue == 'hidden') {
             return '<input type="hidden" data-element-id="' + safeElementId + '" name="' + safeName + '" value="' + escapeHtml(hiddenValue) + '">';
@@ -1692,7 +1797,7 @@ public with sharing class NativeFormsPublisher {
         String htmlType = normalizeInputType(typeValue);
         String valueAttr = String.isNotBlank(defaultValue) ? ' value="' + escapeHtml(defaultValue) + '"' : '';
         String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabel + '</label>';
-        String controlHtml = '<input type="' + escapeHtml(htmlType) + '" id="' + safeName + '" name="' + safeName + '"' + placeholderAttr + valueAttr + requiredAttr + minAttr + maxAttr + dateRangeAttrs + patternAttr + '>';
+        String controlHtml = '<input type="' + escapeHtml(htmlType) + '" id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + placeholderAttr + valueAttr + requiredAttr + minAttr + maxAttr + dateRangeAttrs + patternAttr + '>';
         return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml);
     }
 
@@ -1714,7 +1819,9 @@ public with sharing class NativeFormsPublisher {
             : labelClassAttr;
         String sourceAttr = ' data-repeat-source-field="' + escapeHtml(sourceField) + '"';
         String keyAttr = ' data-repeat-field-key="' + escapeHtml(fieldKey) + '"';
+        String lockOnPrefillAttr = lockOnPrefillDataAttr(config);
         String baseId = escapeHtml(fieldKey);
+        Boolean hiddenByBehavior = isHiddenBehavior(config);
 
         if (typeValue == 'heading') {
             String richHtml = config.containsKey('html') ? String.valueOf(config.get('html')) : '<p>' + escapeHtml(label) + '</p>';
@@ -1726,12 +1833,12 @@ public with sharing class NativeFormsPublisher {
         }
 
         if (typeValue == 'checkbox') {
-            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '"><label' + labelClassAttr + '><input type="checkbox" id="' + baseId + '"' + keyAttr + sourceAttr + '> ' + escapeHtml(label) + '</label></div>';
+            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '"><label' + labelClassAttr + '><input type="checkbox" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + '> ' + escapeHtml(label) + '</label></div>';
         }
 
         if (typeValue == 'textarea') {
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
-            String controlHtml = '<textarea id="' + baseId + '"' + keyAttr + sourceAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '></textarea>';
+            String controlHtml = '<textarea id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '></textarea>';
             return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
         }
 
@@ -1744,7 +1851,7 @@ public with sharing class NativeFormsPublisher {
                 }
             }
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
-            String controlHtml = '<select id="' + baseId + '"' + keyAttr + sourceAttr + '>' + optionsHtml + '</select>';
+            String controlHtml = '<select id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + '>' + optionsHtml + '</select>';
             return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
         }
 
@@ -1758,7 +1865,7 @@ public with sharing class NativeFormsPublisher {
                     Map<String, Object> option = (Map<String, Object>) rawOption;
                     String optionId = baseId + '-' + String.valueOf(optionIndex);
                     html += '<label class="nf-radio-option" for="' + escapeHtml(optionId) + '">';
-                    html += '<input type="radio" id="' + escapeHtml(optionId) + '" value="' + escapeHtml(String.valueOf(option.get('value'))) + '"' + keyAttr + sourceAttr + '>';
+                    html += '<input type="radio" id="' + escapeHtml(optionId) + '" value="' + escapeHtml(String.valueOf(option.get('value'))) + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + '>';
                     html += '<span>' + escapeHtml(String.valueOf(option.get('label'))) + '</span></label>';
                     optionIndex += 1;
                 }
@@ -1767,14 +1874,21 @@ public with sharing class NativeFormsPublisher {
             return html;
         }
 
-        if (typeValue == 'hidden') {
+        if (typeValue == 'hidden' || hiddenByBehavior) {
             return '<input type="hidden" id="' + baseId + '"' + keyAttr + sourceAttr + '>';
         }
 
         String htmlType = normalizeInputType(typeValue);
         String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
-        String controlHtml = '<input type="' + escapeHtml(htmlType) + '" id="' + baseId + '"' + keyAttr + sourceAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '>';
+        String controlHtml = '<input type="' + escapeHtml(htmlType) + '" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '>';
         return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
+    }
+
+    private static String lockOnPrefillDataAttr(Map<String, Object> config) {
+        if (config != null && stringValue(config.get('fieldBehavior')) == 'readonlyWhenPrefilled') {
+            return ' data-lock-on-prefill="true"';
+        }
+        return '';
     }
 
     private static String repeatGroupIdFieldKey(List<NF_Form_Element__c> childElements) {
@@ -1883,6 +1997,10 @@ public with sharing class NativeFormsPublisher {
             return ' style="display:none;"';
         }
         return '';
+    }
+
+    private static Boolean isHiddenBehavior(Map<String, Object> config) {
+        return config != null && stringValue(config.get('fieldBehavior')) == 'hidden';
     }
 
     private static String textPatternAttr(Map<String, Object> config) {

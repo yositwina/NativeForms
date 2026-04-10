@@ -325,6 +325,11 @@ This is the practical Starter to-do list.
 - sticky side panes with center scroll
 - readable form title/settings
 - clean app navigation and remove raw object tabs
+- **"Create Sample Records" onboarding button** — a one-click action in the NativeForms app that seeds a new user's org with ready-to-use sample data so they can immediately try the full product end-to-end:
+  - creates `1` sample Contact
+  - creates `4` sample Cases linked to that Contact
+  - creates a sample Form that shows the Contact details and a repeatable Cases section (prefill + submit)
+  - creates a second sample Form with a prefill query by `Email` that loads the matching Contact and lets the end user update the Contact's details
 
 ### Designer / Runtime
 - basic theme editor

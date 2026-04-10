@@ -7,6 +7,7 @@ import deletePrefillAction from '@salesforce/apex/NativeFormsPrefillActionsContr
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
+const PAGE_VERSION = 'Prefill v0.3';
 
 export default class NativeFormsPrefillActions extends LightningElement {
     isLoading = true;
@@ -24,6 +25,7 @@ export default class NativeFormsPrefillActions extends LightningElement {
     enableProConditionLogic = false;
     enableProPrefillAliasReferences = false;
     prefillAliasDetails = [];
+    aliasFieldOptionsCache = {};
     conditionLogicOptions = [
         { label: 'AND', value: 'AND' },
         { label: 'OR', value: 'OR' }
@@ -43,6 +45,10 @@ export default class NativeFormsPrefillActions extends LightningElement {
     @track draftAction = {};
     @track mappings = [];
     boundHandlePageActivation;
+
+    get pageVersion() {
+        return PAGE_VERSION;
+    }
 
     commandTypeOptions = [
         { label: 'findOne', value: 'findOne' },
@@ -83,10 +89,18 @@ export default class NativeFormsPrefillActions extends LightningElement {
             displayIndex: index + 1,
             isValueSourceField: row.valueSource === 'field',
             isValueSourceAlias: row.valueSource === 'alias',
-            selectedAliasName: row.valueSource === 'alias' ? this.aliasNameFromValue(row.valueText) : '',
-            selectedAliasField: row.valueSource === 'alias' ? this.aliasFieldFromValue(row.valueText) : '',
+            selectedAliasName: row.valueSource === 'alias'
+                ? (row.selectedAliasName || this.aliasNameFromValue(row.valueText))
+                : '',
+            selectedAliasField: row.valueSource === 'alias'
+                ? (row.selectedAliasField || this.aliasFieldFromValue(row.valueText))
+                : '',
             aliasOptions: this.prefillAliasOptions,
-            aliasFieldOptions: this.getPrefillAliasFieldOptions(row.valueSource === 'alias' ? this.aliasNameFromValue(row.valueText) : ''),
+            aliasFieldOptions: this.getPrefillAliasFieldOptions(
+                row.valueSource === 'alias'
+                    ? (row.selectedAliasName || this.aliasNameFromValue(row.valueText))
+                    : ''
+            ),
             valueLabel: this.getConditionValueLabel(row.valueSource || 'param'),
             valuePlaceholder: this.getConditionValuePlaceholder(row.valueSource || 'param')
         }));
@@ -185,6 +199,7 @@ export default class NativeFormsPrefillActions extends LightningElement {
             this.enableProConditionLogic = !!workspace.enableProConditionLogic;
             this.enableProPrefillAliasReferences = !!workspace.enableProPrefillAliasReferences;
             this.prefillAliasDetails = workspace.prefillAliasDetails || [];
+            this.aliasFieldOptionsCache = this.buildAliasFieldOptionsCache(this.prefillAliasDetails);
             this.versionOptions = (workspace.versions || []).map((option) => ({
                 label: `${option.label} (${option.status})`,
                 value: option.value
@@ -345,23 +360,28 @@ export default class NativeFormsPrefillActions extends LightningElement {
         }
     }
 
-    handleConditionChange(event) {
+    async handleConditionChange(event) {
         const rowIndex = Number(event.target.dataset.index);
         const { name, value } = event.target;
         const conditions = [...(this.draftAction.conditions || [])];
         if (name === 'aliasName' || name === 'aliasField') {
-            const currentAlias = this.aliasNameFromValue(conditions[rowIndex]?.valueText || '');
-            const currentField = this.aliasFieldFromValue(conditions[rowIndex]?.valueText || '');
+            const currentAlias = conditions[rowIndex]?.selectedAliasName || this.aliasNameFromValue(conditions[rowIndex]?.valueText || '');
+            const currentField = conditions[rowIndex]?.selectedAliasField || this.aliasFieldFromValue(conditions[rowIndex]?.valueText || '');
             const nextAlias = name === 'aliasName' ? value : currentAlias;
             const nextField = name === 'aliasField' ? value : currentField;
             conditions[rowIndex] = {
                 ...conditions[rowIndex],
+                selectedAliasName: nextAlias,
+                selectedAliasField: nextField,
                 valueText: this.composeAliasValue(nextAlias, nextField)
             };
             this.draftAction = {
                 ...this.draftAction,
                 conditions
             };
+            if (name === 'aliasName') {
+                await this.ensureAliasFieldOptionsLoaded(nextAlias);
+            }
             return;
         }
         conditions[rowIndex] = {
@@ -506,7 +526,13 @@ export default class NativeFormsPrefillActions extends LightningElement {
                 valueText: this.normalizeConditionValueInput(
                     item.valueSource || (item.paramName ? 'param' : 'literal'),
                     item.valueText != null ? item.valueText : (item.paramName || '')
-                )
+                ),
+                selectedAliasName: (item.valueSource === 'alias')
+                    ? this.aliasNameFromValue(item.valueText != null ? item.valueText : '')
+                    : '',
+                selectedAliasField: (item.valueSource === 'alias')
+                    ? this.aliasFieldFromValue(item.valueText != null ? item.valueText : '')
+                    : ''
             }));
         }
         if (!fallbackWhereClause) {
@@ -538,8 +564,19 @@ export default class NativeFormsPrefillActions extends LightningElement {
             fieldApiName: '',
             operator: 'eq',
             valueSource: 'param',
-            valueText: ''
+            valueText: '',
+            selectedAliasName: '',
+            selectedAliasField: ''
         };
+    }
+
+    buildAliasFieldOptionsCache(aliasDetails) {
+        return (aliasDetails || []).reduce((cache, detail) => {
+            if (detail?.alias) {
+                cache[detail.alias] = detail.fieldOptions || [];
+            }
+            return cache;
+        }, {});
     }
 
     sanitizeConditions() {
@@ -686,8 +723,37 @@ export default class NativeFormsPrefillActions extends LightningElement {
         if (!aliasName) {
             return [{ label: 'Select field', value: '' }];
         }
+        const cached = this.aliasFieldOptionsCache?.[aliasName];
+        if (cached && cached.length) {
+            return [{ label: 'Select field', value: '' }].concat(cached);
+        }
         const match = (this.prefillAliasDetails || []).find((item) => item.alias === aliasName);
         return [{ label: 'Select field', value: '' }].concat(match?.fieldOptions || []);
+    }
+
+    async ensureAliasFieldOptionsLoaded(aliasName) {
+        if (!aliasName) {
+            return;
+        }
+        if (this.aliasFieldOptionsCache?.[aliasName]?.length) {
+            return;
+        }
+        const match = (this.prefillAliasDetails || []).find((item) => item.alias === aliasName);
+        if (!match?.objectApiName) {
+            return;
+        }
+        try {
+            const fieldOptions = await getFieldOptions({ objectApiName: match.objectApiName });
+            this.aliasFieldOptionsCache = {
+                ...this.aliasFieldOptionsCache,
+                [aliasName]: fieldOptions || []
+            };
+        } catch (error) {
+            this.aliasFieldOptionsCache = {
+                ...this.aliasFieldOptionsCache,
+                [aliasName]: []
+            };
+        }
     }
 
     defaultConditionExpression(count) {
