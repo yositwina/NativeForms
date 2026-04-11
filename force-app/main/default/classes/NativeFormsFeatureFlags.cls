@@ -28,4 +28,14 @@ public with sharing class NativeFormsFeatureFlags {
         NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
         return config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
     }
+
+    public static Boolean isProSfSecretCodeAuthEnabled() {
+        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
+        return config != null && config.Enable_Pro_SF_Secret_Code_Auth__c;
+    }
+
+    public static Boolean isProLoadFileEnabled() {
+        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
+        return config != null && config.Enable_Pro_Load_File__c;
+    }
 }

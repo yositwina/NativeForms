@@ -53,6 +53,14 @@
         <apexClass>NativeFormsSubmitActionsController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsDemoDataController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsDemoDataService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 
     <objectPermissions>
         <allowCreate>true</allowCreate>
@@ -121,6 +129,31 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>NativeForms_Config__c.Enable_Pro_Condition_Logic__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NativeForms_Config__c.Demo_Data_Installed__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NativeForms_Config__c.Demo_Data_Installed_At__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NativeForms_Config__c.Demo_Data_Last_Message__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NativeForms_Config__c.Demo_Data_Record_Ids__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NativeForms_Config__c.Demo_Data_Version__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -504,6 +537,10 @@
     </fieldPermissions>
 
     <tabSettings>
+        <tab>NativeForms_Home</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
         <tab>NativeForms_Admin_Features</tab>
         <visibility>Visible</visibility>
     </tabSettings>
@@ -517,6 +554,10 @@
     </tabSettings>
     <tabSettings>
         <tab>NativeForms_Themes</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NF_Theme__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>

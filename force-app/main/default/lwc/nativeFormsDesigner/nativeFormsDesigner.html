@@ -590,11 +590,84 @@
                                     <span class="property-inline-text__label">Internal Name (ID):</span>
                                     <span class="property-inline-text__value">{selectedElementFieldKey}</span>
                                 </p>
+
+                                <template if:true={selectedElementSupportsDisplayFieldBehavior}>
+                                    <div class="behavior-radio-group">
+                                        <div class="behavior-radio-group__label-row">
+                                            <label class="slds-form-element__label">User Access</label>
+                                        </div>
+                                        <div class="behavior-radio-group__options" role="radiogroup" aria-label="Field Behavior">
+                                            <template for:each={fieldBehaviorRadioOptions} for:item="option">
+                                                <label key={option.value} class="behavior-radio-option">
+                                                    <input
+                                                        type="radio"
+                                                        name="fieldBehaviorDisplay"
+                                                        value={option.value}
+                                                        checked={option.checked}
+                                                        onchange={handleEditorFieldBehaviorChange} />
+                                                    <span>{option.label}</span>
+                                                </label>
+                                            </template>
+                                        </div>
+                                        <p class="behavior-help-text">Locked means the field becomes read-only only when it already has a value, such as from prefill.</p>
+                                    </div>
+                                </template>
+
+                                <template if:true={selectedElementIsSection}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Title"
+                                        checked={editorShowTitle}
+                                        onchange={handleEditorShowTitleChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Rectangular Box"
+                                        checked={editorBoxed}
+                                        onchange={handleEditorBoxedChange}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Columns"
+                                        value={editorColumns}
+                                        options={sectionColumnOptions}
+                                        onchange={handleEditorColumnsChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsGroup}>
+                                    <lightning-combobox
+                                        label="Columns"
+                                        value={editorColumns}
+                                        options={sectionColumnOptions}
+                                        onchange={handleEditorColumnsChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsRepeatGroup}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Title"
+                                        checked={editorShowTitle}
+                                        onchange={handleEditorShowTitleChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Show Rectangular Box"
+                                        checked={editorBoxed}
+                                        onchange={handleEditorBoxedChange}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Columns"
+                                        value={editorColumns}
+                                        options={sectionColumnOptions}
+                                        onchange={handleEditorColumnsChange}>
+                                    </lightning-combobox>
+                                </template>
                             </div>
 
                             <div class="selection-card">
                                 <p class="selection-label">Behavior</p>
-                                <template if:true={selectedElementSupportsFieldBehavior}>
+                                <template if:true={selectedElementSupportsBehaviorFieldBehavior}>
                                     <div class="behavior-radio-group">
                                         <div class="behavior-radio-group__label-row">
                                             <label class="slds-form-element__label">User Access</label>
@@ -747,55 +820,7 @@
                                     </lightning-input>
                                 </template>
 
-                                <template if:true={selectedElementIsSection}>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Show Title"
-                                        checked={editorShowTitle}
-                                        onchange={handleEditorShowTitleChange}>
-                                    </lightning-input>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Show Rectangular Box"
-                                        checked={editorBoxed}
-                                        onchange={handleEditorBoxedChange}>
-                                    </lightning-input>
-                                    <lightning-combobox
-                                        label="Columns"
-                                        value={editorColumns}
-                                        options={sectionColumnOptions}
-                                        onchange={handleEditorColumnsChange}>
-                                    </lightning-combobox>
-                                </template>
-
-                                <template if:true={selectedElementIsGroup}>
-                                    <lightning-combobox
-                                        label="Columns"
-                                        value={editorColumns}
-                                        options={sectionColumnOptions}
-                                        onchange={handleEditorColumnsChange}>
-                                    </lightning-combobox>
-                                </template>
-
                                 <template if:true={selectedElementIsRepeatGroup}>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Show Title"
-                                        checked={editorShowTitle}
-                                        onchange={handleEditorShowTitleChange}>
-                                    </lightning-input>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Show Rectangular Box"
-                                        checked={editorBoxed}
-                                        onchange={handleEditorBoxedChange}>
-                                    </lightning-input>
-                                    <lightning-combobox
-                                        label="Columns"
-                                        value={editorColumns}
-                                        options={sectionColumnOptions}
-                                        onchange={handleEditorColumnsChange}>
-                                    </lightning-combobox>
                                     <lightning-combobox
                                         label="Source Prefill Alias"
                                         value={editorRepeatSourceAlias}

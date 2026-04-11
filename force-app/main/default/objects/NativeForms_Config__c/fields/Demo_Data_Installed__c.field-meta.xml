@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Demo_Data_Installed__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Tracks whether the packaged NativeForms demo data has been installed for this org.</description>
+    <inlineHelpText>Set automatically when the demo-data installer completes.</inlineHelpText>
+    <label>Demo Data Installed</label>
+    <trackHistory>false</trackHistory>
+    <type>Checkbox</type>
+</CustomField>

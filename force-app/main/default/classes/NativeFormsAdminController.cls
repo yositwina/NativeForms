@@ -6,6 +6,8 @@ public with sharing class NativeFormsAdminController {
         @AuraEnabled public Boolean enableProAdvancedSubmitModes { get; set; }
         @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
+        @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
+        @AuraEnabled public Boolean enableProLoadFile { get; set; }
     }
 
     @AuraEnabled(cacheable=true)
@@ -18,6 +20,8 @@ public with sharing class NativeFormsAdminController {
         settings.enableProAdvancedSubmitModes = config != null && config.Enable_Pro_Advanced_Submit_Modes__c;
         settings.enableProFormulaFields = config != null && config.Enable_Pro_Formula_Fields__c;
         settings.enableProPostSubmitAutoLink = config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
+        settings.enableProSfSecretCodeAuth = config != null && config.Enable_Pro_SF_Secret_Code_Auth__c;
+        settings.enableProLoadFile = config != null && config.Enable_Pro_Load_File__c;
         return settings;
     }
 
@@ -35,6 +39,8 @@ public with sharing class NativeFormsAdminController {
         config.Enable_Pro_Advanced_Submit_Modes__c = inputValue != null && inputValue.enableProAdvancedSubmitModes;
         config.Enable_Pro_Formula_Fields__c = inputValue != null && inputValue.enableProFormulaFields;
         config.Enable_Pro_Post_Submit_Auto_Link__c = inputValue != null && inputValue.enableProPostSubmitAutoLink;
+        config.Enable_Pro_SF_Secret_Code_Auth__c = inputValue != null && inputValue.enableProSfSecretCodeAuth;
+        config.Enable_Pro_Load_File__c = inputValue != null && inputValue.enableProLoadFile;
         if (config.Id == null) {
             insert config;
         } else {

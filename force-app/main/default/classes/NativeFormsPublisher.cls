@@ -2231,7 +2231,8 @@ public with sharing class NativeFormsPublisher {
     }
 
     private static String cssFormWidth(Map<String, Object> source, String key, String fallbackValue) {
-        String value = stringValue(source.get(key)).toLowerCase();
+        String rawValue = stringValue(source.get(key));
+        String value = String.isBlank(rawValue) ? '' : rawValue.toLowerCase();
         if (value == 'narrow') return '640px';
         if (value == 'standard') return '760px';
         if (value == 'wide') return '880px';

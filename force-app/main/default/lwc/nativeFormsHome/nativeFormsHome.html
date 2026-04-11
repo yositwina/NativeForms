@@ -1,0 +1,50 @@
+<template>
+    <lightning-card title="NativeForms Home" icon-name="custom:custom18">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="slds-text-body_regular slds-m-bottom_medium">
+                Install the NativeForms demo pack to create four themes, two contacts, four cases, and two sample forms.
+            </p>
+
+            <template if:true={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={successMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_success slds-m-bottom_medium" role="alert">
+                    <h2>{successMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading NativeForms Home" size="small"></lightning-spinner>
+            </template>
+
+            <div class="slds-box slds-theme_default slds-m-bottom_medium">
+                <p class="slds-text-title_bold">Demo Data Status</p>
+                <p class="slds-m-top_x-small">Status: {installedLabel}</p>
+                <p>Installed Version: {demoDataVersionValue}</p>
+                <p>Themes: {installedThemeCount} / {targetThemeCount}</p>
+                <p>Contacts: {installedContactCount} / {targetContactCount}</p>
+                <p>Cases: {installedCaseCount} / {targetCaseCount}</p>
+                <p>Forms: {installedFormCount} / {targetFormCount}</p>
+            </div>
+
+            <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                <p class="slds-text-title_bold">What Gets Created</p>
+                <p class="slds-m-top_x-small">Themes: Ocean Blue, Deep Blue, Clean Light, Business Dark</p>
+                <p>Contacts: Ava Reynolds and Liam Carter</p>
+                <p>Cases: four sample support cases linked to those contacts</p>
+                <p>Forms: Contact Update Demo and Case Update Demo</p>
+            </div>
+
+            <lightning-button
+                variant="brand"
+                label="Install Demo Records"
+                onclick={handleInstall}
+                disabled={installDisabled}
+            ></lightning-button>
+        </div>
+    </lightning-card>
+</template>

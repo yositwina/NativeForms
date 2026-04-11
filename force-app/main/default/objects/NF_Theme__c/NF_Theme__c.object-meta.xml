@@ -17,6 +17,22 @@
         <type>Text</type>
     </nameField>
     <pluralLabel>NF Themes</pluralLabel>
+    <searchLayouts>
+        <customTabListAdditionalFields>Description__c</customTabListAdditionalFields>
+        <customTabListAdditionalFields>Form_Width__c</customTabListAdditionalFields>
+        <customTabListAdditionalFields>Title_Font__c</customTabListAdditionalFields>
+        <customTabListAdditionalFields>Main_Font__c</customTabListAdditionalFields>
+        <customTabListAdditionalFields>Logo_Position__c</customTabListAdditionalFields>
+        <lookupDialogsAdditionalFields>Description__c</lookupDialogsAdditionalFields>
+        <lookupDialogsAdditionalFields>Form_Width__c</lookupDialogsAdditionalFields>
+        <lookupDialogsAdditionalFields>Title_Font__c</lookupDialogsAdditionalFields>
+        <lookupDialogsAdditionalFields>Main_Font__c</lookupDialogsAdditionalFields>
+        <searchResultsAdditionalFields>Description__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Form_Width__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Title_Font__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Main_Font__c</searchResultsAdditionalFields>
+        <searchResultsAdditionalFields>Logo_Position__c</searchResultsAdditionalFields>
+    </searchLayouts>
     <sharingModel>ReadWrite</sharingModel>
     <visibility>Public</visibility>
 </CustomObject>

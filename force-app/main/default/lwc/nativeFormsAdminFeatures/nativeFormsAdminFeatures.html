@@ -57,13 +57,27 @@
                         onchange={handleToggle}>
                     </lightning-input>
 
-                    <lightning-input
-                        type="checkbox"
-                        name="enableProPostSubmitAutoLink"
-                        label="Enable Pro Post Submit Auto Link"
-                        checked={enableProPostSubmitAutoLink}
-                        onchange={handleToggle}>
-                    </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProPostSubmitAutoLink"
+                            label="Enable Pro Post Submit Auto Link"
+                            checked={enableProPostSubmitAutoLink}
+                            onchange={handleToggle}>
+                        </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProSfSecretCodeAuth"
+                            label="Enable Pro Authenticate Secret Code at SF"
+                            checked={enableProSfSecretCodeAuth}
+                            onchange={handleToggle}>
+                        </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProLoadFile"
+                            label="Enable Pro Load File"
+                            checked={enableProLoadFile}
+                            onchange={handleToggle}>
+                        </lightning-input>
 
                     <div class="actions">
                         <lightning-button

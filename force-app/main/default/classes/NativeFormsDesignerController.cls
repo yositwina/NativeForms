@@ -236,7 +236,12 @@ public with sharing class NativeFormsDesignerController {
             workspace.forms.add(option);
         }
 
+        Map<Id, NF_Form__c> formsById = new Map<Id, NF_Form__c>(forms);
+
         Id effectiveFormId = formId;
+        if (effectiveFormId != null && !formsById.containsKey(effectiveFormId)) {
+            effectiveFormId = null;
+        }
         if (effectiveFormId == null && !forms.isEmpty()) {
             effectiveFormId = forms[0].Id;
         }
@@ -244,12 +249,7 @@ public with sharing class NativeFormsDesignerController {
             return workspace;
         }
 
-        NF_Form__c selectedForm = [
-            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c
-            FROM NF_Form__c
-            WHERE Id = :effectiveFormId
-            LIMIT 1
-        ];
+        NF_Form__c selectedForm = formsById.get(effectiveFormId);
         workspace.selectedFormId = selectedForm.Id;
         workspace.selectedFormName = selectedForm.Name;
         workspace.selectedFormKey = selectedForm.NF_Key__c;
@@ -301,10 +301,18 @@ public with sharing class NativeFormsDesignerController {
             workspace.versions.add(option);
         }
 
+        Map<Id, NF_Form_Version__c> versionsById = new Map<Id, NF_Form_Version__c>(versionRecords);
+
         Id effectiveVersionId = versionId;
+        if (effectiveVersionId != null && !versionsById.containsKey(effectiveVersionId)) {
+            effectiveVersionId = null;
+        }
         if (effectiveVersionId == null) {
             if (selectedForm.Current_Published_Version__c != null) {
                 effectiveVersionId = selectedForm.Current_Published_Version__c;
+                if (!versionsById.containsKey(effectiveVersionId)) {
+                    effectiveVersionId = null;
+                }
             } else if (!versionRecords.isEmpty()) {
                 effectiveVersionId = versionRecords[0].Id;
             }
@@ -313,12 +321,7 @@ public with sharing class NativeFormsDesignerController {
             return workspace;
         }
 
-        NF_Form_Version__c selectedVersion = [
-            SELECT Id, Name, Version_Number__c, Version_Status__c
-            FROM NF_Form_Version__c
-            WHERE Id = :effectiveVersionId
-            LIMIT 1
-        ];
+        NF_Form_Version__c selectedVersion = versionsById.get(effectiveVersionId);
         workspace.selectedVersionId = selectedVersion.Id;
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
@@ -557,24 +560,92 @@ public with sharing class NativeFormsDesignerController {
             LIMIT 1
         ];
 
-        if (elementRecord.Element_Type__c == 'repeatGroup') {
-            throw new AuraHandledException('Repeat groups cannot be nested inside another container in this version.');
-        }
-        if (elementRecord.Element_Type__c == 'group') {
-            throw new AuraHandledException('Groups cannot be nested inside another container in this version.');
-        }
-        if (sectionRecord.Element_Type__c == 'repeatGroup' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup')) {
-            throw new AuraHandledException('Repeat groups can contain fields and display elements, but not other containers.');
-        }
-        if (sectionRecord.Element_Type__c == 'group' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group')) {
-            throw new AuraHandledException('Groups can contain fields and display elements, but not other containers.');
-        }
+        validateContainerPlacement(sectionRecord, elementRecord);
 
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         config.put('sectionColumn', columnNumber);
         elementRecord.Config_JSON__c = JSON.serializePretty(config);
         elementRecord.Parent_Element_Id__c = sectionRecord.Element_Id__c;
         update elementRecord;
+    }
+
+    @AuraEnabled
+    public static void insertElementAfter(Id elementId, Id anchorElementId) {
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        if (anchorElementId == null) {
+            throw new AuraHandledException('Anchor element id is required.');
+        }
+        ensureElementVersionEditable(elementId);
+
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Form_Version__c, Element_Type__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            LIMIT 1
+        ];
+        NF_Form_Element__c anchorRecord = [
+            SELECT Id, Form_Version__c, Element_Id__c, Element_Type__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :anchorElementId
+            LIMIT 1
+        ];
+
+        if (elementRecord.Form_Version__c != anchorRecord.Form_Version__c) {
+            throw new AuraHandledException('Elements must belong to the same version.');
+        }
+
+        String targetParentElementId = anchorRecord.Parent_Element_Id__c;
+        Integer targetColumn = readSectionColumn(anchorRecord.Config_JSON__c);
+        if (targetParentElementId != null) {
+            NF_Form_Element__c parentRecord = [
+                SELECT Id, Element_Id__c, Element_Type__c
+                FROM NF_Form_Element__c
+                WHERE Element_Id__c = :targetParentElementId
+                  AND Form_Version__c = :anchorRecord.Form_Version__c
+                LIMIT 1
+            ];
+            validateContainerPlacement(parentRecord, elementRecord);
+        }
+
+        Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
+        if (targetParentElementId == null) {
+            elementConfig.remove('sectionColumn');
+        } else {
+            elementConfig.put('sectionColumn', targetColumn == null ? 1 : targetColumn);
+        }
+        elementRecord.Config_JSON__c = JSON.serializePretty(elementConfig);
+        elementRecord.Parent_Element_Id__c = targetParentElementId;
+
+        List<NF_Form_Element__c> siblings = [
+            SELECT Id, Order__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :anchorRecord.Form_Version__c
+              AND Parent_Element_Id__c = :targetParentElementId
+              AND Id != :elementId
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ];
+
+        Integer anchorIndex = -1;
+        for (Integer i = 0; i < siblings.size(); i++) {
+            if (siblings[i].Id == anchorRecord.Id) {
+                anchorIndex = i;
+                break;
+            }
+        }
+        if (anchorIndex < 0) {
+            anchorIndex = siblings.size() - 1;
+        }
+
+        siblings.add(anchorIndex + 1, elementRecord);
+
+        Integer orderValue = 10;
+        for (NF_Form_Element__c sibling : siblings) {
+            sibling.Order__c = orderValue;
+            orderValue += 10;
+        }
+        update siblings;
     }
 
     @AuraEnabled
@@ -876,6 +947,21 @@ public with sharing class NativeFormsDesignerController {
             return Integer.valueOf(String.valueOf(config.get('sectionColumn')));
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private static void validateContainerPlacement(NF_Form_Element__c sectionRecord, NF_Form_Element__c elementRecord) {
+        if (elementRecord.Element_Type__c == 'repeatGroup') {
+            throw new AuraHandledException('Repeat groups cannot be nested inside another container in this version.');
+        }
+        if (elementRecord.Element_Type__c == 'group') {
+            throw new AuraHandledException('Groups cannot be nested inside another container in this version.');
+        }
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup')) {
+            throw new AuraHandledException('Repeat groups can contain fields and display elements, but not other containers.');
+        }
+        if (sectionRecord.Element_Type__c == 'group' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group')) {
+            throw new AuraHandledException('Groups can contain fields and display elements, but not other containers.');
         }
     }
 

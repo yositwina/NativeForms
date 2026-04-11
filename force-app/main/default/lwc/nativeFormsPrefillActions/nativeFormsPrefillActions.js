@@ -7,7 +7,7 @@ import deletePrefillAction from '@salesforce/apex/NativeFormsPrefillActionsContr
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
-const PAGE_VERSION = 'Prefill v0.3';
+const PAGE_VERSION = 'Prefill v1.0';
 
 export default class NativeFormsPrefillActions extends LightningElement {
     isLoading = true;
@@ -60,6 +60,11 @@ export default class NativeFormsPrefillActions extends LightningElement {
         { label: 'error', value: 'error' }
     ];
 
+    orderDirectionOptions = [
+        { label: 'Ascending', value: 'ASC' },
+        { label: 'Descending', value: 'DESC' }
+    ];
+
     connectedCallback() {
         this.boundHandlePageActivation = this.handlePageActivation.bind(this);
         window.addEventListener('focus', this.boundHandlePageActivation);
@@ -81,6 +86,18 @@ export default class NativeFormsPrefillActions extends LightningElement {
 
     get isFindMany() {
         return this.draftAction?.commandType === 'findMany';
+    }
+
+    get orderByFieldOptions() {
+        return [{ label: 'Select field', value: '' }].concat(this.fieldOptions || []);
+    }
+
+    get isOrderAscending() {
+        return this.draftAction?.orderByDirection === 'ASC';
+    }
+
+    get isOrderDescending() {
+        return (this.draftAction?.orderByDirection || 'DESC') === 'DESC';
     }
 
     get conditionRows() {
@@ -264,11 +281,13 @@ export default class NativeFormsPrefillActions extends LightningElement {
         }
 
         const config = this.parseConfig(action.configJson);
+        const parsedOrderBy = this.parseOrderBy(config.orderBy || '');
         this.draftAction = {
             ...action,
             objectApiName: this.matchObjectOptionValue(action.objectApiName),
             whereClause: config.where || '',
-            orderBy: config.orderBy || '',
+            orderByField: parsedOrderBy.field,
+            orderByDirection: parsedOrderBy.direction,
             limitValue: config.limit == null ? (action.commandType === 'findMany' ? 25 : null) : config.limit,
             onNotFound: config.onNotFound || 'ignore',
             conditionLogic: config.conditionLogic || '',
@@ -295,8 +314,8 @@ export default class NativeFormsPrefillActions extends LightningElement {
         if (whereClause) {
             config.where = whereClause;
         }
-        if (this.draftAction.commandType === 'findMany' && this.draftAction.orderBy) {
-            config.orderBy = this.draftAction.orderBy;
+        if (this.draftAction.commandType === 'findMany' && this.draftAction.orderByField) {
+            config.orderBy = `${this.draftAction.orderByField} ${this.draftAction.orderByDirection || 'DESC'}`;
         }
         if (this.draftAction.commandType === 'findMany' && this.draftAction.limitValue !== null && this.draftAction.limitValue !== undefined && this.draftAction.limitValue !== '') {
             config.limit = Number(this.draftAction.limitValue);
@@ -351,13 +370,21 @@ export default class NativeFormsPrefillActions extends LightningElement {
             }
             if (value !== 'findMany') {
                 nextDraft.limitValue = null;
-                nextDraft.orderBy = '';
+                nextDraft.orderByField = '';
+                nextDraft.orderByDirection = 'DESC';
             }
         }
         this.draftAction = nextDraft;
         if (name === 'objectApiName') {
             this.loadFieldOptions(value);
         }
+    }
+
+    handleOrderDirectionChange(event) {
+        this.draftAction = {
+            ...this.draftAction,
+            orderByDirection: event.target.value || 'DESC'
+        };
     }
 
     async handleConditionChange(event) {
@@ -556,6 +583,24 @@ export default class NativeFormsPrefillActions extends LightningElement {
                 valueText: this.normalizeConditionValueInput(paramName ? 'param' : 'literal', paramName)
             };
         });
+    }
+
+    parseOrderBy(rawValue) {
+        const value = String(rawValue || '').trim();
+        if (!value) {
+            return { field: '', direction: 'DESC' };
+        }
+        const match = value.match(/^(.+?)\s+(ASC|DESC)$/i);
+        if (match) {
+            return {
+                field: match[1].trim(),
+                direction: match[2].toUpperCase()
+            };
+        }
+        return {
+            field: value,
+            direction: 'DESC'
+        };
     }
 
     createEmptyCondition() {

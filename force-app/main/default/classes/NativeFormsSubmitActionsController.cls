@@ -230,6 +230,13 @@ public with sharing class NativeFormsSubmitActionsController {
         }
         ensureVersionEditable(versionId);
 
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+
         Integer nextOrder = 10;
         AggregateResult[] maxRows = [
             SELECT MAX(Order__c) maxOrder
@@ -244,10 +251,10 @@ public with sharing class NativeFormsSubmitActionsController {
         NF_Form_Action__c actionRecord = new NF_Form_Action__c(
             Form_Version__c = versionId,
             Action_Scope__c = 'Submit',
-            Command_Key__c = 'submitAction' + String.valueOf(Datetime.now().getTime()),
+            Command_Key__c = buildNextSubmitActionKey(versionRecord.Form__c),
             Command_Type__c = 'create',
             Object_Api_Name__c = 'Contact',
-            Store_Result_As__c = 'savedRecord',
+            Store_Result_As__c = buildNextSubmitAlias(versionRecord.Form__c),
             Order__c = nextOrder,
             Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
                 'targetBy' => 'create'
@@ -443,6 +450,62 @@ public with sharing class NativeFormsSubmitActionsController {
         String objectSeed = String.isBlank(objectApiName) ? 'Record' : objectApiName.replaceAll('[^a-zA-Z0-9]', '');
         String actionSeed = String.isBlank(commandType) ? 'create' : commandType.replaceAll('[^a-zA-Z0-9]', '');
         return (actionSeed + objectSeed).left(80);
+    }
+
+    private static String buildNextSubmitActionKey(Id formId) {
+        return buildNextScopedKey(formId, 'Submit', 'submitAction');
+    }
+
+    private static String buildNextSubmitAlias(Id formId) {
+        return buildNextScopedAlias(formId, 'Submit', 'savedRecord');
+    }
+
+    private static String buildNextScopedKey(Id formId, String actionScope, String prefix) {
+        Integer suffix = nextScopedSequence(formId, actionScope, prefix, true);
+        return (prefix + String.valueOf(suffix)).left(80);
+    }
+
+    private static String buildNextScopedAlias(Id formId, String actionScope, String prefix) {
+        Integer suffix = nextScopedSequence(formId, actionScope, prefix, false);
+        return (prefix + String.valueOf(suffix)).left(80);
+    }
+
+    private static Integer nextScopedSequence(Id formId, String actionScope, String prefix, Boolean useCommandKey) {
+        if (formId == null) {
+            return 1;
+        }
+
+        Integer maxSuffix = 0;
+        for (NF_Form_Action__c actionRecord : [
+            SELECT Command_Key__c, Store_Result_As__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__r.Form__c = :formId
+              AND Action_Scope__c = :actionScope
+        ]) {
+            String candidate = useCommandKey ? actionRecord.Command_Key__c : actionRecord.Store_Result_As__c;
+            Integer parsedSuffix = readTrailingSequence(candidate, prefix);
+            if (parsedSuffix != null && parsedSuffix > maxSuffix) {
+                maxSuffix = parsedSuffix;
+            }
+        }
+        return maxSuffix + 1;
+    }
+
+    private static Integer readTrailingSequence(String value, String prefix) {
+        if (String.isBlank(value) || String.isBlank(prefix) || !value.startsWith(prefix)) {
+            return null;
+        }
+
+        String suffix = value.substring(prefix.length());
+        if (String.isBlank(suffix) || !Pattern.matches('^[0-9]+$', suffix)) {
+            return null;
+        }
+
+        try {
+            return Integer.valueOf(suffix);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static String canonicalObjectApiName(String requestedObjectName) {

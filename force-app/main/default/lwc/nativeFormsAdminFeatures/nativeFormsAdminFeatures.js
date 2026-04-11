@@ -4,7 +4,7 @@ import saveFeatureSettings from '@salesforce/apex/NativeFormsAdminController.sav
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 export default class NativeFormsAdminFeatures extends LightningElement {
-    adminFeaturesVersion = 'v0.3';
+    adminFeaturesVersion = 'v0.5';
     isLoading = true;
     errorMessage = '';
     enableProConditionLogic = false;
@@ -13,6 +13,8 @@ export default class NativeFormsAdminFeatures extends LightningElement {
     enableProAdvancedSubmitModes = false;
     enableProFormulaFields = false;
     enableProPostSubmitAutoLink = false;
+    enableProSfSecretCodeAuth = false;
+    enableProLoadFile = false;
 
     connectedCallback() {
         this.loadSettings();
@@ -29,6 +31,8 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
             this.enableProFormulaFields = !!settings?.enableProFormulaFields;
             this.enableProPostSubmitAutoLink = !!settings?.enableProPostSubmitAutoLink;
+            this.enableProSfSecretCodeAuth = !!settings?.enableProSfSecretCodeAuth;
+            this.enableProLoadFile = !!settings?.enableProLoadFile;
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -58,6 +62,14 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             this.enableProPostSubmitAutoLink = event.target.checked;
             return;
         }
+        if (fieldName === 'enableProSfSecretCodeAuth') {
+            this.enableProSfSecretCodeAuth = event.target.checked;
+            return;
+        }
+        if (fieldName === 'enableProLoadFile') {
+            this.enableProLoadFile = event.target.checked;
+            return;
+        }
         this.enableProConditionLogic = event.target.checked;
     }
 
@@ -72,7 +84,9 @@ export default class NativeFormsAdminFeatures extends LightningElement {
                     enableProPrefillAliasReferences: this.enableProPrefillAliasReferences,
                     enableProAdvancedSubmitModes: this.enableProAdvancedSubmitModes,
                     enableProFormulaFields: this.enableProFormulaFields,
-                    enableProPostSubmitAutoLink: this.enableProPostSubmitAutoLink
+                    enableProPostSubmitAutoLink: this.enableProPostSubmitAutoLink,
+                    enableProSfSecretCodeAuth: this.enableProSfSecretCodeAuth,
+                    enableProLoadFile: this.enableProLoadFile
                 }
             });
             this.enableProConditionLogic = !!settings?.enableProConditionLogic;
@@ -81,6 +95,8 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
             this.enableProFormulaFields = !!settings?.enableProFormulaFields;
             this.enableProPostSubmitAutoLink = !!settings?.enableProPostSubmitAutoLink;
+            this.enableProSfSecretCodeAuth = !!settings?.enableProSfSecretCodeAuth;
+            this.enableProLoadFile = !!settings?.enableProLoadFile;
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Settings saved',
                 message: 'NativeForms feature flags were updated.',

@@ -209,12 +209,39 @@
                                 </div>
 
                                 <template if:true={isFindMany}>
-                                    <lightning-input
-                                        name="orderBy"
-                                        label="Order By"
-                                        value={draftAction.orderBy}
-                                        onchange={handleDraftChange}>
-                                    </lightning-input>
+                                    <div class="order-row">
+                                        <lightning-combobox
+                                            name="orderByField"
+                                            label="Order By"
+                                            value={draftAction.orderByField}
+                                            options={orderByFieldOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+
+                                        <div class="sort-direction">
+                                            <span class="sort-direction__label">Sort Direction</span>
+                                            <div class="sort-direction__options">
+                                                <label class="sort-direction__option">
+                                                    <input
+                                                        type="radio"
+                                                        name="orderByDirection"
+                                                        value="ASC"
+                                                        checked={isOrderAscending}
+                                                        onchange={handleOrderDirectionChange}>
+                                                    <span>Ascending</span>
+                                                </label>
+                                                <label class="sort-direction__option">
+                                                    <input
+                                                        type="radio"
+                                                        name="orderByDirection"
+                                                        value="DESC"
+                                                        checked={isOrderDescending}
+                                                        onchange={handleOrderDirectionChange}>
+                                                    <span>Descending</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     <lightning-input
                                         type="number"
@@ -231,7 +258,7 @@
                                             name="actionKey"
                                             label="Action Key"
                                             value={draftAction.actionKey}
-                                            onchange={handleDraftChange}>
+                                            read-only>
                                         </lightning-input>
                                         <lightning-textarea
                                             name="configJson"

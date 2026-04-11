@@ -7,7 +7,7 @@ import deleteSubmitAction from '@salesforce/apex/NativeFormsSubmitActionsControl
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
-const PAGE_VERSION = 'Submit v0.2';
+const PAGE_VERSION = 'Submit v0.6';
 
 export default class NativeFormsSubmitActions extends LightningElement {
     isLoading = true;
@@ -333,9 +333,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
             conditions: this.normalizeConditions(config.conditions, config.where),
             conditionExpression: config.conditionExpression || config.conditionLogic || this.defaultConditionExpression((config.conditions || []).length),
             repeatGroupKey: config.repeatGroupKey || '',
-            relationshipField: config.relationshipField || '',
+            relationshipField: this.matchOptionValue(this.fieldOptions, config.relationshipField || ''),
             relationshipValueSource: config.relationshipValueSource || 'alias',
-            relationshipValueText: this.normalizeConditionValueInput(config.relationshipValueSource || 'alias', config.relationshipValueText || ''),
+            relationshipValueText: this.normalizeRelationshipValue(config.relationshipValueSource || 'alias', config.relationshipValueText || ''),
             relationshipAliasName: this.aliasNameFromValue(config.relationshipValueText || ''),
             relationshipAliasField: this.aliasFieldFromValue(config.relationshipValueText || ''),
             allowDelete: config.allowDelete === true
@@ -612,6 +612,16 @@ export default class NativeFormsSubmitActions extends LightningElement {
         }
         try {
             this.fieldOptions = await getFieldOptions({ objectApiName });
+            if (this.draftAction?.relationshipField || this.draftAction?.relationshipValueText) {
+                this.draftAction = {
+                    ...this.draftAction,
+                    relationshipField: this.matchOptionValue(this.fieldOptions, this.draftAction.relationshipField || ''),
+                    relationshipValueText: this.normalizeRelationshipValue(
+                        this.draftAction.relationshipValueSource || 'alias',
+                        this.draftAction.relationshipValueText || ''
+                    )
+                };
+            }
         } catch (error) {
             this.fieldOptions = [];
         }
@@ -786,6 +796,14 @@ export default class NativeFormsSubmitActions extends LightningElement {
         return value;
     }
 
+    normalizeRelationshipValue(valueSource, rawValue) {
+        const normalized = this.normalizeConditionValueInput(valueSource, rawValue);
+        if (valueSource === 'field') {
+            return this.matchOptionValue(this.formFieldOptions, normalized);
+        }
+        return normalized;
+    }
+
     aliasNameFromValue(rawValue) {
         const value = this.normalizeConditionValueInput('alias', rawValue || '');
         if (!value || !value.includes('.')) {
@@ -924,11 +942,18 @@ export default class NativeFormsSubmitActions extends LightningElement {
         if (!rawValue) {
             return rawValue;
         }
-        const exact = (this.objectOptions || []).find((item) => item.value === rawValue);
+        return this.matchOptionValue(this.objectOptions, rawValue);
+    }
+
+    matchOptionValue(options, rawValue) {
+        if (!rawValue) {
+            return rawValue;
+        }
+        const exact = (options || []).find((item) => item.value === rawValue);
         if (exact) {
             return exact.value;
         }
-        const loose = (this.objectOptions || []).find((item) => (item.value || '').toLowerCase() === String(rawValue).toLowerCase());
+        const loose = (options || []).find((item) => (item.value || '').toLowerCase() === String(rawValue).toLowerCase());
         return loose ? loose.value : rawValue;
     }
 }

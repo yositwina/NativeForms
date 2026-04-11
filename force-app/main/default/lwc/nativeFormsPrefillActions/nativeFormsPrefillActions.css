@@ -147,6 +147,39 @@
     grid-template-columns: 3rem minmax(9rem, 11rem) minmax(9rem, 11rem) minmax(9rem, 11rem) minmax(9rem, 11rem) auto;
 }
 
+.order-row {
+    display: grid;
+    gap: 0.75rem;
+    align-items: end;
+    grid-template-columns: minmax(18rem, 1.6fr) minmax(16rem, 1fr);
+}
+
+.sort-direction {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.sort-direction__label {
+    color: #3e3e3c;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.sort-direction__options {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    min-height: 2.5rem;
+    flex-wrap: wrap;
+}
+
+.sort-direction__option {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    color: #17324d;
+}
+
 .condition-index {
     display: flex;
     align-items: center;
@@ -245,7 +278,8 @@
     }
 
     .editor-grid-top,
-    .condition-row {
+    .condition-row,
+    .order-row {
         grid-template-columns: 1fr;
     }
 }
