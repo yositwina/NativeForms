@@ -581,6 +581,77 @@ async function querySalesforce(instanceUrl, accessToken, soql) {
   return JSON.parse(response.body);
 }
 
+function getClientIp(event) {
+  const sourceIp = event?.requestContext?.http?.sourceIp;
+  if (sourceIp) {
+    return sourceIp;
+  }
+
+  const forwardedFor = event?.headers?.["x-forwarded-for"] || event?.headers?.["X-Forwarded-For"];
+  if (!forwardedFor) {
+    return null;
+  }
+
+  return String(forwardedFor).split(",")[0].trim() || null;
+}
+
+async function verifyCaptcha(formSecurity, inputPayload, event) {
+  const captchaConfig = formSecurity?.captcha;
+  if (!captchaConfig || captchaConfig.enabled !== true) {
+    return;
+  }
+
+  const secretKey = captchaConfig.secretKey;
+  if (!secretKey) {
+    const error = new Error("CAPTCHA is enabled for this form, but the server is missing the secret key.");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const token =
+    inputPayload?.input?.captchaToken ||
+    inputPayload?.input?.["g-recaptcha-response"] ||
+    "";
+  if (!token) {
+    const error = new Error("Please complete the CAPTCHA.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const verifyBody = querystring.stringify({
+    secret: secretKey,
+    response: token,
+    remoteip: getClientIp(event) || undefined
+  });
+
+  const response = await httpsRequest(
+    {
+      hostname: "www.google.com",
+      path: "/recaptcha/api/siteverify",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(verifyBody)
+      }
+    },
+    verifyBody
+  );
+
+  if (response.statusCode !== 200) {
+    const error = new Error(`CAPTCHA verification failed. Status: ${response.statusCode}.`);
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const result = JSON.parse(response.body || "{}");
+  if (result.success !== true) {
+    const codes = Array.isArray(result["error-codes"]) ? result["error-codes"].join(", ") : "";
+    const error = new Error(codes ? `CAPTCHA verification failed: ${codes}` : "CAPTCHA verification failed.");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 async function createSalesforceRecord(instanceUrl, accessToken, objectApiName, fields) {
   const payload = JSON.stringify(fields);
   const url = new URL(instanceUrl);
@@ -925,6 +996,7 @@ export const handler = async (event) => {
 
     const formSecurity = await getFormSecurityRecord(inputPayload.formId);
     ensureFormToken(formSecurity, inputPayload.publishToken);
+    await verifyCaptcha(formSecurity, inputPayload, event);
     const tenantRecord = await ensureActiveTenantForForm(formSecurity);
     const submitCommands = formSecurity.submitDefinition.commands;
 

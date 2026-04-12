@@ -24,6 +24,7 @@ public with sharing class NativeFormsPublisher {
                    Form__r.NF_Key__c,
                    Form__r.Status__c,
                    Form__r.Theme__c,
+                   Form__r.Enable_Captcha__c,
                    Form__r.Theme__r.Id,
                    Form__r.Theme__r.Name,
                    Form__r.Theme__r.Logo_URL__c,
@@ -117,8 +118,10 @@ public with sharing class NativeFormsPublisher {
             ? versionRecord.Publish_Token__c
             : EncodingUtil.convertToHex(Crypto.generateDigest('SHA-256', Blob.valueOf(String.valueOf(versionRecord.Id) + ':' + String.valueOf(Datetime.now().getTime())))).substring(0, 32);
 
+        NativeForms_Config__c orgConfig = NativeForms_Config__c.getOrgDefaults();
+        Map<String, Object> captchaConfig = buildPublishedCaptchaConfig(versionRecord.Form__r.Enable_Captcha__c, orgConfig);
         List<NF_Form_Element__c> publishElements = prepareElementsForPublish(elements);
-        String html = buildHtml(versionRecord, publishElements, formId, publishToken);
+        String html = buildHtml(versionRecord, publishElements, formId, publishToken, captchaConfig);
         String fileName = 'index.html';
 
         try {
@@ -143,6 +146,7 @@ public with sharing class NativeFormsPublisher {
                 'rateLimitProfile' => String.isNotBlank(versionRecord.Rate_Limit_Profile__c) ? versionRecord.Rate_Limit_Profile__c : 'standard',
                 'generatedHtmlRef' => presignResponse.key,
                 'publicUrl' => presignResponse.publicUrl,
+                'captcha' => captchaConfig,
                 'prefillPolicy' => buildPolicy(filterReferencedActions(actions, 'Prefill', publishElements), publishElements, true),
                 'submitPolicy' => buildPolicy(filterReferencedActions(actions, 'Submit', publishElements), publishElements, false),
                 'prefillDefinition' => buildDefinition(filterReferencedActions(actions, 'Prefill', publishElements), true, publishElements),
@@ -1275,9 +1279,11 @@ public with sharing class NativeFormsPublisher {
         }
     }
 
-    private static String buildHtml(NF_Form_Version__c versionRecord, List<NF_Form_Element__c> elements, String formId, String publishToken) {
+    private static String buildHtml(NF_Form_Version__c versionRecord, List<NF_Form_Element__c> elements, String formId, String publishToken, Map<String, Object> captchaConfig) {
         Map<String, Object> theme = buildPublishedTheme(versionRecord);
         Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        Boolean captchaEnabled = captchaConfig != null && booleanValue(captchaConfig.get('enabled'));
+        String captchaSiteKey = captchaEnabled ? stringValue(captchaConfig.get('siteKey')) : '';
         String themeLogoUrl = buildPublishedThemeLogoUrl(versionRecord);
         String titleText = firstNonBlank(
             stringValue(uiSettings.get('title')),
@@ -1378,6 +1384,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-status{margin-top:16px;padding:12px 14px;border-radius:12px;display:none;}';
         html += '.nf-status--success{display:block;background:#e8f6ee;color:#165b33;border:1px solid #b8e0c7;}';
         html += '.nf-status--error{display:block;background:#fde7e9;color:#7f1d1d;border:1px solid #f5c2c7;}';
+        html += '.nf-captcha{margin-top:22px;display:flex;justify-content:flex-start;}';
         html += '.nf-actions{margin-top:28px;display:flex;justify-content:flex-end;}';
         html += '.nf-actions button{background:var(--nf-accent);color:var(--nf-accent-contrast);border:0;border-radius:999px;padding:12px 20px;font-weight:700;cursor:pointer;box-shadow:0 10px 20px rgba(15,108,189,.18);}';
         html += '.nf-meta{display:none;}';
@@ -1468,15 +1475,32 @@ public with sharing class NativeFormsPublisher {
             html += renderElement(elementRecord, childrenByParent);
         }
 
+        if (captchaEnabled) {
+            html += '<div class="nf-captcha"><div class="g-recaptcha" data-sitekey="' + escapeHtml(captchaSiteKey) + '"></div></div>';
+        }
         html += '<div class="nf-actions"><button type="submit">' + escapeHtml(submitLabel) + '</button></div>';
         html += '<div class="nf-status" data-nativeforms-status></div>';
         html += '</form></div>';
+        if (captchaEnabled) {
+            html += '<script src="https://www.google.com/recaptcha/api.js" async defer></script>';
+        }
+        Map<String, Object> publicCaptchaConfig = captchaEnabled
+            ? new Map<String, Object>{
+                'enabled' => true,
+                'provider' => stringValue(captchaConfig.get('provider')),
+                'siteKey' => captchaSiteKey
+            }
+            : new Map<String, Object>{
+                'enabled' => false,
+                'provider' => stringValue(captchaConfig.get('provider'))
+            };
         html += '<script>window.NativeFormsConfig=' + JSON.serialize(new Map<String, Object>{
             'versionId' => (String) versionRecord.Id,
             'formId' => formId,
             'publishToken' => publishToken,
             'prefillUrl' => TEMP_PREFILL_URL,
             'submitUrl' => TEMP_SUBMIT_URL,
+            'captcha' => publicCaptchaConfig,
             'theme' => theme,
             'uiSettings' => uiSettings
         }) + ';</script>';
@@ -1485,8 +1509,12 @@ public with sharing class NativeFormsPublisher {
         html += 'const form=document.querySelector("form[data-nativeforms-version]");';
         html += 'const statusEl=document.querySelector("[data-nativeforms-status]");';
         html += 'if(!form||!config.submitUrl){return;}';
+        html += 'const captchaConfig=config.captcha||{};';
+        html += 'const captchaEnabled=!!captchaConfig.enabled;';
         html += 'function setStatus(kind,message){if(!statusEl){return;}statusEl.className="nf-status nf-status--"+kind;statusEl.textContent=message||"";}';
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
+        html += 'function getCaptchaToken(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");return responseField?responseField.value||"":"";}';
+        html += 'function resetCaptcha(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");if(responseField){responseField.value="";}if(window.grecaptcha&&typeof window.grecaptcha.reset==="function"){try{window.grecaptcha.reset();}catch(e){}}}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
         html += 'function setFieldValue(fieldKey,value){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else{el.value=value==null?"":value;}});}';
         html += 'const repeatDeleteState={};';
@@ -1514,15 +1542,17 @@ public with sharing class NativeFormsPublisher {
         html += 'runPrefill().catch(function(error){setStatus("error",error&&error.message?error.message:"Prefill failed.");});';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'if(!form.reportValidity()){return;}';
+        html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error","Please complete the CAPTCHA.");return;}';
         html += 'const submitButton=form.querySelector("button[type=\'submit\']");if(submitButton){submitButton.disabled=true;}';
         html += 'try{const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){input[key]=value;}';
         html += 'form.querySelectorAll("input[type=\'checkbox\'][name]").forEach(function(el){input[el.name]=!!el.checked;});';
+        html += 'if(captchaEnabled){input.captchaToken=getCaptchaToken();}';
         html += 'input.repeatGroups=collectRepeatGroups();';
         html += 'const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input})});';
         html += 'const data=await response.json();';
         html += 'if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Submit failed");}';
-        html += 'setStatus("success","Form submitted successfully.");form.reset();clearRepeatGroups();';
-        html += '}catch(error){setStatus("error",error&&error.message?error.message:"Submit failed.");}finally{if(submitButton){submitButton.disabled=false;}}';
+        html += 'setStatus("success","Form submitted successfully.");form.reset();clearRepeatGroups();resetCaptcha();';
+        html += '}catch(error){setStatus("error",error&&error.message?error.message:"Submit failed.");if(captchaEnabled){resetCaptcha();}}finally{if(submitButton){submitButton.disabled=false;}}';
         html += '});';
         html += '})();</script>';
         if (String.isNotBlank(versionRecord.Custom_JS__c)) {
@@ -2114,6 +2144,28 @@ public with sharing class NativeFormsPublisher {
         }
 
         return theme;
+    }
+
+    private static Map<String, Object> buildPublishedCaptchaConfig(Boolean enableCaptcha, NativeForms_Config__c orgConfig) {
+        Map<String, Object> captcha = new Map<String, Object>{
+            'enabled' => false,
+            'provider' => 'google-recaptcha-v2'
+        };
+
+        if (enableCaptcha != true) {
+            return captcha;
+        }
+
+        String siteKey = orgConfig == null ? null : orgConfig.Captcha_Site_Key__c;
+        String secretKey = orgConfig == null ? null : orgConfig.Captcha_Secret_Key__c;
+        if (String.isBlank(siteKey) || String.isBlank(secretKey)) {
+            throw new AuraHandledException('CAPTCHA is enabled for this form, but Google CAPTCHA site key and secret key are not configured in NativeForms Admin Features.');
+        }
+
+        captcha.put('enabled', true);
+        captcha.put('siteKey', siteKey.trim());
+        captcha.put('secretKey', secretKey.trim());
+        return captcha;
     }
 
     private static String stringValue(Object value) {

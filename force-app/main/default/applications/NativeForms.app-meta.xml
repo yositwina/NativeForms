@@ -10,6 +10,7 @@
     <label>NativeForms</label>
     <navType>Standard</navType>
     <tabs>NativeForms_Home</tabs>
+    <tabs>NativeForms_Connect</tabs>
     <tabs>NativeForms_Themes</tabs>
     <tabs>NF_Form__c</tabs>
     <tabs>NativeForms_Designer</tabs>

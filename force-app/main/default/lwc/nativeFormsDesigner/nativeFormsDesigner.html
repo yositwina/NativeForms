@@ -37,14 +37,6 @@
                                 <p class="designer-form-description">{selectedFormDescription}</p>
                             </template>
 
-                            <lightning-combobox
-                                name="themeId"
-                                label="Theme"
-                                value={selectedThemeId}
-                                options={themeOptions}
-                                onchange={handleThemeChange}>
-                            </lightning-combobox>
-
                             <lightning-button
                                 variant="brand"
                                 label="Publish Form"
@@ -53,7 +45,12 @@
                             </lightning-button>
 
                             <template if:true={isSelectedVersionReadOnly}>
-                                <div class="panel-error">{readOnlyMessage}</div>
+                                <div class="panel-error">
+                                    <p>{readOnlyMessage}</p>
+                                    <template if:true={hasSelectedPublishedUrl}>
+                                        <p><a href={selectedPublishedUrl} target="_blank" rel="noopener">Open published form</a></p>
+                                    </template>
+                                </div>
                             </template>
                         </div>
 
@@ -114,6 +111,14 @@
                         <template if:true={elements.length}>
                             <div class="designer-canvas-shell" style={designerCanvasThemeStyle}>
                                 <div class="designer-form-surface">
+                                <div class="designer-form-toolbar">
+                                    <button
+                                        type="button"
+                                        class={formSettingsButtonClass}
+                                        onclick={handleOpenFormSettings}>
+                                        Form Settings
+                                    </button>
+                                </div>
                                 <template if:true={showThemeLogo}>
                                     <div class={themeLogoWrapClass}>
                                         <img src={themeLogoUrl} alt="Theme logo" class="designer-logo" style={themeLogoStyle} />
@@ -514,7 +519,7 @@
 
                     <section class="pane pane-right">
                         <div class="pane-header">
-                            <h2>Element Properties</h2>
+                            <h2>{rightPaneTitle}</h2>
                         </div>
 
                         <template if:true={isSelectedVersionReadOnly}>
@@ -522,8 +527,8 @@
                                 This published version is locked. Use the version picker to open a draft for editing.
                             </div>
                         </template>
-                        <template if:false={isSelectedVersionReadOnly}>
                         <template if:true={selectedElement}>
+                            <template if:false={isSelectedVersionReadOnly}>
                             <div class="selection-card">
                                 <p class="selection-label">Field Type</p>
                                 <div class="property-inline-row property-inline-row--type property-inline-row--top">
@@ -906,12 +911,39 @@
                                     </template>
                                 </div>
                             </template>
+                            </template>
                         </template>
                         <template if:false={selectedElement}>
-                            <div class="empty-state">
-                                Select an element on the canvas to inspect it here.
+                            <div class="selection-card">
+                                <p class="selection-label">General</p>
+
+                                <p class="property-inline-text">
+                                    <span class="property-inline-text__label">Form:</span>
+                                    <span class="property-inline-text__value">{selectedFormName}</span>
+                                </p>
+
+                                <lightning-combobox
+                                    label="Theme"
+                                    value={selectedThemeId}
+                                    options={themeOptions}
+                                    onchange={handleThemeChange}>
+                                </lightning-combobox>
                             </div>
-                        </template>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Security</p>
+
+                                <lightning-input
+                                    type="checkbox"
+                                    label="Enable CAPTCHA"
+                                    checked={selectedFormCaptchaEnabled}
+                                    onchange={handleFormCaptchaChange}>
+                                </lightning-input>
+
+                                <div class={formSettingsStatusClass}>
+                                    {formSettingsStatusText}
+                                </div>
+                            </div>
                         </template>
                     </section>
                 </div>

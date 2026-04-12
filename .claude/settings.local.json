@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -1 \"C:/Users/Yosi/NativeFormsAWS/force-app/main/default/classes\"/*.cls)",
+      "Bash(grep -E \"\\\\.md$|\\\\.pdf$\")",
+      "Read(//c/Users/Yosi/.claude/projects/c--Users-Yosi-NativeFormsAWS/memory/**)"
+    ]
+  }
+}

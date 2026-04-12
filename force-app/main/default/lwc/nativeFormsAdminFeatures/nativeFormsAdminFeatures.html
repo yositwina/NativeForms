@@ -12,50 +12,51 @@
             </template>
 
             <template if:false={isLoading}>
-                <div class="feature-panel">
-                    <h2>Pro Feature Flags</h2>
-                    <p class="feature-version">Admin Features {adminFeaturesVersion}</p>
-                    <p class="feature-copy">Use this page to turn Pro-only features on or off while testing in the org.</p>
+                <div class="admin-grid">
+                    <section class="feature-panel">
+                        <h2>Pro Feature Flags</h2>
+                        <p class="feature-version">Admin Features {adminFeaturesVersion}</p>
+                        <p class="feature-copy">Use this left section to turn Pro-only features on or off while testing in the org.</p>
 
-                    <lightning-input
-                        type="checkbox"
-                        name="enableProConditionLogic"
-                        label="Enable Pro Condition Logic"
-                        checked={enableProConditionLogic}
-                        onchange={handleToggle}>
-                    </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProConditionLogic"
+                            label="Enable Pro Condition Logic"
+                            checked={enableProConditionLogic}
+                            onchange={handleToggle}>
+                        </lightning-input>
 
-                    <lightning-input
-                        type="checkbox"
-                        name="enableProRepeatGroups"
-                        label="Enable Pro Repeat Groups"
-                        checked={enableProRepeatGroups}
-                        onchange={handleToggle}>
-                    </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProRepeatGroups"
+                            label="Enable Pro Repeat Groups"
+                            checked={enableProRepeatGroups}
+                            onchange={handleToggle}>
+                        </lightning-input>
 
-                    <lightning-input
-                        type="checkbox"
-                        name="enableProPrefillAliasReferences"
-                        label="Enable Pro Prefill Alias References"
-                        checked={enableProPrefillAliasReferences}
-                        onchange={handleToggle}>
-                    </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProPrefillAliasReferences"
+                            label="Enable Pro Prefill Alias References"
+                            checked={enableProPrefillAliasReferences}
+                            onchange={handleToggle}>
+                        </lightning-input>
 
-                    <lightning-input
-                        type="checkbox"
-                        name="enableProAdvancedSubmitModes"
-                        label="Enable Pro Advanced Submit Modes"
-                        checked={enableProAdvancedSubmitModes}
-                        onchange={handleToggle}>
-                    </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProAdvancedSubmitModes"
+                            label="Enable Pro Advanced Submit Modes"
+                            checked={enableProAdvancedSubmitModes}
+                            onchange={handleToggle}>
+                        </lightning-input>
 
-                    <lightning-input
-                        type="checkbox"
-                        name="enableProFormulaFields"
-                        label="Enable Pro Formula Fields"
-                        checked={enableProFormulaFields}
-                        onchange={handleToggle}>
-                    </lightning-input>
+                        <lightning-input
+                            type="checkbox"
+                            name="enableProFormulaFields"
+                            label="Enable Pro Formula Fields"
+                            checked={enableProFormulaFields}
+                            onchange={handleToggle}>
+                        </lightning-input>
 
                         <lightning-input
                             type="checkbox"
@@ -64,6 +65,7 @@
                             checked={enableProPostSubmitAutoLink}
                             onchange={handleToggle}>
                         </lightning-input>
+
                         <lightning-input
                             type="checkbox"
                             name="enableProSfSecretCodeAuth"
@@ -71,6 +73,7 @@
                             checked={enableProSfSecretCodeAuth}
                             onchange={handleToggle}>
                         </lightning-input>
+
                         <lightning-input
                             type="checkbox"
                             name="enableProLoadFile"
@@ -79,13 +82,70 @@
                             onchange={handleToggle}>
                         </lightning-input>
 
-                    <div class="actions">
-                        <lightning-button
-                            variant="brand"
-                            label="Save Settings"
-                            onclick={handleSave}>
-                        </lightning-button>
-                    </div>
+                        <div class="actions">
+                            <lightning-button
+                                variant="brand"
+                                label="Save Feature Settings"
+                                onclick={handleSave}>
+                            </lightning-button>
+                        </div>
+                    </section>
+
+                    <section class="feature-panel feature-panel--admin">
+                        <h2>Admin Settings</h2>
+                        <p class="feature-version">Admin Features {adminFeaturesVersion}</p>
+                        <p class="feature-copy">Use this right section for org-level settings and connection testing tools.</p>
+
+                        <div class="status-box">
+                            <p class="status-line"><strong>Salesforce Connection:</strong> {salesforceConnectionLabel}</p>
+                            <p class="status-line"><strong>Tenant Secret Auth:</strong> {tenantSecretAuthLabel}</p>
+                            <p class="status-line"><strong>Setup State:</strong> {setupState}</p>
+                            <template if:true={tenantAuthErrorMessage}>
+                                <p class="status-error">{tenantAuthErrorMessage}</p>
+                            </template>
+                        </div>
+
+                        <div class="actions">
+                            <lightning-button
+                                label="Refresh Connection"
+                                onclick={handleRefreshConnection}>
+                            </lightning-button>
+                            <lightning-button
+                                variant="destructive"
+                                label="Disconnect For Testing"
+                                onclick={handleDisconnect}
+                                disabled={disconnectDisabled}>
+                            </lightning-button>
+                        </div>
+
+                        <p class="feature-copy">Disconnect clears the Salesforce OAuth connection only. It keeps the tenant registration and tenant secret in place so you can reconnect quickly.</p>
+
+                        <h3>Google CAPTCHA</h3>
+                        <p class="feature-copy">These org-level keys are reused by any form that enables CAPTCHA in the Designer.</p>
+
+                        <lightning-input
+                            name="captchaSiteKey"
+                            label="CAPTCHA Site Key"
+                            value={captchaSiteKey}
+                            onchange={handleToggle}>
+                        </lightning-input>
+
+                        <lightning-input
+                            type="password"
+                            name="captchaSecretKey"
+                            label="CAPTCHA Secret Key"
+                            value={captchaSecretKey}
+                            onchange={handleToggle}>
+                        </lightning-input>
+
+                        <div class="actions">
+                            <lightning-button
+                                variant="brand"
+                                label="Save Admin Settings"
+                                onclick={handleSave}>
+                            </lightning-button>
+                        </div>
+                    </section>
                 </div>
             </template>
         </div>

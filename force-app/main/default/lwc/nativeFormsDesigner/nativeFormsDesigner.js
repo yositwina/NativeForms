@@ -1,6 +1,6 @@
 import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
-import updateFormTheme from '@salesforce/apex/NativeFormsDesignerController.updateFormTheme';
+import updateFormSettings from '@salesforce/apex/NativeFormsDesignerController.updateFormSettings';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPicklistFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistFieldOptions';
 import getPicklistValueOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistValueOptions';
@@ -18,7 +18,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v8.2';
+    designerVersion = 'v8.4';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -28,8 +28,11 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedFormName = '';
     selectedFormKey = '';
     selectedFormDescription = '';
+    selectedFormCaptchaEnabled = false;
+    captchaKeysConfigured = false;
     selectedVersionName = '';
     selectedVersionStatus = '';
+    selectedPublishedUrl = '';
     selectedTheme = null;
     draggedElementId = null;
     dragTargetIndex = null;
@@ -181,6 +184,28 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.selectedFormDescription || this.selectedFormName;
     }
 
+    get formSettingsButtonClass() {
+        return `designer-form-settings-button${this.selectedElement ? '' : ' designer-form-settings-button--active'}`;
+    }
+
+    get showFormSettingsPanel() {
+        return !this.selectedElement;
+    }
+
+    get rightPaneTitle() {
+        return this.showFormSettingsPanel ? 'Form Settings' : 'Element Properties';
+    }
+
+    get formSettingsStatusText() {
+        return this.captchaKeysConfigured
+            ? 'Google CAPTCHA keys are configured for this org.'
+            : 'Google CAPTCHA is not fully configured yet. Add the site key and secret key in NativeForms Admin Features before publishing.';
+    }
+
+    get formSettingsStatusClass() {
+        return this.captchaKeysConfigured ? 'panel-success' : 'panel-error';
+    }
+
     get canvasSummaryLine() {
         const parts = [];
         if (this.selectedFormKey) {
@@ -256,6 +281,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get readOnlyMessage() {
         return 'This published version is read-only. Publish creates a new draft copy for continued editing.';
+    }
+
+    get hasSelectedPublishedUrl() {
+        return !!this.selectedPublishedUrl;
     }
 
     get selectedElementIsSection() {
@@ -450,8 +479,11 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedFormName = workspace.selectedFormName;
             this.selectedFormKey = workspace.selectedFormKey;
             this.selectedFormDescription = workspace.selectedFormDescription;
+            this.selectedFormCaptchaEnabled = !!workspace.selectedFormCaptchaEnabled;
+            this.captchaKeysConfigured = !!workspace.captchaKeysConfigured;
             this.selectedVersionName = workspace.selectedVersionName;
             this.selectedVersionStatus = workspace.selectedVersionStatus;
+            this.selectedPublishedUrl = workspace.selectedPublishedUrl || '';
             this.prefillAliasDetails = workspace.prefillAliases || [];
             this.submitActionDetails = workspace.submitActions || [];
             this.enableProRepeatGroups = !!workspace.enableProRepeatGroups;
@@ -477,7 +509,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.elements = (workspace.elements || []).map((item) => this.decorateBaseElement(item));
             this.canvasElements = this.buildCanvasElements(this.elements);
             if (!this.elements.some((item) => item.id === this.selectedElementId)) {
-                this.selectedElementId = this.elements.length ? this.elements[0].id : null;
+                this.selectedElementId = null;
                 this.syncSelectedState();
             } else {
                 this.syncEditorState();
@@ -878,23 +910,47 @@ export default class NativeFormsDesigner extends LightningElement {
         this.loadWorkspace(this.selectedFormId, this.selectedVersionId);
     }
 
-    async handleThemeChange(event) {
-        const nextThemeId = event.detail.value || null;
+    async saveFormSettings(nextValues, successMessage) {
         if (!this.selectedFormId) {
             return;
         }
         this.isLoading = true;
         this.errorMessage = '';
         try {
-            const savedThemeId = await updateFormTheme({ formId: this.selectedFormId, themeId: nextThemeId });
-            this.selectedThemeId = savedThemeId || '';
+            await updateFormSettings({
+                formId: this.selectedFormId,
+                themeId: nextValues.themeId === '' ? null : nextValues.themeId,
+                enableCaptcha: !!nextValues.enableCaptcha
+            });
+            this.selectedThemeId = nextValues.themeId || '';
+            this.selectedFormCaptchaEnabled = !!nextValues.enableCaptcha;
             await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
-            this.showToast('Theme assigned', 'Form theme updated.', 'success');
+            this.showToast('Form settings saved', successMessage, 'success');
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
             this.isLoading = false;
         }
+    }
+
+    async handleThemeChange(event) {
+        await this.saveFormSettings(
+            {
+                themeId: event.detail.value || '',
+                enableCaptcha: this.selectedFormCaptchaEnabled
+            },
+            'Form theme updated.'
+        );
+    }
+
+    async handleFormCaptchaChange(event) {
+        await this.saveFormSettings(
+            {
+                themeId: this.selectedThemeId || '',
+                enableCaptcha: event.target.checked
+            },
+            event.target.checked ? 'CAPTCHA enabled for this form.' : 'CAPTCHA disabled for this form.'
+        );
     }
 
     handleInputTypeChange(event) {
@@ -963,6 +1019,12 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     handleCanvasClick() {
+        this.selectedElementId = null;
+        this.syncSelectedState();
+    }
+
+    handleOpenFormSettings(event) {
+        event.stopPropagation();
         this.selectedElementId = null;
         this.syncSelectedState();
     }

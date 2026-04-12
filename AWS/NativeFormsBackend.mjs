@@ -189,6 +189,16 @@ function sanitizeTenantRecord(record) {
   return safe;
 }
 
+function sanitizeFormSecurityRecord(record) {
+  if (!record) return null;
+  const safe = { ...record };
+  if (safe.captcha && typeof safe.captcha === "object") {
+    safe.captcha = { ...safe.captcha };
+    delete safe.captcha.secretKey;
+  }
+  return safe;
+}
+
 function normalizeSubscriptionState(payload, existing = null) {
   return {
     subscriptionState: payload.subscriptionState || existing?.subscriptionState || "trial",
@@ -334,6 +344,14 @@ function validateTenantRegistrationPayload(payload) {
   if (!payload?.adminEmail) throw new Error("Missing required field: adminEmail");
   if (!payload?.companyName) throw new Error("Missing required field: companyName");
   if (!payload?.loginBaseUrl) throw new Error("Missing required field: loginBaseUrl");
+}
+
+function validateClientCredentialsPayload(payload) {
+  if (!payload?.orgId) throw new Error("Missing required field: orgId");
+  if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
+  if (!payload?.adminEmail) throw new Error("Missing required field: adminEmail");
+  if (!payload?.companyName) throw new Error("Missing required field: companyName");
+  if (!payload?.loginBaseUrl) throw new Error("Missing required field: loginBaseUrl");
   if (!payload?.salesforceClientId) throw new Error("Missing required field: salesforceClientId");
   if (!payload?.salesforceClientSecret) throw new Error("Missing required field: salesforceClientSecret");
 }
@@ -374,6 +392,22 @@ function validatePublishPresignPayload(payload) {
   if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
   if (!payload?.formId) throw new Error("Missing required field: formId");
   if (!payload?.fileName) throw new Error("Missing required field: fileName");
+}
+
+function buildTenantSetupState(tenantRecord, connectionRecord) {
+  if (!tenantRecord) {
+    return "not_registered";
+  }
+
+  const hasRefreshToken = !!connectionRecord?.refresh_token;
+  const hasInstanceUrl = !!connectionRecord?.instance_url;
+  const isConnected = tenantRecord.salesforceConnectionStatus === "connected" && hasRefreshToken && hasInstanceUrl;
+
+  return isConnected ? "connected" : "registered_pending_connection";
+}
+
+function hasStoredClientCredentials(connectionRecord) {
+  return !!connectionRecord?.client_id && !!connectionRecord?.client_secret;
 }
 
 function sanitizeKeyPart(value) {
@@ -471,6 +505,115 @@ export const handler = async (event) => {
       },
       body: ""
     };
+  }
+
+  if (path === "/tenant/status" && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      if (!orgId) {
+        throw new Error("Missing required field: orgId");
+      }
+      if (!validateOrgId(orgId)) {
+        throw new Error("Invalid orgId");
+      }
+
+      const tenantRecord = await getTenantRecord(orgId);
+      const connectionRecord = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
+      const setupState = buildTenantSetupState(tenantRecord, connectionRecord);
+
+      return jsonResponse(200, {
+        success: true,
+        registered: !!tenantRecord,
+        connected: setupState === "connected",
+        setupState,
+        connectUrl: tenantRecord && baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(orgId)}` : null,
+        tenant: sanitizeTenantRecord(tenantRecord),
+        hasClientCredentials: hasStoredClientCredentials(connectionRecord),
+        hasRefreshToken: !!connectionRecord?.refresh_token,
+        hasInstanceUrl: !!connectionRecord?.instance_url
+      });
+    } catch (e) {
+      return jsonResponse(400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/tenant/auth-health" && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
+
+      return jsonResponse(200, {
+        success: true,
+        authenticated: true,
+        orgId: tenantRecord.orgId
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        authenticated: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/tenant/disconnect" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      const orgId = normalizeOrgId(payload?.orgId);
+      if (!orgId) {
+        throw new Error("Missing required field: orgId");
+      }
+      if (!validateOrgId(orgId)) {
+        throw new Error("Invalid orgId");
+      }
+
+      const tenantRecord = await getTenantRecord(orgId);
+      if (!tenantRecord) {
+        throw new Error("Tenant not found");
+      }
+
+      const now = new Date().toISOString();
+      const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
+      if (existingConnection) {
+        await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
+          ...existingConnection,
+          orgId,
+          loginBaseUrl: existingConnection.loginBaseUrl || tenantRecord.loginBaseUrl || null,
+          refresh_token: null,
+          instance_url: null,
+          id_url: null,
+          token_issued_at: null,
+          updated_at: now
+        });
+      }
+
+      const updatedTenantRecord = {
+        ...tenantRecord,
+        salesforceConnectionStatus: "not-connected",
+        salesforceConnectionUpdatedAt: now,
+        connectedUsername: null,
+        updatedAt: now
+      };
+      await saveItem(TENANT_TABLE, updatedTenantRecord);
+
+      return jsonResponse(200, {
+        success: true,
+        disconnected: true,
+        connectUrl: baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(orgId)}` : null,
+        tenant: sanitizeTenantRecord(updatedTenantRecord)
+      });
+    } catch (e) {
+      return jsonResponse(400, {
+        success: false,
+        error: e.message
+      });
+    }
   }
 
   if (path === "/oauth/callback") {
@@ -703,18 +846,20 @@ export const handler = async (event) => {
       };
 
       await saveItem(TENANT_TABLE, tenantRecord);
-      await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
-        ...(existingConnection || {}),
-        orgId,
-        loginBaseUrl: payload.loginBaseUrl,
-        client_id: payload.salesforceClientId,
-        client_secret: payload.salesforceClientSecret,
-        refresh_token: existingConnection?.refresh_token || null,
-        instance_url: existingConnection?.instance_url || null,
-        id_url: existingConnection?.id_url || null,
-        token_issued_at: existingConnection?.token_issued_at || null,
-        updated_at: now
-      });
+      if (payload.salesforceClientId && payload.salesforceClientSecret) {
+        await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
+          ...(existingConnection || {}),
+          orgId,
+          loginBaseUrl: payload.loginBaseUrl,
+          client_id: payload.salesforceClientId,
+          client_secret: payload.salesforceClientSecret,
+          refresh_token: existingConnection?.refresh_token || null,
+          instance_url: existingConnection?.instance_url || null,
+          id_url: existingConnection?.id_url || null,
+          token_issued_at: existingConnection?.token_issued_at || null,
+          updated_at: now
+        });
+      }
       const emailSent = await sendTenantSecretEmail(payload.adminEmail, orgId, tenantSecret)
         .catch((error) => {
           console.error("Failed to send tenant secret email:", error);
@@ -733,6 +878,58 @@ export const handler = async (event) => {
       });
     } catch (e) {
       return jsonResponse(400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/tenant/client-credentials" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateClientCredentialsPayload(payload);
+      const orgId = normalizeOrgId(payload.orgId);
+      const tenantRecord = await getTenantRecord(orgId);
+      if (!tenantRecord) {
+        throw new Error("Tenant not found");
+      }
+
+      assertTenantIsActive(tenantRecord);
+
+      const now = new Date().toISOString();
+      const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
+      await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
+        ...(existingConnection || {}),
+        orgId,
+        loginBaseUrl: payload.loginBaseUrl,
+        client_id: payload.salesforceClientId,
+        client_secret: payload.salesforceClientSecret,
+        refresh_token: existingConnection?.refresh_token || null,
+        instance_url: existingConnection?.instance_url || null,
+        id_url: existingConnection?.id_url || null,
+        token_issued_at: existingConnection?.token_issued_at || null,
+        updated_at: now
+      });
+
+      const updatedTenantRecord = {
+        ...tenantRecord,
+        adminEmail: payload.adminEmail,
+        companyName: payload.companyName,
+        loginBaseUrl: payload.loginBaseUrl,
+        updatedAt: now
+      };
+      await saveItem(TENANT_TABLE, updatedTenantRecord);
+
+      return jsonResponse(200, {
+        success: true,
+        connectUrl: baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(orgId)}` : null,
+        tenant: sanitizeTenantRecord(updatedTenantRecord)
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
         success: false,
         error: e.message
       });
@@ -761,6 +958,7 @@ export const handler = async (event) => {
         tokenHash: hashToken(payload.publishToken),
         generatedHtmlRef: payload.generatedHtmlRef || null,
         publicUrl: payload.publicUrl || null,
+        captcha: payload.captcha || null,
         prefillPolicy: payload.prefillPolicy,
         submitPolicy: payload.submitPolicy,
         prefillDefinition: payload.prefillDefinition,
@@ -776,7 +974,7 @@ export const handler = async (event) => {
         tableName: FORM_SECURITY_TABLE,
         created: !existing,
         updated: !!existing,
-        record
+        record: sanitizeFormSecurityRecord(record)
       });
     } catch (e) {
       return jsonResponse(e.statusCode || 400, {

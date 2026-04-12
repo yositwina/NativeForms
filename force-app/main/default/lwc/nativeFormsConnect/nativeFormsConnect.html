@@ -1,0 +1,288 @@
+<template>
+    <lightning-card title="NativeForms Connect" icon-name="custom:custom18">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="slds-text-body_regular slds-m-bottom_medium">
+                Connect this Salesforce org to NativeForms so AWS can publish forms and run prefill and submit securely.
+            </p>
+
+            <p class="connect-version">Page Version {connectVersion}</p>
+
+            <template if:true={showConnectionStatusSection}>
+                <div class="status-panel slds-m-bottom_medium">
+                    <p class="status-panel__title">Connection Status</p>
+                    <p class="status-panel__line"><strong>Status:</strong> {connectionStatusLabel}</p>
+                    <p class="status-panel__line"><strong>Salesforce Connection:</strong> {salesforceConnectionLabel}</p>
+                    <p class="status-panel__line"><strong>Tenant Secret Auth:</strong> {tenantSecretAuthLabel}</p>
+                    <p class="status-panel__line"><strong>Setup State:</strong> {setupState}</p>
+                    <p class="status-panel__line"><strong>Org Id:</strong> {orgId}</p>
+                </div>
+            </template>
+
+            <template if:true={errorMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">error</span>
+                    <h2>{errorMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={successMessage}>
+                <div class="slds-notify slds-notify_alert slds-alert_success slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">success</span>
+                    <h2>{successMessage}</h2>
+                </div>
+            </template>
+
+            <template if:true={showPrincipalAccessHelp}>
+                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
+                    <span class="slds-assistive-text">error</span>
+                    <div>
+                        <h2 class="slds-text-heading_small slds-m-bottom_x-small">What To Do First</h2>
+                        <p class="slds-m-bottom_x-small">An admin needs to finish the NativeForms access setup before this page can connect the org.</p>
+                        <ol class="instruction-list">
+                            <li>Open the <strong>NativeForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
+                            <li>Inside that permission set, open <strong>External Credential Principal Access</strong>.</li>
+                            <li>Enable both principals:
+                                <div class="instruction-detail">NativeFormsBootstrap / NativeFormsBootstrapPrincipal</div>
+                                <div class="instruction-detail">NativeFormsLambdaAuth / NativeFormsSharedSecret</div>
+                            </li>
+                            <li>Return here and click <strong>Generate Secret</strong> again.</li>
+                        </ol>
+                    </div>
+                </div>
+            </template>
+
+            <template if:true={isInitializing}>
+                <lightning-spinner alternative-text="Loading setup context" size="small"></lightning-spinner>
+            </template>
+
+            <template if:true={showTenantSetupCompleteBanner}>
+                <div class="stage-complete slds-m-bottom_medium">
+                    <p class="stage-complete__title">Step 1 Complete</p>
+                    <p class="stage-complete__text">Tenant secret is verified and NativeForms can authenticate this org.</p>
+                </div>
+            </template>
+
+            <template if:true={showTenantSetupStage}>
+                <section class="setup-stage slds-m-bottom_large">
+                    <div class="setup-stage__header">
+                        <div>
+                            <p class="setup-stage__eyebrow">Step 1</p>
+                            <h2 class="setup-stage__title">Generate and verify the tenant secret</h2>
+                        </div>
+                    </div>
+
+                    <div class="instruction-box slds-m-top_medium">
+                        <p class="instruction-title"><strong>Do this first</strong></p>
+                        <ol class="instruction-list">
+                            <li class="instruction-step">
+                                <div class="instruction-step__content">
+                                    <p class="instruction-text-block">
+                                        Open the <strong>NativeForms Admin</strong> permission set in Salesforce Setup and assign it to the admins who will manage the app.
+                                    </p>
+                                    <p class="instruction-text-block slds-m-top_small">
+                                        In that permission set, open <strong>External Credential Principal Access</strong>.
+                                    </p>
+                                    <div class="instruction-toggle">
+                                        <lightning-button
+                                            variant="base"
+                                            label={step1ImageButtonLabel}
+                                            data-section="step1"
+                                            onclick={handleToggleImage}>
+                                        </lightning-button>
+                                    </div>
+                                </div>
+                                <template if:true={showStep1Image}>
+                                    <div class="instruction-step__media">
+                                        <img src={step1ImageUrl} alt="Permission set and External Credential Principal Access example" class="instruction-image" />
+                                    </div>
+                                </template>
+                            </li>
+                            <li class="instruction-step">
+                                <div class="instruction-step__content">
+                                    <p class="instruction-text-block">
+                                        Move these two principals from left to right, then click <strong>Save</strong>.
+                                    </p>
+                                    <div class="instruction-detail">NativeFormsBootstrap / NativeFormsBootstrapPrincipal</div>
+                                    <div class="instruction-detail">NativeFormsLambdaAuth / NativeFormsSharedSecret</div>
+                                    <div class="instruction-toggle">
+                                        <lightning-button
+                                            variant="base"
+                                            label={step2ImageButtonLabel}
+                                            data-section="step2"
+                                            onclick={handleToggleImage}>
+                                        </lightning-button>
+                                    </div>
+                                </div>
+                                <template if:true={showStep2Image}>
+                                    <div class="instruction-step__media">
+                                        <img src={step2ImageUrl} alt="Enabled external credential principals example" class="instruction-image instruction-image--compact" />
+                                    </div>
+                                </template>
+                            </li>
+                            <li>Click <strong>Generate Secret</strong> below.</li>
+                            <li>Add the generated tenant secret to <strong>Named Credentials &gt; NativeForms &gt; NativeFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
+                            <li>Click <strong>Test Tenant Secret</strong> to verify the setup.</li>
+                        </ol>
+                    </div>
+
+                    <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium">
+                        <div class="slds-col slds-size_1-of-1">
+                            <lightning-input
+                                label="Admin Email"
+                                value={adminEmail}
+                                onchange={handleChange}
+                                data-field="adminEmail">
+                            </lightning-input>
+                        </div>
+                    </div>
+
+                    <div class="stage-actions slds-m-top_medium">
+                        <template if:true={showGenerateSecretAction}>
+                            <lightning-button
+                                variant="brand"
+                                label="Generate Secret"
+                                onclick={handleGenerateSecret}
+                                disabled={actionDisabled}>
+                            </lightning-button>
+                        </template>
+                        <template if:true={showTestTenantAction}>
+                            <lightning-button
+                                label="Test Tenant Secret"
+                                onclick={handleTestTenantSetup}
+                                disabled={actionDisabled}>
+                            </lightning-button>
+                        </template>
+                    </div>
+
+                    <template if:true={showTenantTestMessage}>
+                        <div class={tenantTestMessageClass}>
+                            {tenantTestMessage}
+                        </div>
+                    </template>
+
+                    <template if:true={hasTenantSecret}>
+                        <div class="instruction-box slds-m-top_medium">
+                            <p class="instruction-title">Tenant Secret Code</p>
+                            <p class="result-text">{tenantSecret}</p>
+                            <p class="tenant-secret-note">This code is shown here for 5 minutes only. After that, use the admin email inbox.</p>
+                        </div>
+                    </template>
+
+                    <template if:true={showTenantSecretExpiredMessage}>
+                        <div class="instruction-box slds-m-top_medium">
+                            <p class="instruction-title">Tenant Secret Code</p>
+                            <p class="result-text">This code is no longer shown here. Please check the admin email inbox for the tenant secret.</p>
+                        </div>
+                    </template>
+                </section>
+            </template>
+
+            <template if:true={showOauthCompleteBanner}>
+                <div class="stage-complete slds-m-bottom_medium">
+                    <p class="stage-complete__title">Step 2 Complete</p>
+                    <p class="stage-complete__text">Salesforce client credentials and OAuth connection are active.</p>
+                </div>
+            </template>
+
+            <template if:true={showOauthStage}>
+                <section class="setup-stage">
+                    <div class="setup-stage__header">
+                        <div>
+                            <p class="setup-stage__eyebrow">Step 2</p>
+                            <h2 class="setup-stage__title">Save the Salesforce client key and secret</h2>
+                        </div>
+                    </div>
+
+                    <div class="instruction-box slds-m-top_medium">
+                        <p class="instruction-title"><strong>OAuth setup</strong></p>
+                        <ol class="instruction-list">
+                            <li class="instruction-step">
+                                <div class="instruction-step__content">
+                                    <p class="instruction-text-block">
+                                        Open <strong>External Client App Manager</strong>.
+                                    </p>
+                                    <p class="instruction-text-block slds-m-top_small">
+                                        Choose the <strong>NativeForms</strong> app.
+                                    </p>
+                                    <p class="instruction-text-block slds-m-top_small">
+                                        Go to the <strong>Settings</strong> tab, then under <strong>OAuth Settings</strong> click the button to view the <strong>Consumer Key</strong> and <strong>Consumer Secret</strong>.
+                                    </p>
+                                    <div class="instruction-toggle">
+                                        <lightning-button
+                                            variant="base"
+                                            label={step3ImageButtonLabel}
+                                            data-section="step3"
+                                            onclick={handleToggleImage}>
+                                        </lightning-button>
+                                    </div>
+                                </div>
+                                <template if:true={showStep3Image}>
+                                    <div class="instruction-step__media">
+                                        <img src={step3ImageUrl} alt="External Client App Manager and OAuth settings example" class="instruction-image" />
+                                    </div>
+                                </template>
+                            </li>
+                            <li>Paste those values below.</li>
+                            <li>Click <strong>Connect NativeForms</strong>.</li>
+                            <li>Finish authentication in the new Salesforce window. This page will keep checking automatically, and you can also click <strong>Refresh Connection Status</strong>.</li>
+                        </ol>
+                    </div>
+
+                    <template if:true={showOauthCredentialsForm}>
+                        <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium">
+                            <div class="slds-col slds-size_1-of-1">
+                                <lightning-input
+                                    label="Salesforce Client Id"
+                                    value={salesforceClientId}
+                                    onchange={handleChange}
+                                    data-field="salesforceClientId">
+                                </lightning-input>
+                            </div>
+
+                            <div class="slds-col slds-size_1-of-1">
+                                <lightning-input
+                                    type="password"
+                                    label="Salesforce Client Secret"
+                                    value={salesforceClientSecret}
+                                    onchange={handleChange}
+                                    data-field="salesforceClientSecret">
+                                </lightning-input>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="stage-actions slds-m-top_medium">
+                        <template if:true={showConnectAction}>
+                            <lightning-button
+                                variant="brand"
+                                label="Connect NativeForms"
+                                onclick={handleConnect}
+                                disabled={actionDisabled}>
+                            </lightning-button>
+                        </template>
+
+                        <template if:true={showRefreshAction}>
+                            <lightning-button
+                                label="Refresh Connection Status"
+                                onclick={handleRefreshStatus}
+                                disabled={actionDisabled}>
+                            </lightning-button>
+                        </template>
+                    </div>
+
+                    <template if:true={showRefreshAction}>
+                        <div class="awaiting-auth-box slds-m-top_medium">
+                            <p class="awaiting-auth-box__title">Finish in the Salesforce window</p>
+                            <p class="awaiting-auth-box__text">
+                                NativeForms opened the Salesforce authentication page in a new tab or window.
+                            </p>
+                            <p class="awaiting-auth-box__text">
+                                After you finish authentication there, this page will keep checking automatically. You can also click <strong>Refresh Connection Status</strong>.
+                            </p>
+                        </div>
+                    </template>
+                </section>
+            </template>
+        </div>
+    </lightning-card>
+</template>

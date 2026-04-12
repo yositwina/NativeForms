@@ -106,8 +106,11 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedFormName { get; set; }
         @AuraEnabled public String selectedFormKey { get; set; }
         @AuraEnabled public String selectedFormDescription { get; set; }
+        @AuraEnabled public Boolean selectedFormCaptchaEnabled { get; set; }
+        @AuraEnabled public Boolean captchaKeysConfigured { get; set; }
         @AuraEnabled public String selectedVersionName { get; set; }
         @AuraEnabled public String selectedVersionStatus { get; set; }
+        @AuraEnabled public String selectedPublishedUrl { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<SelectOption> themes { get; set; }
@@ -223,11 +226,16 @@ public with sharing class NativeFormsDesignerController {
         workspace.enableProRepeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
 
         List<NF_Form__c> forms = [
-            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c
+            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c, Enable_Captcha__c
             FROM NF_Form__c
             ORDER BY Name ASC
             LIMIT 200
         ];
+
+        NativeForms_Config__c orgConfig = NativeForms_Config__c.getOrgDefaults();
+        workspace.captchaKeysConfigured = orgConfig != null
+            && String.isNotBlank(orgConfig.Captcha_Site_Key__c)
+            && String.isNotBlank(orgConfig.Captcha_Secret_Key__c);
 
         for (NF_Form__c formRecord : forms) {
             SelectOption option = new SelectOption();
@@ -255,6 +263,7 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedFormKey = selectedForm.NF_Key__c;
         workspace.selectedFormDescription = selectedForm.Description__c;
         workspace.selectedThemeId = selectedForm.Theme__c;
+        workspace.selectedFormCaptchaEnabled = selectedForm.Enable_Captcha__c;
 
         for (NF_Theme__c themeRecord : [
             SELECT Id, Name
@@ -325,6 +334,16 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedVersionId = selectedVersion.Id;
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
+        List<NF_Form_Publication__c> publicationRows = [
+            SELECT Generated_HTML_Ref__c
+            FROM NF_Form_Publication__c
+            WHERE Form_Version__c = :effectiveVersionId
+              AND Publication_Status__c = 'Success'
+              AND Generated_HTML_Ref__c != null
+            ORDER BY Published_At__c DESC, CreatedDate DESC
+            LIMIT 1
+        ];
+        workspace.selectedPublishedUrl = publicationRows.isEmpty() ? null : publicationRows[0].Generated_HTML_Ref__c;
 
         for (NF_Form_Element__c elementRecord : [
             SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
@@ -375,20 +394,20 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static Id updateFormTheme(Id formId, Id themeId) {
+    public static void updateFormSettings(Id formId, Id themeId, Boolean enableCaptcha) {
         if (formId == null) {
             throw new AuraHandledException('Form id is required.');
         }
 
         NF_Form__c formRecord = [
-            SELECT Id, Theme__c
+            SELECT Id, Theme__c, Enable_Captcha__c
             FROM NF_Form__c
             WHERE Id = :formId
             LIMIT 1
         ];
         formRecord.Theme__c = themeId;
+        formRecord.Enable_Captcha__c = enableCaptcha == true;
         update formRecord;
-        return formRecord.Theme__c;
     }
 
     @AuraEnabled

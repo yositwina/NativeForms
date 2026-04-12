@@ -138,6 +138,29 @@
     background: var(--nf-theme-form-bg, #ffffff);
 }
 
+.designer-form-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.9rem;
+}
+
+.designer-form-settings-button {
+    border: 1px solid #cfe0f1;
+    background: #f7fbff;
+    color: #0f6cbd;
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.designer-form-settings-button--active {
+    background: #0f6cbd;
+    border-color: #0f6cbd;
+    color: #ffffff;
+    box-shadow: 0 10px 20px rgba(15, 108, 189, 0.16);
+}
+
 .designer-logo-wrap {
     display: flex;
     margin-bottom: 1rem;
