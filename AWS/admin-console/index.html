@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NativeForms Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="admin-app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand__mark">NF</div>
+        <div>
+          <p class="brand__eyebrow">Internal Console</p>
+          <h1 class="brand__title">NativeForms Admin</h1>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav__item nav__item--active" type="button" data-view="overview">Overview</button>
+        <button class="nav__item" type="button" data-view="tenants">Customers</button>
+        <button class="nav__item" type="button" data-view="plans">Plans</button>
+        <button class="nav__item" type="button" data-view="audit">Audit Log</button>
+        <button class="nav__item" type="button" data-view="settings">Settings</button>
+        <button class="nav__item" type="button" data-view="feature-list">Admin Feature List</button>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="topbar__eyebrow">Admin Control App</p>
+          <h2 class="topbar__title" id="workspaceTitle">Customer Operations Workspace</h2>
+        </div>
+        <div class="topbar__meta">
+          <div class="meta-pill">
+            <span class="meta-pill__label">Environment</span>
+            <span class="meta-pill__value">Prototype</span>
+          </div>
+          <div class="meta-pill">
+            <span class="meta-pill__label">Signed In</span>
+            <span class="meta-pill__value">Local Preview</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero__text">
+          <p class="hero__eyebrow" id="heroEyebrow">V1 Focus</p>
+          <h3 class="hero__title" id="heroTitle">Find any customer, understand plan and setup health quickly, then take the next safe action.</h3>
+          <p class="hero__copy">This first screen is intentionally practical: strong search, strong filters, clear health signals, and one detail pane that can later connect directly to the Admin API.</p>
+        </div>
+        <div class="hero__stats">
+          <div class="stat-card">
+            <span class="stat-card__label">Customers</span>
+            <strong class="stat-card__value" id="tenantCount">0</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__label">Attention</span>
+            <strong class="stat-card__value" id="attentionCount">0</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card__label">Trials</span>
+            <strong class="stat-card__value" id="trialCount">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="overviewSection" hidden>
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">Overview</p>
+            <h3 class="panel__title">What needs attention right now</h3>
+          </div>
+        </div>
+
+        <div class="feature-list-layout">
+          <section class="overview-stack">
+            <div class="summary-grid" id="overviewSummary"></div>
+            <div class="insight-grid">
+              <article class="insight-card">
+                <div class="insight-card__header">
+                  <div>
+                    <p class="panel__eyebrow">Setup Issues</p>
+                    <h4>Connection and onboarding blockers</h4>
+                  </div>
+                </div>
+                <div id="overviewSetupIssues" class="timeline-list"></div>
+              </article>
+
+              <article class="insight-card">
+                <div class="insight-card__header">
+                  <div>
+                    <p class="panel__eyebrow">Expiring Trials</p>
+                    <h4>Customers needing follow-up soon</h4>
+                  </div>
+                </div>
+                <div id="overviewExpiringTrials" class="timeline-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <aside class="overview-rail">
+            <article class="insight-card">
+              <div class="insight-card__header">
+                <div>
+                  <p class="panel__eyebrow">Recent Support</p>
+                  <h4>Latest internal notes</h4>
+                </div>
+              </div>
+              <div id="overviewSupportNotes" class="timeline-list"></div>
+            </article>
+
+            <article class="insight-card">
+              <div class="insight-card__header">
+                <div>
+                  <p class="panel__eyebrow">Recent Actions</p>
+                  <h4>Latest admin changes</h4>
+                </div>
+              </div>
+              <div id="overviewAdminActions" class="timeline-list"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel" id="tenantsPanel" hidden>
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">Primary Screen</p>
+            <h3 class="panel__title">Customers</h3>
+          </div>
+          <div class="panel__actions">
+            <button class="ghost-button" type="button" disabled>Export</button>
+            <button class="primary-button" type="button" disabled>Add Customer</button>
+          </div>
+        </div>
+
+        <div id="tenantsSection">
+          <div class="filters">
+            <label class="field">
+              <span class="field__label">Search</span>
+              <input id="searchInput" class="field__control" type="search" placeholder="Search company, email, or org id">
+            </label>
+
+            <label class="field">
+              <span class="field__label">Status</span>
+              <select id="statusFilter" class="field__control">
+                <option value="">All</option>
+                <option value="active">Active</option>
+                <option value="alert">Alert</option>
+                <option value="blocked">Blocked</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Plan</span>
+              <select id="planFilter" class="field__control">
+                <option value="">All</option>
+                <option value="free">Free</option>
+                <option value="trial">Trial</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Setup</span>
+              <select id="setupFilter" class="field__control">
+                <option value="">All</option>
+                <option value="connected">Connected</option>
+                <option value="oauth_pending">OAuth Pending</option>
+                <option value="tenant_secret_verified">Secret Verified</option>
+                <option value="setup_failed">Setup Failed</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Health</span>
+              <select id="healthFilter" class="field__control">
+                <option value="">All</option>
+                <option value="healthy">Healthy</option>
+                <option value="warning">Warning</option>
+                <option value="critical">Critical</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="tenants-layout" id="tenantsLayout">
+            <div class="table-card">
+              <table class="tenant-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th>Setup</th>
+                    <th>Health</th>
+                    <th>Activity</th>
+                    <th>Month</th>
+                  </tr>
+                </thead>
+                <tbody id="tenantTableBody"></tbody>
+              </table>
+              <div class="empty-state" id="emptyState" hidden>
+                <h4>No customers match these filters.</h4>
+                <p>Try clearing one of the filters or search with a broader term.</p>
+              </div>
+            </div>
+
+            <div class="splitter" id="tenantsSplitter" aria-hidden="true"></div>
+
+            <aside class="detail-card" id="tenantDetail">
+              <div class="detail-card__placeholder">
+                <p class="detail-card__eyebrow">Customer Detail</p>
+                <h4>Select a customer</h4>
+                <p>Pick any customer row to open the first version of the summary pane.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="panel" id="plansPanel" hidden>
+        <div class="panel__header panel__header--subsection">
+          <div>
+            <p class="panel__eyebrow">Plan Management</p>
+            <h3 class="panel__title">Plans</h3>
+          </div>
+        </div>
+
+        <div id="planNotice" class="notice-banner" hidden></div>
+
+        <section class="admin-section" id="plansSection">
+          <div class="plans-layout">
+            <aside class="plan-list-card" id="planList"></aside>
+            <section class="detail-card" id="planEditor"></section>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel" id="featureListSection" hidden>
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">Roadmap</p>
+            <h3 class="panel__title">Admin Feature List</h3>
+          </div>
+        </div>
+
+        <div class="overview-grid">
+          <section class="overview-stack">
+            <article class="insight-card">
+              <div class="insight-card__header">
+                <div>
+                  <p class="panel__eyebrow">Current Focus</p>
+                  <h4>Open admin-control features to finish next</h4>
+                </div>
+              </div>
+              <div id="featureListPrimary" class="timeline-list timeline-list--wide"></div>
+            </article>
+          </section>
+
+          <aside class="overview-rail">
+            <article class="insight-card">
+              <div class="insight-card__header">
+                <div>
+                  <p class="panel__eyebrow">Later Phases</p>
+                  <h4>Planned follow-up features</h4>
+                </div>
+              </div>
+              <div id="featureListSecondary" class="timeline-list"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel" id="auditSection" hidden>
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">Audit Log</p>
+            <h3 class="panel__title">Recent administrative actions</h3>
+          </div>
+        </div>
+        <div class="insight-card insight-card--full">
+          <div id="auditLogList" class="timeline-list timeline-list--wide"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="settingsSection" hidden>
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">App setting</p>
+            <h3 class="panel__title">App setting</h3>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <article class="detail-card">
+            <div class="detail-header">
+              <div>
+                <p class="detail-card__eyebrow">Data Source</p>
+                <h4 id="dataModeLabel">Mock Data</h4>
+                <p class="detail-subtitle" id="dataModeCopy">This shell is using the built-in customer examples so you can shape the experience safely.</p>
+              </div>
+            </div>
+
+            <div class="mode-picker mode-picker--light" role="radiogroup" aria-label="Data source">
+              <label class="mode-option mode-option--light">
+                <input type="radio" name="dataMode" value="mock">
+                <span>
+                  <strong>Mock Data</strong>
+                  <small>Safe demo content for UI work.</small>
+                </span>
+              </label>
+              <label class="mode-option mode-option--light">
+                <input type="radio" name="dataMode" value="live">
+                <span>
+                  <strong>Real API</strong>
+                  <small>Load real customer data from `NativeFormsAdminApi`.</small>
+                </span>
+              </label>
+            </div>
+            <p class="settings-helper" id="dataModeHelper">Choose when to stay on demo data and when to connect this screen to the live admin backend.</p>
+          </article>
+
+          <article class="detail-card">
+            <div class="detail-header">
+              <div>
+                <p class="detail-card__eyebrow">Environment</p>
+                <h4>Current runtime</h4>
+                <p class="detail-subtitle">This panel shows how the admin shell is currently connected so testing stays predictable.</p>
+              </div>
+            </div>
+
+            <div class="detail-list">
+              <div class="detail-list__row"><span>Configured API</span><strong id="settingsApiUrl">Not configured</strong></div>
+              <div class="detail-list__row"><span>Requested Mode</span><strong id="settingsRequestedMode">Mock</strong></div>
+              <div class="detail-list__row"><span>Active Mode</span><strong id="settingsActiveMode">Mock</strong></div>
+              <div class="detail-list__row"><span>Plan Storage</span><strong id="settingsPlanStorage">Mock</strong></div>
+              <div class="detail-list__row"><span>Status Alert Email</span><strong id="settingsStatusAlertEmail">Not configured</strong></div>
+              <div class="detail-list__row"><span>Daily Recompute Time</span><strong id="settingsRecomputeTime">02:00 UTC</strong></div>
+              <div class="detail-list__row"><span>Settings Source</span><strong id="settingsSource">Default</strong></div>
+            </div>
+          </article>
+        </div>
+
+        <section class="admin-section">
+          <div class="detail-card">
+            <div class="detail-header">
+              <div>
+                <p class="detail-card__eyebrow">Notifications</p>
+                <h4>Status change email</h4>
+                <p class="detail-subtitle">Send an email whenever a customer status changes between Active, Alert, and Blocked.</p>
+              </div>
+            </div>
+
+            <form id="settingsForm" class="stack-form">
+              <label class="field">
+                <span class="field__label">Recipient Email</span>
+                <input class="field__control" name="statusAlertEmailRecipient" type="email" placeholder="yosi@harmony-it.co.il">
+              </label>
+              <label class="field">
+                <span class="field__label">Daily Recompute Time (UTC)</span>
+                <input class="field__control" name="statusRecomputeTimeUtc" type="time" step="60">
+              </label>
+              <div class="detail-actions">
+                <button class="action-button" type="submit">Save Settings</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="./config.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

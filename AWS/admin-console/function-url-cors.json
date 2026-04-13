@@ -1,0 +1,12 @@
+{
+  "AllowOrigins": [
+    "https://d12d1b2kcyy4zw.cloudfront.net"
+  ],
+  "AllowMethods": [
+    "GET",
+    "POST"
+  ],
+  "AllowHeaders": [
+    "*"
+  ]
+}

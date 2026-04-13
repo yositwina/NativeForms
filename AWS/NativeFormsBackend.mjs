@@ -209,6 +209,28 @@ function normalizeSubscriptionState(payload, existing = null) {
   };
 }
 
+function getEffectiveSubscriptionEndDate(tenantRecord) {
+  if (!tenantRecord) {
+    return null;
+  }
+
+  const subscriptionState = String(tenantRecord.subscriptionState || tenantRecord.planCode || "").toLowerCase();
+  if (subscriptionState === "trial") {
+    return tenantRecord.trialEndsAt || tenantRecord.planEndsAt || tenantRecord.subscriptionEndDate || null;
+  }
+
+  return tenantRecord.planEndsAt || tenantRecord.subscriptionEndDate || null;
+}
+
+function parseNullableNumber(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function isSubscriptionEnded(subscriptionEndDate) {
   if (!subscriptionEndDate) {
     return false;
@@ -218,20 +240,55 @@ function isSubscriptionEnded(subscriptionEndDate) {
   return !Number.isNaN(end.getTime()) && end.getTime() < Date.now();
 }
 
-function getTenantRuntimeAccessError(tenantRecord) {
+function deriveTenantRuntimeStatus(tenantRecord) {
   if (!tenantRecord) {
-    return "Tenant not found";
+    return {
+      status: "missing",
+      reason: "Tenant not found"
+    };
   }
 
-  if (tenantRecord.status !== "active" || tenantRecord.isActive === false) {
-    return "Subscription is not active for this Salesforce org";
+  if (tenantRecord.status === "suspended" || tenantRecord.isActive === false) {
+    return {
+      status: "suspended",
+      reason: tenantRecord.statusReason || "Subscription is not active for this Salesforce org"
+    };
   }
 
-  if (isSubscriptionEnded(tenantRecord.subscriptionEndDate)) {
-    return "Subscription has ended for this Salesforce org";
+  if (isSubscriptionEnded(getEffectiveSubscriptionEndDate(tenantRecord))) {
+    return {
+      status: "expired",
+      reason: tenantRecord.statusReason || "Subscription has ended for this Salesforce org"
+    };
   }
 
-  return null;
+  const submissionLimit = parseNullableNumber(
+    tenantRecord?.effectiveLimits?.maxSubmissionsPerMonth
+    ?? tenantRecord?.planLimits?.maxSubmissionsPerMonth
+    ?? tenantRecord?.limits?.maxSubmissionsPerMonth
+  );
+  const submissionsMonth = parseNullableNumber(tenantRecord?.submissionsMonth) ?? 0;
+
+  if (submissionLimit != null && submissionsMonth > submissionLimit) {
+    return {
+      status: "over_limit",
+      reason: tenantRecord.statusReason || "Monthly submission limit has been exceeded for this Salesforce org"
+    };
+  }
+
+  return {
+    status: tenantRecord.status === "trialing" ? "trialing" : "active",
+    reason: tenantRecord.statusReason || ""
+  };
+}
+
+function getTenantRuntimeAccessError(tenantRecord) {
+  const runtimeStatus = deriveTenantRuntimeStatus(tenantRecord);
+  if (["active", "trialing"].includes(runtimeStatus.status)) {
+    return null;
+  }
+
+  return runtimeStatus.reason || "Subscription is not active for this Salesforce org";
 }
 
 function getHeaderValue(headers, name) {

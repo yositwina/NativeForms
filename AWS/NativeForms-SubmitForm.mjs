@@ -215,13 +215,26 @@ async function getTenantRecord(orgId) {
   return result.Item ? unmarshallItem(result.Item) : null;
 }
 
-function isSubscriptionEnded(subscriptionEndDate) {
-  if (!subscriptionEndDate) {
-    return false;
+function deriveTenantRuntimeStatus(tenantRecord) {
+  if (!tenantRecord) {
+    return {
+      status: "missing",
+      reason: "Owning tenant was not found"
+    };
   }
 
-  const end = new Date(`${subscriptionEndDate}T23:59:59.999Z`);
-  return !Number.isNaN(end.getTime()) && end.getTime() < Date.now();
+  const normalizedStatus = String(tenantRecord.status || "").toLowerCase();
+  if (["blocked", "suspended"].includes(normalizedStatus) || tenantRecord.isActive === false) {
+    return {
+      status: "blocked",
+      reason: tenantRecord.statusReason || "Data could not be updated in Salesforce because this customer is blocked."
+    };
+  }
+
+  return {
+    status: normalizedStatus || "active",
+    reason: tenantRecord.statusReason || ""
+  };
 }
 
 function ensureFormToken(formSecurity, publishToken) {
@@ -264,20 +277,9 @@ async function ensureActiveTenantForForm(formSecurity) {
   }
 
   const tenantRecord = await getTenantRecord(formSecurity.orgId);
-  if (!tenantRecord) {
-    const error = new Error("Owning tenant was not found");
-    error.statusCode = 403;
-    throw error;
-  }
-
-  if (tenantRecord.status !== "active" || tenantRecord.isActive === false) {
-    const error = new Error("Data could not be updated in Salesforce because the subscription is not active.");
-    error.statusCode = 403;
-    throw error;
-  }
-
-  if (isSubscriptionEnded(tenantRecord.subscriptionEndDate)) {
-    const error = new Error("Data could not be updated in Salesforce because the subscription has ended.");
+  const runtimeStatus = deriveTenantRuntimeStatus(tenantRecord);
+  if (runtimeStatus.status === "blocked") {
+    const error = new Error(runtimeStatus.reason);
     error.statusCode = 403;
     throw error;
   }
