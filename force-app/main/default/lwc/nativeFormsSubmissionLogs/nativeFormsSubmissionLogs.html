@@ -1,0 +1,266 @@
+<template>
+    <lightning-card title="Submission Logs" icon-name="utility:receipt">
+        <div class="shell">
+            <p class="intro">
+                Review recent form submissions and inspect private detail when this org stores encrypted logs.
+            </p>
+
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading submission logs"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <section class="summary-grid">
+                    <article class="summary-card">
+                        <strong class="summary-value">{loadedCount}</strong>
+                        <span class="summary-label">Loaded Results</span>
+                    </article>
+                    <article class="summary-card">
+                        <strong class="summary-value summary-value--danger">{failedCount}</strong>
+                        <span class="summary-label">Failed</span>
+                    </article>
+                    <article class="summary-card">
+                        <strong class="summary-value summary-value--success">{successCount}</strong>
+                        <span class="summary-label">Success</span>
+                    </article>
+                    <article class="summary-card">
+                        <strong class="summary-value">{last24HoursCount}</strong>
+                        <span class="summary-label">Last 24h</span>
+                    </article>
+                </section>
+
+                <section class="filters-card">
+                    <div class="filters-grid">
+                        <lightning-input type="search" name="formId" label="Form Name" value={formId} onchange={handleFilterChange}></lightning-input>
+                        <lightning-combobox name="outcome" label="Outcome" value={outcome} options={outcomeOptions} onchange={handleFilterChange}></lightning-combobox>
+                        <lightning-input type="date" name="dateFrom" label="Date From" value={dateFrom} onchange={handleFilterChange}></lightning-input>
+                        <lightning-input type="date" name="dateTo" label="Date To" value={dateTo} onchange={handleFilterChange}></lightning-input>
+                    </div>
+
+                    <div class="actions">
+                        <lightning-button variant="brand" label="Search Logs" onclick={handleSearch}></lightning-button>
+                        <lightning-button label="Reset" onclick={handleReset}></lightning-button>
+                    </div>
+                </section>
+
+                <section class="content-grid">
+                    <article class="results-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="detail-kicker">Submission List</span>
+                                <h2>Recent Submissions</h2>
+                                <p class="panel-copy">Select a row to inspect submitted fields, Salesforce result, and technical context.</p>
+                            </div>
+                        </div>
+
+                        <template if:true={hasLogs}>
+                            <div class="table-wrap">
+                                <table class="logs-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Form</th>
+                                            <th>Outcome</th>
+                                            <th>Failure Stage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={logRows} for:item="row">
+                                            <tr key={row.submissionId} data-id={row.submissionId} class={row.rowClass} onclick={handleSelectRow}>
+                                                <td>{row.submittedAtLabel}</td>
+                                                <td>
+                                                    <div class="cell-title">{row.formId}</div>
+                                                    <div class="cell-subtle">{row.formVersionId}</div>
+                                                </td>
+                                                <td><span class={row.outcomeClass}>{row.outcomeLabel}</span></td>
+                                                <td>{row.failureStageLabel}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <template if:true={nextToken}>
+                                <div class="actions actions--footer">
+                                    <lightning-button label="Load More" onclick={handleLoadMore} disabled={isLoadingMore}></lightning-button>
+                                </div>
+                            </template>
+                        </template>
+
+                        <template if:false={hasLogs}>
+                            <div class="empty-state">
+                                <h3>No submission logs found</h3>
+                                <p>Try a different form name, date range, or outcome filter.</p>
+                            </div>
+                        </template>
+                    </article>
+
+                    <article class="detail-panel">
+                        <template if:true={isLoadingDetail}>
+                            <div class="loading-wrap">
+                                <lightning-spinner alternative-text="Loading log detail" size="small"></lightning-spinner>
+                            </div>
+                        </template>
+
+                        <template if:false={isLoadingDetail}>
+                            <template if:true={selectedDetail}>
+                                <div class="detail-header">
+                                    <div>
+                                        <span class="detail-kicker">Submission Detail</span>
+                                        <h2>{selectedDetail.formHeading}</h2>
+                                        <p class="detail-meta">{selectedDetail.submissionRef}</p>
+                                    </div>
+                                    <lightning-button-icon icon-name="utility:copy" alternative-text="Copy submission ref" title="Copy submission ref" onclick={handleCopySubmissionRef}></lightning-button-icon>
+                                </div>
+
+                                <div class="pill-row">
+                                    <span class={selectedDetail.outcomeClass}>{selectedDetail.outcomeLabel}</span>
+                                    <span class="detail-pill">{selectedDetail.detailModeLabel}</span>
+                                    <template if:true={selectedDetail.failureStageVisible}>
+                                        <span class="detail-pill">{selectedDetail.failureStageLabel}</span>
+                                    </template>
+                                </div>
+
+                                <div class="kv-card">
+                                    <div class="kv-row"><span class="kv-label">Submitted At</span><span class="kv-value">{selectedDetail.submittedAtLabel}</span></div>
+                                    <div class="kv-row"><span class="kv-label">Form Id</span><span class="kv-value">{selectedDetail.formId}</span></div>
+                                    <div class="kv-row"><span class="kv-label">Form Version</span><span class="kv-value">{selectedDetail.formVersionId}</span></div>
+                                    <div class="kv-row"><span class="kv-label">Submission Ref</span><span class="kv-value">{selectedDetail.submissionRef}</span></div>
+                                </div>
+
+                                <template if:true={selectedDetail.metadataOnlyMessage}>
+                                    <div class="metadata-note">{selectedDetail.metadataOnlyMessage}</div>
+                                </template>
+
+                                <template if:true={selectedDetail.hasSubmissionRows}>
+                                    <section class="detail-section">
+                                        <h3>Submitted Fields</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.submissionRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasRepeatGroups}>
+                                    <section class="detail-section">
+                                        <h3>Repeat Groups</h3>
+                                        <template for:each={selectedDetail.repeatGroups} for:item="group">
+                                            <article key={group.groupKey} class="repeat-card">
+                                                <div class="repeat-header">
+                                                    <strong>{group.label}</strong>
+                                                    <span>{group.rowCountLabel}</span>
+                                                </div>
+                                                <template for:each={group.rows} for:item="row">
+                                                    <div key={row.key} class="repeat-row">
+                                                        <div class="repeat-row-title">{row.label}</div>
+                                                        <div class="kv-card">
+                                                            <template for:each={row.fields} for:item="field">
+                                                                <div key={field.key} class="kv-row kv-row--stackable">
+                                                                    <span class="kv-label">{field.label}</span>
+                                                                    <span class={field.valueClass}>{field.value}</span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </article>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasPrefillRows}>
+                                    <section class="detail-section">
+                                        <h3>Prefill Snapshot</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.prefillRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasSalesforceResults}>
+                                    <section class="detail-section">
+                                        <h3>Salesforce Result</h3>
+                                        <template for:each={selectedDetail.salesforceResults} for:item="item">
+                                            <article key={item.key} class="result-card">
+                                                <div class="result-title">{item.title}</div>
+                                                <div class="kv-card">
+                                                    <template for:each={item.rows} for:item="row">
+                                                        <div key={row.key} class="kv-row kv-row--stackable">
+                                                            <span class="kv-label">{row.label}</span>
+                                                            <span class={row.valueClass}>{row.value}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </article>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasErrorRows}>
+                                    <section class="detail-section">
+                                        <h3>Error</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.errorRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasTechnicalRows}>
+                                    <section class="detail-section">
+                                        <h3>Technical Context</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.technicalRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.rawJson}>
+                                    <section class="detail-section">
+                                        <lightning-accordion allow-multiple-sections-open>
+                                            <lightning-accordion-section name="raw" label="Technical JSON">
+                                                <pre class="raw-json">{selectedDetail.rawJson}</pre>
+                                            </lightning-accordion-section>
+                                        </lightning-accordion>
+                                    </section>
+                                </template>
+                            </template>
+
+                            <template if:false={selectedDetail}>
+                                <div class="empty-state empty-state--detail">
+                                    <h3>Select a submission</h3>
+                                    <p>Choose a row on the left to view submitted fields, support detail, and technical context.</p>
+                                </div>
+                            </template>
+                        </template>
+                    </article>
+                </section>
+            </template>
+        </div>
+    </lightning-card>
+</template>

@@ -467,6 +467,10 @@ public with sharing class NativeFormsBuilderController {
         if (elementType == 'checkbox') {
             config.put('checked', false);
         }
+        if (elementType == 'date') {
+            config.put('dateDisplayFormat', 'us');
+            config.put('dateGmtOffset', '+00:00');
+        }
         if (elementType == 'hidden') {
             config.put('value', '');
         }

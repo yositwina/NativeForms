@@ -1,4 +1,6 @@
 public with sharing class NativeFormsPublisher {
+    private static final String SHARED_CAPTCHA_SITE_KEY = '6LcclLgsAAAAAF3Te6PKyPqNhges_8IJkXBJtsru';
+    private static final String PUBLISHED_FORMS_BASE_URL = 'https://forms.twinaforms.com';
     private static final String TEMP_PREFILL_URL = 'https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_SUBMIT_URL = 'https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/';
 
@@ -135,6 +137,7 @@ public with sharing class NativeFormsPublisher {
 
             NativeFormsAwsClient.PresignResponse presignResponse = NativeFormsAwsClient.presignHtml(presignRequest);
             NativeFormsAwsClient.uploadHtml(presignResponse.putUrl, html);
+            String publishedPublicUrl = normalizePublishedPublicUrl(presignResponse.publicUrl, presignResponse.key);
 
             Map<String, Object> registerPayload = new Map<String, Object>{
                 'orgId' => orgId,
@@ -145,7 +148,7 @@ public with sharing class NativeFormsPublisher {
                 'securityMode' => determineSecurityMode(versionRecord.Security_Mode__c, actions, publishElements),
                 'rateLimitProfile' => String.isNotBlank(versionRecord.Rate_Limit_Profile__c) ? versionRecord.Rate_Limit_Profile__c : 'standard',
                 'generatedHtmlRef' => presignResponse.key,
-                'publicUrl' => presignResponse.publicUrl,
+                'publicUrl' => publishedPublicUrl,
                 'captcha' => captchaConfig,
                 'prefillPolicy' => buildPolicy(filterReferencedActions(actions, 'Prefill', publishElements), publishElements, true),
                 'submitPolicy' => buildPolicy(filterReferencedActions(actions, 'Submit', publishElements), publishElements, false),
@@ -164,7 +167,7 @@ public with sharing class NativeFormsPublisher {
                 Published_At__c = System.now(),
                 Published_By__c = UserInfo.getUserId(),
                 Published_Form_Id__c = formId,
-                Generated_HTML_Ref__c = presignResponse.publicUrl,
+                Generated_HTML_Ref__c = publishedPublicUrl,
                 AWS_Response_JSON__c = JSON.serialize(registerResponse),
                 Error_Message__c = null
             );
@@ -196,7 +199,7 @@ public with sharing class NativeFormsPublisher {
             }
 
             result.success = true;
-            result.publicUrl = presignResponse.publicUrl;
+            result.publicUrl = publishedPublicUrl;
             result.key = presignResponse.key;
             result.publicationId = publicationRecord.Id;
             result.message = successorDraft == null
@@ -1515,11 +1518,18 @@ public with sharing class NativeFormsPublisher {
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
         html += 'function getCaptchaToken(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");return responseField?responseField.value||"":"";}';
         html += 'function resetCaptcha(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");if(responseField){responseField.value="";}if(window.grecaptcha&&typeof window.grecaptcha.reset==="function"){try{window.grecaptcha.reset();}catch(e){}}}';
+        html += 'function dateFormatHint(format){return format==="eu"?"DD/MM/YYYY":"MM/DD/YYYY";}';
+        html += 'function isValidDateParts(year,month,day){const test=new Date(Date.UTC(year,month-1,day));return test.getUTCFullYear()===year&&test.getUTCMonth()+1===month&&test.getUTCDate()===day;}';
+        html += 'function parseDateValue(value,format){const raw=String(value||"").trim();if(!raw){return null;}let match=raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);if(match){const year=Number(match[1]);const month=Number(match[2]);const day=Number(match[3]);if(!isValidDateParts(year,month,day)){return null;}return{year:year,month:month,day:day,iso:match[1]+"-"+match[2]+"-"+match[3]};}const normalized=raw.replace(/[.\\-]/g,"/");match=normalized.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);if(!match){return null;}const first=Number(match[1]);const second=Number(match[2]);const year=Number(match[3]);const month=format==="eu"?second:first;const day=format==="eu"?first:second;if(!isValidDateParts(year,month,day)){return null;}const monthText=String(month).padStart(2,"0");const dayText=String(day).padStart(2,"0");return{year:year,month:month,day:day,iso:String(year).padStart(4,"0")+"-"+monthText+"-"+dayText};}';
+        html += 'function formatParsedDate(parsed,format){if(!parsed){return "";}const day=String(parsed.day).padStart(2,"0");const month=String(parsed.month).padStart(2,"0");const year=String(parsed.year).padStart(4,"0");return format==="eu"?day+"/"+month+"/"+year:month+"/"+day+"/"+year;}';
+        html += 'function formatDateForField(value,field){const format=field&&field.dataset&&field.dataset.dateFormat?field.dataset.dateFormat:"us";const parsed=parseDateValue(value,format)||parseDateValue(value,"us")||parseDateValue(value,"eu");return parsed?formatParsedDate(parsed,format):value==null?"":String(value);}';
+        html += 'function validateDateField(el,showMessage){if(!el||el.dataset.nativeformsDate!=="true"){return true;}const format=el.dataset.dateFormat||"us";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseDateValue(raw,format);if(!parsed){el.setCustomValidity("Please enter a valid date in "+dateFormatHint(format)+" format.");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}const minDate=el.dataset.effectiveMinDate||"";const maxDate=el.dataset.effectiveMaxDate||"";if(minDate&&parsed.iso<minDate){el.setCustomValidity("Please enter a date on or after "+formatDateForField(minDate,el)+".");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}if(maxDate&&parsed.iso>maxDate){el.setCustomValidity("Please enter a date on or before "+formatDateForField(maxDate,el)+".");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
-        html += 'function setFieldValue(fieldKey,value){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else{el.value=value==null?"":value;}});}';
+        html += 'function setFieldValue(fieldKey,value){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else{el.value=value==null?"":value;}});}';
         html += 'const repeatDeleteState={};';
-        html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}return first.value||"";}';
-        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}field.value=value==null?"":value;}';
+        html += 'let lastPrefillPayload=null;';
+        html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}return first.value||"";}';
+        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}field.value=value==null?"":value;}';
         html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:"";if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
         html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);});}';
         html += 'function clearRepeatGroups(){form.querySelectorAll("[data-repeat-rows]").forEach(function(host){host.innerHTML="";});Object.keys(repeatDeleteState).forEach(function(key){repeatDeleteState[key]=[];});}';
@@ -1528,12 +1538,13 @@ public with sharing class NativeFormsPublisher {
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
         html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let hasValue=false;if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
         html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
-        html += 'function applyPrefillPayload(payload){if(!payload){return;}const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});applyLockedFields();evaluateConditions();}';
+        html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});applyLockedFields();evaluateConditions();}';
         html += 'async function runPrefill(){if(!config.prefillUrl){return;}const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Prefill failed");}applyPrefillPayload(data);}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
-        html += 'function applyDateConstraints(){form.querySelectorAll("input[type=\'date\']").forEach(function(el){const now=new Date();let minDate=null;let maxDate=null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.min=isoDate(minDate);}if(maxDate){el.max=isoDate(maxDate);}});}';
-        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
-        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}["input","change","blur"].forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
+        html += 'function applyDateConstraints(){form.querySelectorAll("[data-nativeforms-date=\'true\']").forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
+        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
+        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}const events=el.dataset.nativeformsDate==="true"?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
+        html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!validateDateField(el,true)){return{success:false,message:el.validationMessage||"Please review the date fields and try again.",values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
         html += 'function evaluateConditions(){form.querySelectorAll("[data-condition-source]").forEach(function(el){const source=el.dataset.conditionSource;const operator=el.dataset.conditionOperator;const compare=el.dataset.conditionValue||"";const actual=readFieldValue(source);let visible=true;if(operator==="equals"){visible=String(actual)===compare;}else if(operator==="notEquals"){visible=String(actual)!==compare;}else if(operator==="isTrue"){visible=actual===true||String(actual).toLowerCase()==="true";}else if(operator==="isFalse"){visible=actual===false||String(actual).toLowerCase()==="false"||String(actual)==="";}else if(operator==="isBlank"){visible=String(actual)==="";}else if(operator==="isNotBlank"){visible=String(actual)!=="";}el.style.display=visible?"":"none";});}';
         html += 'applyDateConstraints();';
         html += 'wireLiveValidation();';
@@ -1544,14 +1555,15 @@ public with sharing class NativeFormsPublisher {
         html += 'if(!form.reportValidity()){return;}';
         html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error","Please complete the CAPTCHA.");return;}';
         html += 'const submitButton=form.querySelector("button[type=\'submit\']");if(submitButton){submitButton.disabled=true;}';
-        html += 'try{const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){input[key]=value;}';
+        html += 'try{const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){input[key]=value;}';
         html += 'form.querySelectorAll("input[type=\'checkbox\'][name]").forEach(function(el){input[el.name]=!!el.checked;});';
+        html += 'Object.keys(normalizedDates.values).forEach(function(key){input[key]=normalizedDates.values[key];});';
         html += 'if(captchaEnabled){input.captchaToken=getCaptchaToken();}';
         html += 'input.repeatGroups=collectRepeatGroups();';
-        html += 'const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input})});';
+        html += 'const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input,prefillSnapshot:lastPrefillPayload})});';
         html += 'const data=await response.json();';
-        html += 'if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Submit failed");}';
-        html += 'setStatus("success","Form submitted successfully.");form.reset();clearRepeatGroups();resetCaptcha();';
+        html += 'if(!response.ok||data.success===false){const baseMessage=(data.error&&data.error.message)||data.error||"Submit failed";const refSuffix=data&&data.submissionRef?" Reference: "+data.submissionRef:"";throw new Error(baseMessage+refSuffix);}';
+        html += 'const successMessage=data&&data.submissionRef?"Form submitted successfully. Reference: "+data.submissionRef:"Form submitted successfully.";setStatus("success",successMessage);form.reset();clearRepeatGroups();lastPrefillPayload=null;resetCaptcha();';
         html += '}catch(error){setStatus("error",error&&error.message?error.message:"Submit failed.");if(captchaEnabled){resetCaptcha();}}finally{if(submitButton){submitButton.disabled=false;}}';
         html += '});';
         html += '})();</script>';
@@ -1824,6 +1836,15 @@ public with sharing class NativeFormsPublisher {
             return '<input type="hidden" data-element-id="' + safeElementId + '" name="' + safeName + '" value="' + escapeHtml(hiddenValue) + '">';
         }
 
+        if (typeValue == 'date') {
+            String displayValue = formatDateDefaultValue(defaultValue, config);
+            String datePlaceholder = String.isNotBlank(placeholder) ? placeholder : datePlaceholder(config);
+            String dateValueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
+            String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabel + '</label>';
+            String controlHtml = '<input type="text" id="' + safeName + '" name="' + safeName + '" inputmode="numeric" autocomplete="off" data-nativeforms-date="true"' + dateRangeAttrs + lockOnPrefillAttr + ' placeholder="' + escapeHtml(datePlaceholder) + '"' + dateValueAttr + requiredAttr + '>';
+            return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml);
+        }
+
         String htmlType = normalizeInputType(typeValue);
         String valueAttr = String.isNotBlank(defaultValue) ? ' value="' + escapeHtml(defaultValue) + '"' : '';
         String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabel + '</label>';
@@ -1906,6 +1927,15 @@ public with sharing class NativeFormsPublisher {
 
         if (typeValue == 'hidden' || hiddenByBehavior) {
             return '<input type="hidden" id="' + baseId + '"' + keyAttr + sourceAttr + '>';
+        }
+
+        if (typeValue == 'date') {
+            String displayValue = formatDateDefaultValue(stringValue(config.get('defaultValue')), config);
+            String datePlaceholder = String.isNotBlank(placeholder) ? placeholder : datePlaceholder(config);
+            String valueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
+            String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + escapeHtml(label) + '</label>';
+            String controlHtml = '<input type="text" id="' + baseId + '" inputmode="numeric" autocomplete="off" data-nativeforms-date="true"' + keyAttr + sourceAttr + dateRangeDataAttrs(config) + lockOnPrefillAttr + ' placeholder="' + escapeHtml(datePlaceholder) + '"' + valueAttr + '>';
+            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml);
         }
 
         String htmlType = normalizeInputType(typeValue);
@@ -2055,6 +2085,14 @@ public with sharing class NativeFormsPublisher {
             return '';
         }
         List<String> attrs = new List<String>();
+        attrs.add(' data-date-format="' + escapeHtml(normalizedDateDisplayFormat(config)) + '"');
+        attrs.add(' data-date-gmt-offset="' + escapeHtml(normalizedDateGmtOffset(config)) + '"');
+        if (config.containsKey('minValue') && String.isNotBlank(String.valueOf(config.get('minValue')))) {
+            attrs.add(' data-min-date="' + escapeHtml(String.valueOf(config.get('minValue'))) + '"');
+        }
+        if (config.containsKey('maxValue') && String.isNotBlank(String.valueOf(config.get('maxValue')))) {
+            attrs.add(' data-max-date="' + escapeHtml(String.valueOf(config.get('maxValue'))) + '"');
+        }
         if (config.containsKey('pastYears')) {
             attrs.add(' data-past-years="' + escapeHtml(String.valueOf(config.get('pastYears'))) + '"');
         }
@@ -2068,6 +2106,36 @@ public with sharing class NativeFormsPublisher {
             attrs.add(' data-future-months="' + escapeHtml(String.valueOf(config.get('futureMonths'))) + '"');
         }
         return String.join(attrs, '');
+    }
+
+    private static String normalizedDateDisplayFormat(Map<String, Object> config) {
+        String value = stringValue(config == null ? null : config.get('dateDisplayFormat'));
+        return value == 'eu' ? 'eu' : 'us';
+    }
+
+    private static String normalizedDateGmtOffset(Map<String, Object> config) {
+        String value = stringValue(config == null ? null : config.get('dateGmtOffset'));
+        return String.isNotBlank(value) ? value : '+00:00';
+    }
+
+    private static String datePlaceholder(Map<String, Object> config) {
+        return normalizedDateDisplayFormat(config) == 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy';
+    }
+
+    private static String formatDateDefaultValue(String value, Map<String, Object> config) {
+        if (String.isBlank(value)) {
+            return '';
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() >= 10 && trimmed.substring(4, 5) == '-' && trimmed.substring(7, 8) == '-') {
+            String year = trimmed.substring(0, 4);
+            String month = trimmed.substring(5, 7);
+            String day = trimmed.substring(8, 10);
+            return normalizedDateDisplayFormat(config) == 'eu'
+                ? day + '/' + month + '/' + year
+                : month + '/' + day + '/' + year;
+        }
+        return trimmed;
     }
 
     private static String normalizeInputType(String typeValue) {
@@ -2156,16 +2224,31 @@ public with sharing class NativeFormsPublisher {
             return captcha;
         }
 
-        String siteKey = orgConfig == null ? null : orgConfig.Captcha_Site_Key__c;
-        String secretKey = orgConfig == null ? null : orgConfig.Captcha_Secret_Key__c;
-        if (String.isBlank(siteKey) || String.isBlank(secretKey)) {
-            throw new AuraHandledException('CAPTCHA is enabled for this form, but Google CAPTCHA site key and secret key are not configured in NativeForms Admin Features.');
+        String siteKey = SHARED_CAPTCHA_SITE_KEY;
+        if (String.isBlank(siteKey)) {
+            throw new AuraHandledException('CAPTCHA is enabled for this form, but the shared TwinaForms CAPTCHA site key is not configured in the package.');
         }
 
         captcha.put('enabled', true);
         captcha.put('siteKey', siteKey.trim());
-        captcha.put('secretKey', secretKey.trim());
         return captcha;
+    }
+
+    public static Boolean hasSharedCaptchaSiteKey() {
+        return String.isNotBlank(SHARED_CAPTCHA_SITE_KEY);
+    }
+
+    public static String getSharedCaptchaSiteKey() {
+        return SHARED_CAPTCHA_SITE_KEY;
+    }
+
+    private static String normalizePublishedPublicUrl(String publicUrl, String key) {
+        String trimmedBaseUrl = PUBLISHED_FORMS_BASE_URL == null ? null : PUBLISHED_FORMS_BASE_URL.trim();
+        String trimmedKey = key == null ? null : key.trim();
+        if (String.isNotBlank(trimmedBaseUrl) && String.isNotBlank(trimmedKey)) {
+            return trimmedBaseUrl.replaceAll('/+$', '') + '/' + trimmedKey.replaceAll('^/+', '');
+        }
+        return publicUrl;
     }
 
     private static String stringValue(Object value) {

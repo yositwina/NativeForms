@@ -24,8 +24,8 @@ public with sharing class NativeFormsAdminController {
         settings.enableProPostSubmitAutoLink = config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
         settings.enableProSfSecretCodeAuth = config != null && config.Enable_Pro_SF_Secret_Code_Auth__c;
         settings.enableProLoadFile = config != null && config.Enable_Pro_Load_File__c;
-        settings.captchaSiteKey = config == null ? '' : config.Captcha_Site_Key__c;
-        settings.captchaSecretKey = config == null ? '' : config.Captcha_Secret_Key__c;
+        settings.captchaSiteKey = NativeFormsPublisher.getSharedCaptchaSiteKey();
+        settings.captchaSecretKey = '';
         return settings;
     }
 
@@ -45,8 +45,6 @@ public with sharing class NativeFormsAdminController {
         config.Enable_Pro_Post_Submit_Auto_Link__c = inputValue != null && inputValue.enableProPostSubmitAutoLink;
         config.Enable_Pro_SF_Secret_Code_Auth__c = inputValue != null && inputValue.enableProSfSecretCodeAuth;
         config.Enable_Pro_Load_File__c = inputValue != null && inputValue.enableProLoadFile;
-        config.Captcha_Site_Key__c = inputValue == null ? null : normalizeText(inputValue.captchaSiteKey);
-        config.Captcha_Secret_Key__c = inputValue == null ? null : normalizeText(inputValue.captchaSecretKey);
         if (config.Id == null) {
             insert config;
         } else {

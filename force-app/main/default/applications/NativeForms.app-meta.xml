@@ -10,13 +10,11 @@
     <label>NativeForms</label>
     <navType>Standard</navType>
     <tabs>NativeForms_Home</tabs>
-    <tabs>NativeForms_Connect</tabs>
-    <tabs>NativeForms_Themes</tabs>
-    <tabs>NF_Form__c</tabs>
     <tabs>NativeForms_Designer</tabs>
     <tabs>NativeForms_Prefill_Actions</tabs>
     <tabs>NativeForms_Submit_Actions</tabs>
-    <tabs>NF_Form_Publication__c</tabs>
-    <tabs>standard-Contact</tabs>
+    <tabs>NativeForms_Themes</tabs>
+    <tabs>NativeForms_Submission_Logs</tabs>
+    <tabs>NativeForms_Connect</tabs>
     <uiType>Lightning</uiType>
 </CustomApplication>

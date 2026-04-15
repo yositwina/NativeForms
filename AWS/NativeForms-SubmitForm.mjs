@@ -97,16 +97,21 @@ V1 simplifications
 import https from "https";
 import querystring from "querystring";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { DynamoDBClient, GetItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import crypto from "crypto";
 
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
+const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
+const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
+const CAPTCHA_SECRET_KEY = String(process.env.CAPTCHA_SECRET_KEY || "").trim();
 const SALESFORCE_API_VERSION = "v60.0";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
+const SUBMISSION_LOG_SCHEMA_VERSION = "v2";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
+const salesforceDescribeCache = new Map();
 
 function jsonResponse(statusCode, payload) {
   return {
@@ -215,6 +220,421 @@ async function getTenantRecord(orgId) {
   return result.Item ? unmarshallItem(result.Item) : null;
 }
 
+async function getPlanDefinition(planCode) {
+  const normalizedPlanCode = normalizePlanCode(planCode);
+  try {
+    const result = await dynamoClient.send(new GetItemCommand({
+      TableName: PLAN_TABLE,
+      Key: {
+        planCode: { S: normalizedPlanCode }
+      }
+    }));
+
+    return result.Item ? unmarshallItem(result.Item) : null;
+  } catch (error) {
+    if (error?.name !== "ResourceNotFoundException") {
+      console.warn("Submission log plan lookup failed:", error);
+    }
+    return null;
+  }
+}
+
+function toAttributeValue(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return { NULL: true };
+  if (typeof value === "string") return { S: value };
+  if (typeof value === "number") return { N: String(value) };
+  if (typeof value === "boolean") return { BOOL: value };
+  if (Array.isArray(value)) {
+    return {
+      L: value
+        .map((item) => toAttributeValue(item))
+        .filter(Boolean)
+    };
+  }
+  if (typeof value === "object") {
+    const mapped = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const converted = toAttributeValue(nestedValue);
+      if (converted !== undefined) {
+        mapped[key] = converted;
+      }
+    }
+    return { M: mapped };
+  }
+  return { S: String(value) };
+}
+
+function marshallItem(item) {
+  const marshalled = {};
+  for (const [key, value] of Object.entries(item || {})) {
+    const converted = toAttributeValue(value);
+    if (converted !== undefined) {
+      marshalled[key] = converted;
+    }
+  }
+  return marshalled;
+}
+
+function buildFailureError(message, statusCode, failureStage, extra = {}) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.failureStage = failureStage;
+  Object.assign(error, extra);
+  return error;
+}
+
+function generateSubmissionId(submittedAt) {
+  return `${submittedAt}#${crypto.randomUUID()}`;
+}
+
+function generateSubmissionRef() {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:.TZ]/g, "")
+    .slice(0, 14);
+  return `NF-${timestamp}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+function getUserAgent(event) {
+  return event?.headers?.["user-agent"] || event?.headers?.["User-Agent"] || null;
+}
+
+function normalizePlanCode(planCode) {
+  const normalizedPlan = String(planCode || "").trim().toLowerCase();
+  if (normalizedPlan === "free") {
+    return "free";
+  }
+  if (normalizedPlan === "trial") {
+    return "trial";
+  }
+  if (normalizedPlan === "pro") {
+    return "pro";
+  }
+  return normalizedPlan || "starter";
+}
+
+function getDefaultSubmissionLogPlanPolicy(planCode) {
+  const normalizedPlan = normalizePlanCode(planCode);
+  if (normalizedPlan === "free") {
+    return {
+      planCode: "free",
+      retentionDays: 30,
+      detailedLogsIncludedByPlan: false
+    };
+  }
+  if (normalizedPlan === "trial") {
+    return {
+      planCode: "trial",
+      retentionDays: 30,
+      detailedLogsIncludedByPlan: true
+    };
+  }
+  if (normalizedPlan === "pro") {
+    return {
+      planCode: "pro",
+      retentionDays: 365,
+      detailedLogsIncludedByPlan: true
+    };
+  }
+  return {
+    planCode: "starter",
+    retentionDays: 90,
+    detailedLogsIncludedByPlan: true
+  };
+}
+
+function parsePositiveInteger(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return Math.trunc(parsed);
+}
+
+function parseSubmissionLogPublicKey(publicKeyValue) {
+  if (!publicKeyValue) {
+    return null;
+  }
+
+  try {
+    const keyBuffer = Buffer.from(String(publicKeyValue).trim(), "base64");
+    if (!keyBuffer.length) {
+      return null;
+    }
+    return crypto.createPublicKey({
+      key: keyBuffer,
+      format: "der",
+      type: "spki"
+    });
+  } catch (error) {
+    return null;
+  }
+}
+
+function resolveSubmissionLogPolicy(tenantRecord, planDefinition) {
+  const defaultPolicy = getDefaultSubmissionLogPlanPolicy(tenantRecord?.planCode);
+  const effectiveFeatureFlags = tenantRecord?.effectiveFeatureFlags || {
+    enableDetailedSubmissionLogs: planDefinition?.featureFlags?.enableDetailedSubmissionLogs
+  };
+  const effectiveLimits = tenantRecord?.effectiveLimits || {
+    submissionLogRetentionDays: planDefinition?.limits?.submissionLogRetentionDays
+  };
+  const detailedLogsIncludedByPlan =
+    effectiveFeatureFlags?.enableDetailedSubmissionLogs == null
+      ? defaultPolicy.detailedLogsIncludedByPlan
+      : effectiveFeatureFlags.enableDetailedSubmissionLogs === true;
+  const retentionDays =
+    parsePositiveInteger(effectiveLimits?.submissionLogRetentionDays) ||
+    parsePositiveInteger(planDefinition?.limits?.submissionLogRetentionDays) ||
+    defaultPolicy.retentionDays;
+  const publicKey = parseSubmissionLogPublicKey(tenantRecord?.submissionLogPublicKey);
+  const detailMode =
+    detailedLogsIncludedByPlan && !!publicKey
+      ? "encrypted_detail"
+      : "metadata_only";
+
+  return {
+    planCode: defaultPolicy.planCode,
+    retentionDays,
+    detailMode,
+    keyVersion: tenantRecord?.submissionLogKeyVersion || "v2",
+    publicKey,
+    detailedLogsIncludedByPlan
+  };
+}
+
+function encryptSubmissionLogDetail(detailPayload, publicKey, keyVersion) {
+  if (!publicKey) {
+    throw new Error("Submission log public key is invalid");
+  }
+
+  const dataKey = crypto.randomBytes(32);
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-cbc", dataKey, iv);
+  const plaintext = Buffer.from(JSON.stringify(detailPayload), "utf8");
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const encryptedDataKey = crypto.publicEncrypt(
+    {
+      key: publicKey,
+      oaepHash: "sha256"
+    },
+    dataKey
+  );
+
+  return {
+    detailCiphertextB64: ciphertext.toString("base64"),
+    detailIvB64: iv.toString("base64"),
+    detailEncryptedKeyB64: encryptedDataKey.toString("base64"),
+    detailKeyVersion: keyVersion || "v2",
+    detailSchemaVersion: SUBMISSION_LOG_SCHEMA_VERSION
+  };
+}
+
+function getFailureStage(error, fallbackStage = "system") {
+  if (error?.failureStage) {
+    return error.failureStage;
+  }
+
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("captcha") || message.includes("missing required field") || message.includes("invalid publish token")) {
+    return "validation";
+  }
+  if (message.includes("command") || message.includes("allowed") || message.includes("unsupported")) {
+    return "mapping";
+  }
+  if (
+    message.includes("token refresh failed") ||
+    message.includes("query failed") ||
+    message.includes("create failed") ||
+    message.includes("update failed") ||
+    message.includes("delete failed")
+  ) {
+    return "salesforce";
+  }
+  return fallbackStage;
+}
+
+function maybeGetSubmitterEmail(inputPayload) {
+  const input = inputPayload?.input || {};
+  for (const candidate of ["email", "Email", "emailAddress", "EmailAddress"]) {
+    if (input[candidate]) {
+      return String(input[candidate]);
+    }
+  }
+  return null;
+}
+
+function extractPrimaryRecordId(results) {
+  for (let index = results.length - 1; index >= 0; index -= 1) {
+    const result = results[index];
+    if (result?.id) {
+      return result.id;
+    }
+    if (Array.isArray(result?.createdIds) && result.createdIds.length > 0) {
+      return result.createdIds[0];
+    }
+    if (Array.isArray(result?.updatedIds) && result.updatedIds.length > 0) {
+      return result.updatedIds[0];
+    }
+  }
+  return null;
+}
+
+function buildCommandTraceSnapshot(command, context) {
+  const snapshot = {
+    commandKey: command?.commandKey || null,
+    type: command?.type || null,
+    objectApiName: command?.objectApiName || null
+  };
+
+  if (command?.type === "findOne") {
+    if (command.where) {
+      snapshot.where = resolveValue(command.where, context);
+    }
+    if (command.whereClause) {
+      snapshot.whereClause = interpolateWhereClause(command.whereClause, context);
+    }
+    if (Array.isArray(command.fieldsToReturn)) {
+      snapshot.fieldsToReturn = command.fieldsToReturn;
+    }
+    return snapshot;
+  }
+
+  if (command?.type === "create" || command?.type === "update") {
+    snapshot.fields = resolveValue(command.fields || {}, context);
+    if (command.id) {
+      snapshot.id = resolveValue(command.id, context);
+    }
+    return snapshot;
+  }
+
+  if (command?.type === "delete") {
+    snapshot.id = resolveValue(command.id, context);
+    return snapshot;
+  }
+
+  if (command?.type === "upsertMany") {
+    snapshot.rows = resolveRowsSource(command.rows, context);
+    snapshot.fields = resolveValue(command.fields || {}, context);
+    snapshot.relationshipField = command.relationshipField || null;
+    if (command.relationshipValue !== undefined) {
+      snapshot.relationshipValue = resolveValue(command.relationshipValue, context);
+    }
+    if (command.deleteIds !== undefined) {
+      snapshot.deleteIds = resolveValue(command.deleteIds, context);
+    }
+    return snapshot;
+  }
+
+  return snapshot;
+}
+
+function buildErrorDetail(error) {
+  return {
+    message: error?.message || "Unknown submission error",
+    failureStage: getFailureStage(error),
+    statusCode: error?.statusCode || null,
+    commandKey: error?.commandKey || null,
+    commandType: error?.commandType || null,
+    objectApiName: error?.objectApiName || null,
+    responseBody: error?.responseBody || null
+  };
+}
+
+async function writeSubmissionLog(item) {
+  await dynamoClient.send(new PutItemCommand({
+    TableName: SUBMISSION_LOG_TABLE,
+    Item: marshallItem(item)
+  }));
+}
+
+async function writeSubmissionLogSafely({
+  tenantRecord,
+  formSecurity,
+  inputPayload,
+  event,
+  submissionId,
+  submissionRef,
+  submittedAt,
+  startedAtMs,
+  outcome,
+  failureStage,
+  results,
+  commandTrace,
+  error
+}) {
+  if (!formSecurity?.orgId) {
+    return;
+  }
+
+  try {
+    const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+    const submissionLogPolicy = resolveSubmissionLogPolicy(tenantRecord, planDefinition);
+    const expiresAt = Math.floor(new Date(submittedAt).getTime() / 1000) + (submissionLogPolicy.retentionDays * 86400);
+    const baseItem = {
+      tenantId: formSecurity.orgId,
+      submittedAtSubmissionId: submissionId,
+      submissionId,
+      submissionRef,
+      formId: formSecurity.formId || inputPayload?.formId || null,
+      formVersionId: formSecurity.publishedVersionId || null,
+      submittedAt,
+      outcome,
+      failureStage,
+      detailMode: submissionLogPolicy.detailMode,
+      recordId: outcome === "success" ? extractPrimaryRecordId(results || []) : null,
+      expiresAt,
+      tenantFormKey: `${formSecurity.orgId}#${formSecurity.formId || inputPayload?.formId || "unknown"}`,
+      tenantOutcomeKey: `${formSecurity.orgId}#${outcome}`
+    };
+
+    if (submissionLogPolicy.detailMode === "encrypted_detail") {
+      const detailPayload = {
+        tenantId: formSecurity.orgId,
+        planCode: submissionLogPolicy.planCode,
+        submissionId,
+        submissionRef,
+        formId: formSecurity.formId || inputPayload?.formId || null,
+        formVersionId: formSecurity.publishedVersionId || null,
+        submittedAt,
+        outcome,
+        failureStage,
+        durationMs: Math.max(Date.now() - startedAtMs, 0),
+        submitterEmail: maybeGetSubmitterEmail(inputPayload),
+        submittedPayload: inputPayload?.input || {},
+        prefillSnapshot: inputPayload?.prefillSnapshot || null,
+        commandTrace: commandTrace || [],
+        partialResults: results || [],
+        error: error ? buildErrorDetail(error) : null,
+        technicalContext: {
+          ipAddress: getClientIp(event),
+          userAgent: getUserAgent(event),
+          securityMode: formSecurity.securityMode || null
+        }
+      };
+
+      Object.assign(
+        baseItem,
+        encryptSubmissionLogDetail(
+          detailPayload,
+          submissionLogPolicy.publicKey,
+          submissionLogPolicy.keyVersion
+        )
+      );
+    }
+
+    await writeSubmissionLog(baseItem);
+  } catch (logError) {
+    console.error("NativeForms submission log write failed:", logError);
+  }
+}
+
 function deriveTenantRuntimeStatus(tenantRecord) {
   if (!tenantRecord) {
     return {
@@ -239,33 +659,23 @@ function deriveTenantRuntimeStatus(tenantRecord) {
 
 function ensureFormToken(formSecurity, publishToken) {
   if (!publishToken) {
-    const error = new Error("Missing required field: publishToken");
-    error.statusCode = 401;
-    throw error;
+    throw buildFailureError("Missing required field: publishToken", 401, "validation");
   }
 
   if (!formSecurity || formSecurity.status !== "published") {
-    const error = new Error("Form is not published");
-    error.statusCode = 403;
-    throw error;
+    throw buildFailureError("Form is not published", 403, "validation");
   }
 
   if (formSecurity.tokenHash !== hashToken(publishToken)) {
-    const error = new Error("Unauthorized: invalid publish token");
-    error.statusCode = 401;
-    throw error;
+    throw buildFailureError("Unauthorized: invalid publish token", 401, "validation");
   }
 
   if (!formSecurity.submitPolicy) {
-    const error = new Error("Submit policy is not configured for this form");
-    error.statusCode = 403;
-    throw error;
+    throw buildFailureError("Submit policy is not configured for this form", 403, "mapping");
   }
 
   if (!formSecurity.submitDefinition || !Array.isArray(formSecurity.submitDefinition.commands)) {
-    const error = new Error("Submit definition is not configured for this form");
-    error.statusCode = 403;
-    throw error;
+    throw buildFailureError("Submit definition is not configured for this form", 403, "mapping");
   }
 }
 
@@ -373,7 +783,14 @@ async function refreshAccessToken(secret, loginUrl) {
   );
 
   if (response.statusCode !== 200) {
-    throw new Error(`Token refresh failed. Status: ${response.statusCode}. Body: ${response.body}`);
+    throw buildFailureError(
+      `Token refresh failed. Status: ${response.statusCode}. Body: ${response.body}`,
+      502,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
   }
 
   return JSON.parse(response.body).access_token;
@@ -563,6 +980,129 @@ function resolveRowsSource(rows, context) {
   return Array.isArray(resolvedRows) ? resolvedRows : [];
 }
 
+async function getSalesforceObjectDescribe(instanceUrl, accessToken, objectApiName) {
+  const cacheKey = `${instanceUrl}::${objectApiName}`;
+  if (salesforceDescribeCache.has(cacheKey)) {
+    return salesforceDescribeCache.get(cacheKey);
+  }
+
+  const url = new URL(instanceUrl);
+  const response = await httpsRequest({
+    hostname: url.hostname,
+    path: `/services/data/${SALESFORCE_API_VERSION}/sobjects/${encodeURIComponent(objectApiName)}/describe`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (response.statusCode !== 200) {
+    throw buildFailureError(
+      `Describe failed. Status: ${response.statusCode}. Body: ${response.body}`,
+      response.statusCode >= 500 ? 502 : 400,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
+  }
+
+  const parsed = JSON.parse(response.body || "{}");
+  salesforceDescribeCache.set(cacheKey, parsed);
+  return parsed;
+}
+
+function parseFlexibleDateString(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const test = new Date(Date.UTC(year, month - 1, day));
+    if (test.getUTCFullYear() === year && test.getUTCMonth() + 1 === month && test.getUTCDate() === day) {
+      return { year, month, day };
+    }
+    return null;
+  }
+
+  const normalized = raw.replace(/[.\-]/g, "/");
+  match = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) {
+    return null;
+  }
+
+  const first = Number(match[1]);
+  const second = Number(match[2]);
+  const year = Number(match[3]);
+  const candidates = [
+    { month: first, day: second },
+    { month: second, day: first }
+  ];
+
+  for (const candidate of candidates) {
+    const test = new Date(Date.UTC(year, candidate.month - 1, candidate.day));
+    if (
+      test.getUTCFullYear() === year &&
+      test.getUTCMonth() + 1 === candidate.month &&
+      test.getUTCDate() === candidate.day
+    ) {
+      return {
+        year,
+        month: candidate.month,
+        day: candidate.day
+      };
+    }
+  }
+
+  return null;
+}
+
+function formatDatePartsAsIso(parts) {
+  if (!parts) {
+    return null;
+  }
+  const year = String(parts.year).padStart(4, "0");
+  const month = String(parts.month).padStart(2, "0");
+  const day = String(parts.day).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function coerceFieldsForSalesforce(instanceUrl, accessToken, objectApiName, fields) {
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
+    return fields;
+  }
+
+  const describe = await getSalesforceObjectDescribe(instanceUrl, accessToken, objectApiName);
+  const fieldTypeByName = {};
+  for (const field of describe?.fields || []) {
+    if (field?.name) {
+      fieldTypeByName[field.name] = field.type;
+    }
+  }
+
+  const coerced = { ...fields };
+  for (const [fieldName, value] of Object.entries(coerced)) {
+    if (value == null || value === "") {
+      continue;
+    }
+
+    const fieldType = fieldTypeByName[fieldName];
+    if (fieldType === "date") {
+      const parsed = parseFlexibleDateString(value);
+      if (parsed) {
+        coerced[fieldName] = formatDatePartsAsIso(parsed);
+      }
+    }
+  }
+
+  return coerced;
+}
+
 async function querySalesforce(instanceUrl, accessToken, soql) {
   const url = new URL(instanceUrl);
   const path = `/services/data/${SALESFORCE_API_VERSION}/query?q=${encodeURIComponent(soql)}`;
@@ -577,7 +1117,14 @@ async function querySalesforce(instanceUrl, accessToken, soql) {
   });
 
   if (response.statusCode !== 200) {
-    throw new Error(`Query failed. Status: ${response.statusCode}. Body: ${response.body}`);
+    throw buildFailureError(
+      `Query failed. Status: ${response.statusCode}. Body: ${response.body}`,
+      response.statusCode >= 500 ? 502 : 400,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
   }
 
   return JSON.parse(response.body);
@@ -603,11 +1150,12 @@ async function verifyCaptcha(formSecurity, inputPayload, event) {
     return;
   }
 
-  const secretKey = captchaConfig.secretKey;
-  if (!secretKey) {
-    const error = new Error("CAPTCHA is enabled for this form, but the server is missing the secret key.");
-    error.statusCode = 500;
-    throw error;
+  if (!CAPTCHA_SECRET_KEY) {
+    throw buildFailureError(
+      "CAPTCHA is enabled for this form, but the server is missing the shared CAPTCHA secret key.",
+      500,
+      "system"
+    );
   }
 
   const token =
@@ -615,13 +1163,11 @@ async function verifyCaptcha(formSecurity, inputPayload, event) {
     inputPayload?.input?.["g-recaptcha-response"] ||
     "";
   if (!token) {
-    const error = new Error("Please complete the CAPTCHA.");
-    error.statusCode = 400;
-    throw error;
+    throw buildFailureError("Please complete the CAPTCHA.", 400, "validation");
   }
 
   const verifyBody = querystring.stringify({
-    secret: secretKey,
+    secret: CAPTCHA_SECRET_KEY,
     response: token,
     remoteip: getClientIp(event) || undefined
   });
@@ -640,17 +1186,27 @@ async function verifyCaptcha(formSecurity, inputPayload, event) {
   );
 
   if (response.statusCode !== 200) {
-    const error = new Error(`CAPTCHA verification failed. Status: ${response.statusCode}.`);
-    error.statusCode = 502;
-    throw error;
+    throw buildFailureError(
+      `CAPTCHA verification failed. Status: ${response.statusCode}.`,
+      502,
+      "system",
+      {
+        responseBody: response.body
+      }
+    );
   }
 
   const result = JSON.parse(response.body || "{}");
   if (result.success !== true) {
     const codes = Array.isArray(result["error-codes"]) ? result["error-codes"].join(", ") : "";
-    const error = new Error(codes ? `CAPTCHA verification failed: ${codes}` : "CAPTCHA verification failed.");
-    error.statusCode = 400;
-    throw error;
+    throw buildFailureError(
+      codes ? `CAPTCHA verification failed: ${codes}` : "CAPTCHA verification failed.",
+      400,
+      "validation",
+      {
+        responseBody: response.body
+      }
+    );
   }
 }
 
@@ -673,7 +1229,14 @@ async function createSalesforceRecord(instanceUrl, accessToken, objectApiName, f
   );
 
   if (response.statusCode !== 201) {
-    throw new Error(`Create failed. Status: ${response.statusCode}. Body: ${response.body}`);
+    throw buildFailureError(
+      `Create failed. Status: ${response.statusCode}. Body: ${response.body}`,
+      response.statusCode >= 500 ? 502 : 400,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
   }
 
   return JSON.parse(response.body);
@@ -698,7 +1261,14 @@ async function updateSalesforceRecord(instanceUrl, accessToken, objectApiName, i
   );
 
   if (response.statusCode !== 204) {
-    throw new Error(`Update failed. Status: ${response.statusCode}. Body: ${response.body}`);
+    throw buildFailureError(
+      `Update failed. Status: ${response.statusCode}. Body: ${response.body}`,
+      response.statusCode >= 500 ? 502 : 400,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
   }
 
   return { id, success: true };
@@ -717,7 +1287,14 @@ async function deleteSalesforceRecord(instanceUrl, accessToken, objectApiName, i
   });
 
   if (response.statusCode !== 204) {
-    throw new Error(`Delete failed. Status: ${response.statusCode}. Body: ${response.body}`);
+    throw buildFailureError(
+      `Delete failed. Status: ${response.statusCode}. Body: ${response.body}`,
+      response.statusCode >= 500 ? 502 : 400,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
   }
 
   return { id, success: true };
@@ -743,7 +1320,12 @@ async function executeUpsertManyCommand(command, context, sf) {
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex] || {};
     const rowContext = buildRowContext(context, row, rowIndex);
-    const resolvedFields = resolveValue(command.fields, rowContext);
+    const resolvedFields = await coerceFieldsForSalesforce(
+      instanceUrl,
+      accessToken,
+      command.objectApiName,
+      resolveValue(command.fields, rowContext)
+    );
 
     if (command.relationshipField && relationshipValue !== undefined) {
       resolvedFields[command.relationshipField] = relationshipValue;
@@ -846,7 +1428,12 @@ async function executeCommand(command, context, sf) {
       throw new Error(`create command '${command.commandKey || "unknown"}' is missing objectApiName or fields`);
     }
 
-    const resolvedFields = resolveValue(command.fields, context);
+    const resolvedFields = await coerceFieldsForSalesforce(
+      instanceUrl,
+      accessToken,
+      command.objectApiName,
+      resolveValue(command.fields, context)
+    );
     const createResult = await createSalesforceRecord(instanceUrl, accessToken, command.objectApiName, resolvedFields);
 
     return {
@@ -862,7 +1449,12 @@ async function executeCommand(command, context, sf) {
       throw new Error(`update command '${command.commandKey || "unknown"}' is missing objectApiName or fields`);
     }
 
-    const resolvedFields = resolveValue(command.fields, context);
+    const resolvedFields = await coerceFieldsForSalesforce(
+      instanceUrl,
+      accessToken,
+      command.objectApiName,
+      resolveValue(command.fields, context)
+    );
     const id = command.id ? resolveValue(command.id, context) : resolvedFields.Id;
     const shouldCreateOnMissing = command.onNotFound === "create";
 
@@ -952,54 +1544,73 @@ function interpolateWhereClause(template, context) {
 }
 
 export const handler = async (event) => {
+  const startedAtMs = Date.now();
+  const submittedAt = new Date(startedAtMs).toISOString();
+  const submissionId = generateSubmissionId(submittedAt);
+  const submissionRef = generateSubmissionRef();
+  let inputPayload = {};
+  let formSecurity = null;
+  let tenantRecord = null;
+  const results = [];
+  const commandTrace = [];
+
   try {
-  const isDirectPayload =
-    !!event &&
-    typeof event === "object" &&
-    !event?.requestContext &&
-    !event?.httpMethod &&
-    (event?.input || event?.publishToken || event?.formId);
-  
-  const method =
-    event?.requestContext?.http?.method ||
-    event?.httpMethod ||
-    (isDirectPayload ? "POST" : (event?.body ? "POST" : "GET"));
-  
-  if (method === "OPTIONS") {
-    return jsonResponse(200, { success: true });
-  }
-  
-  if (method === "GET") {
-    return jsonResponse(200, {
-      success: true,
-      message: "NativeForms endpoint is alive"
-    });
-  }
-  
-  if (method !== "POST") {
-    return jsonResponse(405, {
-      success: false,
-      error: `Method ${method} not allowed`
-    });
-  }
-  
-  const inputPayload = isDirectPayload
-    ? event
-    : event.body
-      ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
-      : {};
-      
+    const isDirectPayload =
+      !!event &&
+      typeof event === "object" &&
+      !event?.requestContext &&
+      !event?.httpMethod &&
+      (event?.input || event?.publishToken || event?.formId);
+
+    const method =
+      event?.requestContext?.http?.method ||
+      event?.httpMethod ||
+      (isDirectPayload ? "POST" : (event?.body ? "POST" : "GET"));
+
+    if (method === "OPTIONS") {
+      return jsonResponse(200, { success: true });
+    }
+
+    if (method === "GET") {
+      return jsonResponse(200, {
+        success: true,
+        message: "NativeForms endpoint is alive"
+      });
+    }
+
+    if (method !== "POST") {
+      return jsonResponse(405, {
+        success: false,
+        error: `Method ${method} not allowed`
+      });
+    }
+
+    inputPayload = isDirectPayload
+      ? event
+      : event.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
     if (!inputPayload.formId) {
       return jsonResponse(400, {
         success: false,
+        submissionRef,
         error: "Missing required field: formId"
       });
     }
 
-    const formSecurity = await getFormSecurityRecord(inputPayload.formId);
+    formSecurity = await getFormSecurityRecord(inputPayload.formId);
     ensureFormToken(formSecurity, inputPayload.publishToken);
     await verifyCaptcha(formSecurity, inputPayload, event);
-    const tenantRecord = await ensureActiveTenantForForm(formSecurity);
+    tenantRecord = await getTenantRecord(formSecurity.orgId);
+    const runtimeStatus = deriveTenantRuntimeStatus(tenantRecord);
+    if (runtimeStatus.status === "blocked") {
+      throw buildFailureError(
+        runtimeStatus.reason || "Data could not be updated in Salesforce because this customer is blocked.",
+        403,
+        "system"
+      );
+    }
     const submitCommands = formSecurity.submitDefinition.commands;
 
     const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
@@ -1011,18 +1622,26 @@ export const handler = async (event) => {
       input: inputPayload.input || {}
     };
 
-    const results = [];
-
     for (const command of submitCommands) {
+      let traceEntry = null;
       try {
-    
         if (!command.type) {
-          throw new Error("Each command must include 'type'");
+          throw buildFailureError("Each command must include 'type'", 400, "mapping");
         }
 
-        validateSubmitCommandAgainstPolicy(command, formSecurity);
-    
+        try {
+          validateSubmitCommandAgainstPolicy(command, formSecurity);
+        } catch (error) {
+          throw buildFailureError(error.message, 400, "mapping");
+        }
+
+        traceEntry = buildCommandTraceSnapshot(command, context);
+
         if (!shouldRunCommand(command.runIf, context)) {
+          commandTrace.push({
+            ...traceEntry,
+            skipped: true
+          });
           results.push({
             commandKey: command.commandKey || null,
             type: command.type,
@@ -1031,7 +1650,7 @@ export const handler = async (event) => {
           });
           continue;
         }
-    
+
         const result = await executeCommand(
           command,
           context,
@@ -1048,7 +1667,12 @@ export const handler = async (event) => {
             context[command.storeResultAs] = result;
           }
         }
-    
+
+        commandTrace.push({
+          ...traceEntry,
+          skipped: false,
+          result
+        });
         results.push({
           commandKey: command.commandKey || null,
           type: command.type,
@@ -1062,11 +1686,37 @@ export const handler = async (event) => {
           skipped: false,
           success: true
         });
-    
       } catch (err) {
-    
-        return jsonResponse(400, {
+        err.commandKey = command?.commandKey || null;
+        err.commandType = command?.type || null;
+        err.objectApiName = command?.objectApiName || null;
+
+        commandTrace.push({
+          ...(traceEntry || buildCommandTraceSnapshot(command || {}, context)),
+          skipped: false,
+          error: buildErrorDetail(err)
+        });
+
+        const failureStage = getFailureStage(err, "mapping");
+        await writeSubmissionLogSafely({
+          tenantRecord,
+          formSecurity,
+          inputPayload,
+          event,
+          submissionId,
+          submissionRef,
+          submittedAt,
+          startedAtMs,
+          outcome: "failed",
+          failureStage,
+          results,
+          commandTrace,
+          error: err
+        });
+
+        return jsonResponse(err.statusCode || 400, {
           success: false,
+          submissionRef,
           error: {
             message: err.message,
             commandKey: command.commandKey || null,
@@ -1078,13 +1728,49 @@ export const handler = async (event) => {
       }
     }
 
+    await writeSubmissionLogSafely({
+      tenantRecord,
+      formSecurity,
+      inputPayload,
+      event,
+      submissionId,
+      submissionRef,
+      submittedAt,
+      startedAtMs,
+      outcome: "success",
+      failureStage: "none",
+      results,
+      commandTrace,
+      error: null
+    });
+
     return jsonResponse(200, {
       success: true,
+      submissionRef,
       results
     });
   } catch (error) {
-    return jsonResponse(500, {
+    if (formSecurity?.orgId) {
+      await writeSubmissionLogSafely({
+        tenantRecord,
+        formSecurity,
+        inputPayload,
+        event,
+        submissionId,
+        submissionRef,
+        submittedAt,
+        startedAtMs,
+        outcome: "failed",
+        failureStage: getFailureStage(error, "system"),
+        results,
+        commandTrace,
+        error
+      });
+    }
+
+    return jsonResponse(error?.statusCode || 500, {
       success: false,
+      submissionRef,
       error: error.message
     });
   }

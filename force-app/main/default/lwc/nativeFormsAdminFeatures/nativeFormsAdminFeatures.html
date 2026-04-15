@@ -121,13 +121,13 @@
                         <p class="feature-copy">Disconnect clears the Salesforce OAuth connection only. It keeps the tenant registration and tenant secret in place so you can reconnect quickly.</p>
 
                         <h3>Google CAPTCHA</h3>
-                        <p class="feature-copy">These org-level keys are reused by any form that enables CAPTCHA in the Designer.</p>
+                        <p class="feature-copy">CAPTCHA is now managed centrally by TwinaForms for forms published on <strong>forms.twinaforms.com</strong>. Customers do not need to paste or manage Google CAPTCHA keys in Salesforce.</p>
 
                         <lightning-input
                             name="captchaSiteKey"
-                            label="CAPTCHA Site Key"
+                            label="Shared CAPTCHA Site Key"
                             value={captchaSiteKey}
-                            onchange={handleToggle}>
+                            disabled>
                         </lightning-input>
 
                         <lightning-input
@@ -135,7 +135,8 @@
                             name="captchaSecretKey"
                             label="CAPTCHA Secret Key"
                             value={captchaSecretKey}
-                            onchange={handleToggle}>
+                            placeholder="Managed in AWS only"
+                            disabled>
                         </lightning-input>
 
                         <div class="actions">
@@ -143,6 +144,34 @@
                                 variant="brand"
                                 label="Save Admin Settings"
                                 onclick={handleSave}>
+                            </lightning-button>
+                        </div>
+
+                        <h3>Submission Logs</h3>
+                        <p class="feature-copy">Submission Logs now follow the customer plan automatically. Org users do not choose the log mode or paste keys manually, and NativeForms will try to prepare and sync the hidden crypto setup automatically.</p>
+
+                        <div class="status-box">
+                            <p class="status-line"><strong>Current Plan:</strong> {submissionLogPlanLabel}</p>
+                            <p class="status-line"><strong>Detailed Logs:</strong> {submissionLogsIncludedLabel}</p>
+                            <p class="status-line"><strong>Retention:</strong> {submissionLogRetentionLabel}</p>
+                            <p class="status-line"><strong>Encryption Status:</strong> {submissionLogEncryptionLabel}</p>
+                            <p class="status-line"><strong>Key Version:</strong> {submissionLogKeyVersion}</p>
+                            <p class="status-line"><strong>Last Sync:</strong> {submissionLogSyncLabel}</p>
+                        </div>
+
+                        <p class="feature-copy">{submissionLogStatusCopy}</p>
+
+                        <div class="actions">
+                            <lightning-button
+                                label="Repair Submission Logs"
+                                onclick={handlePrepareSubmissionLogs}
+                                disabled={prepareSubmissionLogsDisabled}>
+                            </lightning-button>
+                            <lightning-button
+                                variant="brand"
+                                label="Resync Submission Logs To AWS"
+                                onclick={handleSyncSubmissionLogs}
+                                disabled={syncSubmissionLogsDisabled}>
                             </lightning-button>
                         </div>
                     </section>

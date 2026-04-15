@@ -1027,6 +1027,10 @@ button:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.inline-fields--quad {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .field__control--textarea {
   min-height: 6.5rem;
   padding: 0.85rem 0.9rem;
@@ -1178,6 +1182,7 @@ button:focus-visible {
   .filters,
   .inline-fields,
   .inline-fields--triple,
+  .inline-fields--quad,
   .feature-grid,
   .feature-list-layout,
   .summary-grid {

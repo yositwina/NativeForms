@@ -303,29 +303,12 @@
           <article class="detail-card">
             <div class="detail-header">
               <div>
-                <p class="detail-card__eyebrow">Data Source</p>
-                <h4 id="dataModeLabel">Mock Data</h4>
-                <p class="detail-subtitle" id="dataModeCopy">This shell is using the built-in customer examples so you can shape the experience safely.</p>
+                <p class="detail-card__eyebrow">Admin API</p>
+                <h4>Live backend connection</h4>
+                <p class="detail-subtitle">This app now runs only against the real Admin API and no longer switches into mock data mode.</p>
               </div>
             </div>
-
-            <div class="mode-picker mode-picker--light" role="radiogroup" aria-label="Data source">
-              <label class="mode-option mode-option--light">
-                <input type="radio" name="dataMode" value="mock">
-                <span>
-                  <strong>Mock Data</strong>
-                  <small>Safe demo content for UI work.</small>
-                </span>
-              </label>
-              <label class="mode-option mode-option--light">
-                <input type="radio" name="dataMode" value="live">
-                <span>
-                  <strong>Real API</strong>
-                  <small>Load real customer data from `NativeFormsAdminApi`.</small>
-                </span>
-              </label>
-            </div>
-            <p class="settings-helper" id="dataModeHelper">Choose when to stay on demo data and when to connect this screen to the live admin backend.</p>
+            <p class="settings-helper" id="dataModeHelper">If the backend is unavailable, the app stays on the live path and shows the error directly instead of using sample records.</p>
           </article>
 
           <article class="detail-card">
@@ -339,8 +322,7 @@
 
             <div class="detail-list">
               <div class="detail-list__row"><span>Configured API</span><strong id="settingsApiUrl">Not configured</strong></div>
-              <div class="detail-list__row"><span>Requested Mode</span><strong id="settingsRequestedMode">Mock</strong></div>
-              <div class="detail-list__row"><span>Active Mode</span><strong id="settingsActiveMode">Mock</strong></div>
+              <div class="detail-list__row"><span>Connection Mode</span><strong id="settingsActiveMode">Live API</strong></div>
               <div class="detail-list__row"><span>Plan Storage</span><strong id="settingsPlanStorage">Mock</strong></div>
               <div class="detail-list__row"><span>Status Alert Email</span><strong id="settingsStatusAlertEmail">Not configured</strong></div>
               <div class="detail-list__row"><span>Daily Recompute Time</span><strong id="settingsRecomputeTime">02:00 UTC</strong></div>

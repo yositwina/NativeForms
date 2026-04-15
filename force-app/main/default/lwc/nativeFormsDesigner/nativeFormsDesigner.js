@@ -18,7 +18,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v8.4';
+    designerVersion = 'v8.7';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -80,6 +80,8 @@ export default class NativeFormsDesigner extends LightningElement {
     editorConditionalValue = '';
     editorMinValue = '';
     editorMaxValue = '';
+    editorDateDisplayFormat = 'us';
+    editorDateGmtOffset = '+00:00';
     editorPastYears = '';
     editorPastMonths = '';
     editorFutureYears = '';
@@ -155,6 +157,42 @@ export default class NativeFormsDesigner extends LightningElement {
         { label: 'Numbers Only', value: 'numbers' }
     ];
 
+    dateDisplayFormatOptions = [
+        { label: 'US (MM/DD/YYYY)', value: 'us' },
+        { label: 'EU (DD/MM/YYYY)', value: 'eu' }
+    ];
+
+    dateGmtOffsetOptions = [
+        { label: 'UTC -12:00', value: '-12:00' },
+        { label: 'UTC -11:00', value: '-11:00' },
+        { label: 'UTC -10:00', value: '-10:00' },
+        { label: 'UTC -09:00', value: '-09:00' },
+        { label: 'UTC -08:00', value: '-08:00' },
+        { label: 'UTC -07:00', value: '-07:00' },
+        { label: 'UTC -06:00', value: '-06:00' },
+        { label: 'UTC -05:00', value: '-05:00' },
+        { label: 'UTC -04:00', value: '-04:00' },
+        { label: 'UTC -03:00', value: '-03:00' },
+        { label: 'UTC -02:00', value: '-02:00' },
+        { label: 'UTC -01:00', value: '-01:00' },
+        { label: 'UTC +00:00', value: '+00:00' },
+        { label: 'UTC +01:00', value: '+01:00' },
+        { label: 'UTC +02:00', value: '+02:00' },
+        { label: 'UTC +03:00', value: '+03:00' },
+        { label: 'UTC +04:00', value: '+04:00' },
+        { label: 'UTC +05:00', value: '+05:00' },
+        { label: 'UTC +05:30', value: '+05:30' },
+        { label: 'UTC +06:00', value: '+06:00' },
+        { label: 'UTC +07:00', value: '+07:00' },
+        { label: 'UTC +08:00', value: '+08:00' },
+        { label: 'UTC +09:00', value: '+09:00' },
+        { label: 'UTC +10:00', value: '+10:00' },
+        { label: 'UTC +11:00', value: '+11:00' },
+        { label: 'UTC +12:00', value: '+12:00' },
+        { label: 'UTC +13:00', value: '+13:00' },
+        { label: 'UTC +14:00', value: '+14:00' }
+    ];
+
     sectionColumnOptions = [
         { label: '1', value: '1' },
         { label: '2', value: '2' },
@@ -194,16 +232,6 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get rightPaneTitle() {
         return this.showFormSettingsPanel ? 'Form Settings' : 'Element Properties';
-    }
-
-    get formSettingsStatusText() {
-        return this.captchaKeysConfigured
-            ? 'Google CAPTCHA keys are configured for this org.'
-            : 'Google CAPTCHA is not fully configured yet. Add the site key and secret key in NativeForms Admin Features before publishing.';
-    }
-
-    get formSettingsStatusClass() {
-        return this.captchaKeysConfigured ? 'panel-success' : 'panel-error';
     }
 
     get canvasSummaryLine() {
@@ -391,6 +419,12 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get selectedElementIsDate() {
         return this.editorElementType === 'date';
+    }
+
+    get selectedDateFormatHelpText() {
+        return this.editorDateDisplayFormat === 'eu'
+            ? 'Users will enter dates as DD/MM/YYYY. NativeForms will normalize the submitted value before Salesforce submit.'
+            : 'Users will enter dates as MM/DD/YYYY. NativeForms will normalize the submitted value before Salesforce submit.';
     }
 
     get selectedElementSupportsTextValidation() {
@@ -787,6 +821,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     previewPlaceholder(item) {
         const config = this.parseConfig(item.configJson);
+        if (item.elementType === 'date') {
+            return config.dateDisplayFormat === 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy';
+        }
         return config.defaultValue || config.placeholder || '';
     }
 
@@ -833,6 +870,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     previewInputType(item) {
         const effectiveType = item.elementType === 'hidden' ? 'text' : item.elementType;
+        if (effectiveType === 'date') {
+            return 'text';
+        }
         return ['text', 'number', 'date', 'email', 'tel', 'url'].includes(effectiveType) ? effectiveType : 'text';
     }
 
@@ -988,17 +1028,7 @@ export default class NativeFormsDesigner extends LightningElement {
         try {
             const created = await addElement({ versionId: this.selectedVersionId, elementType });
             const selectedElement = this.selectedElement;
-            const selectedContainer = this.selectedElementIsContainer ? selectedElement : null;
-            const shouldPlaceInContainer = selectedContainer && !['section', 'group', 'repeatGroup'].includes(elementType);
-
-            if (shouldPlaceInContainer) {
-                const targetColumn = 1;
-                await placeElementInSection({
-                    elementId: created.id,
-                    sectionId: selectedContainer.id,
-                    columnNumber: targetColumn
-                });
-            } else if (selectedElement) {
+            if (selectedElement) {
                 await insertElementAfter({
                     elementId: created.id,
                     anchorElementId: selectedElement.id
@@ -1185,6 +1215,16 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorMaxValueChange(event) {
         this.editorMaxValue = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorDateDisplayFormatChange(event) {
+        this.editorDateDisplayFormat = event.detail.value || 'us';
+        this.applyEditorDraft();
+    }
+
+    handleEditorDateGmtOffsetChange(event) {
+        this.editorDateGmtOffset = event.detail.value || '+00:00';
         this.applyEditorDraft();
     }
 
@@ -1472,6 +1512,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorConditionalValue = '';
             this.editorMinValue = '';
             this.editorMaxValue = '';
+            this.editorDateDisplayFormat = 'us';
+            this.editorDateGmtOffset = '+00:00';
             this.editorPastYears = '';
             this.editorPastMonths = '';
             this.editorFutureYears = '';
@@ -1515,6 +1557,8 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorConditionalValue = config.conditionalValue || '';
         this.editorMinValue = config.minValue === null || config.minValue === undefined ? '' : String(config.minValue);
         this.editorMaxValue = config.maxValue === null || config.maxValue === undefined ? '' : String(config.maxValue);
+        this.editorDateDisplayFormat = config.dateDisplayFormat || 'us';
+        this.editorDateGmtOffset = config.dateGmtOffset || '+00:00';
         this.editorPastYears = config.pastYears === null || config.pastYears === undefined ? '' : String(config.pastYears);
         this.editorPastMonths = config.pastMonths === null || config.pastMonths === undefined ? '' : String(config.pastMonths);
         this.editorFutureYears = config.futureYears === null || config.futureYears === undefined ? '' : String(config.futureYears);
@@ -1606,6 +1650,13 @@ export default class NativeFormsDesigner extends LightningElement {
         if (this.selectedElementIsNumber || this.selectedElementIsDate) {
             nextConfig.minValue = this.editorMinValue;
             nextConfig.maxValue = this.editorMaxValue;
+            if (this.selectedElementIsDate) {
+                nextConfig.dateDisplayFormat = this.editorDateDisplayFormat || 'us';
+                nextConfig.dateGmtOffset = this.editorDateGmtOffset || '+00:00';
+            } else {
+                delete nextConfig.dateDisplayFormat;
+                delete nextConfig.dateGmtOffset;
+            }
             delete nextConfig.pastYears;
             delete nextConfig.pastMonths;
             delete nextConfig.futureYears;
@@ -1613,6 +1664,8 @@ export default class NativeFormsDesigner extends LightningElement {
         } else {
             delete nextConfig.minValue;
             delete nextConfig.maxValue;
+            delete nextConfig.dateDisplayFormat;
+            delete nextConfig.dateGmtOffset;
             delete nextConfig.pastYears;
             delete nextConfig.pastMonths;
             delete nextConfig.futureYears;

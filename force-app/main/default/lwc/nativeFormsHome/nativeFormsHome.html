@@ -1,50 +1,141 @@
 <template>
     <lightning-card title="NativeForms Home" icon-name="custom:custom18">
-        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-            <p class="slds-text-body_regular slds-m-bottom_medium">
-                Install the NativeForms demo pack to create four themes, two contacts, four cases, and two sample forms.
-            </p>
-
+        <div class="shell">
             <template if:true={errorMessage}>
-                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
-                    <h2>{errorMessage}</h2>
-                </div>
+                <div class="panel-error">{errorMessage}</div>
             </template>
 
             <template if:true={successMessage}>
-                <div class="slds-notify slds-notify_alert slds-alert_success slds-m-bottom_medium" role="alert">
-                    <h2>{successMessage}</h2>
-                </div>
+                <div class="panel-success">{successMessage}</div>
             </template>
 
             <template if:true={isLoading}>
-                <lightning-spinner alternative-text="Loading NativeForms Home" size="small"></lightning-spinner>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading NativeForms Home" size="small"></lightning-spinner>
+                </div>
             </template>
 
-            <div class="slds-box slds-theme_default slds-m-bottom_medium">
-                <p class="slds-text-title_bold">Demo Data Status</p>
-                <p class="slds-m-top_x-small">Status: {installedLabel}</p>
-                <p>Installed Version: {demoDataVersionValue}</p>
-                <p>Themes: {installedThemeCount} / {targetThemeCount}</p>
-                <p>Contacts: {installedContactCount} / {targetContactCount}</p>
-                <p>Cases: {installedCaseCount} / {targetCaseCount}</p>
-                <p>Forms: {installedFormCount} / {targetFormCount}</p>
-            </div>
+            <template if:false={isLoading}>
+                <section class="hero">
+                    <div class="hero__copy">
+                        <span class="hero__eyebrow">Workspace Overview</span>
+                        <h2>See your NativeForms connection, plan access, and getting-started status in one place.</h2>
+                        <p>
+                            This home page is designed to help you understand whether setup is complete, what your current plan includes,
+                            and what still needs attention before your team works with forms live.
+                        </p>
+                    </div>
+                    <div class="hero__status">
+                        <span class={connectionBadgeClass}>{connectionBadgeLabel}</span>
+                        <span class={planBadgeClass}>{planLabel}</span>
+                    </div>
+                </section>
 
-            <div class="slds-box slds-theme_shade slds-m-bottom_medium">
-                <p class="slds-text-title_bold">What Gets Created</p>
-                <p class="slds-m-top_x-small">Themes: Ocean Blue, Deep Blue, Clean Light, Business Dark</p>
-                <p>Contacts: Ava Reynolds and Liam Carter</p>
-                <p>Cases: four sample support cases linked to those contacts</p>
-                <p>Forms: Contact Update Demo and Case Update Demo</p>
-            </div>
+                <section class="overview-grid">
+                    <article class="overview-card overview-card--primary">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-kicker">Connection</span>
+                                <h3>NativeForms setup status</h3>
+                            </div>
+                        </div>
 
-            <lightning-button
-                variant="brand"
-                label="Install Demo Records"
-                onclick={handleInstall}
-                disabled={installDisabled}
-            ></lightning-button>
+                        <div class="detail-list">
+                            <div class="detail-list__row"><span>Setup State</span><strong>{connectionSetupLabel}</strong></div>
+                            <div class="detail-list__row"><span>Connection</span><strong>{connectionLabel}</strong></div>
+                            <div class="detail-list__row"><span>Tenant Auth</span><strong>{tenantAuthLabel}</strong></div>
+                            <div class="detail-list__row"><span>Client Credentials</span><strong>{credentialsLabel}</strong></div>
+                        </div>
+
+                        <template if:true={showConnectAction}>
+                            <div class="action-row">
+                                <lightning-button
+                                    variant="brand"
+                                    label="Continue Connect"
+                                    onclick={handleOpenConnect}
+                                ></lightning-button>
+                                <p class="action-copy">Finish the connection flow before relying on live publish, prefill, submit, and logging behavior.</p>
+                            </div>
+                        </template>
+
+                        <template if:false={showConnectAction}>
+                            <div class="status-note status-note--success">
+                                Your NativeForms connection looks ready for normal use.
+                            </div>
+                        </template>
+                    </article>
+
+                    <article class="overview-card">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-kicker">Plan</span>
+                                <h3>Current access and entitlements</h3>
+                            </div>
+                        </div>
+
+                        <div class="detail-list">
+                            <div class="detail-list__row"><span>Current Plan</span><strong>{planLabel}</strong></div>
+                            <div class="detail-list__row"><span>Detailed Logs</span><strong>{detailedLogsLabel}</strong></div>
+                            <div class="detail-list__row"><span>Retention</span><strong>{retentionLabel}</strong></div>
+                            <div class="detail-list__row"><span>Encryption</span><strong>{encryptionLabel}</strong></div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="overview-grid">
+                    <article class="overview-card">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-kicker">Features</span>
+                                <h3>Features available on this org</h3>
+                            </div>
+                        </div>
+
+                        <div class="feature-list">
+                            <template for:each={featureAccessList} for:item="feature">
+                                <div key={feature.key} class="feature-row">
+                                    <div>
+                                        <strong>{feature.label}</strong>
+                                        <p>{feature.detail}</p>
+                                    </div>
+                                    <span class={feature.badgeClass}>{feature.badgeLabel}</span>
+                                </div>
+                            </template>
+                        </div>
+                    </article>
+
+                    <article class="overview-card">
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-kicker">Getting Started</span>
+                                <h3>Demo data and sample assets</h3>
+                            </div>
+                        </div>
+
+                        <div class="detail-list">
+                            <div class="detail-list__row"><span>Demo Data</span><strong>{installedLabel}</strong></div>
+                            <div class="detail-list__row"><span>Installed Version</span><strong>{demoDataVersionValue}</strong></div>
+                            <div class="detail-list__row"><span>Themes</span><strong>{installedThemeCount} / {targetThemeCount}</strong></div>
+                            <div class="detail-list__row"><span>Contacts</span><strong>{installedContactCount} / {targetContactCount}</strong></div>
+                            <div class="detail-list__row"><span>Cases</span><strong>{installedCaseCount} / {targetCaseCount}</strong></div>
+                            <div class="detail-list__row"><span>Forms</span><strong>{installedFormCount} / {targetFormCount}</strong></div>
+                        </div>
+
+                        <p class="demo-copy">
+                            The demo pack creates four themes, two contacts, four cases, and two sample forms to help you explore the product safely.
+                        </p>
+
+                        <div class="action-row">
+                            <lightning-button
+                                variant="brand-outline"
+                                label="Install Demo Records"
+                                onclick={handleInstall}
+                                disabled={installDisabled}
+                            ></lightning-button>
+                        </div>
+                    </article>
+                </section>
+            </template>
         </div>
     </lightning-card>
 </template>

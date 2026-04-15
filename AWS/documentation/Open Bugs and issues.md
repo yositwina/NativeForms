@@ -17,6 +17,12 @@
   - File: lambda/submit/index.mjs
   - Description:  Error fils shoud be clear , we need to define set of error messages i.e Authenication not set up, subscription end, faile to deploy to sf fields not matched.  we need to discuss this feature
   - Example : Query failed. Status: 400. Body: [{"message":"\nContact WHERE Email = liam.carter@example.com ORDER BY CreatedDate\n ^\nERROR at Row:1:Column:54\nunexpected token: '@'","errorCode":"MALFORMED_QUERY"}]
+  - Example : Token refresh failed. Status: 400. Body: {"error":"invalid_client_id","error_description":"client identifier invalid"} Reference: NF-20260414125612-9583FB
+  - Example : update command 'submitAction1' requires id or fields.Id Reference: NF-20260414133051-08BF01
+  - Example : Update failed. Status: 404. Body: [{"errorCode":"NOT_FOUND","message":"Provided external ID field does not exist or is not accessible: 1222222"}] Reference: NF-20260415130212-970924
+  - Expected friendly message : We could not match the submitted record in Salesforce. Please check the form mapping or contact support.
+  - Example : Update failed. Status: 400. Body: [{"message":"Cannot deserialize instance of date from VALUE_STRING value or request may be missing a required field at [line:1, column:16]","errorCode":"JSON_PARSER_ERROR"}] Reference: NF-20260415130755-3EE40D
+  - Expected friendly message : One of the date values in this form is not in a valid format. Please review the date field and try again.
   
 - [X] BUG-003 NF themes Object fiels deiplays
   - Status: Solved

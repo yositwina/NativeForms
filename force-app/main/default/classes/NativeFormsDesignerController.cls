@@ -232,10 +232,7 @@ public with sharing class NativeFormsDesignerController {
             LIMIT 200
         ];
 
-        NativeForms_Config__c orgConfig = NativeForms_Config__c.getOrgDefaults();
-        workspace.captchaKeysConfigured = orgConfig != null
-            && String.isNotBlank(orgConfig.Captcha_Site_Key__c)
-            && String.isNotBlank(orgConfig.Captcha_Secret_Key__c);
+        workspace.captchaKeysConfigured = NativeFormsPublisher.hasSharedCaptchaSiteKey();
 
         for (NF_Form__c formRecord : forms) {
             SelectOption option = new SelectOption();
@@ -657,7 +654,12 @@ public with sharing class NativeFormsDesignerController {
             anchorIndex = siblings.size() - 1;
         }
 
-        siblings.add(anchorIndex + 1, elementRecord);
+        Integer insertIndex = anchorIndex + 1;
+        if (insertIndex >= siblings.size()) {
+            siblings.add(elementRecord);
+        } else {
+            siblings.add(insertIndex, elementRecord);
+        }
 
         Integer orderValue = 10;
         for (NF_Form_Element__c sibling : siblings) {
@@ -871,6 +873,8 @@ public with sharing class NativeFormsDesignerController {
             config.put('defaultValue', '');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('dateDisplayFormat', 'us');
+            config.put('dateGmtOffset', '+00:00');
         }
         if (elementType == 'email') {
             config.put('defaultValue', 'name@example.com');

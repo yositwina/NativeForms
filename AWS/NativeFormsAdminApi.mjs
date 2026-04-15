@@ -32,7 +32,8 @@ const DEFAULT_PLANS = [
     limits: {
       maxSfUsers: 1,
       maxForms: 1,
-      maxSubmissionsPerMonth: 100
+      maxSubmissionsPerMonth: 100,
+      submissionLogRetentionDays: 30
     },
     featureFlags: {
       enableProConditionLogic: false,
@@ -42,7 +43,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
-      enableProLoadFile: false
+      enableProLoadFile: false,
+      enableDetailedSubmissionLogs: false
     }
   },
   {
@@ -55,7 +57,8 @@ const DEFAULT_PLANS = [
     limits: {
       maxSfUsers: 1,
       maxForms: 5,
-      maxSubmissionsPerMonth: null
+      maxSubmissionsPerMonth: null,
+      submissionLogRetentionDays: 30
     },
     featureFlags: {
       enableProConditionLogic: true,
@@ -65,7 +68,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
-      enableProLoadFile: true
+      enableProLoadFile: true,
+      enableDetailedSubmissionLogs: true
     }
   },
   {
@@ -78,7 +82,8 @@ const DEFAULT_PLANS = [
     limits: {
       maxSfUsers: 1,
       maxForms: 5,
-      maxSubmissionsPerMonth: 1000
+      maxSubmissionsPerMonth: 1000,
+      submissionLogRetentionDays: 90
     },
     featureFlags: {
       enableProConditionLogic: false,
@@ -88,7 +93,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
-      enableProLoadFile: false
+      enableProLoadFile: false,
+      enableDetailedSubmissionLogs: true
     }
   },
   {
@@ -101,7 +107,8 @@ const DEFAULT_PLANS = [
     limits: {
       maxSfUsers: null,
       maxForms: null,
-      maxSubmissionsPerMonth: null
+      maxSubmissionsPerMonth: null,
+      submissionLogRetentionDays: 365
     },
     featureFlags: {
       enableProConditionLogic: true,
@@ -111,7 +118,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
-      enableProLoadFile: true
+      enableProLoadFile: true,
+      enableDetailedSubmissionLogs: true
     }
   }
 ];
@@ -389,6 +397,8 @@ async function sendStatusChangeEmail(recipient, beforeTenant, afterTenant) {
   const afterStatus = afterTenant?.status || "unknown";
   const beforeAlert = beforeTenant?.alertType || "none";
   const afterAlert = afterTenant?.alertType || "none";
+  const beforePlan = beforeTenant?.planLabel || beforeTenant?.planCode || "unknown";
+  const afterPlan = afterTenant?.planLabel || afterTenant?.planCode || "unknown";
 
   await sesClient.send(new SendEmailCommand({
     Source: SES_FROM,
@@ -407,6 +417,8 @@ async function sendStatusChangeEmail(recipient, beforeTenant, afterTenant) {
             `Customer: ${afterTenant?.companyName || ""}`,
             `Org Id: ${afterTenant?.orgId || ""}`,
             `Admin Email: ${afterTenant?.adminEmail || ""}`,
+            `Previous Plan: ${beforePlan}`,
+            `New Plan: ${afterPlan}`,
             `Previous Status: ${beforeStatus}`,
             `New Status: ${afterStatus}`,
             `Previous Alert Type: ${beforeAlert}`,
@@ -453,25 +465,29 @@ function normalizePlanDefinition(plan, existingPlan = {}) {
     throw error;
   }
 
+  const defaultPlan = DEFAULT_PLANS.find((item) => item.planCode === planCode) || {};
+
   const limits = {
-    maxSfUsers: plan?.limits?.maxSfUsers ?? existingPlan?.limits?.maxSfUsers ?? null,
-    maxForms: plan?.limits?.maxForms ?? existingPlan?.limits?.maxForms ?? null,
-    maxSubmissionsPerMonth: plan?.limits?.maxSubmissionsPerMonth ?? existingPlan?.limits?.maxSubmissionsPerMonth ?? null
+    maxSfUsers: plan?.limits?.maxSfUsers ?? existingPlan?.limits?.maxSfUsers ?? defaultPlan?.limits?.maxSfUsers ?? null,
+    maxForms: plan?.limits?.maxForms ?? existingPlan?.limits?.maxForms ?? defaultPlan?.limits?.maxForms ?? null,
+    maxSubmissionsPerMonth: plan?.limits?.maxSubmissionsPerMonth ?? existingPlan?.limits?.maxSubmissionsPerMonth ?? defaultPlan?.limits?.maxSubmissionsPerMonth ?? null,
+    submissionLogRetentionDays: plan?.limits?.submissionLogRetentionDays ?? existingPlan?.limits?.submissionLogRetentionDays ?? defaultPlan?.limits?.submissionLogRetentionDays ?? null
   };
 
   const featureFlags = {
+    ...(defaultPlan?.featureFlags || {}),
     ...existingPlan?.featureFlags,
     ...plan?.featureFlags
   };
 
   return {
     planCode,
-    label: plan.label || existingPlan.label || labelizePlanCode(planCode),
-    description: plan.description || existingPlan.description || "",
-    isActive: plan.isActive ?? existingPlan.isActive ?? true,
-    durationType: plan.durationType || existingPlan.durationType || "forever",
-    durationDays: plan.durationDays ?? existingPlan.durationDays ?? null,
-    sortOrder: plan.sortOrder ?? existingPlan.sortOrder ?? getDefaultPlanSortOrder(planCode),
+    label: plan.label || existingPlan.label || defaultPlan.label || labelizePlanCode(planCode),
+    description: plan.description || existingPlan.description || defaultPlan.description || "",
+    isActive: plan.isActive ?? existingPlan.isActive ?? defaultPlan.isActive ?? true,
+    durationType: plan.durationType || existingPlan.durationType || defaultPlan.durationType || "forever",
+    durationDays: plan.durationDays ?? existingPlan.durationDays ?? defaultPlan.durationDays ?? null,
+    sortOrder: plan.sortOrder ?? existingPlan.sortOrder ?? defaultPlan.sortOrder ?? getDefaultPlanSortOrder(planCode),
     limits,
     featureFlags,
     updatedAt: new Date().toISOString()
@@ -864,7 +880,7 @@ function buildTenantSummary(tenantDetail) {
 
 async function loadPlans() {
   try {
-    const plans = sortPlans(await scanAllItems(PLAN_TABLE));
+    const plans = sortPlans((await scanAllItems(PLAN_TABLE)).map((plan) => normalizePlanDefinition(plan, plan)));
     if (!plans.length) {
       return {
         items: sortPlans(DEFAULT_PLANS),
@@ -1095,6 +1111,57 @@ function routeMatch(path) {
   return parts;
 }
 
+async function getAdminHealth() {
+  const checks = {
+    tenants: "unknown",
+    plans: "unknown",
+    settings: "unknown"
+  };
+
+  try {
+    await dynamoClient.send(new ScanCommand({
+      TableName: TENANT_TABLE,
+      Limit: 1
+    }));
+    checks.tenants = "ok";
+  } catch (error) {
+    checks.tenants = error?.name === "ResourceNotFoundException" ? "missing" : "error";
+  }
+
+  try {
+    await dynamoClient.send(new ScanCommand({
+      TableName: PLAN_TABLE,
+      Limit: 1
+    }));
+    checks.plans = "ok";
+  } catch (error) {
+    checks.plans = error?.name === "ResourceNotFoundException" ? "missing" : "error";
+  }
+
+  try {
+    await dynamoClient.send(new GetItemCommand({
+      TableName: SETTINGS_TABLE,
+      Key: {
+        settingKey: { S: "admin_notifications" }
+      }
+    }));
+    checks.settings = "ok";
+  } catch (error) {
+    checks.settings = error?.name === "ResourceNotFoundException" ? "missing" : "error";
+  }
+
+  const isHealthy = checks.tenants === "ok" && checks.plans === "ok";
+
+  return {
+    status: isHealthy ? "ok" : "degraded",
+    message: isHealthy
+      ? "Admin API is reachable and core DynamoDB tables responded."
+      : "Admin API is reachable, but one or more backend tables are unavailable.",
+    checks,
+    checkedAt: getNowIso()
+  };
+}
+
 export const handler = async (event) => {
   const path = event?.requestContext?.http?.path || event?.rawPath || "/";
   const method = event?.requestContext?.http?.method || event?.httpMethod || "GET";
@@ -1128,6 +1195,10 @@ export const handler = async (event) => {
     const plans = plansResult.items;
     const plansByCode = getPlanMap(plans);
     const parts = routeMatch(path);
+
+    if (method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "health") {
+      return jsonResponse(200, success(await getAdminHealth()));
+    }
 
     if (method === "GET" && parts.length === 2 && parts[0] === "admin" && parts[1] === "overview") {
       const tenantDetails = await loadTenantDetails(plansByCode);

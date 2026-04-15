@@ -61,6 +61,10 @@
         <apexClass>NativeFormsDemoDataService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsSubmissionLogsController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 
     <objectPermissions>
         <allowCreate>true</allowCreate>
@@ -601,6 +605,10 @@
     </tabSettings>
     <tabSettings>
         <tab>NativeForms_Connect</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NativeForms_Submission_Logs</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>

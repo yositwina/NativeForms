@@ -591,6 +591,22 @@
                                     </lightning-input>
                                 </template>
 
+                                <template if:true={selectedElementIsDate}>
+                                    <lightning-combobox
+                                        label="Display Format"
+                                        value={editorDateDisplayFormat}
+                                        options={dateDisplayFormatOptions}
+                                        onchange={handleEditorDateDisplayFormatChange}>
+                                    </lightning-combobox>
+                                    <lightning-combobox
+                                        label="Timezone / GMT Offset"
+                                        value={editorDateGmtOffset}
+                                        options={dateGmtOffsetOptions}
+                                        onchange={handleEditorDateGmtOffsetChange}>
+                                    </lightning-combobox>
+                                    <p class="selection-hint">{selectedDateFormatHelpText}</p>
+                                </template>
+
                                 <p class="property-inline-text">
                                     <span class="property-inline-text__label">Internal Name (ID):</span>
                                     <span class="property-inline-text__value">{selectedElementFieldKey}</span>
@@ -939,10 +955,6 @@
                                     checked={selectedFormCaptchaEnabled}
                                     onchange={handleFormCaptchaChange}>
                                 </lightning-input>
-
-                                <div class={formSettingsStatusClass}>
-                                    {formSettingsStatusText}
-                                </div>
                             </div>
                         </template>
                     </section>

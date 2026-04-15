@@ -6,7 +6,8 @@ const FEATURE_FLAG_LABELS = {
   enableProFormulaFields: "Formula Fields",
   enableProPostSubmitAutoLink: "Post Submit Auto Link",
   enableProSfSecretCodeAuth: "Secret Code Auth",
-  enableProLoadFile: "Load File"
+  enableProLoadFile: "Load File",
+  enableDetailedSubmissionLogs: "Detailed Submission Logs"
 };
 
 function buildFeatureFlags(enabledKeys) {
@@ -36,73 +37,6 @@ function sortPlans(plans) {
     return String(a?.label || "").localeCompare(String(b?.label || ""));
   });
 }
-
-const mockPlans = [
-  {
-    planCode: "free",
-    label: "Free",
-    description: "Permanent low-volume entry plan.",
-    isActive: true,
-    durationType: "forever",
-    durationDays: null,
-    sortOrder: 1,
-    limits: { maxSfUsers: 1, maxForms: 1, maxSubmissionsPerMonth: 100 },
-    featureFlags: buildFeatureFlags([])
-  },
-  {
-    planCode: "trial",
-    label: "Trial",
-    description: "Time-limited evaluation with all Pro features.",
-    isActive: true,
-    durationType: "fixed_days",
-    durationDays: 30,
-    sortOrder: 2,
-    limits: { maxSfUsers: 1, maxForms: 5, maxSubmissionsPerMonth: null },
-    featureFlags: buildFeatureFlags(Object.keys(FEATURE_FLAG_LABELS))
-  },
-  {
-    planCode: "starter",
-    label: "Starter",
-    description: "Paid production plan without Pro-only features.",
-    isActive: true,
-    durationType: "forever",
-    durationDays: null,
-    sortOrder: 3,
-    limits: { maxSfUsers: 1, maxForms: 5, maxSubmissionsPerMonth: 1000 },
-    featureFlags: buildFeatureFlags([])
-  },
-  {
-    planCode: "pro",
-    label: "Pro",
-    description: "Full plan with no product limits.",
-    isActive: true,
-    durationType: "forever",
-    durationDays: null,
-    sortOrder: 4,
-    limits: { maxSfUsers: null, maxForms: null, maxSubmissionsPerMonth: null },
-    featureFlags: buildFeatureFlags(Object.keys(FEATURE_FLAG_LABELS))
-  }
-];
-
-const mockSupportNote = {
-  eventId: "support-1",
-  orgId: "00DgL00000C9obQ",
-  eventType: "support_note",
-  severity: "watch",
-  message: "Customer asked for help completing OAuth after tenant secret verification.",
-  createdAt: "2026-04-12T16:20:00.000Z",
-  createdBy: "admin@nativeforms.internal"
-};
-
-const mockAuditEntry = {
-  auditId: "audit-1",
-  orgId: "00DgL00000C9obQ",
-  actionType: "change_plan",
-  actionLabel: "Changed plan",
-  reason: "Demo adjustment while shaping tenant policies.",
-  createdAt: "2026-04-12T16:32:00.000Z",
-  actorEmail: "admin@nativeforms.internal"
-};
 
 const adminFeatureListPrimary = [
   {
@@ -190,84 +124,6 @@ const adminFeatureListSecondary = [
   }
 ];
 
-const mockTenants = [
-  {
-    orgId: "00DgL00000C9obQ",
-    companyName: "Harmony IT",
-    adminEmail: "yosi@harmony-it.co.il",
-    planCode: "starter",
-    planLabel: "Starter",
-    status: "alert",
-    alertType: "submission_limit_exceeded",
-    subscriptionStatus: "active",
-    supportStatus: "watch",
-    planStartedAt: "2026-04-01",
-    planEndsAt: null,
-    trialStartedAt: null,
-    trialEndsAt: null,
-    setupState: "oauth_pending",
-    healthStatus: "warning",
-    tenantSecretStatus: "verified",
-    oauthStatus: "pending",
-    lastActivityAt: "2026-04-12T18:24:00.000Z",
-    submissionsMonth: 128,
-    activeFormsCount: 3,
-    internalNotes: "Waiting for the customer to finish OAuth connection.",
-    effectiveLimits: { maxSfUsers: 1, maxForms: 5, maxSubmissionsPerMonth: 1000 },
-    effectiveFeatureFlags: buildFeatureFlags([])
-  },
-  {
-    orgId: "00DgL00000D3fRA",
-    companyName: "Acme Renewables",
-    adminEmail: "ops@acme-renewables.com",
-    planCode: "pro",
-    planLabel: "Pro",
-    status: "active",
-    alertType: null,
-    subscriptionStatus: "active",
-    supportStatus: "normal",
-    planStartedAt: "2026-03-10",
-    planEndsAt: null,
-    trialStartedAt: null,
-    trialEndsAt: null,
-    setupState: "connected",
-    healthStatus: "healthy",
-    tenantSecretStatus: "verified",
-    oauthStatus: "connected",
-    lastActivityAt: "2026-04-12T17:48:00.000Z",
-    submissionsMonth: 1824,
-    activeFormsCount: 14,
-    internalNotes: "",
-    effectiveLimits: { maxSfUsers: null, maxForms: null, maxSubmissionsPerMonth: null },
-    effectiveFeatureFlags: buildFeatureFlags(Object.keys(FEATURE_FLAG_LABELS))
-  },
-  {
-    orgId: "00DgL00000G7trM",
-    companyName: "Northwind Legal",
-    adminEmail: "admin@northwindlegal.com",
-    planCode: "trial",
-    planLabel: "Trial",
-    status: "alert",
-    alertType: "end_date_passed",
-    subscriptionStatus: "trialing",
-    supportStatus: "priority",
-    planStartedAt: "2026-04-02",
-    planEndsAt: "2026-05-02",
-    trialStartedAt: "2026-04-02",
-    trialEndsAt: "2026-05-02",
-    setupState: "tenant_secret_verified",
-    healthStatus: "warning",
-    tenantSecretStatus: "verified",
-    oauthStatus: "not_started",
-    lastActivityAt: "2026-04-11T14:11:00.000Z",
-    submissionsMonth: 0,
-    activeFormsCount: 1,
-    internalNotes: "Needs closer follow-up before trial ends.",
-    effectiveLimits: { maxSfUsers: 1, maxForms: 5, maxSubmissionsPerMonth: null },
-    effectiveFeatureFlags: buildFeatureFlags(Object.keys(FEATURE_FLAG_LABELS))
-  }
-];
-
 const state = {
   view: "overview",
   search: "",
@@ -291,9 +147,13 @@ const state = {
     statusRecomputeTimeUtc: "02:00",
     source: "default"
   },
+  apiHealth: {
+    status: "unknown",
+    message: "Health check has not run yet."
+  },
   isLoading: true,
-  dataMode: "mock",
-  requestedDataMode: "mock",
+  dataMode: "live",
+  requestedDataMode: "live",
   isSavingPlan: false,
   isSavingTenant: false,
   busyActionKey: "",
@@ -303,8 +163,6 @@ const state = {
 
 const config = window.NativeFormsAdminConfig || {};
 const apiBaseUrl = String(config.apiBaseUrl || "").replace(/\/+$/, "");
-const defaultDataMode = config.defaultDataMode === "live" ? "live" : "mock";
-const DATA_MODE_STORAGE_KEY = "nativeforms-admin-data-mode-v2";
 
 const refs = {
   tenantTableBody: document.getElementById("tenantTableBody"),
@@ -316,10 +174,7 @@ const refs = {
   attentionCount: document.getElementById("attentionCount"),
   trialCount: document.getElementById("trialCount"),
   heroCopy: document.querySelector(".hero__copy"),
-  dataModeLabel: document.getElementById("dataModeLabel"),
-  dataModeCopy: document.getElementById("dataModeCopy"),
   dataModeHelper: document.getElementById("dataModeHelper"),
-  dataModeInputs: Array.from(document.querySelectorAll('input[name="dataMode"]')),
   planNotice: document.getElementById("planNotice"),
   planList: document.getElementById("planList"),
   planEditor: document.getElementById("planEditor"),
@@ -343,30 +198,12 @@ const refs = {
   featureListSecondary: document.getElementById("featureListSecondary"),
   auditLogList: document.getElementById("auditLogList"),
   settingsApiUrl: document.getElementById("settingsApiUrl"),
-  settingsRequestedMode: document.getElementById("settingsRequestedMode"),
   settingsActiveMode: document.getElementById("settingsActiveMode"),
   settingsPlanStorage: document.getElementById("settingsPlanStorage"),
   settingsStatusAlertEmail: document.getElementById("settingsStatusAlertEmail"),
   settingsRecomputeTime: document.getElementById("settingsRecomputeTime"),
   settingsSource: document.getElementById("settingsSource")
 };
-
-function getSavedDataMode() {
-  try {
-    const saved = window.localStorage.getItem(DATA_MODE_STORAGE_KEY);
-    return saved === "live" || saved === "mock" ? saved : defaultDataMode;
-  } catch (error) {
-    return defaultDataMode;
-  }
-}
-
-function saveDataMode(value) {
-  try {
-    window.localStorage.setItem(DATA_MODE_STORAGE_KEY, value);
-  } catch (error) {
-    // Keep in memory only if localStorage is blocked.
-  }
-}
 
 function getSavedSplitWidth() {
   try {
@@ -497,19 +334,33 @@ function getSelectedTenant(items = state.tenants) {
   return state.tenantDetailsById.get(summary.orgId) || summary;
 }
 
+async function parseApiResponse(response, path) {
+  const rawText = await response.text();
+  let payload = null;
+
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch (error) {
+      const preview = rawText.replace(/\s+/g, " ").slice(0, 180);
+      throw new Error(`The Admin API returned invalid JSON for ${path} (${response.status}). ${preview}`);
+    }
+  }
+
+  if (!response.ok || payload?.success !== true) {
+    throw new Error(payload?.error?.message || `The Admin API request failed for ${path} (${response.status}).`);
+  }
+
+  return payload.data;
+}
+
 async function fetchJson(path) {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: {
       "Content-Type": "application/json"
     }
   });
-  const payload = await response.json();
-
-  if (!response.ok || payload?.success !== true) {
-    throw new Error(payload?.error?.message || `Request failed for ${path}`);
-  }
-
-  return payload.data;
+  return parseApiResponse(response, path);
 }
 
 async function postJson(path, body) {
@@ -520,13 +371,7 @@ async function postJson(path, body) {
     },
     body: JSON.stringify(body)
   });
-  const payload = await response.json();
-
-  if (!response.ok || payload?.success !== true) {
-    throw new Error(payload?.error?.message || `Request failed for ${path}`);
-  }
-
-  return payload.data;
+  return parseApiResponse(response, path);
 }
 
 async function loadTenantsFromApi() {
@@ -556,6 +401,10 @@ async function loadSettingsFromApi() {
   return data.settings || null;
 }
 
+async function loadHealthFromApi() {
+  return fetchJson("/admin/health");
+}
+
 async function loadAuditLogFromApi() {
   const data = await fetchJson("/admin/audit");
   return data.items || [];
@@ -571,38 +420,6 @@ async function loadTenantSupportFromApi(orgId) {
   return data.items || [];
 }
 
-function buildMockOverview() {
-  const tenantSummaries = mockTenants;
-  return {
-    summary: {
-      activeTenants: tenantSummaries.filter((tenant) => tenant.status === "active").length,
-      trialsInProgress: tenantSummaries.filter((tenant) => tenant.planCode === "trial").length,
-      expiringTrials: tenantSummaries.filter((tenant) => tenant.trialEndsAt).length,
-      tenantsWithIssues: tenantSummaries.filter((tenant) => tenant.healthStatus !== "healthy").length,
-      submissionsToday: 0,
-      tenantsNeedingSupport: tenantSummaries.filter((tenant) => tenant.supportStatus !== "normal").length
-    },
-    lists: {
-      setupIssues: tenantSummaries.filter((tenant) => tenant.setupState !== "connected"),
-      expiringTrials: tenantSummaries.filter((tenant) => tenant.trialEndsAt),
-      recentSupportNotes: [mockSupportNote],
-      recentAdminActions: [mockAuditEntry]
-    }
-  };
-}
-
-function buildMockAuditLog() {
-  return [mockAuditEntry];
-}
-
-function buildMockSupport(orgId) {
-  return orgId === mockSupportNote.orgId ? [mockSupportNote] : [];
-}
-
-function buildMockTenantAudit(orgId) {
-  return orgId === mockAuditEntry.orgId ? [mockAuditEntry] : [];
-}
-
 async function loadInitialData() {
   state.isLoading = true;
   state.errorMessage = "";
@@ -612,64 +429,40 @@ async function loadInitialData() {
   state.supportByOrgId.clear();
   state.auditByOrgId.clear();
 
-  if (state.requestedDataMode !== "live") {
-    state.tenants = mockTenants;
-    state.plans = sortPlans(mockPlans);
-    state.planStorageMode = "mock";
-    state.dataMode = "mock";
-    state.overview = buildMockOverview();
-    state.auditLog = buildMockAuditLog();
-    state.settings = {
-      statusAlertEmailRecipient: "yosi@harmony-it.co.il",
-      statusRecomputeTimeUtc: "02:00",
-      source: "mock"
-    };
-    state.isLoading = false;
-    state.selectedOrgId = state.selectedOrgId || state.tenants[0]?.orgId || null;
-    state.selectedPlanCode = state.selectedPlanCode || state.plans[0]?.planCode || "free";
-    render();
-    return;
-  }
-
   if (!apiBaseUrl) {
-    state.tenants = mockTenants;
-    state.plans = sortPlans(mockPlans);
-    state.planStorageMode = "mock";
-    state.dataMode = "mock";
-    state.overview = buildMockOverview();
-    state.auditLog = buildMockAuditLog();
-    state.errorMessage = "Real API mode is selected, but no admin API URL is configured yet. This screen is showing mock data until the live endpoint is connected.";
+    state.tenants = [];
+    state.plans = [];
+    state.planStorageMode = "unavailable";
+    state.dataMode = "live";
+    state.overview = null;
+    state.errorMessage = "The Admin API URL is not configured, so live admin data cannot be loaded.";
     state.isLoading = false;
     render();
     return;
   }
 
   try {
-    const [tenants, plansPayload, overview, settings] = await Promise.all([
+    const [tenants, plansPayload, overview, settings, health] = await Promise.all([
       loadTenantsFromApi(),
       loadPlansFromApi(),
       loadOverviewFromApi().catch(() => null),
-      loadSettingsFromApi().catch(() => null)
+      loadSettingsFromApi().catch(() => null),
+      loadHealthFromApi().catch(() => null)
     ]);
     state.tenants = tenants;
     state.plans = sortPlans(plansPayload.items);
     state.planStorageMode = plansPayload.storageMode;
     state.overview = overview;
     state.settings = settings || state.settings;
+    state.apiHealth = health || state.apiHealth;
     state.dataMode = "live";
   } catch (error) {
-    state.tenants = mockTenants;
-    state.plans = sortPlans(mockPlans);
-    state.planStorageMode = "mock";
-    state.overview = buildMockOverview();
-    state.auditLog = buildMockAuditLog();
-    state.settings = {
-      statusAlertEmailRecipient: "yosi@harmony-it.co.il",
-      statusRecomputeTimeUtc: "02:00",
-      source: "mock"
-    };
-    state.dataMode = "mock";
-    state.errorMessage = `Live admin API is not reachable yet, so this screen is showing mock data. ${error.message}`;
+    state.tenants = [];
+    state.plans = [];
+    state.planStorageMode = "unavailable";
+    state.overview = null;
+    state.dataMode = "live";
+    state.errorMessage = `The live Admin API could not be loaded. ${error.message}`;
   } finally {
     state.isLoading = false;
     state.selectedOrgId = state.selectedOrgId || state.tenants[0]?.orgId || null;
@@ -679,7 +472,7 @@ async function loadInitialData() {
 }
 
 async function ensureOverview() {
-  if (state.dataMode !== "live" || !apiBaseUrl || state.overview) {
+  if (!apiBaseUrl || state.overview) {
     return;
   }
 
@@ -693,7 +486,7 @@ async function ensureOverview() {
 }
 
 async function ensureAuditLog() {
-  if (state.dataMode !== "live" || !apiBaseUrl || state.auditLog.length) {
+  if (!apiBaseUrl || state.auditLog.length) {
     return;
   }
 
@@ -711,13 +504,7 @@ async function ensureTenantData(orgId) {
     return;
   }
 
-  if (state.dataMode !== "live" || !apiBaseUrl) {
-    if (!state.supportByOrgId.has(orgId)) {
-      state.supportByOrgId.set(orgId, buildMockSupport(orgId));
-    }
-    if (!state.auditByOrgId.has(orgId)) {
-      state.auditByOrgId.set(orgId, buildMockTenantAudit(orgId));
-    }
+  if (!apiBaseUrl) {
     return;
   }
 
@@ -840,7 +627,8 @@ async function savePlan(form) {
     limits: {
       maxSfUsers: parseNullableNumber(formData.get("maxSfUsers")),
       maxForms: parseNullableNumber(formData.get("maxForms")),
-      maxSubmissionsPerMonth: parseNullableNumber(formData.get("maxSubmissionsPerMonth"))
+      maxSubmissionsPerMonth: parseNullableNumber(formData.get("maxSubmissionsPerMonth")),
+      submissionLogRetentionDays: parseNullableNumber(formData.get("submissionLogRetentionDays"))
     },
     featureFlags: Object.fromEntries(
       Object.keys(FEATURE_FLAG_LABELS).map((key) => [key, formData.get(key) === "on"])
@@ -994,7 +782,15 @@ function renderTimeline(target, items, emptyTitle, type) {
 }
 
 function renderOverview() {
-  const overview = state.overview || buildMockOverview();
+  const overview = state.overview || {
+    summary: {},
+    lists: {
+      setupIssues: [],
+      expiringTrials: [],
+      recentSupportNotes: [],
+      recentAdminActions: []
+    }
+  };
   const summary = overview.summary || {};
   const cards = [
     ["Active Customers", summary.activeTenants ?? 0],
@@ -1046,50 +842,36 @@ function renderBanner() {
   }
 
   if (state.view === "plans") {
-    refs.heroCopy.textContent = state.dataMode === "live" && state.planStorageMode === "dynamodb"
+    refs.heroCopy.textContent = state.planStorageMode === "dynamodb"
       ? "Plan changes save directly into the NativeFormsPlans DynamoDB table and can immediately influence customer limits."
-      : "This screen is shaping plan definitions and feature flags before or while live storage is available.";
+      : "The live plan endpoint is reachable, but plan storage is currently unavailable or unhealthy.";
     return;
   }
 
   if (state.view === "settings") {
-    refs.heroCopy.textContent = "Use this page to control app behavior, switch between demo and live data, and manage notification and recompute settings.";
+    refs.heroCopy.textContent = "Use this page to review live admin connection details and manage notification and recompute settings.";
     return;
   }
 
-  refs.heroCopy.textContent = state.dataMode === "live"
-    ? "This customer workspace is running on the live Admin API, including customer profile saves and real plan assignments."
-    : "This customer workspace is using built-in sample records so you can shape the workflow safely before touching live data.";
+  refs.heroCopy.textContent = "This customer workspace is running on the live Admin API, including customer profile saves and real plan assignments.";
 }
 
 function renderModePanel() {
-  refs.dataModeInputs.forEach((input) => {
-    input.checked = input.value === state.requestedDataMode;
-  });
-
-  if (state.requestedDataMode === "live" && state.dataMode === "live" && !state.errorMessage) {
-    refs.dataModeLabel.textContent = "Real API";
-    refs.dataModeCopy.textContent = "This workspace is reading live customer records and plan definitions from the Admin API.";
-    refs.dataModeHelper.textContent = "Live mode is active. Customer data, plan storage, overview cards, and actions are all using the backend.";
-  } else if (state.requestedDataMode === "live") {
-    refs.dataModeLabel.textContent = "Real API Requested";
-    refs.dataModeCopy.textContent = "Live mode is selected, but the page is currently using fallback mock data until the backend answers cleanly.";
-    refs.dataModeHelper.textContent = apiBaseUrl
-      ? "The live admin API URL is configured. If the request fails, the console stays usable with mock data."
-      : "Add the live Admin API URL to config.js to activate backend mode.";
-  } else {
-    refs.dataModeLabel.textContent = "Mock Data";
-    refs.dataModeCopy.textContent = "This workspace is using built-in sample customers so you can refine the admin flow safely.";
-    refs.dataModeHelper.textContent = "Switch to Real API here when you want to test the live backend.";
-  }
-
   refs.settingsApiUrl.textContent = apiBaseUrl || "Not configured";
-  refs.settingsRequestedMode.textContent = labelize(state.requestedDataMode);
-  refs.settingsActiveMode.textContent = labelize(state.dataMode);
+  refs.settingsActiveMode.textContent = !apiBaseUrl
+    ? "Live API Missing"
+    : (state.errorMessage ? "Live API Error" : "Live API");
   refs.settingsPlanStorage.textContent = labelize(state.planStorageMode);
   refs.settingsStatusAlertEmail.textContent = state.settings?.statusAlertEmailRecipient || "Not configured";
   refs.settingsRecomputeTime.textContent = `${state.settings?.statusRecomputeTimeUtc || "02:00"} UTC`;
   refs.settingsSource.textContent = labelize(state.settings?.source || "default");
+  if (refs.dataModeHelper) {
+    refs.dataModeHelper.textContent = !apiBaseUrl
+      ? "The Admin API URL is missing, so live data cannot be loaded."
+      : (state.errorMessage
+        ? "The app stays on the live path and shows backend errors directly until the Admin API is healthy again."
+        : `The Admin API is active. Health: ${state.apiHealth?.status || "unknown"}. ${state.apiHealth?.message || ""}`.trim());
+  }
   const settingsForm = document.getElementById("settingsForm");
   if (settingsForm) {
     const emailInput = settingsForm.querySelector('[name="statusAlertEmailRecipient"]');
@@ -1097,14 +879,14 @@ function renderModePanel() {
     const submitButton = settingsForm.querySelector('button[type="submit"]');
     if (emailInput) {
       emailInput.value = state.settings?.statusAlertEmailRecipient || "";
-      emailInput.disabled = state.dataMode !== "live" || state.busyActionKey === "settings:save";
+      emailInput.disabled = !apiBaseUrl || state.busyActionKey === "settings:save";
     }
     if (timeInput) {
       timeInput.value = state.settings?.statusRecomputeTimeUtc || "02:00";
-      timeInput.disabled = state.dataMode !== "live" || state.busyActionKey === "settings:save";
+      timeInput.disabled = !apiBaseUrl || state.busyActionKey === "settings:save";
     }
     if (submitButton) {
-      submitButton.disabled = state.dataMode !== "live" || state.busyActionKey === "settings:save";
+      submitButton.disabled = !apiBaseUrl || state.busyActionKey === "settings:save";
       submitButton.textContent = state.busyActionKey === "settings:save" ? "Saving Settings..." : "Save Settings";
     }
   }
@@ -1304,7 +1086,7 @@ function renderDetail(items) {
           <input class="field__control" type="text" value="${escapeHtml(selectedTenant.connectedUsername || "Not connected yet")}" disabled>
         </label>
         <div class="detail-actions">
-          <button class="${saveTenantButtonClass}" type="submit" ${state.dataMode !== "live" || state.isSavingTenant ? "disabled" : ""}>${state.isSavingTenant ? "Saving Customer..." : "Save Customer"}</button>
+          <button class="${saveTenantButtonClass}" type="submit" ${state.isSavingTenant ? "disabled" : ""}>${state.isSavingTenant ? "Saving Customer..." : "Save Customer"}</button>
         </div>
       </form>
     </section>
@@ -1324,10 +1106,10 @@ function renderDetail(items) {
           </label>
         </div>
         <div class="detail-actions detail-actions--split">
-          <button class="action-button action-button--secondary" type="button" data-action="extend-trial" ${state.dataMode !== "live" || isBusy("extend-trial") ? "disabled" : ""}>${isBusy("extend-trial") ? "Extending..." : "Extend Trial"}</button>
-          <button class="action-button action-button--secondary" type="button" data-action="${selectedTenant.status === "blocked" ? "unblock" : "block"}" ${state.dataMode !== "live" || isBusy("block") || isBusy("unblock") ? "disabled" : ""}>${selectedTenant.status === "blocked" ? (isBusy("unblock") ? "Unblocking..." : "Unblock Customer") : (isBusy("block") ? "Blocking..." : "Block Customer")}</button>
-          <button class="action-button action-button--secondary" type="button" data-action="resend-setup" ${state.dataMode !== "live" || isBusy("resend-setup") ? "disabled" : ""}>${isBusy("resend-setup") ? "Sending..." : "Resend Setup"}</button>
-          <button class="action-button action-button--secondary" type="button" data-action="regenerate-secret" ${state.dataMode !== "live" || isBusy("regenerate-secret") ? "disabled" : ""}>${isBusy("regenerate-secret") ? "Requesting..." : "Regenerate Secret"}</button>
+          <button class="action-button action-button--secondary" type="button" data-action="extend-trial" ${isBusy("extend-trial") ? "disabled" : ""}>${isBusy("extend-trial") ? "Extending..." : "Extend Trial"}</button>
+          <button class="action-button action-button--secondary" type="button" data-action="${selectedTenant.status === "blocked" ? "unblock" : "block"}" ${(isBusy("block") || isBusy("unblock")) ? "disabled" : ""}>${selectedTenant.status === "blocked" ? (isBusy("unblock") ? "Unblocking..." : "Unblock Customer") : (isBusy("block") ? "Blocking..." : "Block Customer")}</button>
+          <button class="action-button action-button--secondary" type="button" data-action="resend-setup" ${isBusy("resend-setup") ? "disabled" : ""}>${isBusy("resend-setup") ? "Sending..." : "Resend Setup"}</button>
+          <button class="action-button action-button--secondary" type="button" data-action="regenerate-secret" ${isBusy("regenerate-secret") ? "disabled" : ""}>${isBusy("regenerate-secret") ? "Requesting..." : "Regenerate Secret"}</button>
         </div>
       </form>
     </section>
@@ -1351,7 +1133,7 @@ function renderDetail(items) {
           <textarea class="field__control field__control--textarea" name="message" placeholder="Capture context for the next admin or support person." required></textarea>
         </label>
         <div class="detail-actions">
-          <button class="${isBusy("support-note") ? "action-button action-button--busy" : "action-button"}" type="submit" ${state.dataMode !== "live" || isBusy("support-note") ? "disabled" : ""}>${isBusy("support-note") ? "Saving Note..." : "Save Support Note"}</button>
+          <button class="${isBusy("support-note") ? "action-button action-button--busy" : "action-button"}" type="submit" ${isBusy("support-note") ? "disabled" : ""}>${isBusy("support-note") ? "Saving Note..." : "Save Support Note"}</button>
         </div>
       </form>
       <div class="activity-stream">
@@ -1412,15 +1194,10 @@ function renderPlans() {
   const savePlanButtonClass = state.isSavingPlan ? "action-button action-button--busy" : "action-button";
 
   refs.planNotice.hidden = false;
-  if (state.dataMode !== "live") {
-    refs.planNotice.className = "notice-banner notice-banner--info";
-    refs.planNotice.innerHTML = "<strong>Mock plan definitions.</strong><span>You are in demo mode, so this screen is showing sample plan settings instead of live DynamoDB records.</span>";
-  } else {
-    refs.planNotice.className = `notice-banner ${planStorageReady ? "notice-banner--success" : "notice-banner--warning"}`;
-    refs.planNotice.innerHTML = planStorageReady
-      ? "<strong>Plan storage is live.</strong><span>Changes on this screen save into the NativeFormsPlans DynamoDB table.</span>"
-      : "<strong>Plan storage is not ready yet.</strong><span>The API is currently using fallback hardcoded plan definitions because NativeFormsPlans does not exist yet.</span>";
-  }
+  refs.planNotice.className = `notice-banner ${planStorageReady ? "notice-banner--success" : "notice-banner--warning"}`;
+  refs.planNotice.innerHTML = planStorageReady
+    ? "<strong>Plan storage is live.</strong><span>Changes on this screen save into the NativeFormsPlans DynamoDB table.</span>"
+    : "<strong>Plan storage is currently unavailable.</strong><span>The live API could not confirm DynamoDB-backed plan storage. Check the Admin API health and table access.</span>";
 
   refs.planList.innerHTML = `
     <p class="detail-card__eyebrow">Plans</p>
@@ -1466,7 +1243,7 @@ function renderPlans() {
           <input class="field__control" name="durationDays" type="number" min="0" value="${escapeHtml(selectedPlan.durationDays ?? "")}">
         </label>
       </div>
-      <div class="inline-fields inline-fields--triple">
+      <div class="inline-fields inline-fields--quad">
         <label class="field">
           <span class="field__label">Max SF Users</span>
           <input class="field__control" name="maxSfUsers" type="number" min="0" value="${escapeHtml(selectedPlan.limits?.maxSfUsers ?? "")}">
@@ -1478,6 +1255,10 @@ function renderPlans() {
         <label class="field">
           <span class="field__label">Monthly Submissions</span>
           <input class="field__control" name="maxSubmissionsPerMonth" type="number" min="0" value="${escapeHtml(selectedPlan.limits?.maxSubmissionsPerMonth ?? "")}">
+        </label>
+        <label class="field">
+          <span class="field__label">Submission Log Retention (Days)</span>
+          <input class="field__control" name="submissionLogRetentionDays" type="number" min="1" value="${escapeHtml(selectedPlan.limits?.submissionLogRetentionDays ?? "")}">
         </label>
       </div>
       <label class="toggle-field">
@@ -1496,7 +1277,7 @@ function renderPlans() {
         </div>
       </section>
       <div class="detail-actions">
-        <button class="${savePlanButtonClass}" type="submit" ${(state.dataMode !== "live" || !planStorageReady || state.isSavingPlan) ? "disabled" : ""}>${state.isSavingPlan ? "Saving Plan..." : "Save Plan"}</button>
+        <button class="${savePlanButtonClass}" type="submit" ${(!apiBaseUrl || !planStorageReady || state.isSavingPlan) ? "disabled" : ""}>${state.isSavingPlan ? "Saving Plan..." : "Save Plan"}</button>
       </div>
     </form>
   ` : `
@@ -1521,7 +1302,7 @@ function renderPlans() {
 }
 
 function renderAuditPage() {
-  const items = state.auditLog.length ? state.auditLog : buildMockAuditLog();
+  const items = state.auditLog;
   renderTimeline(refs.auditLogList, items, "No audit entries yet", "audit");
 }
 
@@ -1652,24 +1433,9 @@ document.getElementById("healthFilter").addEventListener("change", (event) => {
   render();
 });
 
-state.requestedDataMode = getSavedDataMode();
-state.dataMode = state.requestedDataMode;
+state.requestedDataMode = "live";
+state.dataMode = "live";
 state.splitLeftWidth = getSavedSplitWidth();
-
-refs.dataModeInputs.forEach((input) => {
-  input.checked = input.value === state.dataMode;
-  input.addEventListener("change", async (event) => {
-    if (!event.target.checked) {
-      return;
-    }
-
-    state.requestedDataMode = event.target.value;
-    state.selectedOrgId = null;
-    state.tenantDetailsById.clear();
-    saveDataMode(state.requestedDataMode);
-    await loadInitialData();
-  });
-});
 
 refs.navButtons.forEach((button) => {
   button.addEventListener("click", async () => {
