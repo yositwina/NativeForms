@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Element_Type__c</fullName>
-    <description>Element type used by the NativeForms runtime.</description>
+    <description>Element type used by the TwinaForms runtime.</description>
     <inlineHelpText>Choose the element type.</inlineHelpText>
     <label>Element Type</label>
     <required>false</required>

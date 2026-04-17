@@ -121,6 +121,12 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
     }
 
+    public class NewFormResult {
+        @AuraEnabled public Id formId { get; set; }
+        @AuraEnabled public Id versionId { get; set; }
+        @AuraEnabled public String formName { get; set; }
+    }
+
     @AuraEnabled(cacheable=true)
     public static List<SelectOption> getObjectOptions() {
         List<SelectOption> options = new List<SelectOption>();
@@ -236,10 +242,11 @@ public with sharing class NativeFormsDesignerController {
 
         for (NF_Form__c formRecord : forms) {
             SelectOption option = new SelectOption();
-            option.label = formRecord.Name + (String.isNotBlank(formRecord.NF_Key__c) ? ' (' + formRecord.NF_Key__c + ')' : '');
+            option.label = formRecord.Description__c + (String.isNotBlank(formRecord.NF_Key__c) ? ' (' + formRecord.NF_Key__c + ')' : '');
             option.value = (String) formRecord.Id;
             workspace.forms.add(option);
         }
+        sortOptionsByLabel(workspace.forms);
 
         Map<Id, NF_Form__c> formsById = new Map<Id, NF_Form__c>(forms);
 
@@ -256,7 +263,7 @@ public with sharing class NativeFormsDesignerController {
 
         NF_Form__c selectedForm = formsById.get(effectiveFormId);
         workspace.selectedFormId = selectedForm.Id;
-        workspace.selectedFormName = selectedForm.Name;
+        workspace.selectedFormName = selectedForm.Description__c;
         workspace.selectedFormKey = selectedForm.NF_Key__c;
         workspace.selectedFormDescription = selectedForm.Description__c;
         workspace.selectedThemeId = selectedForm.Theme__c;
@@ -408,6 +415,43 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
+    public static NewFormResult createFormWithDraftVersion(String description, Id themeId) {
+        String normalizedDescription = String.isBlank(description) ? null : description.trim();
+        if (String.isBlank(normalizedDescription)) {
+            throw new AuraHandledException('Description is required.');
+        }
+
+        NF_Form__c formRecord = new NF_Form__c(
+            Description__c = normalizedDescription,
+            Status__c = 'Draft',
+            Theme__c = themeId
+        );
+        insert formRecord;
+
+        NF_Form_Version__c versionRecord = new NF_Form_Version__c(
+            Form__c = formRecord.Id,
+            Version_Number__c = 1,
+            Version_Status__c = 'Draft',
+            Publish_Status__c = 'Never Published',
+            Security_Mode__c = pickPreferredPicklistValue(
+                NF_Form_Version__c.Security_Mode__c,
+                new List<String>{ 'secure-edit', 'public-prefill', 'public-create' }
+            ),
+            Prefill_Params_JSON__c = '[{"key":"email","label":"Email","required":true}]'
+        );
+        insert versionRecord;
+
+        formRecord.Current_Draft_Version__c = versionRecord.Id;
+        update formRecord;
+
+        NewFormResult result = new NewFormResult();
+        result.formId = formRecord.Id;
+        result.versionId = versionRecord.Id;
+        result.formName = normalizedDescription;
+        return result;
+    }
+
+    @AuraEnabled
     public static void deleteElement(Id elementId) {
         if (elementId == null) {
             throw new AuraHandledException('Element id is required.');
@@ -446,7 +490,7 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
-            throw new AuraHandledException('Repeat Group is a Pro-only feature. Enable it first in NativeForms Admin Features.');
+            throw new AuraHandledException('Repeat Groups are not available on your current TwinaForms plan.');
         }
 
         NF_Form_Version__c versionRecord = [
@@ -936,7 +980,7 @@ public with sharing class NativeFormsDesignerController {
 
     private static String titleFromFileName(String fileName) {
         if (String.isBlank(fileName)) {
-            return 'NativeForms Image';
+            return 'TwinaForms Image';
         }
         Integer dotIndex = fileName.lastIndexOf('.');
         return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
@@ -1083,6 +1127,24 @@ public with sharing class NativeFormsDesignerController {
             return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
         }
         return fallbackName;
+    }
+
+    private static String pickPreferredPicklistValue(Schema.SObjectField fieldRef, List<String> preferredValues) {
+        Schema.DescribeFieldResult describeResult = fieldRef.getDescribe();
+        List<Schema.PicklistEntry> entries = describeResult.getPicklistValues();
+        for (String preferredValue : preferredValues) {
+            for (Schema.PicklistEntry entry : entries) {
+                if (entry.getValue() == preferredValue && entry.isActive()) {
+                    return entry.getValue();
+                }
+            }
+        }
+        for (Schema.PicklistEntry entry : entries) {
+            if (entry.isActive()) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private static void ensureVersionEditable(Id versionId) {

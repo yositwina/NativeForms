@@ -77,7 +77,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
     async loadConnectionStatus() {
         const status = await getConnectionStatus({ orgId: null });
         if (status?.success !== true) {
-            throw new Error(status?.errorMessage || 'Unable to load NativeForms connection status.');
+            throw new Error(status?.errorMessage || 'Unable to load TwinaForms connection status.');
         }
 
         this.setupState = status.setupState || 'not_registered';
@@ -239,7 +239,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             this.captchaSecretKey = settings?.captchaSecretKey || '';
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Settings saved',
-                message: 'NativeForms feature flags were updated.',
+                message: 'TwinaForms feature flags were updated.',
                 variant: 'success'
             }));
         } catch (error) {
@@ -278,7 +278,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
 
             const result = await syncSubmissionLogConfig();
             if (result?.success !== true) {
-                throw new Error(result?.errorMessage || 'Unable to sync NativeForms submission-log settings to AWS.');
+                throw new Error(result?.errorMessage || 'Unable to sync TwinaForms submission-log settings to AWS.');
             }
 
             await this.loadSubmissionLogStatus();
@@ -301,7 +301,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
             await this.loadConnectionStatus();
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Connection refreshed',
-                message: 'NativeForms connection status was refreshed.',
+                message: 'TwinaForms connection status was refreshed.',
                 variant: 'success'
             }));
         } catch (error) {
@@ -313,7 +313,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
 
     async handleDisconnect() {
         const confirmed = window.confirm(
-            'Disconnect NativeForms for testing? This keeps the tenant registered but clears the Salesforce OAuth connection.'
+            'Disconnect TwinaForms for testing? This keeps the tenant registered but clears the Salesforce OAuth connection.'
         );
         if (!confirmed) {
             return;
@@ -324,13 +324,13 @@ export default class NativeFormsAdminFeatures extends LightningElement {
         try {
             const result = await disconnectOrg({ orgId: null });
             if (result?.success !== true) {
-                throw new Error(result?.errorMessage || 'Unable to disconnect NativeForms.');
+                throw new Error(result?.errorMessage || 'Unable to disconnect TwinaForms.');
             }
 
             await this.loadConnectionStatus();
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Connection cleared',
-                message: 'NativeForms Salesforce connection was disconnected for this org.',
+                message: 'TwinaForms Salesforce connection was disconnected for this org.',
                 variant: 'success'
             }));
         } catch (error) {

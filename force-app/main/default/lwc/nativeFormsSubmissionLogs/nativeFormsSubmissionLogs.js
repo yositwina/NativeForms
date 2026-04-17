@@ -6,6 +6,12 @@ import getSubmissionLogStatus from '@salesforce/apex/NativeFormsSubmissionLogsCo
 import saveSubmissionLogKeyPair from '@salesforce/apex/NativeFormsSubmissionLogsController.saveSubmissionLogKeyPair';
 import syncSubmissionLogConfig from '@salesforce/apex/NativeFormsSubmissionLogsController.syncSubmissionLogConfig';
 
+const HIDDEN_DETAIL_KEYS = new Set([
+    'captchaToken',
+    'gRecaptchaResponse',
+    'g-recaptcha-response'
+]);
+
 export default class NativeFormsSubmissionLogs extends LightningElement {
     isLoading = true;
     isLoadingMore = false;
@@ -436,6 +442,10 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
     }
 
     normalizeDisplayRow(key, label, rawValue) {
+        if (this.shouldHideDetailKey(key)) {
+            return null;
+        }
+
         const formatted = this.formatDisplayValue(rawValue);
         if (formatted.hidden) {
             return null;
@@ -447,6 +457,10 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             value: formatted.value,
             valueClass: formatted.multiline ? 'kv-value kv-value--multiline' : 'kv-value'
         };
+    }
+
+    shouldHideDetailKey(key) {
+        return HIDDEN_DETAIL_KEYS.has(String(key || '').trim());
     }
 
     formatDisplayValue(value) {

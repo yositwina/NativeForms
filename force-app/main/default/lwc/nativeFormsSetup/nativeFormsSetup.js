@@ -36,7 +36,7 @@ export default class NativeFormsSetup extends LightningElement {
         try {
             const context = await getSetupContext();
             this.orgId = context.orgId || '';
-            this.companyName = context.orgName || 'NativeForms Tenant';
+            this.companyName = context.orgName || 'TwinaForms Tenant';
             this.adminEmail = context.adminEmail || '';
             this.loginBaseUrl = context.loginBaseUrl || '';
         } catch (error) {
@@ -74,7 +74,7 @@ export default class NativeFormsSetup extends LightningElement {
     }
 
     get actionLabel() {
-        return this.connectUrl ? 'Reconnect NativeForms' : 'Connect NativeForms';
+        return this.connectUrl ? 'Reconnect TwinaForms' : 'Connect TwinaForms';
     }
 
     get actionDisabled() {
@@ -120,7 +120,7 @@ export default class NativeFormsSetup extends LightningElement {
             this.rawResponse = data?.rawResponse || '';
 
             if (!data?.success) {
-                throw new Error(data?.errorMessage || 'NativeForms registration failed.');
+                throw new Error(data?.errorMessage || 'TwinaForms registration failed.');
             }
 
             this.tenantSecret = data.tenantSecret || '';
@@ -142,7 +142,7 @@ export default class NativeFormsSetup extends LightningElement {
         }
 
         if (!this.connectUrl) {
-            this.errorMessage = this.errorMessage || 'NativeForms could not generate a Salesforce connection URL.';
+            this.errorMessage = this.errorMessage || 'TwinaForms could not generate a Salesforce connection URL.';
             return;
         }
         window.open(this.connectUrl, '_blank');

@@ -1,5 +1,5 @@
 <template>
-    <lightning-card title="NativeForms Home" icon-name="custom:custom18">
+    <lightning-card title="TwinaForms Home" icon-name="custom:custom18">
         <div class="shell">
             <template if:true={errorMessage}>
                 <div class="panel-error">{errorMessage}</div>
@@ -11,7 +11,7 @@
 
             <template if:true={isLoading}>
                 <div class="loading-wrap">
-                    <lightning-spinner alternative-text="Loading NativeForms Home" size="small"></lightning-spinner>
+                    <lightning-spinner alternative-text="Loading TwinaForms Home" size="small"></lightning-spinner>
                 </div>
             </template>
 
@@ -19,122 +19,146 @@
                 <section class="hero">
                     <div class="hero__copy">
                         <span class="hero__eyebrow">Workspace Overview</span>
-                        <h2>See your NativeForms connection, plan access, and getting-started status in one place.</h2>
-                        <p>
-                            This home page is designed to help you understand whether setup is complete, what your current plan includes,
-                            and what still needs attention before your team works with forms live.
-                        </p>
+                        <h2>{heroHeading}</h2>
+                        <p>{heroCopy}</p>
                     </div>
-                    <div class="hero__status">
-                        <span class={connectionBadgeClass}>{connectionBadgeLabel}</span>
-                        <span class={planBadgeClass}>{planLabel}</span>
+
+                    <div class="hero__meta">
+                        <div class="hero__pills">
+                            <span class={connectionBadgeClass}>{connectionBadgeLabel}</span>
+                            <span class={planBadgeClass}>{planLabel}</span>
+                        </div>
+
+                        <template if:true={showPrimaryAction}>
+                            <lightning-button
+                                variant="brand"
+                                label={primaryActionLabel}
+                                onclick={handlePrimaryAction}
+                            ></lightning-button>
+                        </template>
                     </div>
                 </section>
 
-                <section class="overview-grid">
-                    <article class="overview-card overview-card--primary">
+                <section class="top-grid">
+                    <article class="summary-card summary-card--accent">
                         <div class="section-heading">
                             <div>
-                                <span class="section-kicker">Connection</span>
-                                <h3>NativeForms setup status</h3>
+                                <span class="section-kicker">Connection Status</span>
+                                <h3>{connectionCardTitle}</h3>
                             </div>
                         </div>
 
                         <div class="detail-list">
-                            <div class="detail-list__row"><span>Setup State</span><strong>{connectionSetupLabel}</strong></div>
-                            <div class="detail-list__row"><span>Connection</span><strong>{connectionLabel}</strong></div>
-                            <div class="detail-list__row"><span>Tenant Auth</span><strong>{tenantAuthLabel}</strong></div>
-                            <div class="detail-list__row"><span>Client Credentials</span><strong>{credentialsLabel}</strong></div>
+                            <div class="detail-list__row">
+                                <span>Secret key added to External Credential</span>
+                                <strong>{connection.secretKeyLabel}</strong>
+                            </div>
+                            <div class="detail-list__row">
+                                <span>Permission set access configured</span>
+                                <strong>{connection.permissionSetLabel}</strong>
+                            </div>
                         </div>
 
-                        <template if:true={showConnectAction}>
-                            <div class="action-row">
+                        <template if:true={connection.needsConnectAction}>
+                            <div class="helper-row">
+                                <p class="helper-copy">Finish setup on the Connect page.</p>
                                 <lightning-button
-                                    variant="brand"
-                                    label="Continue Connect"
+                                    variant="base"
+                                    label="Open Connect Page"
                                     onclick={handleOpenConnect}
                                 ></lightning-button>
-                                <p class="action-copy">Finish the connection flow before relying on live publish, prefill, submit, and logging behavior.</p>
-                            </div>
-                        </template>
-
-                        <template if:false={showConnectAction}>
-                            <div class="status-note status-note--success">
-                                Your NativeForms connection looks ready for normal use.
                             </div>
                         </template>
                     </article>
 
-                    <article class="overview-card">
+                    <article class="summary-card">
                         <div class="section-heading">
                             <div>
-                                <span class="section-kicker">Plan</span>
-                                <h3>Current access and entitlements</h3>
+                                <span class="section-kicker">Current Plan</span>
+                                <h3>{plan.label}</h3>
                             </div>
                         </div>
+
+                        <p class="card-copy">{plan.description}</p>
 
                         <div class="detail-list">
-                            <div class="detail-list__row"><span>Current Plan</span><strong>{planLabel}</strong></div>
-                            <div class="detail-list__row"><span>Detailed Logs</span><strong>{detailedLogsLabel}</strong></div>
-                            <div class="detail-list__row"><span>Retention</span><strong>{retentionLabel}</strong></div>
-                            <div class="detail-list__row"><span>Encryption</span><strong>{encryptionLabel}</strong></div>
-                        </div>
-                    </article>
-                </section>
-
-                <section class="overview-grid">
-                    <article class="overview-card">
-                        <div class="section-heading">
-                            <div>
-                                <span class="section-kicker">Features</span>
-                                <h3>Features available on this org</h3>
-                            </div>
+                            <div class="detail-list__row"><span>Forms Allowed</span><strong>{planMaxFormsLabel}</strong></div>
+                            <div class="detail-list__row"><span>Demo data installed</span><strong>{demo.installedLabel}</strong></div>
                         </div>
 
-                        <div class="feature-list">
-                            <template for:each={featureAccessList} for:item="feature">
-                                <div key={feature.key} class="feature-row">
-                                    <div>
-                                        <strong>{feature.label}</strong>
-                                        <p>{feature.detail}</p>
-                                    </div>
-                                    <span class={feature.badgeClass}>{feature.badgeLabel}</span>
-                                </div>
+                        <div class="action-row">
+                            <template if:false={demo.installed}>
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Install Demo Records"
+                                    onclick={handleInstall}
+                                    disabled={installDisabled}
+                                ></lightning-button>
+                            </template>
+
+                            <template if:true={showPlanUpgradeAction}>
+                                <lightning-button
+                                    variant="brand-outline"
+                                    label="Upgrade Plan"
+                                    onclick={handleOpenUpgrade}
+                                ></lightning-button>
                             </template>
                         </div>
                     </article>
 
-                    <article class="overview-card">
+                    <article class="summary-card">
                         <div class="section-heading">
                             <div>
-                                <span class="section-kicker">Getting Started</span>
-                                <h3>Demo data and sample assets</h3>
+                                <span class="section-kicker">Usage &amp; Limits</span>
+                                <h3>Current workspace usage</h3>
                             </div>
                         </div>
 
                         <div class="detail-list">
-                            <div class="detail-list__row"><span>Demo Data</span><strong>{installedLabel}</strong></div>
-                            <div class="detail-list__row"><span>Installed Version</span><strong>{demoDataVersionValue}</strong></div>
-                            <div class="detail-list__row"><span>Themes</span><strong>{installedThemeCount} / {targetThemeCount}</strong></div>
-                            <div class="detail-list__row"><span>Contacts</span><strong>{installedContactCount} / {targetContactCount}</strong></div>
-                            <div class="detail-list__row"><span>Cases</span><strong>{installedCaseCount} / {targetCaseCount}</strong></div>
-                            <div class="detail-list__row"><span>Forms</span><strong>{installedFormCount} / {targetFormCount}</strong></div>
-                        </div>
-
-                        <p class="demo-copy">
-                            The demo pack creates four themes, two contacts, four cases, and two sample forms to help you explore the product safely.
-                        </p>
-
-                        <div class="action-row">
-                            <lightning-button
-                                variant="brand-outline"
-                                label="Install Demo Records"
-                                onclick={handleInstall}
-                                disabled={installDisabled}
-                            ></lightning-button>
+                            <div class="detail-list__row"><span>Forms</span><strong>{usage.formsUsageLabel}</strong></div>
+                            <div class="detail-list__row"><span>Submissions This Month</span><strong>{usage.submissionsUsageLabel}</strong></div>
+                            <div class="detail-list__row"><span>Active Users</span><strong>{usage.activeUsersLabel}</strong></div>
                         </div>
                     </article>
                 </section>
+
+                <template if:true={showUpgradeSection}>
+                    <section class="section-block section-block--upgrade">
+                        <div class="section-heading section-heading--wide">
+                            <div>
+                                <span class="section-kicker">Unlock More</span>
+                                <h3>Upgrade when you are ready for broader production use</h3>
+                            </div>
+                        </div>
+
+                        <div class="upgrade-list">
+                            <template for:each={upgradeFeatures} for:item="feature">
+                                <div key={feature.key} class="upgrade-list__row">
+                                    <span class="upgrade-list__dot"></span>
+                                    <span class="upgrade-list__body">
+                                        <span class="upgrade-list__label">{feature.label}</span>
+                                        <template if:true={feature.detail}>
+                                            <span class="upgrade-list__detail">{feature.detail}</span>
+                                        </template>
+                                    </span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="section-actions">
+                            <lightning-button
+                                variant="neutral"
+                                label="Compare Plans"
+                                onclick={handleOpenComparePlans}
+                            ></lightning-button>
+                            <lightning-button
+                                variant="brand"
+                                label="Upgrade Plan"
+                                onclick={handleOpenUpgrade}
+                            ></lightning-button>
+                        </div>
+                    </section>
+                </template>
             </template>
         </div>
     </lightning-card>

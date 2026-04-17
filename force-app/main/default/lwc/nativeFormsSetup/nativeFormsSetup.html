@@ -1,21 +1,21 @@
 <template>
-    <lightning-card title="NativeForms Setup" icon-name="custom:custom18">
+    <lightning-card title="TwinaForms Setup" icon-name="custom:custom18">
         <div class="slds-p-horizontal_medium slds-p-bottom_medium">
             <p class="slds-text-body_regular slds-m-bottom_medium">
-                Connect this Salesforce org to NativeForms so AWS can publish forms and run prefill and submit securely.
+                Connect this Salesforce org to TwinaForms so AWS can publish forms and run prefill and submit securely.
             </p>
 
             <div class="instruction-box slds-m-bottom_medium">
-                <p class="instruction-title">Action Required To Use NativeForms</p>
+                <p class="instruction-title">Action Required To Use TwinaForms</p>
                 <ol class="instruction-list">
-                    <li>Open the <strong>NativeForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
+                    <li>Open the <strong>TwinaForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
                     <li>In that permission set, open <strong>External Credential Principal Access</strong> and enable both principals:
-                        <div class="instruction-detail">`NativeFormsBootstrap / NativeFormsBootstrapPrincipal`</div>
-                        <div class="instruction-detail">`NativeFormsLambdaAuth / NativeFormsSharedSecret`</div>
+                        <div class="instruction-detail">`TwinaForms Bootstrap / NativeFormsBootstrapPrincipal`</div>
+                        <div class="instruction-detail">`TwinaForms Shared Secret / NativeFormsSharedSecret`</div>
                     </li>
                     <li>Open <strong>External Client App Manager</strong>, open <strong>NativForms</strong>, then copy the <strong>Consumer Key</strong> and <strong>Consumer Secret</strong> from the app settings.</li>
-                    <li>Enter the admin email plus the Salesforce client id and secret below, then click <strong>Connect NativeForms</strong>.</li>
-                    <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>NativeForms</strong>, then open its external credential principal <strong>NativeFormsSharedSecret</strong>.</li>
+                    <li>Enter the admin email plus the Salesforce client id and secret below, then click <strong>Connect TwinaForms</strong>.</li>
+                    <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>TwinaForms</strong>, then open its external credential principal <strong>NativeFormsSharedSecret</strong>.</li>
                     <li>Add or edit the authentication parameter named <strong>secret</strong> and paste the tenant secret value there.</li>
                 </ol>
             </div>
@@ -150,7 +150,7 @@
             <template if:true={connectUrl}>
                 <div class="result-box slds-m-top_medium">
                     <p class="slds-text-title_bold">Connection Ready</p>
-                    <p class="result-text">NativeForms generated the Salesforce connection URL successfully.</p>
+                    <p class="result-text">TwinaForms generated the Salesforce connection URL successfully.</p>
                 </div>
             </template>
 

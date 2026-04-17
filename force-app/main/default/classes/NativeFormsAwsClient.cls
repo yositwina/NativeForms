@@ -6,6 +6,7 @@ public with sharing class NativeFormsAwsClient {
     public class PresignRequest {
         public String orgId;
         public String formId;
+        public String formSlug;
         public String versionId;
         public String fileName;
         public String contentType;
@@ -17,10 +18,13 @@ public with sharing class NativeFormsAwsClient {
         public String putUrl;
         public String publicUrl;
         public String key;
+        public String companySlug;
+        public String formSlug;
         public Long expiresAt;
         public String error;
     }
 
+    @TestVisible
     public static String namedCredentialName() {
         if (cachedNc != null) {
             return cachedNc;
@@ -35,6 +39,11 @@ public with sharing class NativeFormsAwsClient {
             : ns + '__' + BASE_NC_NAME;
 
         return cachedNc;
+    }
+
+    @TestVisible
+    static void resetNamedCredentialCache() {
+        cachedNc = null;
     }
 
     public static PresignResponse presignHtml(PresignRequest requestBody) {

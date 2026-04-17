@@ -4,10 +4,10 @@
         <headerColor>#1D4ED8</headerColor>
         <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
     </brand>
-    <description>Administrative app for NativeForms configuration, versioning, actions, and publication history.</description>
+    <description>Administrative app for TwinaForms configuration, versioning, actions, and publication history.</description>
     <formFactors>Large</formFactors>
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
-    <label>NativeForms Admin</label>
+    <label>TwinaForms Admin</label>
     <navType>Standard</navType>
     <tabs>NativeForms_Admin_Features</tabs>
     <tabs>NativeForms_Guided_Setup</tabs>

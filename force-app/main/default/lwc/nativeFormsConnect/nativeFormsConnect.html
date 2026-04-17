@@ -1,8 +1,8 @@
 <template>
-    <lightning-card title="NativeForms Connect" icon-name="custom:custom18">
+    <lightning-card title="TwinaForms Connect" icon-name="custom:custom18">
         <div class="slds-p-horizontal_medium slds-p-bottom_medium">
             <p class="slds-text-body_regular slds-m-bottom_medium">
-                Connect this Salesforce org to NativeForms so AWS can publish forms and run prefill and submit securely.
+                Connect this Salesforce org to TwinaForms so AWS can publish forms and run prefill and submit securely.
             </p>
 
             <p class="connect-version">Page Version {connectVersion}</p>
@@ -37,13 +37,13 @@
                     <span class="slds-assistive-text">error</span>
                     <div>
                         <h2 class="slds-text-heading_small slds-m-bottom_x-small">What To Do First</h2>
-                        <p class="slds-m-bottom_x-small">An admin needs to finish the NativeForms access setup before this page can connect the org.</p>
+                        <p class="slds-m-bottom_x-small">An admin needs to finish the TwinaForms access setup before this page can connect the org.</p>
                         <ol class="instruction-list">
-                            <li>Open the <strong>NativeForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
+                            <li>Open the <strong>TwinaForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
                             <li>Inside that permission set, open <strong>External Credential Principal Access</strong>.</li>
                             <li>Enable both principals:
-                                <div class="instruction-detail">NativeFormsBootstrap / NativeFormsBootstrapPrincipal</div>
-                                <div class="instruction-detail">NativeFormsLambdaAuth / NativeFormsSharedSecret</div>
+                                <div class="instruction-detail">TwinaForms Bootstrap / NativeFormsBootstrapPrincipal</div>
+                                <div class="instruction-detail">TwinaForms Shared Secret / NativeFormsSharedSecret</div>
                             </li>
                             <li>Return here and click <strong>Generate Secret</strong> again.</li>
                         </ol>
@@ -58,7 +58,7 @@
             <template if:true={showTenantSetupCompleteBanner}>
                 <div class="stage-complete slds-m-bottom_medium">
                     <p class="stage-complete__title">Step 1 Complete</p>
-                    <p class="stage-complete__text">Tenant secret is verified and NativeForms can authenticate this org.</p>
+                    <p class="stage-complete__text">Tenant secret is verified and TwinaForms can authenticate this org.</p>
                 </div>
             </template>
 
@@ -77,7 +77,7 @@
                             <li class="instruction-step">
                                 <div class="instruction-step__content">
                                     <p class="instruction-text-block">
-                                        Open the <strong>NativeForms Admin</strong> permission set in Salesforce Setup and assign it to the admins who will manage the app.
+                                        Open the <strong>TwinaForms Admin</strong> permission set in Salesforce Setup and assign it to the admins who will manage the app.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
                                         In that permission set, open <strong>External Credential Principal Access</strong>.
@@ -102,8 +102,8 @@
                                     <p class="instruction-text-block">
                                         Move these two principals from left to right, then click <strong>Save</strong>.
                                     </p>
-                                    <div class="instruction-detail">NativeFormsBootstrap / NativeFormsBootstrapPrincipal</div>
-                                    <div class="instruction-detail">NativeFormsLambdaAuth / NativeFormsSharedSecret</div>
+                                    <div class="instruction-detail">TwinaForms Bootstrap / NativeFormsBootstrapPrincipal</div>
+                                    <div class="instruction-detail">TwinaForms Shared Secret / NativeFormsSharedSecret</div>
                                     <div class="instruction-toggle">
                                         <lightning-button
                                             variant="base"
@@ -120,7 +120,7 @@
                                 </template>
                             </li>
                             <li>Click <strong>Generate Secret</strong> below.</li>
-                            <li>Add the generated tenant secret to <strong>Named Credentials &gt; NativeForms &gt; NativeFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
+                            <li>Add the generated tenant secret to <strong>Named Credentials &gt; TwinaForms &gt; NativeFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
                             <li>Click <strong>Test Tenant Secret</strong> to verify the setup.</li>
                         </ol>
                     </div>
@@ -202,7 +202,7 @@
                                         Open <strong>External Client App Manager</strong>.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
-                                        Choose the <strong>NativeForms</strong> app.
+                                        Choose the <strong>TwinaForms</strong> app.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
                                         Go to the <strong>Settings</strong> tab, then under <strong>OAuth Settings</strong> click the button to view the <strong>Consumer Key</strong> and <strong>Consumer Secret</strong>.
@@ -223,7 +223,7 @@
                                 </template>
                             </li>
                             <li>Paste those values below.</li>
-                            <li>Click <strong>Connect NativeForms</strong>.</li>
+                            <li>Click <strong>Connect TwinaForms</strong>.</li>
                             <li>Finish authentication in the new Salesforce window. This page will keep checking automatically, and you can also click <strong>Refresh Connection Status</strong>.</li>
                         </ol>
                     </div>
@@ -255,7 +255,7 @@
                         <template if:true={showConnectAction}>
                             <lightning-button
                                 variant="brand"
-                                label="Connect NativeForms"
+                                label="Connect TwinaForms"
                                 onclick={handleConnect}
                                 disabled={actionDisabled}>
                             </lightning-button>
@@ -274,7 +274,7 @@
                         <div class="awaiting-auth-box slds-m-top_medium">
                             <p class="awaiting-auth-box__title">Finish in the Salesforce window</p>
                             <p class="awaiting-auth-box__text">
-                                NativeForms opened the Salesforce authentication page in a new tab or window.
+                                TwinaForms opened the Salesforce authentication page in a new tab or window.
                             </p>
                             <p class="awaiting-auth-box__text">
                                 After you finish authentication there, this page will keep checking automatically. You can also click <strong>Refresh Connection Status</strong>.

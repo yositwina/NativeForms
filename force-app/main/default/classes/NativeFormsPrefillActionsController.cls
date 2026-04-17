@@ -280,6 +280,7 @@ public with sharing class NativeFormsPrefillActionsController {
             LIMIT 1
         ];
         ensureActionVersionEditable(actionRecord.Form_Version__c);
+        enforcePrefillEntitlements(inputValue.configJson);
 
         actionRecord.Command_Key__c = String.isBlank(inputValue.actionKey)
             ? buildActionKey(inputValue.storeResultAs, inputValue.objectApiName)
@@ -431,6 +432,37 @@ public with sharing class NativeFormsPrefillActionsController {
         return String.valueOf(value).toLowerCase() == 'true';
     }
 
+    private static void enforcePrefillEntitlements(String configJson) {
+        Map<String, Object> config = parseJsonMap(configJson);
+        List<Object> conditions = listValue(config.get('conditions'));
+
+        if (conditions.size() > 1 && !NativeFormsFeatureFlags.isProConditionLogicEnabled()) {
+            throw new AuraHandledException('Advanced condition logic is not available on your current TwinaForms plan.');
+        }
+
+        if (containsAliasValueSource(conditions) && !NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled()) {
+            throw new AuraHandledException('Prefill alias references are not available on your current TwinaForms plan.');
+        }
+    }
+
+    private static Boolean containsAliasValueSource(List<Object> conditions) {
+        for (Object conditionEntry : conditions) {
+            if (!(conditionEntry instanceof Map<String, Object>)) {
+                continue;
+            }
+
+            Map<String, Object> condition = (Map<String, Object>) conditionEntry;
+            if (stringValue(condition.get('valueSource')) == 'alias') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Object> listValue(Object value) {
+        return value instanceof List<Object> ? (List<Object>) value : new List<Object>();
+    }
+
     private static String buildActionKey(String aliasValue, String objectApiName) {
         String aliasSeed = String.isBlank(aliasValue) ? '' : aliasValue.replaceAll('[^a-zA-Z0-9]', '');
         if (!String.isBlank(aliasSeed)) {
@@ -505,7 +537,7 @@ public with sharing class NativeFormsPrefillActionsController {
             LIMIT 1
         ];
         if (versionRecord.Version_Status__c == 'Published') {
-            throw new AuraHandledException('Published versions are read-only. Open the latest draft in NativeForms Designer.');
+            throw new AuraHandledException('Published versions are read-only. Open the latest draft in TwinaForms Designer.');
         }
     }
 

@@ -1,6 +1,7 @@
 import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
 import updateFormSettings from '@salesforce/apex/NativeFormsDesignerController.updateFormSettings';
+import createFormWithDraftVersion from '@salesforce/apex/NativeFormsDesignerController.createFormWithDraftVersion';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPicklistFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistFieldOptions';
 import getPicklistValueOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistValueOptions';
@@ -18,7 +19,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v8.7';
+    designerVersion = 'v9.4';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -39,6 +40,9 @@ export default class NativeFormsDesigner extends LightningElement {
     dragSectionTarget = null;
     autoSaveTimeoutId = null;
     publishResult = null;
+    showNewFormModal = false;
+    newFormDescription = '';
+    isCreatingForm = false;
 
     @track formOptions = [];
     @track versionOptions = [];
@@ -303,6 +307,27 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.publishResult?.success ? 'Publish completed' : 'Publish failed';
     }
 
+    get publishResultInlineClass() {
+        return this.publishResult?.success ? 'designer-topbar__result designer-topbar__result--success' : 'designer-topbar__result designer-topbar__result--error';
+    }
+
+    get publishResultInlineMessage() {
+        if (!this.publishResult) {
+            return '';
+        }
+        return this.publishResult.success
+            ? 'Published successfully.'
+            : (this.publishResult.message || 'Publish failed.');
+    }
+
+    get publishResultLinkLabel() {
+        return this.publishResult?.success ? 'Open published form' : 'Open form';
+    }
+
+    get newFormCreateDisabled() {
+        return this.isCreatingForm || !String(this.newFormDescription || '').trim();
+    }
+
     get isSelectedVersionReadOnly() {
         return this.selectedVersionStatus === 'Published';
     }
@@ -423,8 +448,8 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get selectedDateFormatHelpText() {
         return this.editorDateDisplayFormat === 'eu'
-            ? 'Users will enter dates as DD/MM/YYYY. NativeForms will normalize the submitted value before Salesforce submit.'
-            : 'Users will enter dates as MM/DD/YYYY. NativeForms will normalize the submitted value before Salesforce submit.';
+            ? 'Users will enter dates as DD/MM/YYYY. TwinaForms will normalize the submitted value before Salesforce submit.'
+            : 'Users will enter dates as MM/DD/YYYY. TwinaForms will normalize the submitted value before Salesforce submit.';
     }
 
     get selectedElementSupportsTextValidation() {
@@ -950,6 +975,51 @@ export default class NativeFormsDesigner extends LightningElement {
         this.loadWorkspace(this.selectedFormId, this.selectedVersionId);
     }
 
+    handleOpenNewFormModal() {
+        this.newFormDescription = '';
+        this.showNewFormModal = true;
+    }
+
+    handleCloseNewFormModal() {
+        if (this.isCreatingForm) {
+            return;
+        }
+        this.showNewFormModal = false;
+        this.newFormDescription = '';
+    }
+
+    handleNewFormDescriptionChange(event) {
+        this.newFormDescription = event.detail.value || '';
+    }
+
+    async handleCreateNewForm() {
+        if (this.newFormCreateDisabled) {
+            return;
+        }
+
+        this.isCreatingForm = true;
+        this.errorMessage = '';
+        try {
+            const result = await createFormWithDraftVersion({
+                description: this.newFormDescription,
+                themeId: this.selectedThemeId || null
+            });
+            this.selectedFormId = result.formId;
+            this.selectedVersionId = result.versionId;
+            this.selectedElementId = null;
+            this.publishResult = null;
+            this.storeSelectedVersion(result.versionId);
+            this.showNewFormModal = false;
+            this.newFormDescription = '';
+            await this.loadWorkspace(result.formId, result.versionId);
+            this.showToast('Form created', `${result.formName} is ready in Draft mode.`, 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isCreatingForm = false;
+        }
+    }
+
     async saveFormSettings(nextValues, successMessage) {
         if (!this.selectedFormId) {
             return;
@@ -1015,7 +1085,7 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
         if (elementType === 'repeatGroup' && !this.enableProRepeatGroups) {
-            this.showToast('Pro feature', 'Enable Pro Repeat Groups in NativeForms Admin Features first.', 'warning');
+            this.showToast('Pro feature', 'Enable Pro Repeat Groups in TwinaForms Admin Features first.', 'warning');
             return;
         }
         await this.addElementType(elementType);

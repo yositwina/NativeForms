@@ -2,6 +2,7 @@ import {
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
+  QueryCommand,
   ScanCommand
 } from "@aws-sdk/client-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
@@ -15,11 +16,51 @@ const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
 const AUDIT_TABLE = process.env.AUDIT_TABLE || "NativeFormsAdminAudit";
 const SUPPORT_TABLE = process.env.SUPPORT_TABLE || "NativeFormsSupportEvents";
 const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
+const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
+const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const REQUIRE_ADMIN_AUTH = String(process.env.REQUIRE_ADMIN_AUTH || "").toLowerCase() === "true";
 const EDITABLE_PLAN_CODES = new Set(["free", "trial", "starter", "pro"]);
 const DEFAULT_STATUS_ALERT_EMAIL = process.env.DEFAULT_STATUS_ALERT_EMAIL || "yosi@harmony-it.co.il";
 const SES_FROM = process.env.SES_FROM || "yosi@harmony-it.co.il";
 const DEFAULT_STATUS_RECOMPUTE_TIME_UTC = process.env.DEFAULT_STATUS_RECOMPUTE_TIME_UTC || "02:00";
+const FEATURE_FLAG_METADATA = {
+  enableProConditionLogic: {
+    label: "Conditional Logic",
+    description: "Show, hide, or control behavior based on multiple form conditions and grouped logic."
+  },
+  enableProRepeatGroups: {
+    label: "Repeated Records Table",
+    description: "Collect and submit multiple rows of related records, like products, household members, or case items, in one form."
+  },
+  enableProPrefillAliasReferences: {
+    label: "Prefill Result References",
+    description: "Reuse prefill results across new Prefill actions."
+  },
+  enableProAdvancedSubmitModes: {
+    label: "Advanced Submit Actions",
+    description: "Use richer submit flows like find-and-update or update-by-id for more advanced Salesforce writeback behavior."
+  },
+  enableProFormulaFields: {
+    label: "Calculated Fields",
+    description: "Generate values automatically inside the form instead of asking users to enter them manually."
+  },
+  enableProPostSubmitAutoLink: {
+    label: "Post Submit Auto Link",
+    description: "Automatically link related Salesforce records after submission based on configured matching rules."
+  },
+  enableProSfSecretCodeAuth: {
+    label: "Secret Code Verification",
+    description: "Add an extra verification step with a secret code for more sensitive workflows."
+  },
+  enableProLoadFile: {
+    label: "File Load Support",
+    description: "Support advanced file-loading behavior as part of the form experience and submission flow."
+  },
+  enableDetailedSubmissionLogs: {
+    label: "Detailed Submission Logs",
+    description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."
+  }
+};
 
 const DEFAULT_PLANS = [
   {
@@ -29,6 +70,7 @@ const DEFAULT_PLANS = [
     isActive: true,
     durationType: "forever",
     durationDays: null,
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
     limits: {
       maxSfUsers: 1,
       maxForms: 1,
@@ -54,6 +96,7 @@ const DEFAULT_PLANS = [
     isActive: true,
     durationType: "fixed_days",
     durationDays: 30,
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
     limits: {
       maxSfUsers: 1,
       maxForms: 5,
@@ -79,6 +122,7 @@ const DEFAULT_PLANS = [
     isActive: true,
     durationType: "forever",
     durationDays: null,
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
     limits: {
       maxSfUsers: 1,
       maxForms: 5,
@@ -104,6 +148,7 @@ const DEFAULT_PLANS = [
     isActive: true,
     durationType: "forever",
     durationDays: null,
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
     limits: {
       maxSfUsers: null,
       maxForms: null,
@@ -317,6 +362,82 @@ async function scanAllItemsSafe(tableName) {
   }
 }
 
+function getCurrentMonthRangeUtc() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString();
+  const end = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)).toISOString();
+  return { start, end };
+}
+
+async function countTenantSubmissionsForCurrentMonth(orgId) {
+  if (!orgId) {
+    return 0;
+  }
+
+  const normalizedOrgId = normalizeOrgId(orgId);
+  const { start, end } = getCurrentMonthRangeUtc();
+  let count = 0;
+  let exclusiveStartKey;
+
+  do {
+    const result = await dynamoClient.send(new QueryCommand({
+      TableName: SUBMISSION_LOG_TABLE,
+      KeyConditionExpression: "tenantId = :tenantId AND submittedAtSubmissionId BETWEEN :fromKey AND :toKey",
+      ExpressionAttributeValues: {
+        ":tenantId": { S: normalizedOrgId },
+        ":fromKey": { S: `${start}#` },
+        ":toKey": { S: `${end}#\uffff` }
+      },
+      Select: "COUNT",
+      ExclusiveStartKey: exclusiveStartKey
+    }));
+
+    count += Number(result?.Count || 0);
+    exclusiveStartKey = result?.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return count;
+}
+
+async function loadTenantUsageCounters(tenants) {
+  const activeFormsByOrgId = new Map();
+  const formItems = await scanAllItemsSafe(FORM_SECURITY_TABLE);
+
+  for (const item of formItems) {
+    const orgId = normalizeOrgId(item?.orgId);
+    const status = String(item?.status || "").toLowerCase();
+    if (!orgId || status !== "published") {
+      continue;
+    }
+    activeFormsByOrgId.set(orgId, (activeFormsByOrgId.get(orgId) || 0) + 1);
+  }
+
+  const submissionsMonthByOrgId = new Map();
+  for (const tenant of tenants || []) {
+    const orgId = normalizeOrgId(tenant?.orgId);
+    if (!orgId || submissionsMonthByOrgId.has(orgId)) {
+      continue;
+    }
+
+    try {
+      submissionsMonthByOrgId.set(orgId, await countTenantSubmissionsForCurrentMonth(orgId));
+    } catch (error) {
+      if (isTableUnavailableError(error)) {
+        submissionsMonthByOrgId.set(orgId, 0);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  return {
+    activeFormsByOrgId,
+    submissionsMonthByOrgId
+  };
+}
+
 async function putItemIfTableExists(tableName, item) {
   try {
     await putItem(tableName, item);
@@ -340,6 +461,7 @@ async function getAdminSettings() {
   return {
     statusAlertEmailRecipient: normalizeOptionalString(stored?.statusAlertEmailRecipient) || DEFAULT_STATUS_ALERT_EMAIL,
     statusRecomputeTimeUtc: normalizeTimeOfDay(stored?.statusRecomputeTimeUtc) || DEFAULT_STATUS_RECOMPUTE_TIME_UTC,
+    featureMetadata: normalizeFeatureMetadata(stored?.featureMetadata),
     updatedAt: stored?.updatedAt || null,
     source: stored ? "dynamodb" : "default"
   };
@@ -358,6 +480,7 @@ async function saveAdminSettings(settings) {
     settingKey: "admin_notifications",
     statusAlertEmailRecipient: normalizeOptionalString(settings?.statusAlertEmailRecipient) || DEFAULT_STATUS_ALERT_EMAIL,
     statusRecomputeTimeUtc: normalizeTimeOfDay(settings?.statusRecomputeTimeUtc) || DEFAULT_STATUS_RECOMPUTE_TIME_UTC,
+    featureMetadata: normalizeFeatureMetadata(settings?.featureMetadata),
     updatedAt: getNowIso()
   };
 
@@ -366,9 +489,33 @@ async function saveAdminSettings(settings) {
   return {
     statusAlertEmailRecipient: record.statusAlertEmailRecipient,
     statusRecomputeTimeUtc: record.statusRecomputeTimeUtc,
+    featureMetadata: record.featureMetadata,
     updatedAt: record.updatedAt,
     source: "dynamodb"
   };
+}
+
+function normalizeFeatureMetadata(inputValue) {
+  const output = {};
+
+  for (const [key, defaults] of Object.entries(FEATURE_FLAG_METADATA)) {
+    const incoming = inputValue && typeof inputValue === "object" ? inputValue[key] : null;
+    const legacyLabel = inputValue && typeof inputValue === "object" ? inputValue?.[`${key}Label`] : null;
+
+    output[key] = {
+      label: normalizeOptionalString(incoming?.label) || normalizeOptionalString(legacyLabel) || defaults.label,
+      description: normalizeOptionalString(incoming?.description) || defaults.description
+    };
+  }
+
+  return output;
+}
+
+function getFeatureFlagLabelsFromMetadata(featureMetadata) {
+  const normalizedMetadata = normalizeFeatureMetadata(featureMetadata);
+  return Object.fromEntries(
+    Object.entries(normalizedMetadata).map(([key, value]) => [key, value.label])
+  );
 }
 
 function normalizeTimeOfDay(value) {
@@ -479,6 +626,12 @@ function normalizePlanDefinition(plan, existingPlan = {}) {
     ...existingPlan?.featureFlags,
     ...plan?.featureFlags
   };
+  const featureLabels = {
+    ...getFeatureFlagLabelsFromMetadata(FEATURE_FLAG_METADATA),
+    ...(defaultPlan?.featureLabels || {}),
+    ...(existingPlan?.featureLabels || {}),
+    ...(plan?.featureLabels || {})
+  };
 
   return {
     planCode,
@@ -489,6 +642,7 @@ function normalizePlanDefinition(plan, existingPlan = {}) {
     durationDays: plan.durationDays ?? existingPlan.durationDays ?? defaultPlan.durationDays ?? null,
     sortOrder: plan.sortOrder ?? existingPlan.sortOrder ?? defaultPlan.sortOrder ?? getDefaultPlanSortOrder(planCode),
     limits,
+    featureLabels,
     featureFlags,
     updatedAt: new Date().toISOString()
   };
@@ -902,19 +1056,31 @@ async function loadPlans() {
 async function syncTenantStatuses(tenants, plansByCode) {
   const details = [];
   let updatedCount = 0;
+  const usageCounters = await loadTenantUsageCounters(tenants);
 
   for (const tenant of tenants) {
-    const detail = buildTenantDetail(tenant, plansByCode);
+    const orgId = normalizeOrgId(tenant?.orgId);
+    const countedActiveForms = usageCounters.activeFormsByOrgId.get(orgId) || 0;
+    const countedSubmissionsMonth = usageCounters.submissionsMonthByOrgId.get(orgId) || 0;
+    const tenantWithUsage = {
+      ...tenant,
+      activeFormsCount: countedActiveForms,
+      submissionsMonth: countedSubmissionsMonth
+    };
+
+    const detail = buildTenantDetail(tenantWithUsage, plansByCode);
     details.push(detail);
 
     const needsStatusSync = tenant.status !== detail.status
       || !isSameValue(tenant.alertType, detail.alertType)
       || tenant.statusReason !== detail.statusReason
-      || tenant.statusSource !== detail.statusSource;
+      || tenant.statusSource !== detail.statusSource
+      || (parseNumberOrNull(tenant.activeFormsCount) ?? 0) !== countedActiveForms
+      || (parseNumberOrNull(tenant.submissionsMonth) ?? 0) !== countedSubmissionsMonth;
 
     if (needsStatusSync) {
       const syncedTenant = {
-        ...tenant,
+        ...tenantWithUsage,
         status: detail.status,
         isActive: detail.isActive,
         alertType: detail.alertType,
@@ -928,7 +1094,7 @@ async function syncTenantStatuses(tenants, plansByCode) {
       };
 
       await putItem(TENANT_TABLE, syncedTenant);
-      await notifyStatusChangeIfNeeded(buildTenantDetail(tenant, plansByCode), detail);
+      await notifyStatusChangeIfNeeded(buildTenantDetail(tenantWithUsage, plansByCode), detail);
       updatedCount += 1;
     }
   }
@@ -975,6 +1141,25 @@ async function runScheduledStatusRefresh() {
     configuredTimeUtc: recomputeTime,
     updatedCount: result.updatedCount,
     totalCustomers: result.details.length
+  };
+}
+
+async function runManualStatusRefresh() {
+  const settings = await getAdminSettings();
+  const recomputeTime = normalizeTimeOfDay(settings.statusRecomputeTimeUtc) || DEFAULT_STATUS_RECOMPUTE_TIME_UTC;
+  const plansResult = await loadPlans();
+  const plansByCode = getPlanMap(plansResult.items);
+  const tenants = await scanAllItems(TENANT_TABLE);
+  const result = await syncTenantStatuses(tenants, plansByCode);
+
+  return {
+    ran: true,
+    reason: "Manual admin data refresh executed.",
+    configuredTimeUtc: recomputeTime,
+    updatedCount: result.updatedCount,
+    totalCustomers: result.details.length,
+    triggeredAt: getNowIso(),
+    triggerSource: "manual_admin"
   };
 }
 
@@ -1327,12 +1512,17 @@ export const handler = async (event) => {
       const body = parseJsonBody(event?.body);
       const settings = await saveAdminSettings({
         statusAlertEmailRecipient: body.statusAlertEmailRecipient,
-        statusRecomputeTimeUtc: body.statusRecomputeTimeUtc
+        statusRecomputeTimeUtc: body.statusRecomputeTimeUtc,
+        featureMetadata: body.featureMetadata
       });
 
       return jsonResponse(200, success({
         settings
       }));
+    }
+
+    if (method === "POST" && parts.length === 2 && parts[0] === "admin" && parts[1] === "refresh-data") {
+      return jsonResponse(200, success(await runManualStatusRefresh()));
     }
 
     if (method === "POST" && parts.length === 4 && parts[0] === "admin" && parts[1] === "tenants" && parts[3] === "profile") {

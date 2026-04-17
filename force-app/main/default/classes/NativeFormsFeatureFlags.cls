@@ -1,41 +1,33 @@
 public with sharing class NativeFormsFeatureFlags {
     public static Boolean isProConditionLogicEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Condition_Logic__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProConditionLogic');
     }
 
     public static Boolean isProRepeatGroupsEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Repeat_Groups__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProRepeatGroups');
     }
 
     public static Boolean isProPrefillAliasReferencesEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Prefill_Alias_References__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProPrefillAliasReferences');
     }
 
     public static Boolean isProAdvancedSubmitModesEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Advanced_Submit_Modes__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProAdvancedSubmitModes');
     }
 
     public static Boolean isProFormulaFieldsEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Formula_Fields__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProFormulaFields');
     }
 
     public static Boolean isProPostSubmitAutoLinkEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProPostSubmitAutoLink');
     }
 
     public static Boolean isProSfSecretCodeAuthEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_SF_Secret_Code_Auth__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSfSecretCodeAuth');
     }
 
     public static Boolean isProLoadFileEnabled() {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        return config != null && config.Enable_Pro_Load_File__c;
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProLoadFile');
     }
 }

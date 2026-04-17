@@ -4,10 +4,10 @@
         <headerColor>#0F6CBD</headerColor>
         <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
     </brand>
-    <description>Customer-facing NativeForms app for onboarding, configuration, and form publishing.</description>
+    <description>Customer-facing TwinaForms app for onboarding, configuration, and form publishing.</description>
     <formFactors>Large</formFactors>
     <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
-    <label>NativeForms</label>
+    <label>TwinaForms</label>
     <navType>Standard</navType>
     <tabs>NativeForms_Home</tabs>
     <tabs>NativeForms_Designer</tabs>

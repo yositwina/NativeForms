@@ -309,6 +309,7 @@ public with sharing class NativeFormsSubmitActionsController {
             LIMIT 1
         ];
         ensureActionVersionEditable(actionRecord.Form_Version__c);
+        enforceSubmitEntitlements(inputValue.commandType, inputValue.configJson);
 
         actionRecord.Command_Key__c = String.isBlank(inputValue.actionKey)
             ? buildActionKey(inputValue.objectApiName, inputValue.commandType)
@@ -446,6 +447,66 @@ public with sharing class NativeFormsSubmitActionsController {
         return String.valueOf(value).toLowerCase() == 'true';
     }
 
+    private static void enforceSubmitEntitlements(String commandType, String configJson) {
+        Map<String, Object> config = parseJsonMap(configJson);
+        List<Object> conditions = listValue(config.get('conditions'));
+
+        if (new Set<String>{ 'updateById', 'findAndUpdate' }.contains(commandType)
+            && !NativeFormsFeatureFlags.isProAdvancedSubmitModesEnabled()) {
+            throw new AuraHandledException('Advanced submit modes are not available on your current TwinaForms plan.');
+        }
+
+        if (commandType == 'upsertMany' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
+            throw new AuraHandledException('Repeat Groups are not available on your current TwinaForms plan.');
+        }
+
+        if (conditions.size() > 1 && !NativeFormsFeatureFlags.isProConditionLogicEnabled()) {
+            throw new AuraHandledException('Advanced condition logic is not available on your current TwinaForms plan.');
+        }
+
+        if (containsAliasValueSource(conditions) && !NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled()) {
+            throw new AuraHandledException('Prefill alias references are not available on your current TwinaForms plan.');
+        }
+
+        if (stringValue(config.get('relationshipValueSource')) == 'alias'
+            && !String.isBlank(stringValue(config.get('relationshipValueText')))
+            && !NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled()) {
+            throw new AuraHandledException('Prefill alias references are not available on your current TwinaForms plan.');
+        }
+
+        if (looksLikeAliasExpression(stringValue(config.get('recordIdSource')))
+            && !NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled()) {
+            throw new AuraHandledException('Prefill alias references are not available on your current TwinaForms plan.');
+        }
+    }
+
+    private static Boolean containsAliasValueSource(List<Object> conditions) {
+        for (Object conditionEntry : conditions) {
+            if (!(conditionEntry instanceof Map<String, Object>)) {
+                continue;
+            }
+
+            Map<String, Object> condition = (Map<String, Object>) conditionEntry;
+            if (stringValue(condition.get('valueSource')) == 'alias') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Boolean looksLikeAliasExpression(String rawValue) {
+        String value = String.isBlank(rawValue) ? null : rawValue.trim();
+        if (String.isBlank(value) || !value.startsWith('{') || !value.endsWith('}')) {
+            return false;
+        }
+
+        return !value.startsWith('{params.') && !value.startsWith('{input.');
+    }
+
+    private static List<Object> listValue(Object value) {
+        return value instanceof List<Object> ? (List<Object>) value : new List<Object>();
+    }
+
     private static String buildActionKey(String objectApiName, String commandType) {
         String objectSeed = String.isBlank(objectApiName) ? 'Record' : objectApiName.replaceAll('[^a-zA-Z0-9]', '');
         String actionSeed = String.isBlank(commandType) ? 'create' : commandType.replaceAll('[^a-zA-Z0-9]', '');
@@ -535,7 +596,7 @@ public with sharing class NativeFormsSubmitActionsController {
             LIMIT 1
         ];
         if (versionRecord.Version_Status__c == 'Published') {
-            throw new AuraHandledException('Published versions are read-only. Open the latest draft in NativeForms Designer.');
+            throw new AuraHandledException('Published versions are read-only. Open the latest draft in TwinaForms Designer.');
         }
     }
 

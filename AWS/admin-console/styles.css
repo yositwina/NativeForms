@@ -1065,7 +1065,7 @@ button:focus-visible {
 .toggle-card {
   display: flex;
   gap: 0.65rem;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: 0.95rem;
@@ -1074,6 +1074,38 @@ button:focus-visible {
 
 .toggle-card input {
   accent-color: var(--brand);
+}
+
+.toggle-card__body {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.toggle-card__body strong {
+  font-size: 0.95rem;
+}
+
+.toggle-card__body small {
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.feature-settings-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.feature-settings-item {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0.95rem;
+}
+
+.feature-settings-item__title {
+  margin: 0 0 0.7rem;
+  color: var(--brand-deep);
+  font-size: 0.92rem;
 }
 
 .notice-banner {

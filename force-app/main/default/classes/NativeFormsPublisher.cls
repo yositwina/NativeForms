@@ -3,6 +3,7 @@ public with sharing class NativeFormsPublisher {
     private static final String PUBLISHED_FORMS_BASE_URL = 'https://forms.twinaforms.com';
     private static final String TEMP_PREFILL_URL = 'https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_SUBMIT_URL = 'https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/';
+    private static final Pattern FRIENDLY_FORM_SLUG_PATTERN = Pattern.compile('^[a-z0-9]+(?:-[a-z0-9]+)*$');
 
     public class PublishResult {
         @AuraEnabled public Boolean success { get; set; }
@@ -110,11 +111,20 @@ public with sharing class NativeFormsPublisher {
         ];
 
         String orgId = UserInfo.getOrganizationId().substring(0, 15);
+        String formSlug = normalizePublishedFormSlug(versionRecord.Form__r.NF_Key__c);
+        if (String.isBlank(formSlug)) {
+            versionRecord.Publish_Status__c = 'Publish Failed';
+            versionRecord.Last_Publish_Error__c = 'Friendly published URLs require NF Key before publish. Fill NF Key with lowercase letters, numbers, and hyphens, then publish again.';
+            update versionRecord;
+            result.success = false;
+            result.message = versionRecord.Last_Publish_Error__c;
+            return result;
+        }
+
         String formId = String.isNotBlank(versionRecord.Form_Id__c)
             ? versionRecord.Form_Id__c
-            : String.isNotBlank(versionRecord.Form__r.NF_Key__c)
-                ? versionRecord.Form__r.NF_Key__c
-                : 'nativeforms-' + String.valueOf(versionRecord.Id).substring(0, 8);
+            : buildInternalFormId(orgId, versionRecord.Form__c);
+        versionRecord.Form_Id__c = formId;
 
         String publishToken = String.isNotBlank(versionRecord.Publish_Token__c)
             ? versionRecord.Publish_Token__c
@@ -130,6 +140,7 @@ public with sharing class NativeFormsPublisher {
             NativeFormsAwsClient.PresignRequest presignRequest = new NativeFormsAwsClient.PresignRequest();
             presignRequest.orgId = orgId;
             presignRequest.formId = formId;
+            presignRequest.formSlug = formSlug;
             presignRequest.versionId = 'current';
             presignRequest.fileName = fileName;
             presignRequest.contentType = 'text/html; charset=utf-8';
@@ -149,6 +160,8 @@ public with sharing class NativeFormsPublisher {
                 'rateLimitProfile' => String.isNotBlank(versionRecord.Rate_Limit_Profile__c) ? versionRecord.Rate_Limit_Profile__c : 'standard',
                 'generatedHtmlRef' => presignResponse.key,
                 'publicUrl' => publishedPublicUrl,
+                'companySlug' => presignResponse.companySlug,
+                'formSlug' => formSlug,
                 'captcha' => captchaConfig,
                 'prefillPolicy' => buildPolicy(filterReferencedActions(actions, 'Prefill', publishElements), publishElements, true),
                 'submitPolicy' => buildPolicy(filterReferencedActions(actions, 'Submit', publishElements), publishElements, false),
@@ -174,6 +187,7 @@ public with sharing class NativeFormsPublisher {
             insert publicationRecord;
 
             versionRecord.Publish_Token__c = publishToken;
+            versionRecord.Form_Id__c = formId;
             versionRecord.Publish_Status__c = 'Published';
             versionRecord.Version_Status__c = 'Published';
             versionRecord.Last_Published_At__c = System.now();
@@ -2240,6 +2254,22 @@ public with sharing class NativeFormsPublisher {
 
     public static String getSharedCaptchaSiteKey() {
         return SHARED_CAPTCHA_SITE_KEY;
+    }
+
+    @TestVisible
+    private static String buildInternalFormId(String orgId, Id formId) {
+        return 'nf-' + orgId + '-' + String.valueOf(formId);
+    }
+
+    @TestVisible
+    private static String normalizePublishedFormSlug(String rawValue) {
+        if (String.isBlank(rawValue)) {
+            return null;
+        }
+
+        String normalized = rawValue.trim().toLowerCase();
+        Matcher matcher = FRIENDLY_FORM_SLUG_PATTERN.matcher(normalized);
+        return matcher.matches() ? normalized : null;
     }
 
     private static String normalizePublishedPublicUrl(String publicUrl, String key) {

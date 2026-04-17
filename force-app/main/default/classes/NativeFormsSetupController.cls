@@ -106,7 +106,7 @@ public with sharing class NativeFormsSetupController {
 
             if (!result.success && String.isBlank(result.errorMessage)) {
                 Object errorValue = responseBody.get('error');
-                result.errorMessage = errorValue == null ? 'NativeForms registration failed.' : String.valueOf(errorValue);
+                result.errorMessage = errorValue == null ? 'TwinaForms registration failed.' : String.valueOf(errorValue);
             }
         } catch (Exception e) {
             result.success = false;
@@ -171,7 +171,7 @@ public with sharing class NativeFormsSetupController {
             HttpResponse response = new Http().send(request);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 result.success = false;
-                result.errorMessage = 'Unable to load NativeForms connection status: '
+                result.errorMessage = 'Unable to load TwinaForms connection status: '
                     + response.getStatusCode() + ' ' + response.getStatus();
 
                 String responseBody = response.getBody();
@@ -225,7 +225,7 @@ public with sharing class NativeFormsSetupController {
             HttpResponse response = new Http().send(request);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 result.success = false;
-                result.errorMessage = 'Unable to disconnect NativeForms: '
+                result.errorMessage = 'Unable to disconnect TwinaForms: '
                     + response.getStatusCode() + ' ' + response.getStatus();
 
                 String responseBody = response.getBody();

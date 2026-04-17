@@ -7,7 +7,9 @@ import {
 import {
   DynamoDBClient,
   GetItemCommand,
-  PutItemCommand
+  PutItemCommand,
+  QueryCommand,
+  ScanCommand
 } from "@aws-sdk/client-dynamodb";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
@@ -20,11 +22,148 @@ const s3Client = new S3Client({});
 const sesClient = new SESClient({ region: process.env.SES_REGION || process.env.AWS_REGION || "eu-north-1" });
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
+const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
+const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
+const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SES_FROM = process.env.SES_FROM || "";
 const DEV_MODE = String(process.env.DEV_MODE || "").toLowerCase() === "true";
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "";
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, "");
+const PRICING_BASE_URL = (process.env.PRICING_BASE_URL || "https://twinaforms.com").replace(/\/+$/, "");
+const FEATURE_FLAG_METADATA = {
+  enableProConditionLogic: {
+    label: "Conditional Logic",
+    description: "Show, hide, or control behavior based on multiple form conditions and grouped logic."
+  },
+  enableProRepeatGroups: {
+    label: "Repeated Records Table",
+    description: "Collect and submit multiple rows of related records, like products, household members, or case items, in one form."
+  },
+  enableProPrefillAliasReferences: {
+    label: "Prefill Result References",
+    description: "Reuse prefill results across new Prefill actions."
+  },
+  enableProAdvancedSubmitModes: {
+    label: "Advanced Submit Actions",
+    description: "Use richer submit flows like find-and-update or update-by-id for more advanced Salesforce writeback behavior."
+  },
+  enableProFormulaFields: {
+    label: "Calculated Fields",
+    description: "Generate values automatically inside the form instead of asking users to enter them manually."
+  },
+  enableProPostSubmitAutoLink: {
+    label: "Post Submit Auto Link",
+    description: "Automatically link related Salesforce records after submission based on configured matching rules."
+  },
+  enableProSfSecretCodeAuth: {
+    label: "Secret Code Verification",
+    description: "Add an extra verification step with a secret code for more sensitive workflows."
+  },
+  enableProLoadFile: {
+    label: "File Load Support",
+    description: "Support advanced file-loading behavior as part of the form experience and submission flow."
+  },
+  enableDetailedSubmissionLogs: {
+    label: "Detailed Submission Logs",
+    description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."
+  }
+};
+
+const DEFAULT_PLANS = [
+  {
+    planCode: "free",
+    label: "Free",
+    description: "Permanent low-volume entry plan.",
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
+    limits: {
+      maxSfUsers: 1,
+      maxForms: 1,
+      maxSubmissionsPerMonth: 100,
+      submissionLogRetentionDays: 30
+    },
+    featureFlags: {
+      enableDetailedSubmissionLogs: false,
+      enableProConditionLogic: false,
+      enableProRepeatGroups: false,
+      enableProPrefillAliasReferences: false,
+      enableProAdvancedSubmitModes: false,
+      enableProFormulaFields: false,
+      enableProPostSubmitAutoLink: false,
+      enableProSfSecretCodeAuth: false,
+      enableProLoadFile: false
+    }
+  },
+  {
+    planCode: "trial",
+    label: "Trial",
+    description: "Time-limited evaluation with all Pro features.",
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
+    limits: {
+      maxSfUsers: 1,
+      maxForms: 5,
+      maxSubmissionsPerMonth: null,
+      submissionLogRetentionDays: 30
+    },
+    featureFlags: {
+      enableDetailedSubmissionLogs: true,
+      enableProConditionLogic: true,
+      enableProRepeatGroups: true,
+      enableProPrefillAliasReferences: true,
+      enableProAdvancedSubmitModes: true,
+      enableProFormulaFields: true,
+      enableProPostSubmitAutoLink: true,
+      enableProSfSecretCodeAuth: true,
+      enableProLoadFile: true
+    }
+  },
+  {
+    planCode: "starter",
+    label: "Starter",
+    description: "Paid production plan without Pro-only features.",
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
+    limits: {
+      maxSfUsers: 1,
+      maxForms: 5,
+      maxSubmissionsPerMonth: 1000,
+      submissionLogRetentionDays: 90
+    },
+    featureFlags: {
+      enableDetailedSubmissionLogs: true,
+      enableProConditionLogic: false,
+      enableProRepeatGroups: false,
+      enableProPrefillAliasReferences: false,
+      enableProAdvancedSubmitModes: false,
+      enableProFormulaFields: false,
+      enableProPostSubmitAutoLink: false,
+      enableProSfSecretCodeAuth: false,
+      enableProLoadFile: false
+    }
+  },
+  {
+    planCode: "pro",
+    label: "Pro",
+    description: "Full plan with no product limits.",
+    featureLabels: Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
+    limits: {
+      maxSfUsers: null,
+      maxForms: null,
+      maxSubmissionsPerMonth: null,
+      submissionLogRetentionDays: 365
+    },
+    featureFlags: {
+      enableDetailedSubmissionLogs: true,
+      enableProConditionLogic: true,
+      enableProRepeatGroups: true,
+      enableProPrefillAliasReferences: true,
+      enableProAdvancedSubmitModes: true,
+      enableProFormulaFields: true,
+      enableProPostSubmitAutoLink: true,
+      enableProSfSecretCodeAuth: true,
+      enableProLoadFile: true
+    }
+  }
+];
 
 async function saveSalesforceConnection(secretName, payload) {
   const secretString = JSON.stringify(payload, null, 2);
@@ -171,6 +310,45 @@ async function saveItem(tableName, record) {
   }));
 }
 
+async function scanAllItems(tableName) {
+  const items = [];
+  let exclusiveStartKey;
+
+  do {
+    const result = await dynamoClient.send(new ScanCommand({
+      TableName: tableName,
+      ExclusiveStartKey: exclusiveStartKey
+    }));
+
+    (result.Items || []).forEach((item) => {
+      items.push(unmarshallItem(item));
+    });
+
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return items;
+}
+
+function isMissingTableError(error) {
+  return error?.name === "ResourceNotFoundException";
+}
+
+function isTableUnavailableError(error) {
+  return isMissingTableError(error) || error?.name === "AccessDeniedException";
+}
+
+async function scanAllItemsSafe(tableName) {
+  try {
+    return await scanAllItems(tableName);
+  } catch (error) {
+    if (isTableUnavailableError(error)) {
+      return [];
+    }
+    throw error;
+  }
+}
+
 async function getFormSecurityRecord(formId) {
   return getItemByKey(FORM_SECURITY_TABLE, "formId", formId);
 }
@@ -206,6 +384,331 @@ function normalizeSubscriptionState(payload, existing = null) {
     subscriptionEndDate: payload.subscriptionEndDate || existing?.subscriptionEndDate || null,
     isActive: typeof payload.isActive === "boolean" ? payload.isActive : (existing?.isActive ?? true),
     status: payload.status || existing?.status || "active"
+  };
+}
+
+function normalizePlanCode(planCode, tenantRecord = null) {
+  const normalized = String(
+    planCode
+    || tenantRecord?.planCode
+    || tenantRecord?.subscriptionState
+    || ""
+  ).trim().toLowerCase();
+
+  return ["free", "trial", "starter", "pro"].includes(normalized)
+    ? normalized
+    : "trial";
+}
+
+async function loadPlanDefinitions() {
+  try {
+    const items = await scanAllItems(PLAN_TABLE);
+    if (Array.isArray(items) && items.length > 0) {
+      return {
+        items,
+        storageMode: "dynamodb"
+      };
+    }
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      throw error;
+    }
+  }
+
+  return {
+    items: DEFAULT_PLANS,
+    storageMode: "fallback"
+  };
+}
+
+function getPlanByCode(planDefinitions, planCode) {
+  const normalizedPlanCode = normalizePlanCode(planCode);
+  const defaultPlan = DEFAULT_PLANS.find((item) => item.planCode === normalizedPlanCode)
+    || DEFAULT_PLANS[1];
+  const storedPlan = planDefinitions.find((item) => normalizePlanCode(item?.planCode) === normalizedPlanCode);
+
+  if (!storedPlan) {
+    return defaultPlan;
+  }
+
+  return {
+    ...defaultPlan,
+    ...storedPlan,
+    featureLabels: {
+      ...Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
+      ...(defaultPlan?.featureLabels || {}),
+      ...(storedPlan?.featureLabels || {})
+    },
+    limits: {
+      ...(defaultPlan?.limits || {}),
+      ...(storedPlan?.limits || {})
+    },
+    featureFlags: {
+      ...(defaultPlan?.featureFlags || {}),
+      ...(storedPlan?.featureFlags || {})
+    }
+  };
+}
+
+function mergeDefinedObjects(...items) {
+  const output = {};
+  for (const item of items) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    for (const [key, value] of Object.entries(item)) {
+      if (value !== undefined) {
+        output[key] = value;
+      }
+    }
+  }
+  return output;
+}
+
+function getEffectivePlanLimits(tenantRecord, selectedPlan) {
+  return mergeDefinedObjects(
+    selectedPlan?.limits || {},
+    tenantRecord?.planLimits || {},
+    tenantRecord?.limits || {},
+    tenantRecord?.planOverrides?.limits || {},
+    tenantRecord?.effectiveLimits || {}
+  );
+}
+
+function getEffectivePlanFeatures(tenantRecord, selectedPlan) {
+  return mergeDefinedObjects(
+    selectedPlan?.featureFlags || {},
+    tenantRecord?.planFeatureFlags || {},
+    tenantRecord?.featureFlags || {},
+    tenantRecord?.planOverrides?.featureFlags || {},
+    tenantRecord?.effectiveFeatureFlags || {}
+  );
+}
+
+async function countPublishedForms(orgId) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+  if (!normalizedOrgId) {
+    return 0;
+  }
+
+  const formRecords = await scanAllItemsSafe(FORM_SECURITY_TABLE);
+  return formRecords.filter((record) =>
+    normalizeOrgId(record?.orgId) === normalizedOrgId
+    && String(record?.status || "").toLowerCase() === "published"
+  ).length;
+}
+
+function getCurrentMonthRangeUtc() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString();
+  const end = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)).toISOString();
+  return { start, end };
+}
+
+async function countTenantSubmissionsForCurrentMonth(orgId) {
+  if (!orgId) {
+    return 0;
+  }
+
+  const normalizedOrgId = normalizeOrgId(orgId);
+  const { start, end } = getCurrentMonthRangeUtc();
+  let count = 0;
+  let exclusiveStartKey;
+
+  do {
+    const result = await dynamoClient.send(new QueryCommand({
+      TableName: SUBMISSION_LOG_TABLE,
+      KeyConditionExpression: "tenantId = :tenantId AND submittedAtSubmissionId BETWEEN :fromKey AND :toKey",
+      ExpressionAttributeValues: {
+        ":tenantId": { S: normalizedOrgId },
+        ":fromKey": { S: `${start}#` },
+        ":toKey": { S: `${end}#\uffff` }
+      },
+      Select: "COUNT",
+      ExclusiveStartKey: exclusiveStartKey
+    }));
+
+    count += Number(result?.Count || 0);
+    exclusiveStartKey = result?.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return count;
+}
+
+function hasAdvancedProFeatures(featureFlags) {
+  return [
+    "enableProConditionLogic",
+    "enableProRepeatGroups",
+    "enableProPrefillAliasReferences",
+    "enableProAdvancedSubmitModes",
+    "enableProFormulaFields",
+    "enableProPostSubmitAutoLink",
+    "enableProSfSecretCodeAuth",
+    "enableProLoadFile"
+  ].some((key) => featureFlags?.[key] === true);
+}
+
+function getFeatureFlagLabels() {
+  return Object.fromEntries(
+    Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])
+  );
+}
+
+function normalizeFeatureMetadata(inputValue = null) {
+  const output = {};
+
+  for (const [key, defaults] of Object.entries(FEATURE_FLAG_METADATA)) {
+    const incoming = inputValue && typeof inputValue === "object" ? inputValue[key] : null;
+    output[key] = {
+      label: String(incoming?.label || defaults.label),
+      description: String(incoming?.description || defaults.description)
+    };
+  }
+
+  return output;
+}
+
+function getFeatureMetadata(planDefinition = null, settingsMetadata = null) {
+  const output = normalizeFeatureMetadata(settingsMetadata);
+  const planLabels = getFeatureFlagLabels();
+
+  for (const [key, label] of Object.entries(planLabels)) {
+    if (!output[key]) {
+      output[key] = {
+        label: String(label || key),
+        description: ""
+      };
+      continue;
+    }
+    output[key].label = String(label || output[key].label || key);
+  }
+
+  return output;
+}
+
+async function loadAdminSettings() {
+  try {
+    return await getItemByKey(SETTINGS_TABLE, "settingKey", "admin_notifications");
+  } catch (error) {
+    console.warn("Admin settings lookup failed for home summary; falling back to defaults.", error?.name || error?.message || error);
+    return null;
+  }
+}
+
+function buildIncludedFeatures(featureFlags) {
+  const items = [
+    {
+      key: "builder",
+      label: "Core Form Builder",
+      detail: "Create and manage production forms from Salesforce.",
+      status: "included"
+    },
+    {
+      key: "themes",
+      label: "Themes",
+      detail: "Customize form branding and visual style.",
+      status: "included"
+    },
+    {
+      key: "prefill",
+      label: "Prefill",
+      detail: "Use Salesforce data to prefill form fields.",
+      status: "included"
+    },
+    {
+      key: "submit",
+      label: "Submit Actions",
+      detail: "Send submitted form data back into Salesforce.",
+      status: "included"
+    }
+  ];
+
+  if (featureFlags?.enableDetailedSubmissionLogs) {
+    items.push({
+      key: "detailedLogs",
+      label: "Detailed Logs",
+      detail: "Review richer submission activity and troubleshooting detail.",
+      status: "included"
+    });
+  }
+
+  if (hasAdvancedProFeatures(featureFlags)) {
+    items.push({
+      key: "advancedPro",
+      label: "Advanced Pro Features",
+      detail: "Use advanced form logic and richer runtime capabilities.",
+      status: "included"
+    });
+  }
+
+  return items;
+}
+
+function buildUpgradeFeatures(planCode, featureFlags, proPlan = null, featureMetadata = null) {
+  const normalizedPlanCode = normalizePlanCode(planCode);
+  if (["trial", "pro"].includes(normalizedPlanCode)) {
+    return [];
+  }
+
+  const items = [];
+  const proFeatures = proPlan?.featureFlags || {};
+  const metadataByKey = getFeatureMetadata(proPlan, featureMetadata);
+
+  for (const key of Object.keys(metadataByKey)) {
+    if (proFeatures?.[key] !== true || featureFlags?.[key] === true) {
+      continue;
+    }
+
+    items.push({
+      key,
+      label: metadataByKey[key]?.label || key,
+      detail: metadataByKey[key]?.description || null,
+      status: "upgrade"
+    });
+  }
+
+  return items;
+}
+
+function buildFormsUsageMessage(activeFormsCount, maxForms) {
+  if (maxForms == null) {
+    return null;
+  }
+
+  if (activeFormsCount >= maxForms) {
+    return "You have reached your current published-form limit.";
+  }
+
+  if (maxForms > 0 && activeFormsCount >= Math.max(1, maxForms - 1)) {
+    return "You are close to your current published-form limit.";
+  }
+
+  return null;
+}
+
+function buildPlanUrls(planCode) {
+  const normalizedPlanCode = normalizePlanCode(planCode);
+  return {
+    comparePlansUrl: `${PRICING_BASE_URL}/pricing?source=salesforce-home&plan=${encodeURIComponent(normalizedPlanCode)}`,
+    upgradeUrl: `${PRICING_BASE_URL}/upgrade?source=salesforce-home&plan=${encodeURIComponent(normalizedPlanCode)}`
+  };
+}
+
+function buildTenantEntitlementsPayload(orgId, tenantRecord, planResult) {
+  const planCode = normalizePlanCode(null, tenantRecord);
+  const selectedPlan = getPlanByCode(planResult.items, planCode);
+  const limits = getEffectivePlanLimits(tenantRecord, selectedPlan);
+  const featureFlags = getEffectivePlanFeatures(tenantRecord, selectedPlan);
+
+  return {
+    success: true,
+    orgId,
+    planCode,
+    planLabel: selectedPlan?.label || "Trial",
+    effectiveFeatureFlags: featureFlags,
+    effectiveLimits: limits
   };
 }
 
@@ -421,6 +924,8 @@ function validateFormSecurityPayload(payload) {
   if (!payload?.publishedVersionId) throw new Error("Missing required field: publishedVersionId");
   if (!payload?.status) throw new Error("Missing required field: status");
   if (!payload?.securityMode) throw new Error("Missing required field: securityMode");
+  if (!payload?.companySlug) throw new Error("Missing required field: companySlug");
+  if (!payload?.formSlug) throw new Error("Missing required field: formSlug");
   if (!payload?.prefillPolicy || typeof payload.prefillPolicy !== "object") {
     throw new Error("Missing required field: prefillPolicy");
   }
@@ -448,6 +953,7 @@ function validatePublishPresignPayload(payload) {
   if (!payload?.orgId) throw new Error("Missing required field: orgId");
   if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
   if (!payload?.formId) throw new Error("Missing required field: formId");
+  if (!payload?.formSlug) throw new Error("Missing required field: formSlug");
   if (!payload?.fileName) throw new Error("Missing required field: fileName");
 }
 
@@ -475,12 +981,61 @@ function sanitizeKeyPart(value) {
     .replace(/^-|-$/g, "") || "nativeforms";
 }
 
-function buildPublishKey(orgId, formId, versionId, fileName) {
-  const safeOrgId = sanitizeKeyPart(orgId);
-  const safeFormId = sanitizeKeyPart(formId);
-  const safeVersionId = sanitizeKeyPart(versionId || "current");
-  const safeFileName = sanitizeKeyPart(fileName);
-  return `org/${safeOrgId}/forms/${safeFormId}/${safeVersionId}/${safeFileName}`;
+function slugifyPublicSegment(value, fallbackValue) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || fallbackValue;
+}
+
+function last4OrgId(orgId) {
+  const normalized = normalizeOrgId(orgId);
+  return normalized ? normalized.slice(-4).toLowerCase() : "org";
+}
+
+function buildPublishKey(companySlug, formSlug) {
+  const safeCompanySlug = slugifyPublicSegment(companySlug, "company");
+  const safeFormSlug = slugifyPublicSegment(formSlug, "form");
+  return `${safeCompanySlug}/${safeFormSlug}`;
+}
+
+async function ensureTenantCompanySlug(orgId, tenantRecord) {
+  if (!tenantRecord) {
+    throw new Error("Tenant not found");
+  }
+
+  if (tenantRecord.companySlug) {
+    return {
+      companySlug: tenantRecord.companySlug,
+      tenantRecord
+    };
+  }
+
+  const baseCompanySlug = slugifyPublicSegment(tenantRecord.companyName, "company");
+  const tenants = await scanAllItems(TENANT_TABLE);
+  const collision = tenants.find((tenant) =>
+    tenant?.orgId !== orgId &&
+    slugifyPublicSegment(tenant?.companySlug || tenant?.companyName, "company") === baseCompanySlug
+  );
+
+  let companySlug = baseCompanySlug;
+  if (collision) {
+    companySlug = `${baseCompanySlug}-${last4OrgId(orgId)}`;
+  }
+
+  const updatedTenantRecord = {
+    ...tenantRecord,
+    companySlug,
+    updatedAt: new Date().toISOString()
+  };
+  await saveItem(TENANT_TABLE, updatedTenantRecord);
+
+  return {
+    companySlug,
+    tenantRecord: updatedTenantRecord
+  };
 }
 
 export const handler = async (event) => {
@@ -597,6 +1152,79 @@ export const handler = async (event) => {
     }
   }
 
+  if (path === "/tenant/home-summary" && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      if (!orgId) {
+        throw new Error("Missing required field: orgId");
+      }
+      if (!validateOrgId(orgId)) {
+        throw new Error("Invalid orgId");
+      }
+
+      const [tenantRecord, connectionRecord, planResult, activeFormsCount, adminSettings] = await Promise.all([
+        getTenantRecord(orgId),
+        getSalesforceConnection(getSalesforceConnectionSecretName(orgId)),
+        loadPlanDefinitions(),
+        countPublishedForms(orgId),
+        loadAdminSettings()
+      ]);
+
+      const planCode = normalizePlanCode(null, tenantRecord);
+      const selectedPlan = getPlanByCode(planResult.items, planCode);
+      const proPlan = getPlanByCode(planResult.items, "pro");
+      const limits = getEffectivePlanLimits(tenantRecord, selectedPlan);
+      const featureFlags = getEffectivePlanFeatures(tenantRecord, selectedPlan);
+      const urls = buildPlanUrls(planCode);
+      const setupState = buildTenantSetupState(tenantRecord, connectionRecord);
+      let submissionsMonth = 0;
+
+      try {
+        submissionsMonth = await countTenantSubmissionsForCurrentMonth(orgId);
+      } catch (error) {
+        if (!isTableUnavailableError(error)) {
+          throw error;
+        }
+      }
+
+      return jsonResponse(200, {
+        success: true,
+        orgId,
+        registered: !!tenantRecord,
+        setupState,
+        plan: {
+          code: planCode,
+          label: selectedPlan?.label || "Trial",
+          description: selectedPlan?.description || "",
+          storageMode: planResult.storageMode,
+          retentionDays: limits?.submissionLogRetentionDays ?? null,
+          detailedLogsIncluded: featureFlags?.enableDetailedSubmissionLogs === true,
+          advancedSecurityIncluded: featureFlags?.enableProSfSecretCodeAuth === true,
+          limits,
+          featureFlags
+        },
+        usage: {
+          activeFormsCount,
+          submissionsMonth,
+          maxSubmissionsPerMonth: limits?.maxSubmissionsPerMonth ?? null,
+          activeUsersCount: 1,
+          maxSfUsers: limits?.maxSfUsers ?? null,
+          maxForms: limits?.maxForms ?? null,
+          formsUsageMessage: buildFormsUsageMessage(activeFormsCount, limits?.maxForms ?? null)
+        },
+        includedFeatures: buildIncludedFeatures(featureFlags),
+        upgradeFeatures: buildUpgradeFeatures(planCode, featureFlags, proPlan, adminSettings?.featureMetadata || null),
+        comparePlansUrl: urls.comparePlansUrl,
+        upgradeUrl: urls.upgradeUrl
+      });
+    } catch (e) {
+      return jsonResponse(400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
   if (path === "/tenant/auth-health" && method === "GET") {
     try {
       const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
@@ -611,6 +1239,28 @@ export const handler = async (event) => {
       return jsonResponse(e.statusCode || 400, {
         success: false,
         authenticated: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/tenant/entitlements" && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      if (!orgId) {
+        throw new Error("Missing required field: orgId");
+      }
+      if (!validateOrgId(orgId)) {
+        throw new Error("Invalid orgId");
+      }
+
+      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
+      const planResult = await loadPlanDefinitions();
+
+      return jsonResponse(200, buildTenantEntitlementsPayload(orgId, tenantRecord, planResult));
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
         error: e.message
       });
     }
@@ -1008,6 +1658,8 @@ export const handler = async (event) => {
       const record = {
         formId: payload.formId,
         orgId,
+        companySlug: payload.companySlug,
+        formSlug: payload.formSlug,
         publishedVersionId: payload.publishedVersionId,
         status: payload.status,
         securityMode: payload.securityMode,
@@ -1049,13 +1701,15 @@ export const handler = async (event) => {
 
       validatePublishPresignPayload(payload);
       const orgId = normalizeOrgId(payload.orgId);
-      await requireTenantAuth(event?.headers, orgId);
+      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
 
       if (!PUBLISH_BUCKET || !PUBLIC_BASE_URL) {
         throw new Error("Server misconfigured: PUBLISH_BUCKET and PUBLIC_BASE_URL are required");
       }
 
-      const key = buildPublishKey(orgId, payload.formId, payload.versionId, payload.fileName);
+      const { companySlug } = await ensureTenantCompanySlug(orgId, tenantRecord);
+      const formSlug = slugifyPublicSegment(payload.formSlug, "form");
+      const key = buildPublishKey(companySlug, formSlug);
       const contentType = payload.contentType || "text/html; charset=utf-8";
       const expiresIn = Number(payload.expires) > 0 ? Number(payload.expires) : 900;
       const putCommand = new PutObjectCommand({
@@ -1071,6 +1725,8 @@ export const handler = async (event) => {
         putUrl,
         publicUrl,
         key,
+        companySlug,
+        formSlug,
         expiresAt: Date.now() + expiresIn * 1000
       });
     } catch (e) {

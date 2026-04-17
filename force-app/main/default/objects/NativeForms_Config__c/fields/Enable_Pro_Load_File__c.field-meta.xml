@@ -2,7 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Enable_Pro_Load_File__c</fullName>
     <defaultValue>false</defaultValue>
-    <description>Controls the Pro feature for loading a file in NativeForms.</description>
+    <description>Controls the Pro feature for loading a file in TwinaForms.</description>
     <externalId>false</externalId>
     <inlineHelpText>Enable the Pro feature for file load support.</inlineHelpText>
     <label>Enable Pro Load File</label>

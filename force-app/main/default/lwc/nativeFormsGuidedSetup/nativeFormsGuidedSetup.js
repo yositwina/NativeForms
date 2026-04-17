@@ -33,7 +33,7 @@ export default class NativeFormsGuidedSetup extends LightningElement {
         try {
             const context = await getSetupContext();
             this.orgId = context.orgId || '';
-            this.companyName = context.orgName || 'NativeForms Tenant';
+            this.companyName = context.orgName || 'TwinaForms Tenant';
             this.adminEmail = context.adminEmail || '';
             this.loginBaseUrl = context.loginBaseUrl || '';
         } catch (error) {
@@ -99,15 +99,15 @@ export default class NativeFormsGuidedSetup extends LightningElement {
             const result = await registerOrg({ requestBody: this.buildRegistrationPayload() });
 
             if (!result?.success) {
-                throw new Error(result?.errorMessage || 'NativeForms registration failed.');
+                throw new Error(result?.errorMessage || 'TwinaForms registration failed.');
             }
 
             this.tenantSecret = result.tenantSecret || '';
             this.connectUrl = result.connectUrl || '';
-            this.successMessage = 'NativeForms generated your tenant code and opened Salesforce authorization in a new tab.';
+            this.successMessage = 'TwinaForms generated your tenant code and opened Salesforce authorization in a new tab.';
 
             if (!this.connectUrl) {
-                throw new Error('NativeForms could not generate a Salesforce connection URL.');
+                throw new Error('TwinaForms could not generate a Salesforce connection URL.');
             }
 
             window.open(this.connectUrl, '_blank');

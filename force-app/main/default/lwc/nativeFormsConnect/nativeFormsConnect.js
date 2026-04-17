@@ -69,7 +69,7 @@ export default class NativeFormsConnect extends LightningElement {
         try {
             const context = await getSetupContext();
             this.orgId = context.orgId || '';
-            this.companyName = context.orgName || 'NativeForms Tenant';
+            this.companyName = context.orgName || 'TwinaForms Tenant';
             this.adminEmail = context.adminEmail || '';
             this.loginBaseUrl = context.loginBaseUrl || '';
             this.restoreConnectState(this.orgId);
@@ -118,7 +118,7 @@ export default class NativeFormsConnect extends LightningElement {
         this.showPrincipalAccessHelp = isPrincipalAccessIssue;
 
         if (isPrincipalAccessIssue) {
-            return 'NativeForms could not connect yet because the required permission-set access is not fully enabled.';
+            return 'TwinaForms could not connect yet because the required permission-set access is not fully enabled.';
         }
 
         return rawMessage;
@@ -361,7 +361,7 @@ export default class NativeFormsConnect extends LightningElement {
             const data = await registerOrg({ requestBody: this.buildRegistrationPayload() });
 
             if (!data?.success) {
-                throw new Error(data?.errorMessage || 'NativeForms registration failed.');
+                throw new Error(data?.errorMessage || 'TwinaForms registration failed.');
             }
 
             this.tenantSecret = data.tenantSecret || '';
@@ -411,14 +411,14 @@ export default class NativeFormsConnect extends LightningElement {
             const data = await saveClientCredentials({ requestBody: this.buildClientCredentialsPayload() });
 
             if (!data?.success) {
-                throw new Error(data?.errorMessage || 'NativeForms could not save the Salesforce client credentials.');
+                throw new Error(data?.errorMessage || 'TwinaForms could not save the Salesforce client credentials.');
             }
 
             this.connectUrl = data.connectUrl || '';
             this.hasClientCredentials = true;
 
             if (!this.connectUrl) {
-                throw new Error('NativeForms could not generate a Salesforce connection URL.');
+                throw new Error('TwinaForms could not generate a Salesforce connection URL.');
             }
 
             this.isAwaitingOauthReturn = true;
@@ -456,7 +456,7 @@ export default class NativeFormsConnect extends LightningElement {
             const status = await getConnectionStatus({ orgId: this.orgId });
             if (status?.success !== true) {
                 this.errorMessage = this.normalizeRegistrationError(
-                    new Error(status?.errorMessage || 'Unable to verify NativeForms connection status.')
+                    new Error(status?.errorMessage || 'Unable to verify TwinaForms connection status.')
                 );
                 return;
             }
@@ -476,7 +476,7 @@ export default class NativeFormsConnect extends LightningElement {
             if (this.isConnected) {
                 this.isAwaitingOauthReturn = false;
                 this.stopConnectionPolling();
-                this.successMessage = 'NativeForms is fully connected.';
+                this.successMessage = 'TwinaForms is fully connected.';
             } else if (this.isAwaitingOauthReturn && !this.isPendingConnection) {
                 this.isAwaitingOauthReturn = false;
                 this.stopConnectionPolling();
@@ -487,7 +487,7 @@ export default class NativeFormsConnect extends LightningElement {
             this.persistConnectState();
         } catch (error) {
             this.errorMessage = this.normalizeRegistrationError(
-                new Error(`Unable to verify NativeForms connection status.\n\n${this.formatError(error)}`)
+                new Error(`Unable to verify TwinaForms connection status.\n\n${this.formatError(error)}`)
             );
         }
     }
@@ -500,7 +500,7 @@ export default class NativeFormsConnect extends LightningElement {
         }
 
         if (raw.includes('unauthorized') || raw.includes('not verified')) {
-            return 'NativeForms could not verify the tenant secret yet. Please check the secret value and try again.';
+            return 'TwinaForms could not verify the tenant secret yet. Please check the secret value and try again.';
         }
 
         return 'Tenant secret is not verified yet. Please finish the Named Credential step and try Test again.';

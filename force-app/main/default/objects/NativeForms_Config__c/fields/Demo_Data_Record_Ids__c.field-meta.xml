@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Demo_Data_Record_Ids__c</fullName>
-    <description>Serialized JSON of record ids created by the NativeForms demo data installer.</description>
+    <description>Serialized JSON of record ids created by the TwinaForms demo data installer.</description>
     <inlineHelpText>Used internally for demo-data tracking and future cleanup/reset support.</inlineHelpText>
     <label>Demo Data Record Ids</label>
     <trackHistory>false</trackHistory>

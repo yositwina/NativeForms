@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Captcha_Site_Key__c</fullName>
-    <description>Google reCAPTCHA site key used by published NativeForms HTML pages.</description>
+    <description>Google reCAPTCHA site key used by published TwinaForms HTML pages.</description>
     <externalId>false</externalId>
     <inlineHelpText>Paste the Google reCAPTCHA site key that should be rendered on published forms.</inlineHelpText>
     <label>CAPTCHA Site Key</label>

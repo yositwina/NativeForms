@@ -1,18 +1,66 @@
-const FEATURE_FLAG_LABELS = {
-  enableProConditionLogic: "Conditional Logic",
-  enableProRepeatGroups: "Repeat Groups",
-  enableProPrefillAliasReferences: "Prefill Alias References",
-  enableProAdvancedSubmitModes: "Advanced Submit Modes",
-  enableProFormulaFields: "Formula Fields",
-  enableProPostSubmitAutoLink: "Post Submit Auto Link",
-  enableProSfSecretCodeAuth: "Secret Code Auth",
-  enableProLoadFile: "Load File",
-  enableDetailedSubmissionLogs: "Detailed Submission Logs"
+const FEATURE_FLAG_METADATA = {
+  enableProConditionLogic: {
+    label: "Conditional Logic",
+    description: "Show, hide, or control behavior based on multiple form conditions and grouped logic."
+  },
+  enableProRepeatGroups: {
+    label: "Repeated Records Table",
+    description: "Collect and submit multiple rows of related records, like products, household members, or case items, in one form."
+  },
+  enableProPrefillAliasReferences: {
+    label: "Prefill Result References",
+    description: "Reuse prefill results across new Prefill actions."
+  },
+  enableProAdvancedSubmitModes: {
+    label: "Advanced Submit Actions",
+    description: "Use richer submit flows like find-and-update or update-by-id for more advanced Salesforce writeback behavior."
+  },
+  enableProFormulaFields: {
+    label: "Calculated Fields",
+    description: "Generate values automatically inside the form instead of asking users to enter them manually."
+  },
+  enableProPostSubmitAutoLink: {
+    label: "Post Submit Auto Link",
+    description: "Automatically link related Salesforce records after submission based on configured matching rules."
+  },
+  enableProSfSecretCodeAuth: {
+    label: "Secret Code Verification",
+    description: "Add an extra verification step with a secret code for more sensitive workflows."
+  },
+  enableProLoadFile: {
+    label: "File Load Support",
+    description: "Support advanced file-loading behavior as part of the form experience and submission flow."
+  },
+  enableDetailedSubmissionLogs: {
+    label: "Detailed Submission Logs",
+    description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."
+  }
 };
+
+function getFeatureMetadata(settings = state.settings) {
+  const featureMetadata = { ...FEATURE_FLAG_METADATA };
+  const incoming = settings?.featureMetadata || {};
+
+  for (const key of Object.keys(featureMetadata)) {
+    featureMetadata[key] = {
+      label: incoming?.[key]?.label || featureMetadata[key].label,
+      description: incoming?.[key]?.description || featureMetadata[key].description
+    };
+  }
+
+  return featureMetadata;
+}
+
+function getFeatureFlagLabels(plan = null, settings = state.settings) {
+  const metadata = getFeatureMetadata(settings);
+  return Object.fromEntries(
+    Object.entries(metadata).map(([key, value]) => [key, value.label])
+  );
+}
 
 function buildFeatureFlags(enabledKeys) {
   return Object.fromEntries(
-    Object.keys(FEATURE_FLAG_LABELS).map((key) => [key, enabledKeys.includes(key)])
+    Object.keys(FEATURE_FLAG_METADATA).map((key) => [key, enabledKeys.includes(key)])
   );
 }
 
@@ -145,6 +193,7 @@ const state = {
   settings: {
     statusAlertEmailRecipient: "yosi@harmony-it.co.il",
     statusRecomputeTimeUtc: "02:00",
+    featureMetadata: getFeatureMetadata({ featureMetadata: FEATURE_FLAG_METADATA }),
     source: "default"
   },
   apiHealth: {
@@ -202,7 +251,9 @@ const refs = {
   settingsPlanStorage: document.getElementById("settingsPlanStorage"),
   settingsStatusAlertEmail: document.getElementById("settingsStatusAlertEmail"),
   settingsRecomputeTime: document.getElementById("settingsRecomputeTime"),
-  settingsSource: document.getElementById("settingsSource")
+  settingsSource: document.getElementById("settingsSource"),
+  settingsFeatureMetadata: document.getElementById("settingsFeatureMetadata"),
+  refreshDataButton: document.getElementById("refreshDataButton")
 };
 
 function getSavedSplitWidth() {
@@ -618,6 +669,9 @@ async function saveTenantProfile(form) {
 
 async function savePlan(form) {
   const formData = new FormData(form);
+  const selectedPlan = getSelectedPlan();
+  const featureMetadata = getFeatureMetadata();
+  const featureFlagLabels = getFeatureFlagLabels(selectedPlan);
   const payload = {
     label: String(formData.get("label") || "").trim(),
     description: String(formData.get("description") || "").trim(),
@@ -630,8 +684,11 @@ async function savePlan(form) {
       maxSubmissionsPerMonth: parseNullableNumber(formData.get("maxSubmissionsPerMonth")),
       submissionLogRetentionDays: parseNullableNumber(formData.get("submissionLogRetentionDays"))
     },
+    featureLabels: Object.fromEntries(
+      Object.entries(featureMetadata).map(([key, value]) => [key, value.label])
+    ),
     featureFlags: Object.fromEntries(
-      Object.keys(FEATURE_FLAG_LABELS).map((key) => [key, formData.get(key) === "on"])
+      Object.keys(featureFlagLabels).map((key) => [key, formData.get(key) === "on"])
     )
   };
 
@@ -714,9 +771,17 @@ async function saveSupportNote(form) {
 
 async function saveSettings(form) {
   const formData = new FormData(form);
+  const featureMetadata = {};
+  for (const key of Object.keys(FEATURE_FLAG_METADATA)) {
+    featureMetadata[key] = {
+      label: String(formData.get(`featureLabel__${key}`) || "").trim(),
+      description: String(formData.get(`featureDescription__${key}`) || "").trim()
+    };
+  }
   const payload = {
     statusAlertEmailRecipient: String(formData.get("statusAlertEmailRecipient") || "").trim(),
-    statusRecomputeTimeUtc: String(formData.get("statusRecomputeTimeUtc") || "").trim()
+    statusRecomputeTimeUtc: String(formData.get("statusRecomputeTimeUtc") || "").trim(),
+    featureMetadata
   };
 
   state.busyActionKey = "settings:save";
@@ -730,6 +795,31 @@ async function saveSettings(form) {
     state.successMessage = "Settings saved.";
   } catch (error) {
     state.errorMessage = `Settings save failed. ${error.message}`;
+  } finally {
+    state.busyActionKey = "";
+  }
+
+  render();
+}
+
+async function refreshAdminData() {
+  state.busyActionKey = "settings:refresh-data";
+  state.errorMessage = "";
+  state.successMessage = "";
+  render();
+
+  try {
+    const data = await postJson("/admin/refresh-data", {});
+    state.tenantDetailsById.clear();
+    state.supportByOrgId.clear();
+    state.auditByOrgId.clear();
+    state.overview = null;
+    state.auditLog = [];
+    await loadInitialData();
+    await ensureTenantData(state.selectedOrgId || state.tenants[0]?.orgId || null);
+    state.successMessage = data?.reason || "Admin data was refreshed.";
+  } catch (error) {
+    state.errorMessage = `Refresh Data failed. ${error.message}`;
   } finally {
     state.busyActionKey = "";
   }
@@ -885,9 +975,31 @@ function renderModePanel() {
       timeInput.value = state.settings?.statusRecomputeTimeUtc || "02:00";
       timeInput.disabled = !apiBaseUrl || state.busyActionKey === "settings:save";
     }
+    if (refs.settingsFeatureMetadata) {
+      const featureMetadata = getFeatureMetadata();
+      refs.settingsFeatureMetadata.innerHTML = Object.entries(featureMetadata).map(([key, value]) => `
+        <article class="feature-settings-item">
+          <p class="feature-settings-item__title">${escapeHtml(value.label)}</p>
+          <div class="stack-form">
+            <label class="field">
+              <span class="field__label">Feature Name</span>
+              <input class="field__control" name="featureLabel__${escapeHtml(key)}" type="text" value="${escapeHtml(value.label)}" ${(!apiBaseUrl || state.busyActionKey === "settings:save") ? "disabled" : ""}>
+            </label>
+            <label class="field">
+              <span class="field__label">Feature Description</span>
+              <textarea class="field__control field__control--textarea" name="featureDescription__${escapeHtml(key)}" ${(!apiBaseUrl || state.busyActionKey === "settings:save") ? "disabled" : ""}>${escapeHtml(value.description || "")}</textarea>
+            </label>
+          </div>
+        </article>
+      `).join("");
+    }
     if (submitButton) {
       submitButton.disabled = !apiBaseUrl || state.busyActionKey === "settings:save";
       submitButton.textContent = state.busyActionKey === "settings:save" ? "Saving Settings..." : "Save Settings";
+    }
+    if (refs.refreshDataButton) {
+      refs.refreshDataButton.disabled = !apiBaseUrl || state.busyActionKey === "settings:refresh-data";
+      refs.refreshDataButton.textContent = state.busyActionKey === "settings:refresh-data" ? "Refreshing Data..." : "Refresh Data";
     }
   }
 }
@@ -1211,6 +1323,9 @@ function renderPlans() {
     </div>
   `;
 
+  const featureFlagLabels = getFeatureFlagLabels(selectedPlan);
+  const featureMetadata = getFeatureMetadata();
+
   refs.planEditor.innerHTML = selectedPlan ? `
     <div class="detail-header">
       <div>
@@ -1268,10 +1383,13 @@ function renderPlans() {
       <section class="detail-section detail-section--tight">
         <h5>Pro Feature Flags</h5>
         <div class="feature-grid">
-          ${Object.entries(FEATURE_FLAG_LABELS).map(([key, label]) => `
+          ${Object.entries(featureFlagLabels).map(([key, label]) => `
             <label class="toggle-card">
               <input type="checkbox" name="${escapeHtml(key)}" ${selectedPlan.featureFlags?.[key] ? "checked" : ""}>
-              <span>${escapeHtml(label)}</span>
+              <span class="toggle-card__body">
+                <strong>${escapeHtml(label)}</strong>
+                <small>${escapeHtml(featureMetadata?.[key]?.description || "")}</small>
+              </span>
             </label>
           `).join("")}
         </div>
@@ -1337,6 +1455,10 @@ function bindSettingsForm() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     await saveSettings(event.currentTarget);
+  });
+
+  refs.refreshDataButton?.addEventListener("click", async () => {
+    await refreshAdminData();
   });
 }
 

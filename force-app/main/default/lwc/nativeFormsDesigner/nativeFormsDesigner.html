@@ -1,5 +1,5 @@
 <template>
-    <lightning-card title="NativeForms Designer" icon-name="utility:brush">
+    <lightning-card>
         <div class="designer-shell">
             <template if:true={errorMessage}>
                 <div class="panel-error">{errorMessage}</div>
@@ -12,56 +12,77 @@
             </template>
 
             <template if:false={isLoading}>
-                <div class="designer-layout">
-                    <section class="pane pane-left">
-                        <p class="designer-version">Designer {designerVersion}</p>
-
-                        <div class="designer-picker-stack">
+                <section class="designer-topbar">
+                    <div class="designer-topbar__left">
+                        <div class="designer-topbar__field designer-topbar__field--form designer-topbar__field--inline">
+                            <span class="designer-topbar__inline-label">Form</span>
                             <lightning-combobox
                                 name="formId"
+                                variant="label-hidden"
                                 label="Form"
                                 value={selectedFormId}
                                 options={formOptions}
+                                placeholder="Select form"
                                 onchange={handleFormChange}>
                             </lightning-combobox>
+                        </div>
 
+                        <div class="designer-topbar__field designer-topbar__field--version designer-topbar__field--inline">
+                            <span class="designer-topbar__inline-label">Form Version</span>
                             <lightning-combobox
                                 name="versionId"
-                                label="Version"
+                                variant="label-hidden"
+                                label="Form Version"
                                 value={selectedVersionId}
                                 options={versionOptions}
+                                placeholder="Select version"
                                 onchange={handleVersionChange}>
                             </lightning-combobox>
+                        </div>
 
-                            <template if:true={selectedFormDescription}>
-                                <p class="designer-form-description">{selectedFormDescription}</p>
-                            </template>
-
+                        <div class="designer-topbar__action">
                             <lightning-button
                                 variant="brand"
                                 label="Publish Form"
                                 disabled={isSelectedVersionReadOnly}
                                 onclick={handlePublishVersion}>
                             </lightning-button>
-
-                            <template if:true={isSelectedVersionReadOnly}>
-                                <div class="panel-error">
-                                    <p>{readOnlyMessage}</p>
-                                    <template if:true={hasSelectedPublishedUrl}>
-                                        <p><a href={selectedPublishedUrl} target="_blank" rel="noopener">Open published form</a></p>
-                                    </template>
-                                </div>
-                            </template>
                         </div>
 
-                        <template if:true={publishResult}>
-                            <div class={publishResultClass}>
-                                <p class="result-title">{publishResultTitle}</p>
-                                <p>{publishResult.message}</p>
-                                <template if:true={publishResult.publicUrl}>
-                                    <p><a href={publishResult.publicUrl} target="_blank" rel="noopener">Open published form</a></p>
+                        <template if:true={isSelectedVersionReadOnly}>
+                            <div class="designer-topbar__result designer-topbar__result--error">
+                                <span>This published version is read-only.</span>
+                                <template if:true={hasSelectedPublishedUrl}>
+                                    <a href={selectedPublishedUrl} target="_blank" rel="noopener">Open published form</a>
                                 </template>
                             </div>
+                        </template>
+
+                        <template if:true={publishResult}>
+                            <div class={publishResultInlineClass}>
+                                <span>{publishResultInlineMessage}</span>
+                                <template if:true={publishResult.publicUrl}>
+                                    <a href={publishResult.publicUrl} target="_blank" rel="noopener">{publishResultLinkLabel}</a>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="designer-topbar__right">
+                        <lightning-button
+                            variant="brand-outline"
+                            label="+ New Form"
+                            onclick={handleOpenNewFormModal}>
+                        </lightning-button>
+                    </div>
+                </section>
+
+                <div class="designer-layout">
+                    <section class="pane pane-left">
+                        <p class="designer-version">Designer {designerVersion}</p>
+
+                        <template if:true={selectedFormDescription}>
+                            <p class="designer-form-description">{selectedFormDescription}</p>
                         </template>
 
                         <div class="pane-header">
@@ -959,6 +980,41 @@
                         </template>
                     </section>
                 </div>
+
+                <template if:true={showNewFormModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="new-form-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-new-form-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="new-form-modal-heading" class="slds-modal__title slds-hyphenate">Create New Form</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <lightning-textarea
+                                    label="Description"
+                                    value={newFormDescription}
+                                    onchange={handleNewFormDescriptionChange}
+                                    max-length="255">
+                                </lightning-textarea>
+                                <p class="designer-new-form-help">A new form and its first Draft version will be created immediately.</p>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    disabled={isCreatingForm}
+                                    onclick={handleCloseNewFormModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Create Form"
+                                    class="slds-m-left_small"
+                                    disabled={newFormCreateDisabled}
+                                    onclick={handleCreateNewForm}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
             </template>
         </div>
     </lightning-card>

@@ -350,8 +350,13 @@
                 <span class="field__label">Daily Recompute Time (UTC)</span>
                 <input class="field__control" name="statusRecomputeTimeUtc" type="time" step="60">
               </label>
+              <section class="detail-section detail-section--tight">
+                <h5>Feature Names And Descriptions</h5>
+                <div id="settingsFeatureMetadata" class="feature-settings-list"></div>
+              </section>
               <div class="detail-actions">
                 <button class="action-button" type="submit">Save Settings</button>
+                <button class="action-button action-button--secondary" id="refreshDataButton" type="button">Refresh Data</button>
               </div>
             </form>
           </div>

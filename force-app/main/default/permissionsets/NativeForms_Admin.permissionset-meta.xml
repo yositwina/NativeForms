@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Administrative access for the NativeForms package baseline objects.</description>
+    <description>Administrative access for the TwinaForms package baseline objects.</description>
     <hasActivationRequired>false</hasActivationRequired>
-    <label>NativeForms Admin</label>
+    <label>TwinaForms Admin</label>
 
     <applicationVisibilities>
         <application>NativeForms</application>

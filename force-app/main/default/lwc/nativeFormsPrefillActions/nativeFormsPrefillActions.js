@@ -257,14 +257,14 @@ export default class NativeFormsPrefillActions extends LightningElement {
     async handleRefreshFromDesigner() {
         const storedVersionId = this.loadStoredVersionId();
         if (!storedVersionId) {
-            this.showToast('No Designer selection', 'Open NativeForms Designer and choose a version first.', 'warning');
+            this.showToast('No Designer selection', 'Open TwinaForms Designer and choose a version first.', 'warning');
             return;
         }
 
         this.selectedActionId = null;
         this.draftAction = {};
         await this.loadWorkspace(storedVersionId);
-        this.showToast('Refreshed', 'Loaded the version currently selected in NativeForms Designer.', 'success');
+        this.showToast('Refreshed', 'Loaded the version currently selected in TwinaForms Designer.', 'success');
     }
 
     decorateAction(item) {

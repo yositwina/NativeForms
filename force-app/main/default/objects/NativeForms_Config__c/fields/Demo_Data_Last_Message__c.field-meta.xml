@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Demo_Data_Last_Message__c</fullName>
-    <description>Last status message produced by the NativeForms demo data installer.</description>
+    <description>Last status message produced by the TwinaForms demo data installer.</description>
     <inlineHelpText>Stores the latest success or informational message from demo-data setup.</inlineHelpText>
     <label>Demo Data Last Message</label>
     <trackHistory>false</trackHistory>

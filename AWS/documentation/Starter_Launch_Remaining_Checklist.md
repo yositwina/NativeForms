@@ -70,6 +70,8 @@ These are the highest-priority items for a credible Starter package.
 ### Core product completeness
 
 - polish of the NativeForms screens inside Salesforce
+- add a clear `New Form` button on the Designer page so admins can create a new form directly from the main Designer workflow
+- improve demo-data creation records, especially demo forms, so the generated sample data feels clean, intentional, and launch-ready
 - basic thank-you page / thank-you message after submit
 - customer-safe runtime and setup error messages
 - CAPTCHA activation once the production domain is in place
@@ -229,6 +231,8 @@ These are useful, but they do not appear to be the next critical step.
 ### Confirmed open
 
 - Salesforce Native app screen polish
+- add a clear `New Form` button on the Designer page
+- improve demo-data creation records, especially forms
 - thank-you page
 - customer-safe error handling
 - production domain / CloudFront setup
@@ -256,6 +260,22 @@ These are useful, but they do not appear to be the next critical step.
 - published form URLs are not yet in the intended friendly format like `forms.twinaforms.com/company-name/form-name`
 
 ## Recommended Next-Step Options
+
+### Starter critical path
+
+1. Salesforce Native app UI polish
+2. domain and runtime endpoint cleanup
+3. thank-you page
+4. customer-safe error handling
+5. full QA across current features
+6. Apex test classes
+7. Salesforce package creation
+8. Cognito for Admin
+
+Note:
+
+- `Cognito for Admin` is intentionally the last step in this path
+- it is required before real commercial admin operations, but it does not need to block earlier product-core Starter completion work
 
 Recommended order:
 

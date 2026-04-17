@@ -304,7 +304,7 @@ public with sharing class NativeFormsThemesController {
 
     private static String titleFromFileName(String fileName) {
         if (String.isBlank(fileName)) {
-            return 'NativeForms Theme Logo';
+            return 'TwinaForms Theme Logo';
         }
         Integer dotIndex = fileName.lastIndexOf('.');
         return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;

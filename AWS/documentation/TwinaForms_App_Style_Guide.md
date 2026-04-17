@@ -1,0 +1,16 @@
+# TwinaForms App Style Guide
+- Overall feel: calm, professional, builder-first, and Salesforce-friendly.
+- Tone: practical and trustworthy, not flashy or marketing-heavy.
+- Layout: structured workspaces with clear left/center/right zones and strong visual hierarchy.
+- Surfaces: white cards on very light blue-gray backgrounds, with soft gradients only for emphasis.
+- Corners: rounded generously, usually around `0.9rem` to `1.25rem`.
+- Borders: light gray-blue strokes; use them more than heavy shadows.
+- Shadows: soft and lifted, subtle depth only.
+- Primary color: Salesforce blue `#0f6cbd` for main actions, active states, and highlights.
+- Success/error colors: muted green and soft red backgrounds with readable dark text.
+- Typography: headings feel editorial and stable; body text stays clean and utilitarian.
+- Font direction: serif-style headings, sans-serif body and controls.
+- Forms: inputs should feel spacious, rounded, and quiet, with low visual noise.
+- Selection states: use blue outline, pale blue fill, and soft glow instead of hard contrast.
+- Empty/help states: supportive, lightweight, and instructional.
+- Responsive behavior: stack cleanly on smaller screens without losing workflow clarity.
