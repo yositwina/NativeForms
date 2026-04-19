@@ -696,6 +696,86 @@ function buildPlanUrls(planCode) {
   };
 }
 
+function sortPlansForDisplay(plans = []) {
+  const order = new Map([
+    ["free", 1],
+    ["trial", 2],
+    ["starter", 3],
+    ["pro", 4]
+  ]);
+
+  return [...plans].sort((left, right) => {
+    const leftOrder = order.get(normalizePlanCode(left?.planCode)) || 99;
+    const rightOrder = order.get(normalizePlanCode(right?.planCode)) || 99;
+    return leftOrder - rightOrder;
+  });
+}
+
+function formatLimitValue(value) {
+  return value == null ? "Unlimited" : String(value);
+}
+
+function buildPlanFeatureList(planDefinition, featureMetadata = null) {
+  const metadataByKey = getFeatureMetadata(planDefinition, featureMetadata);
+  const featureFlags = planDefinition?.featureFlags || {};
+
+  return Object.keys(metadataByKey)
+    .filter((key) => featureFlags?.[key] === true)
+    .map((key) => ({
+      key,
+      label: metadataByKey[key]?.label || key,
+      description: metadataByKey[key]?.description || ""
+    }));
+}
+
+function buildPublicPlansPayload(planDefinitions, featureMetadata = null) {
+  const items = sortPlansForDisplay(planDefinitions)
+    .filter((plan) => plan?.isActive !== false)
+    .map((plan) => {
+      const normalizedPlanCode = normalizePlanCode(plan?.planCode);
+      const selectedPlan = getPlanByCode(planDefinitions, normalizedPlanCode);
+      const limits = selectedPlan?.limits || {};
+
+      return {
+        planCode: normalizedPlanCode,
+        label: selectedPlan?.label || normalizedPlanCode,
+        description: selectedPlan?.description || "",
+        durationType: selectedPlan?.durationType || "forever",
+        durationDays: selectedPlan?.durationDays ?? null,
+        limits: {
+          maxSfUsers: limits?.maxSfUsers ?? null,
+          maxForms: limits?.maxForms ?? null,
+          maxSubmissionsPerMonth: limits?.maxSubmissionsPerMonth ?? null,
+          submissionLogRetentionDays: limits?.submissionLogRetentionDays ?? null
+        },
+        limitSummary: [
+          {
+            key: "maxForms",
+            label: "Forms",
+            value: formatLimitValue(limits?.maxForms ?? null)
+          },
+          {
+            key: "maxSubmissionsPerMonth",
+            label: "Monthly submissions",
+            value: formatLimitValue(limits?.maxSubmissionsPerMonth ?? null)
+          },
+          {
+            key: "maxSfUsers",
+            label: "Active users",
+            value: formatLimitValue(limits?.maxSfUsers ?? null)
+          }
+        ],
+        features: buildPlanFeatureList(selectedPlan, featureMetadata)
+      };
+    });
+
+  return {
+    success: true,
+    storageMode: "dynamodb",
+    items
+  };
+}
+
 function buildTenantEntitlementsPayload(orgId, tenantRecord, planResult) {
   const planCode = normalizePlanCode(null, tenantRecord);
   const selectedPlan = getPlanByCode(planResult.items, planCode);
@@ -1216,6 +1296,25 @@ export const handler = async (event) => {
         upgradeFeatures: buildUpgradeFeatures(planCode, featureFlags, proPlan, adminSettings?.featureMetadata || null),
         comparePlansUrl: urls.comparePlansUrl,
         upgradeUrl: urls.upgradeUrl
+      });
+    } catch (e) {
+      return jsonResponse(400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/public/plans" && method === "GET") {
+    try {
+      const [planResult, adminSettings] = await Promise.all([
+        loadPlanDefinitions(),
+        loadAdminSettings()
+      ]);
+
+      return jsonResponse(200, {
+        ...buildPublicPlansPayload(planResult.items, adminSettings?.featureMetadata || null),
+        storageMode: planResult.storageMode
       });
     } catch (e) {
       return jsonResponse(400, {

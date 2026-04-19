@@ -95,7 +95,7 @@ public with sharing class NativeFormsSetupController {
 
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 result.success = false;
-                result.errorMessage = 'Registration failed: ' + response.getStatusCode() + ' ' + response.getStatus() + ' ' + response.getBody();
+                result.errorMessage = buildRegisterOrgErrorMessage(response.getStatusCode(), response.getBody());
                 return result;
             }
 
@@ -105,12 +105,11 @@ public with sharing class NativeFormsSetupController {
             result.connectUrl = (String) responseBody.get('connectUrl');
 
             if (!result.success && String.isBlank(result.errorMessage)) {
-                Object errorValue = responseBody.get('error');
-                result.errorMessage = errorValue == null ? 'TwinaForms registration failed.' : String.valueOf(errorValue);
+                result.errorMessage = buildRegisterOrgErrorMessage(null, String.valueOf(responseBody.get('error')));
             }
         } catch (Exception e) {
             result.success = false;
-            result.errorMessage = e.getMessage();
+            result.errorMessage = buildRegisterOrgExceptionMessage(e);
         }
 
         return result;
@@ -133,8 +132,7 @@ public with sharing class NativeFormsSetupController {
 
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 result.success = false;
-                result.errorMessage = 'Saving client credentials failed: '
-                    + response.getStatusCode() + ' ' + response.getStatus() + ' ' + response.getBody();
+                result.errorMessage = buildSaveClientCredentialsErrorMessage(response.getStatusCode(), response.getBody());
                 return result;
             }
 
@@ -143,12 +141,11 @@ public with sharing class NativeFormsSetupController {
             result.connectUrl = (String) responseBody.get('connectUrl');
 
             if (!result.success && String.isBlank(result.errorMessage)) {
-                Object errorValue = responseBody.get('error');
-                result.errorMessage = errorValue == null ? 'Saving client credentials failed.' : String.valueOf(errorValue);
+                result.errorMessage = buildSaveClientCredentialsErrorMessage(null, String.valueOf(responseBody.get('error')));
             }
         } catch (Exception e) {
             result.success = false;
-            result.errorMessage = e.getMessage();
+            result.errorMessage = buildSaveClientCredentialsExceptionMessage(e);
         }
 
         return result;
@@ -171,13 +168,7 @@ public with sharing class NativeFormsSetupController {
             HttpResponse response = new Http().send(request);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 result.success = false;
-                result.errorMessage = 'Unable to load TwinaForms connection status: '
-                    + response.getStatusCode() + ' ' + response.getStatus();
-
-                String responseBody = response.getBody();
-                if (!String.isBlank(responseBody)) {
-                    result.errorMessage += ' ' + responseBody;
-                }
+                result.errorMessage = buildConnectionStatusErrorMessage(response.getStatusCode(), response.getBody());
                 return result;
             }
 
@@ -190,7 +181,9 @@ public with sharing class NativeFormsSetupController {
             result.hasClientCredentials = responseBody.containsKey('hasClientCredentials')
                 ? (Boolean) responseBody.get('hasClientCredentials')
                 : false;
-            result.errorMessage = result.success ? null : String.valueOf(responseBody.get('error'));
+            result.errorMessage = result.success
+                ? null
+                : buildConnectionStatusErrorMessage(null, String.valueOf(responseBody.get('error')));
 
             TenantAuthStatus tenantAuth = verifyTenantAuth(effectiveOrgId);
             result.tenantAuthVerified = tenantAuth.verified;
@@ -198,7 +191,7 @@ public with sharing class NativeFormsSetupController {
             result.tenantAuthErrorMessage = tenantAuth.errorMessage;
         } catch (Exception e) {
             result.success = false;
-            result.errorMessage = e.getMessage();
+            result.errorMessage = 'TwinaForms could not verify the current connection status. Refresh and try again.';
         }
 
         return result;
@@ -225,23 +218,19 @@ public with sharing class NativeFormsSetupController {
             HttpResponse response = new Http().send(request);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                 result.success = false;
-                result.errorMessage = 'Unable to disconnect TwinaForms: '
-                    + response.getStatusCode() + ' ' + response.getStatus();
-
-                String responseBody = response.getBody();
-                if (!String.isBlank(responseBody)) {
-                    result.errorMessage += ' ' + responseBody;
-                }
+                result.errorMessage = buildDisconnectErrorMessage(response.getStatusCode(), response.getBody());
                 return result;
             }
 
             Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
             result.success = responseBody.containsKey('success') ? (Boolean) responseBody.get('success') : false;
             result.connectUrl = (String) responseBody.get('connectUrl');
-            result.errorMessage = result.success ? null : String.valueOf(responseBody.get('error'));
+            result.errorMessage = result.success
+                ? null
+                : buildDisconnectErrorMessage(null, String.valueOf(responseBody.get('error')));
         } catch (Exception e) {
             result.success = false;
-            result.errorMessage = e.getMessage();
+            result.errorMessage = 'TwinaForms could not disconnect this org right now. Try again in a moment.';
         }
 
         return result;
@@ -272,16 +261,10 @@ public with sharing class NativeFormsSetupController {
             }
 
             result.status = 'not_verified';
-            result.errorMessage = 'Tenant secret auth check failed: '
-                + response.getStatusCode() + ' ' + response.getStatus();
-
-            String responseBody = response.getBody();
-            if (!String.isBlank(responseBody)) {
-                result.errorMessage += ' ' + responseBody;
-            }
+            result.errorMessage = buildTenantAuthErrorMessage(response.getStatusCode(), response.getBody());
         } catch (Exception e) {
             result.status = 'not_verified';
-            result.errorMessage = e.getMessage();
+            result.errorMessage = 'TwinaForms could not verify the tenant secret yet. Check the Named Credential secret and try again.';
         }
 
         return result;
@@ -301,5 +284,75 @@ public with sharing class NativeFormsSetupController {
             : ns + '__' + BASE_BOOTSTRAP_NC_NAME;
 
         return cachedBootstrapNc;
+    }
+
+    private static String buildRegisterOrgErrorMessage(Integer statusCode, String rawBody) {
+        if (isPermissionSetAccessIssue(statusCode, rawBody)) {
+            return 'TwinaForms could not generate the tenant secret yet because setup access is not complete. Check permission-set access and try again.';
+        }
+        return 'TwinaForms could not generate the tenant secret. Check setup access and try again.';
+    }
+
+    private static String buildRegisterOrgExceptionMessage(Exception e) {
+        String message = e == null ? '' : String.valueOf(e.getMessage());
+        if (isPermissionSetAccessIssue(null, message)) {
+            return 'TwinaForms could not generate the tenant secret yet because setup access is not complete. Check permission-set access and try again.';
+        }
+        return 'TwinaForms could not generate the tenant secret. Check setup access and try again.';
+    }
+
+    private static String buildSaveClientCredentialsErrorMessage(Integer statusCode, String rawBody) {
+        if (isPermissionSetAccessIssue(statusCode, rawBody)) {
+            return 'TwinaForms could not save the Salesforce client credentials yet because setup access is not complete. Check permission-set access and try again.';
+        }
+        return 'TwinaForms could not save the Salesforce client credentials. Check the values and try again.';
+    }
+
+    private static String buildSaveClientCredentialsExceptionMessage(Exception e) {
+        String message = e == null ? '' : String.valueOf(e.getMessage());
+        if (isPermissionSetAccessIssue(null, message)) {
+            return 'TwinaForms could not save the Salesforce client credentials yet because setup access is not complete. Check permission-set access and try again.';
+        }
+        return 'TwinaForms could not save the Salesforce client credentials. Check the values and try again.';
+    }
+
+    private static String buildConnectionStatusErrorMessage(Integer statusCode, String rawBody) {
+        if (isPermissionSetAccessIssue(statusCode, rawBody)) {
+            return 'TwinaForms could not verify the current connection status because setup access is not complete.';
+        }
+        return 'TwinaForms could not verify the current connection status. Refresh and try again.';
+    }
+
+    private static String buildDisconnectErrorMessage(Integer statusCode, String rawBody) {
+        if (statusCode != null && statusCode == 401) {
+            return 'TwinaForms could not disconnect this org because the current connection is no longer authorized.';
+        }
+        return 'TwinaForms could not disconnect this org right now. Try again in a moment.';
+    }
+
+    private static String buildTenantAuthErrorMessage(Integer statusCode, String rawBody) {
+        String normalized = normalizeMessage(rawBody);
+        if (normalized.contains('invalid tenant secret') || statusCode == 401) {
+            return 'The tenant secret is incorrect. Update the Named Credential secret and try again.';
+        }
+        return 'TwinaForms could not verify the tenant secret yet. Check the Named Credential secret and try again.';
+    }
+
+    private static Boolean isPermissionSetAccessIssue(Integer statusCode, String rawBody) {
+        String normalized = normalizeMessage(rawBody);
+        if (normalized.contains('external credential')
+            || normalized.contains('principal access')
+            || normalized.contains('nativeforms_bootstrap')
+            || normalized.contains('nativeformsbootstrap')
+            || normalized.contains('nativeforms shared secret')
+            || normalized.contains('permission-set access')
+            || normalized.contains('permission set access')) {
+            return true;
+        }
+        return statusCode == 401 && normalized.contains('credential');
+    }
+
+    private static String normalizeMessage(String value) {
+        return String.isBlank(value) ? '' : value.trim().toLowerCase();
     }
 }

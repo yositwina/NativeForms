@@ -19,7 +19,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v9.4';
+    designerVersion = 'v13.8';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -29,10 +29,15 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedFormName = '';
     selectedFormKey = '';
     selectedFormDescription = '';
+    draftFormName = '';
     selectedFormCaptchaEnabled = false;
     captchaKeysConfigured = false;
     selectedVersionName = '';
     selectedVersionStatus = '';
+    selectedVersionSubmitSuccessMessage = 'Your form was submitted successfully.';
+    selectedVersionRtlEnabled = false;
+    draftSubmitSuccessMessage = 'Your form was submitted successfully.';
+    draftRtlEnabled = false;
     selectedPublishedUrl = '';
     selectedTheme = null;
     draggedElementId = null;
@@ -60,6 +65,7 @@ export default class NativeFormsDesigner extends LightningElement {
     editorLabel = '';
     editorElementType = '';
     editorLabelPosition = 'above';
+    editorDefaultValue = '';
     editorPlaceholder = '';
     editorDisplayText = '';
     editorImageUrl = '';
@@ -77,6 +83,7 @@ export default class NativeFormsDesigner extends LightningElement {
     editorPicklistField = '';
     editorRadioOptionsText = '';
     editorLabelBold = false;
+    editorRequired = false;
     editorFieldBehavior = 'editable';
     editorConditionalEnabled = false;
     editorConditionalFieldKey = '';
@@ -281,6 +288,14 @@ export default class NativeFormsDesigner extends LightningElement {
         ].join(';');
     }
 
+    get designerFormSurfaceClass() {
+        return `designer-form-surface${this.draftRtlEnabled ? ' designer-form-surface--rtl' : ''}`;
+    }
+
+    get designerFormDirection() {
+        return this.draftRtlEnabled ? 'rtl' : 'ltr';
+    }
+
     get themeLogoUrl() {
         return this.selectedTheme?.logoUrl || '';
     }
@@ -370,7 +385,15 @@ export default class NativeFormsDesigner extends LightningElement {
         return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
     }
 
+    get selectedElementSupportsPlaceholder() {
+        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url'].includes(this.editorElementType);
+    }
+
     get selectedElementSupportsBoldLabel() {
+        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+    }
+
+    get selectedElementSupportsRequired() {
         return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
     }
 
@@ -538,10 +561,15 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedFormName = workspace.selectedFormName;
             this.selectedFormKey = workspace.selectedFormKey;
             this.selectedFormDescription = workspace.selectedFormDescription;
+            this.draftFormName = this.selectedFormName || '';
             this.selectedFormCaptchaEnabled = !!workspace.selectedFormCaptchaEnabled;
             this.captchaKeysConfigured = !!workspace.captchaKeysConfigured;
             this.selectedVersionName = workspace.selectedVersionName;
             this.selectedVersionStatus = workspace.selectedVersionStatus;
+            this.selectedVersionSubmitSuccessMessage = workspace.selectedVersionSubmitSuccessMessage || 'Your form was submitted successfully.';
+            this.selectedVersionRtlEnabled = !!workspace.selectedVersionRtlEnabled;
+            this.draftSubmitSuccessMessage = this.selectedVersionSubmitSuccessMessage;
+            this.draftRtlEnabled = this.selectedVersionRtlEnabled;
             this.selectedPublishedUrl = workspace.selectedPublishedUrl || '';
             this.prefillAliasDetails = workspace.prefillAliases || [];
             this.submitActionDetails = workspace.submitActions || [];
@@ -715,6 +743,7 @@ export default class NativeFormsDesigner extends LightningElement {
             fieldBehavior: this.fieldBehavior(item),
             previewText: this.previewText(item),
             previewHtml: this.previewHtml(item),
+            previewValue: this.previewValue(item),
             previewPlaceholder: this.previewPlaceholder(item),
             previewChecked: this.previewChecked(item),
             previewOptions: this.previewOptions(item),
@@ -740,10 +769,12 @@ export default class NativeFormsDesigner extends LightningElement {
             showExpandedPicklist: normalized.isSelect && selected,
             showLabel: normalized.labelPosition !== 'hidden',
             showConditionalBadge: !!normalized.conditionalSummary,
+            displayLabel: this.previewLabel(item),
             labelClass: `preview-field__label${this.labelBold(item) ? ' preview-field__label--bold' : ''}`,
             cardStyle: this.elementCardStyle(normalized),
             cardClass: `designer-node ${!(normalized.isSectionLike || normalized.isRepeatGroup) ? 'designer-node--field ' : ''}${isChild ? 'designer-node--child ' : ''}designer-node--${normalized.elementType}${(normalized.isSectionLike || normalized.isRepeatGroup) && !normalized.showSectionBox ? ' designer-node--section-unboxed' : ''}${selected ? ' designer-node--selected' : ''}`,
             fieldPreviewClass: `preview-field preview-field--${normalized.labelPosition || 'above'}`,
+            previewInputDirection: this.previewInputDirection(item),
             previewTextClass: `preview-heading${selected ? ' preview-heading--selected' : ''}`,
             imageFrameClass: `preview-image__frame preview-image__frame--${normalized.previewImageFit || 'original'}`,
             imageClass: `preview-image__img preview-image__img--${normalized.previewImageFit || 'original'}`,
@@ -839,17 +870,42 @@ export default class NativeFormsDesigner extends LightningElement {
         return config.text || item.label;
     }
 
+    previewLabel(item) {
+        const label = item?.label || '';
+        if (!this.supportsRequiredMarker(item)) {
+            return label;
+        }
+        return `${label} *`;
+    }
+
+    supportsRequiredMarker(item) {
+        const effectiveType = item?.elementType === 'hidden' ? 'text' : item?.elementType;
+        if (!['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(effectiveType)) {
+            return false;
+        }
+        const config = this.parseConfig(item?.configJson);
+        return config.required === true;
+    }
+
     previewHtml(item) {
         const config = this.parseConfig(item.configJson);
         return config.html || config.text || '<p>Display text</p>';
     }
 
+    previewValue(item) {
+        const config = this.parseConfig(item.configJson);
+        if (config.placeholder) {
+            return '';
+        }
+        return config.defaultValue || '';
+    }
+
     previewPlaceholder(item) {
         const config = this.parseConfig(item.configJson);
         if (item.elementType === 'date') {
-            return config.dateDisplayFormat === 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy';
+            return config.placeholder || (config.dateDisplayFormat === 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy');
         }
-        return config.defaultValue || config.placeholder || '';
+        return config.placeholder || '';
     }
 
     previewChecked(item) {
@@ -899,6 +955,10 @@ export default class NativeFormsDesigner extends LightningElement {
             return 'text';
         }
         return ['text', 'number', 'date', 'email', 'tel', 'url'].includes(effectiveType) ? effectiveType : 'text';
+    }
+
+    previewInputDirection(item) {
+        return ['number', 'date', 'email', 'tel', 'url'].includes(item?.elementType) ? 'ltr' : null;
     }
 
     validationPattern(item) {
@@ -1029,13 +1089,25 @@ export default class NativeFormsDesigner extends LightningElement {
         try {
             await updateFormSettings({
                 formId: this.selectedFormId,
+                versionId: this.selectedVersionId,
+                formName: (nextValues.formName || '').trim(),
                 themeId: nextValues.themeId === '' ? null : nextValues.themeId,
-                enableCaptcha: !!nextValues.enableCaptcha
+                enableCaptcha: !!nextValues.enableCaptcha,
+                submitSuccessMessage: nextValues.submitSuccessMessage || '',
+                rtlEnabled: !!nextValues.rtlEnabled
             });
+            this.selectedFormName = (nextValues.formName || '').trim();
+            this.selectedFormDescription = this.selectedFormName;
+            this.draftFormName = this.selectedFormName;
             this.selectedThemeId = nextValues.themeId || '';
             this.selectedFormCaptchaEnabled = !!nextValues.enableCaptcha;
+            this.selectedVersionSubmitSuccessMessage = nextValues.submitSuccessMessage || 'Your form was submitted successfully.';
+            this.selectedVersionRtlEnabled = !!nextValues.rtlEnabled;
+            this.draftRtlEnabled = this.selectedVersionRtlEnabled;
             await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
-            this.showToast('Form settings saved', successMessage, 'success');
+            if (successMessage) {
+                this.showToast('Form settings saved', successMessage, 'success');
+            }
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -1047,7 +1119,10 @@ export default class NativeFormsDesigner extends LightningElement {
         await this.saveFormSettings(
             {
                 themeId: event.detail.value || '',
-                enableCaptcha: this.selectedFormCaptchaEnabled
+                formName: this.draftFormName,
+                enableCaptcha: this.selectedFormCaptchaEnabled,
+                submitSuccessMessage: this.draftSubmitSuccessMessage,
+                rtlEnabled: this.draftRtlEnabled
             },
             'Form theme updated.'
         );
@@ -1057,9 +1132,74 @@ export default class NativeFormsDesigner extends LightningElement {
         await this.saveFormSettings(
             {
                 themeId: this.selectedThemeId || '',
-                enableCaptcha: event.target.checked
+                formName: this.draftFormName,
+                enableCaptcha: event.target.checked,
+                submitSuccessMessage: this.draftSubmitSuccessMessage,
+                rtlEnabled: this.draftRtlEnabled
             },
             event.target.checked ? 'CAPTCHA enabled for this form.' : 'CAPTCHA disabled for this form.'
+        );
+    }
+
+    async handleFormRtlChange(event) {
+        this.draftRtlEnabled = event.target.checked;
+        await this.saveFormSettings(
+            {
+                themeId: this.selectedThemeId || '',
+                formName: this.draftFormName,
+                enableCaptcha: this.selectedFormCaptchaEnabled,
+                submitSuccessMessage: this.draftSubmitSuccessMessage,
+                rtlEnabled: this.draftRtlEnabled
+            },
+            this.draftRtlEnabled ? 'RTL enabled for this form.' : 'RTL disabled for this form.'
+        );
+    }
+
+    handleSubmitSuccessMessageInput(event) {
+        this.draftSubmitSuccessMessage = event.target.value || '';
+    }
+
+    handleFormNameInput(event) {
+        this.draftFormName = event.target.value || '';
+    }
+
+    async handleFormNameBlur(event) {
+        const nextName = (event.target.value || '').trim();
+        if (!nextName) {
+            this.draftFormName = this.selectedFormName || '';
+            return;
+        }
+        this.draftFormName = nextName;
+        if (nextName === (this.selectedFormName || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings(
+            {
+                formName: nextName,
+                themeId: this.selectedThemeId || '',
+                enableCaptcha: this.selectedFormCaptchaEnabled,
+                submitSuccessMessage: this.draftSubmitSuccessMessage,
+                rtlEnabled: this.draftRtlEnabled
+            },
+            null
+        );
+    }
+
+    async handleSubmitSuccessMessageBlur(event) {
+        const nextMessage = event.target.value || '';
+        this.draftSubmitSuccessMessage = nextMessage;
+        if ((nextMessage || '').trim() === (this.selectedVersionSubmitSuccessMessage || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings(
+            {
+                themeId: this.selectedThemeId || '',
+                formName: this.draftFormName,
+                enableCaptcha: this.selectedFormCaptchaEnabled,
+                submitSuccessMessage: nextMessage,
+                rtlEnabled: this.draftRtlEnabled
+            },
+            null
         );
     }
 
@@ -1158,9 +1298,10 @@ export default class NativeFormsDesigner extends LightningElement {
         }
     }
 
-    handleEditorLabelChange(event) {
-        this.editorLabel = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorLabelCommit(event) {
+        this.editorLabel = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorTypeChange(event) {
@@ -1170,12 +1311,24 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorLabelPositionChange(event) {
         this.editorLabelPosition = event.target.value;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
-    handleEditorPlaceholderChange(event) {
-        this.editorPlaceholder = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorLabelPositionCommit() {
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorDefaultValueCommit(event) {
+        this.editorDefaultValue = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorPlaceholderCommit(event) {
+        this.editorPlaceholder = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorDisplayTextChange(event) {
@@ -1183,14 +1336,16 @@ export default class NativeFormsDesigner extends LightningElement {
         this.applyEditorDraft();
     }
 
-    handleEditorImageUrlChange(event) {
-        this.editorImageUrl = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorImageUrlCommit(event) {
+        this.editorImageUrl = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
-    handleEditorImageAltChange(event) {
-        this.editorImageAlt = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorImageAltCommit(event) {
+        this.editorImageAlt = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorImageFitChange(event) {
@@ -1243,24 +1398,50 @@ export default class NativeFormsDesigner extends LightningElement {
         await this.loadPicklistValuesIntoEditor(this.editorPicklistObject, this.editorPicklistField);
     }
 
-    handleEditorRadioOptionsChange(event) {
-        this.editorRadioOptionsText = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorRadioOptionsCommit(event) {
+        this.editorRadioOptionsText = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorLabelBoldChange(event) {
         this.editorLabelBold = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorLabelBoldCommit() {
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorRequiredChange(event) {
+        this.editorRequired = event.target.checked;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorRequiredCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorFieldBehaviorChange(event) {
         this.editorFieldBehavior = event.detail?.value || event.target?.value || 'editable';
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorFieldBehaviorCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorConditionalEnabledChange(event) {
         this.editorConditionalEnabled = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorConditionalEnabledCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorConditionalFieldChange(event) {
@@ -1273,19 +1454,22 @@ export default class NativeFormsDesigner extends LightningElement {
         this.applyEditorDraft();
     }
 
-    handleEditorConditionalValueChange(event) {
-        this.editorConditionalValue = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorConditionalValueCommit(event) {
+        this.editorConditionalValue = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
-    handleEditorMinValueChange(event) {
-        this.editorMinValue = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorMinValueCommit(event) {
+        this.editorMinValue = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
-    handleEditorMaxValueChange(event) {
-        this.editorMaxValue = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorMaxValueCommit(event) {
+        this.editorMaxValue = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorDateDisplayFormatChange(event) {
@@ -1325,7 +1509,12 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorPrefillEnabledChange(event) {
         this.editorPrefillEnabled = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorPrefillEnabledCommit() {
+        this.flushEditorDraftSave();
     }
 
     async handleEditorPrefillAliasChange(event) {
@@ -1344,7 +1533,12 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorSubmitEnabledChange(event) {
         this.editorSubmitEnabled = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorSubmitEnabledCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorSubmitActionChange(event) {
@@ -1362,12 +1556,22 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorShowTitleChange(event) {
         this.editorShowTitle = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorShowTitleCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorBoxedChange(event) {
         this.editorBoxed = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorBoxedCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorColumnsChange(event) {
@@ -1382,17 +1586,32 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorAllowAddRowsChange(event) {
         this.editorAllowAddRows = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorAllowAddRowsCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorAllowDeleteRowsChange(event) {
         this.editorAllowDeleteRows = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorAllowDeleteRowsCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleEditorShowLabelsOnEachRowChange(event) {
         this.editorShowLabelsOnEachRow = event.target.checked;
-        this.applyEditorDraft();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorShowLabelsOnEachRowCommit() {
+        this.flushEditorDraftSave();
     }
 
     handleDragStart(event) {
@@ -1558,6 +1777,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorLabel = '';
             this.editorElementType = '';
             this.editorLabelPosition = 'above';
+            this.editorDefaultValue = '';
             this.editorPlaceholder = '';
             this.editorDisplayText = '';
             this.editorImageUrl = '';
@@ -1575,6 +1795,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorPicklistField = '';
             this.editorRadioOptionsText = '';
             this.editorLabelBold = false;
+            this.editorRequired = false;
             this.editorFieldBehavior = 'editable';
             this.editorConditionalEnabled = false;
             this.editorConditionalFieldKey = '';
@@ -1603,7 +1824,8 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorLabel = selected.label || '';
         this.editorElementType = selected.elementType === 'hidden' ? 'text' : (selected.elementType || 'text');
         this.editorLabelPosition = config.labelPosition === 'inline' ? 'above' : (config.labelPosition || 'above');
-        this.editorPlaceholder = config.defaultValue || config.placeholder || '';
+        this.editorDefaultValue = config.defaultValue || '';
+        this.editorPlaceholder = config.placeholder || '';
         this.editorDisplayText = config.html || config.text || '';
         this.editorImageUrl = config.imageUrl || '';
         this.editorImageAlt = config.altText || '';
@@ -1620,6 +1842,7 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorPicklistField = config.sourcePicklistFieldApiName || '';
         this.editorRadioOptionsText = this.radioOptionsText(config.options);
         this.editorLabelBold = config.labelBold === true;
+        this.editorRequired = config.required === true;
         this.editorFieldBehavior = config.fieldBehavior || (selected.elementType === 'hidden' ? 'hidden' : 'editable');
         this.editorConditionalEnabled = config.conditionalEnabled === true;
         this.editorConditionalFieldKey = config.conditionalFieldKey || '';
@@ -1659,13 +1882,18 @@ export default class NativeFormsDesigner extends LightningElement {
         }
 
         if (this.selectedElementSupportsDefaultValue) {
-            nextConfig.defaultValue = this.editorPlaceholder || '';
+            nextConfig.defaultValue = this.editorDefaultValue || '';
             delete nextConfig.placeholder;
             if (this.editorElementType === 'checkbox') {
-                nextConfig.checked = ['true', '1', 'yes', 'checked'].includes(String(this.editorPlaceholder || '').toLowerCase());
+                nextConfig.checked = ['true', '1', 'yes', 'checked'].includes(String(this.editorDefaultValue || '').toLowerCase());
             }
         } else {
             delete nextConfig.defaultValue;
+        }
+
+        if (this.selectedElementSupportsPlaceholder) {
+            nextConfig.placeholder = this.editorPlaceholder || '';
+        } else {
             delete nextConfig.placeholder;
         }
 
@@ -1697,6 +1925,12 @@ export default class NativeFormsDesigner extends LightningElement {
             nextConfig.labelBold = this.editorLabelBold;
         } else {
             delete nextConfig.labelBold;
+        }
+
+        if (this.selectedElementSupportsRequired) {
+            nextConfig.required = this.editorRequired === true;
+        } else {
+            delete nextConfig.required;
         }
 
         if (this.selectedElementSupportsFieldBehavior) {
@@ -1809,7 +2043,7 @@ export default class NativeFormsDesigner extends LightningElement {
         });
     }
 
-    applyEditorDraft() {
+    applyEditorDraft(shouldAutoSave = true) {
         if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
             return;
         }
@@ -1833,7 +2067,9 @@ export default class NativeFormsDesigner extends LightningElement {
             });
         });
         this.syncSelectedState();
-        this.scheduleAutoSave();
+        if (shouldAutoSave) {
+            this.scheduleAutoSave();
+        }
     }
 
     generatedFieldKey(elementType) {
@@ -1850,9 +2086,15 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
-        this.autoSaveTimeoutId = window.setTimeout(() => {
-            this.persistVisualSettings(false);
-        }, 500);
+        this.persistVisualSettings(false);
+    }
+
+    flushEditorDraftSave() {
+        if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
+            return;
+        }
+        window.clearTimeout(this.autoSaveTimeoutId);
+        this.persistVisualSettings(false);
     }
 
     async persistVisualSettings(showToast) {

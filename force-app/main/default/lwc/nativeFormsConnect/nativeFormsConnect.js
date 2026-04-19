@@ -113,7 +113,10 @@ export default class NativeFormsConnect extends LightningElement {
             normalized.includes('nativeforms_bootstrap') ||
             normalized.includes('nativeformsbootstrap') ||
             normalized.includes('nativeformslambd') ||
-            normalized.includes('principal access');
+            normalized.includes('principal access') ||
+            normalized.includes('setup access is not complete') ||
+            normalized.includes('permission-set access') ||
+            normalized.includes('permission set access');
 
         this.showPrincipalAccessHelp = isPrincipalAccessIssue;
 

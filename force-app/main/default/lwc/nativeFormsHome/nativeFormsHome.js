@@ -3,6 +3,8 @@ import { NavigationMixin } from 'lightning/navigation';
 import getHomeView from '@salesforce/apex/NativeFormsHomeController.getHomeView';
 import installDemoData from '@salesforce/apex/NativeFormsDemoDataController.installDemoData';
 
+const TEMP_UPGRADE_URL = 'https://twinaforms.com/upgrade/';
+
 export default class NativeFormsHome extends NavigationMixin(LightningElement) {
     homeView;
     isLoading = true;
@@ -63,11 +65,11 @@ export default class NativeFormsHome extends NavigationMixin(LightningElement) {
     }
 
     handleOpenUpgrade() {
-        this.navigateToUrl(this.homeView?.upgradeUrl);
+        this.navigateToUrl(TEMP_UPGRADE_URL);
     }
 
     handleOpenComparePlans() {
-        this.navigateToUrl(this.homeView?.comparePlansUrl);
+        this.navigateToUrl(TEMP_UPGRADE_URL);
     }
 
     navigateToUrl(url) {

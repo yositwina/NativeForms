@@ -110,6 +110,8 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean captchaKeysConfigured { get; set; }
         @AuraEnabled public String selectedVersionName { get; set; }
         @AuraEnabled public String selectedVersionStatus { get; set; }
+        @AuraEnabled public String selectedVersionSubmitSuccessMessage { get; set; }
+        @AuraEnabled public Boolean selectedVersionRtlEnabled { get; set; }
         @AuraEnabled public String selectedPublishedUrl { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
@@ -297,7 +299,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         List<NF_Form_Version__c> versionRecords = [
-            SELECT Id, Name, Version_Number__c, Version_Status__c, Publish_Status__c, LastModifiedDate
+            SELECT Id, Name, Version_Number__c, Version_Status__c, Publish_Status__c, LastModifiedDate, UI_Settings_JSON__c
             FROM NF_Form_Version__c
             WHERE Form__c = :effectiveFormId
             ORDER BY LastModifiedDate DESC
@@ -338,6 +340,11 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedVersionId = selectedVersion.Id;
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
+        Map<String, Object> versionUiSettings = parseJsonMap(selectedVersion.UI_Settings_JSON__c);
+        workspace.selectedVersionSubmitSuccessMessage = defaultSubmitSuccessMessage(
+            stringValue(versionUiSettings.get('submitSuccessMessage'))
+        );
+        workspace.selectedVersionRtlEnabled = booleanValue(versionUiSettings.get('rtlEnabled'));
         List<NF_Form_Publication__c> publicationRows = [
             SELECT Generated_HTML_Ref__c
             FROM NF_Form_Publication__c
@@ -398,20 +405,44 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static void updateFormSettings(Id formId, Id themeId, Boolean enableCaptcha) {
+    public static void updateFormSettings(Id formId, Id versionId, String formName, Id themeId, Boolean enableCaptcha, String submitSuccessMessage, Boolean rtlEnabled) {
         if (formId == null) {
             throw new AuraHandledException('Form id is required.');
         }
+        String normalizedFormName = String.isBlank(formName) ? null : formName.trim();
+        if (String.isBlank(normalizedFormName)) {
+            throw new AuraHandledException('Form name is required.');
+        }
 
         NF_Form__c formRecord = [
-            SELECT Id, Theme__c, Enable_Captcha__c
+            SELECT Id, Theme__c, Enable_Captcha__c, Description__c
             FROM NF_Form__c
             WHERE Id = :formId
             LIMIT 1
         ];
+        formRecord.Description__c = normalizedFormName;
         formRecord.Theme__c = themeId;
         formRecord.Enable_Captcha__c = enableCaptcha == true;
-        update formRecord;
+
+        List<SObject> recordsToUpdate = new List<SObject>{ formRecord };
+        if (versionId != null) {
+            NF_Form_Version__c versionRecord = [
+                SELECT Id, Form__c, UI_Settings_JSON__c
+                FROM NF_Form_Version__c
+                WHERE Id = :versionId
+                LIMIT 1
+            ];
+            if (versionRecord.Form__c != formId) {
+                throw new AuraHandledException('Selected version does not belong to the selected form.');
+            }
+            Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+            uiSettings.put('submitSuccessMessage', defaultSubmitSuccessMessage(submitSuccessMessage));
+            uiSettings.put('rtlEnabled', rtlEnabled == true);
+            versionRecord.UI_Settings_JSON__c = JSON.serializePretty(uiSettings);
+            recordsToUpdate.add(versionRecord);
+        }
+
+        update recordsToUpdate;
     }
 
     @AuraEnabled
@@ -901,17 +932,20 @@ public with sharing class NativeFormsDesignerController {
             config.put('defaultValue', 'Enter text');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'textarea') {
             config.put('defaultValue', 'Enter longer text');
             config.put('labelPosition', 'above');
             config.put('rows', 4);
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'number') {
             config.put('defaultValue', 'Enter number');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'date') {
             config.put('defaultValue', '');
@@ -919,32 +953,38 @@ public with sharing class NativeFormsDesignerController {
             config.put('fieldBehavior', 'editable');
             config.put('dateDisplayFormat', 'us');
             config.put('dateGmtOffset', '+00:00');
+            config.put('required', false);
         }
         if (elementType == 'email') {
             config.put('defaultValue', 'name@example.com');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'tel') {
             config.put('defaultValue', 'Phone number');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'url') {
             config.put('defaultValue', 'https://example.com');
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'checkbox') {
             config.put('checked', false);
             config.put('defaultValue', 'false');
             config.put('labelPosition', 'inline');
             config.put('fieldBehavior', 'editable');
+            config.put('required', false);
         }
         if (elementType == 'select' || elementType == 'radio') {
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('defaultValue', 'option1');
+            config.put('required', false);
             config.put('options', new List<Object>{
                 new Map<String, Object>{ 'label' => 'Option 1', 'value' => 'option1' },
                 new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
@@ -992,6 +1032,22 @@ public with sharing class NativeFormsDesignerController {
 
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private static Boolean booleanValue(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return String.valueOf(value).toLowerCase() == 'true';
+    }
+
+    private static String defaultSubmitSuccessMessage(String value) {
+        return String.isBlank(value)
+            ? 'Your form was submitted successfully.'
+            : value.trim();
     }
 
     private static Map<String, Object> parseJsonMap(String rawJson) {

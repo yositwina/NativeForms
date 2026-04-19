@@ -19,6 +19,7 @@ Defer to `Architect` when a change affects AWS contracts, product scope, or syst
 
 ### AWS Expert
 Own Lambda, DynamoDB, plan/tenant model, admin API, runtime endpoints, and trust/auth behavior.
+Use `skills/aws/auth.md` for trust/auth rules and `skills/aws/infrastructure.md` for region, S3, domain, and deployment-target facts.
 Defer to `Architect` when a change reshapes publish flow or product boundaries.
 
 ### UX Expert

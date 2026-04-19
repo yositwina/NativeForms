@@ -131,7 +131,7 @@
                     <section class="pane pane-center">
                         <template if:true={elements.length}>
                             <div class="designer-canvas-shell" style={designerCanvasThemeStyle}>
-                                <div class="designer-form-surface">
+                                <div class={designerFormSurfaceClass} dir={designerFormDirection}>
                                 <div class="designer-form-toolbar">
                                     <button
                                         type="button"
@@ -213,7 +213,7 @@
                                                                             <template lwc:if={child.isCheckbox}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
                                                                                     <div class="preview-checkbox__control">
                                                                                         <input type="checkbox" disabled />
@@ -240,9 +240,9 @@
                                                                             <template lwc:elseif={child.isSelect}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <select disabled>
+                                                                                    <select dir={child.previewInputDirection} disabled>
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <option key={option.value}>{option.label}</option>
                                                                                         </template>
@@ -259,7 +259,7 @@
                                                                             <template lwc:elseif={child.isRadio}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
                                                                                     <div class="preview-radio-group">
                                                                                         <template for:each={child.previewOptions} for:item="option">
@@ -274,9 +274,9 @@
                                                                             <template lwc:elseif={child.isTextarea}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <textarea disabled>{child.previewPlaceholder}</textarea>
+                                                                                    <textarea dir={child.previewInputDirection} placeholder={child.previewPlaceholder} disabled>{child.previewValue}</textarea>
                                                                                     <template if:true={child.validationPattern}>
                                                                                         <div class="preview-validation-hint">{child.validationPattern}</div>
                                                                                     </template>
@@ -285,9 +285,9 @@
                                                                             <template lwc:else>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <input type={child.previewInputType} value={child.previewPlaceholder} disabled />
+                                                                                    <input type={child.previewInputType} dir={child.previewInputDirection} value={child.previewValue} placeholder={child.previewPlaceholder} disabled />
                                                                                     <template if:true={child.validationPattern}>
                                                                                         <div class="preview-validation-hint">{child.validationPattern}</div>
                                                                                     </template>
@@ -355,7 +355,7 @@
                                                                             <template lwc:if={child.isCheckbox}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
                                                                                     <div class="preview-checkbox__control">
                                                                                         <input type="checkbox" checked={child.previewChecked} disabled />
@@ -382,9 +382,9 @@
                                                                             <template lwc:elseif={child.isSelect}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <select value={child.previewPlaceholder} disabled>
+                                                                                    <select dir={child.previewInputDirection} value={child.previewPlaceholder} disabled>
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <option key={option.value}>{option.label}</option>
                                                                                         </template>
@@ -394,7 +394,7 @@
                                                                             <template lwc:elseif={child.isRadio}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
                                                                                     <div class="preview-radio-group">
                                                                                         <template for:each={child.previewOptions} for:item="option">
@@ -409,17 +409,17 @@
                                                                             <template lwc:elseif={child.isTextarea}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <textarea disabled>{child.previewPlaceholder}</textarea>
+                                                                                    <textarea dir={child.previewInputDirection} placeholder={child.previewPlaceholder} disabled>{child.previewValue}</textarea>
                                                                                 </div>
                                                                             </template>
                                                                             <template lwc:else>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
-                                                                                        <label class={child.labelClass}>{child.label}</label>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <input type={child.previewInputType} value={child.previewPlaceholder} disabled />
+                                                                                    <input type={child.previewInputType} dir={child.previewInputDirection} value={child.previewValue} placeholder={child.previewPlaceholder} disabled />
                                                                                 </div>
                                                                             </template>
                                                                         </article>
@@ -438,7 +438,7 @@
                                         <template lwc:elseif={row.item.isCheckbox}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
-                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
                                                 </template>
                                                 <div class="preview-checkbox__control">
                                                     <input type="checkbox" checked={row.item.previewChecked} disabled />
@@ -468,9 +468,9 @@
                                         <template lwc:elseif={row.item.isSelect}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
-                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
                                                 </template>
-                                                <select value={row.item.previewPlaceholder} disabled>
+                                                <select dir={row.item.previewInputDirection} value={row.item.previewPlaceholder} disabled>
                                                     <template for:each={row.item.previewOptions} for:item="option">
                                                         <option key={option.value}>{option.label}</option>
                                                     </template>
@@ -488,7 +488,7 @@
                                         <template lwc:elseif={row.item.isRadio}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
-                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
                                                 </template>
                                                 <div class="preview-radio-group">
                                                     <template for:each={row.item.previewOptions} for:item="option">
@@ -504,9 +504,9 @@
                                         <template lwc:elseif={row.item.isTextarea}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
-                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
                                                 </template>
-                                                <textarea disabled>{row.item.previewPlaceholder}</textarea>
+                                                <textarea dir={row.item.previewInputDirection} placeholder={row.item.previewPlaceholder} disabled>{row.item.previewValue}</textarea>
                                                 <template if:true={row.item.validationPattern}>
                                                     <div class="preview-validation-hint">{row.item.validationPattern}</div>
                                                 </template>
@@ -516,9 +516,9 @@
                                         <template lwc:else>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
-                                                    <label class={row.item.labelClass}>{row.item.label}</label>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
                                                 </template>
-                                                <input type={row.item.previewInputType} value={row.item.previewPlaceholder} disabled />
+                                                <input type={row.item.previewInputType} dir={row.item.previewInputDirection} value={row.item.previewValue} placeholder={row.item.previewPlaceholder} disabled />
                                                 <template if:true={row.item.validationPattern}>
                                                     <div class="preview-validation-hint">{row.item.validationPattern}</div>
                                                 </template>
@@ -571,7 +571,7 @@
                                 <lightning-input
                                     label="Field Label"
                                     value={editorLabel}
-                                    onchange={handleEditorLabelChange}>
+                                    onblur={handleEditorLabelCommit}>
                                 </lightning-input>
 
                                 <template if:true={selectedElementSupportsBoldLabel}>
@@ -607,8 +607,16 @@
                                 <template if:true={selectedElementSupportsDefaultValue}>
                                     <lightning-input
                                         label="Default Value"
+                                        value={editorDefaultValue}
+                                        onblur={handleEditorDefaultValueCommit}>
+                                    </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementSupportsPlaceholder}>
+                                    <lightning-input
+                                        label="Placeholder Text"
                                         value={editorPlaceholder}
-                                        onchange={handleEditorPlaceholderChange}>
+                                        onblur={handleEditorPlaceholderCommit}>
                                     </lightning-input>
                                 </template>
 
@@ -709,6 +717,14 @@
 
                             <div class="selection-card">
                                 <p class="selection-label">Behavior</p>
+                                <template if:true={selectedElementSupportsRequired}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Required"
+                                        checked={editorRequired}
+                                        onchange={handleEditorRequiredChange}>
+                                    </lightning-input>
+                                </template>
                                 <template if:true={selectedElementSupportsBehaviorFieldBehavior}>
                                     <div class="behavior-radio-group">
                                         <div class="behavior-radio-group__label-row">
@@ -735,12 +751,12 @@
                                     <lightning-input
                                         label="Min Value"
                                         value={editorMinValue}
-                                        onchange={handleEditorMinValueChange}>
+                                        onblur={handleEditorMinValueCommit}>
                                     </lightning-input>
                                     <lightning-input
                                         label="Max Value"
                                         value={editorMaxValue}
-                                        onchange={handleEditorMaxValueChange}>
+                                        onblur={handleEditorMaxValueCommit}>
                                     </lightning-input>
                                 </template>
 
@@ -749,13 +765,13 @@
                                         type="date"
                                         label="From Date"
                                         value={editorMinValue}
-                                        onchange={handleEditorMinValueChange}>
+                                        onblur={handleEditorMinValueCommit}>
                                     </lightning-input>
                                     <lightning-input
                                         type="date"
                                         label="To Date"
                                         value={editorMaxValue}
-                                        onchange={handleEditorMaxValueChange}>
+                                        onblur={handleEditorMaxValueCommit}>
                                     </lightning-input>
                                 </template>
 
@@ -792,7 +808,7 @@
                                             <lightning-input
                                                 label="Compare Value"
                                                 value={editorConditionalValue}
-                                                onchange={handleEditorConditionalValueChange}>
+                                                onblur={handleEditorConditionalValueCommit}>
                                             </lightning-input>
                                         </template>
                                     </template>
@@ -817,7 +833,7 @@
                                     <lightning-textarea
                                         label="Radio Options"
                                         value={editorRadioOptionsText}
-                                        onchange={handleEditorRadioOptionsChange}>
+                                        onblur={handleEditorRadioOptionsCommit}>
                                     </lightning-textarea>
                                 </template>
 
@@ -839,12 +855,12 @@
                                     <lightning-input
                                         label="Image URL"
                                         value={editorImageUrl}
-                                        onchange={handleEditorImageUrlChange}>
+                                        onblur={handleEditorImageUrlCommit}>
                                     </lightning-input>
                                     <lightning-input
                                         label="Alt Text"
                                         value={editorImageAlt}
-                                        onchange={handleEditorImageAltChange}>
+                                        onblur={handleEditorImageAltCommit}>
                                     </lightning-input>
                                     <lightning-combobox
                                         label="Image Fit"
@@ -954,10 +970,13 @@
                             <div class="selection-card">
                                 <p class="selection-label">General</p>
 
-                                <p class="property-inline-text">
-                                    <span class="property-inline-text__label">Form:</span>
-                                    <span class="property-inline-text__value">{selectedFormName}</span>
-                                </p>
+                                <lightning-input
+                                    type="text"
+                                    label="Form Name"
+                                    value={draftFormName}
+                                    oninput={handleFormNameInput}
+                                    onblur={handleFormNameBlur}>
+                                </lightning-input>
 
                                 <lightning-combobox
                                     label="Theme"
@@ -976,6 +995,30 @@
                                     checked={selectedFormCaptchaEnabled}
                                     onchange={handleFormCaptchaChange}>
                                 </lightning-input>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Direction</p>
+
+                                <lightning-input
+                                    type="checkbox"
+                                    label="Enable right-to-left (RTL) layout"
+                                    checked={draftRtlEnabled}
+                                    onchange={handleFormRtlChange}>
+                                </lightning-input>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Submit Result</p>
+
+                                <lightning-textarea
+                                    label="Success Message"
+                                    value={draftSubmitSuccessMessage}
+                                    max-length="255"
+                                    message-when-too-long="Keep the success message under 255 characters."
+                                    oninput={handleSubmitSuccessMessageInput}
+                                    onblur={handleSubmitSuccessMessageBlur}>
+                                </lightning-textarea>
                             </div>
                         </template>
                     </section>

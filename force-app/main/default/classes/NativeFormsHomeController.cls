@@ -83,7 +83,7 @@ public with sharing class NativeFormsHomeController {
             view.connection = buildConnectionSummary(connectionStatus);
         } catch (Exception e) {
             view.success = false;
-            view.errorMessage = e.getMessage();
+            view.errorMessage = 'TwinaForms Home could not load the latest connection details.';
         }
 
         try {
@@ -91,7 +91,7 @@ public with sharing class NativeFormsHomeController {
             applyAwsHomeSummary(view, homeSummary);
         } catch (Exception e) {
             view.success = false;
-            view.errorMessage = appendError(view.errorMessage, e.getMessage());
+            view.errorMessage = appendError(view.errorMessage, 'Plan and usage details are temporarily unavailable.');
         }
 
         return view;
@@ -214,14 +214,11 @@ public with sharing class NativeFormsHomeController {
         HttpResponse response = new Http().send(request);
         Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
         if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-            String errorMessage = responseBody != null && responseBody.containsKey('error')
-                ? String.valueOf(responseBody.get('error'))
-                : 'Unable to load TwinaForms home summary.';
-            throw new AuraHandledException(errorMessage);
+            throw new AuraHandledException('Plan and usage details are temporarily unavailable.');
         }
 
         if (responseBody == null || !booleanValue(responseBody, 'success')) {
-            throw new AuraHandledException(stringValue(responseBody, 'error'));
+            throw new AuraHandledException('Plan and usage details are temporarily unavailable.');
         }
 
         return responseBody;

@@ -13,6 +13,7 @@ Use for package-visible metadata, object changes, tabs/apps/pages, Apex/LWC chan
 - Assume clean-org validation matters; package work is not done until setup, connect, publish, and core usage make sense without internal knowledge.
 - Starter package polish, demo quality, Apex tests, and install/post-install guidance are release-critical.
 - Default Salesforce deployment alias for this repo is `NativeFormsDev` unless the user explicitly asks for a different org.
+- When changing a Salesforce page design, bump the page version label shown in the UI (for example `Designer v9.4` in the top-left of the Designer page) so the rendered screen reflects the latest design revision.
 
 ## Escalate When
 - A change introduces metadata or behavior that may fail in a clean org or subscriber org.

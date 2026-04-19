@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TwinaForms Upgrade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/upgrade/styles.css?v=20260417-2">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <p class="eyebrow">TwinaForms Plans</p>
+      <h1>Choose the plan that fits your form operations.</h1>
+      <p class="hero-copy">A simple view of plan limits and included features, powered by the same DynamoDB plan definitions used inside TwinaForms.</p>
+    </section>
+
+    <section class="plans-section" aria-live="polite">
+      <div id="statusMessage" class="status-message">Loading plans...</div>
+      <div id="plansGrid" class="plans-grid" hidden></div>
+    </section>
+  </main>
+
+  <script id="planMarketingData" type="application/json">
+    {
+      "descriptions": {
+        "free": "Permanent low-volume entry plan.",
+        "starter": "Ready to go live with production forms.",
+        "pro": "Full plan with no product limits."
+      },
+      "commonFeatures": [
+        {
+          "key": "native-builder",
+          "label": "Native Salesforce Form Builder",
+          "description": "A truly native TwinaForms experience built to work directly with Salesforce."
+        },
+        {
+          "key": "native-prefill",
+          "label": "Native Prefill",
+          "description": "Bring Salesforce data into forms with built-in native prefill behavior."
+        },
+        {
+          "key": "native-submit",
+          "label": "Native Submit",
+          "description": "Send form results back into Salesforce with native submit actions."
+        },
+        {
+          "key": "any-object",
+          "label": "Any Standard Or Custom Object",
+          "description": "Build against the Salesforce objects your org already uses, including custom objects."
+        },
+        {
+          "key": "anyone-can-use",
+          "label": "Anyone Can Use It",
+          "description": "Published forms are designed for external users, not just Salesforce license holders."
+        },
+        {
+          "key": "rtl-support",
+          "label": "RTL Language Support",
+          "description": "Build forms for right-to-left languages like Hebrew and Arabic with native RTL layout support."
+        }
+      ]
+    }
+  </script>
+
+  <template id="planCardTemplate">
+    <article class="plan-card">
+      <div class="plan-card__header">
+        <div>
+          <p class="plan-card__eyebrow"></p>
+          <h2 class="plan-card__title"></h2>
+        </div>
+        <span class="plan-card__pill"></span>
+      </div>
+      <p class="plan-card__description"></p>
+      <div class="plan-card__limits"></div>
+      <section class="plan-card__features-section">
+        <h3>Included features</h3>
+        <p class="plan-card__features-intro" hidden></p>
+        <ul class="plan-card__features"></ul>
+      </section>
+    </article>
+  </template>
+
+  <script src="/upgrade/app-v3.js?v=20260417-3" type="module"></script>
+</body>
+</html>
