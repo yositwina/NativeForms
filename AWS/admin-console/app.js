@@ -28,8 +28,8 @@ const FEATURE_FLAG_METADATA = {
     description: "Add an extra verification step with a secret code for more sensitive workflows."
   },
   enableProLoadFile: {
-    label: "File Load Support",
-    description: "Support advanced file-loading behavior as part of the form experience and submission flow."
+    label: "File Uploads",
+    description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
@@ -1125,6 +1125,18 @@ function renderDetail(items) {
       <div class="detail-block">
         <p class="detail-block__label">Status Reason</p>
         <p class="detail-block__value">${escapeHtml(selectedTenant.statusReason || "No current alert reason")}</p>
+      </div>
+      <div class="detail-block">
+        <p class="detail-block__label">Trial Window</p>
+        <p class="detail-block__value">${escapeHtml(formatDate(selectedTenant.trialStartedAt))} - ${escapeHtml(formatDate(selectedTenant.trialEndsAt))}</p>
+      </div>
+      <div class="detail-block">
+        <p class="detail-block__label">Location</p>
+        <p class="detail-block__value">${escapeHtml([
+          selectedTenant.city,
+          selectedTenant.state,
+          selectedTenant.country
+        ].filter(Boolean).join(", ") || "Not set")}</p>
       </div>
     </div>
 

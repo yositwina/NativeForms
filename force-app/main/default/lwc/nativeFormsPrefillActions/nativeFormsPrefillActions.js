@@ -884,7 +884,8 @@ export default class NativeFormsPrefillActions extends LightningElement {
 
     loadStoredVersionId() {
         try {
-            return window.sessionStorage.getItem(DESIGNER_VERSION_KEY);
+            return window.localStorage.getItem(DESIGNER_VERSION_KEY)
+                || window.sessionStorage.getItem(DESIGNER_VERSION_KEY);
         } catch (e) {
             return null;
         }

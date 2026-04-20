@@ -570,7 +570,7 @@ Example:
 - raw flags:
   - `enableProRepeatGroups`
   - `enableProFormulaFields`
-  - `enableProLoadFile`
+  - `enableProLoadFile` (`File Uploads`)
 - customer-facing home tile:
   - `Advanced Pro Features`
 

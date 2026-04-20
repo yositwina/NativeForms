@@ -100,6 +100,7 @@ public with sharing class NativeFormsPrefillActionsController {
                    Version_Number__c,
                    Version_Status__c,
                    Form__r.Name,
+                   Form__r.Description__c,
                    LastModifiedDate
             FROM NF_Form_Version__c
             ORDER BY LastModifiedDate DESC
@@ -109,7 +110,9 @@ public with sharing class NativeFormsPrefillActionsController {
         for (NF_Form_Version__c versionRecord : versions) {
             VersionOption option = new VersionOption();
             option.value = versionRecord.Id;
-            option.label = versionRecord.Form__r.Name + ' - ' + formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
+            option.label = displayFormName(versionRecord.Form__r.Description__c, versionRecord.Form__r.Name)
+                + ' - '
+                + formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
             option.status = versionRecord.Version_Status__c;
             workspace.versions.add(option);
         }
@@ -123,7 +126,7 @@ public with sharing class NativeFormsPrefillActionsController {
         }
 
         NF_Form_Version__c selectedVersion = [
-            SELECT Id, Name, Version_Number__c, Version_Status__c, Form__r.Name
+            SELECT Id, Name, Version_Number__c, Version_Status__c, Form__r.Name, Form__r.Description__c
             FROM NF_Form_Version__c
             WHERE Id = :effectiveVersionId
             LIMIT 1
@@ -131,7 +134,7 @@ public with sharing class NativeFormsPrefillActionsController {
         workspace.selectedVersionId = selectedVersion.Id;
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
-        workspace.selectedFormName = selectedVersion.Form__r.Name;
+        workspace.selectedFormName = displayFormName(selectedVersion.Form__r.Description__c, selectedVersion.Form__r.Name);
 
         Integer actionNumber = 1;
         for (NF_Form_Action__c actionRecord : [
@@ -330,6 +333,10 @@ public with sharing class NativeFormsPrefillActionsController {
             return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
         }
         return fallbackName;
+    }
+
+    private static String displayFormName(String descriptionValue, String fallbackName) {
+        return String.isBlank(descriptionValue) ? fallbackName : descriptionValue;
     }
 
     private static List<SelectOption> getObjectOptions() {

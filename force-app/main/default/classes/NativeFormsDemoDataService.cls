@@ -1,7 +1,7 @@
 public with sharing class NativeFormsDemoDataService {
-    public static final String DEMO_DATA_VERSION = '1.0';
-    private static final String CONTACT_UPDATE_FORM_KEY = 'DEMO_CONTACT_UPDATE';
-    private static final String CASE_UPDATE_FORM_KEY = 'DEMO_CASE_UPDATE';
+    public static final String DEMO_DATA_VERSION = '2.1';
+    private static final String CONTACT_UPDATE_FORM_LABEL = 'Contact details update demo';
+    private static final String CASE_UPDATE_FORM_LABEL = 'Prefill multi record demo';
 
     public class HomeSnapshot {
         @AuraEnabled public Boolean demoDataInstalled { get; set; }
@@ -43,6 +43,11 @@ public with sharing class NativeFormsDemoDataService {
     private class DemoFormContext {
         public NF_Form__c formRecord;
         public NF_Form_Version__c versionRecord;
+    }
+
+    private class DemoFormKeyBundle {
+        public String contactUpdateKey;
+        public String caseUpdateKey;
     }
 
     public static HomeSnapshot getHomeSnapshot() {
@@ -182,6 +187,8 @@ public with sharing class NativeFormsDemoDataService {
 
     private static DemoTracker collectExistingDemoTracker() {
         DemoTracker tracker = new DemoTracker();
+        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
+        DemoTracker trackedIds = config == null ? new DemoTracker() : parseTracker(config.Demo_Data_Record_Ids__c);
 
         for (NF_Theme__c row : [
             SELECT Id
@@ -201,12 +208,29 @@ public with sharing class NativeFormsDemoDataService {
             contactsByEmail.put(row.Email, row);
         }
 
-        for (NF_Form__c row : [
-            SELECT Id
-            FROM NF_Form__c
-            WHERE NF_Key__c IN :new Set<String>{ CONTACT_UPDATE_FORM_KEY, CASE_UPDATE_FORM_KEY }
-        ]) {
-            tracker.formIds.add(row.Id);
+        Set<Id> trackedFormIds = new Set<Id>();
+        trackedFormIds.addAll(trackedIds.formIds);
+        if (!trackedFormIds.isEmpty()) {
+            for (NF_Form__c row : [
+                SELECT Id, NF_Key__c, Description__c
+                FROM NF_Form__c
+                WHERE NF_Key__c LIKE 'form%'
+                   OR Id IN :trackedFormIds
+            ]) {
+                if (row.Description__c == CONTACT_UPDATE_FORM_LABEL || row.Description__c == CASE_UPDATE_FORM_LABEL) {
+                    tracker.formIds.add(row.Id);
+                }
+            }
+        } else {
+            for (NF_Form__c row : [
+                SELECT Id, NF_Key__c, Description__c
+                FROM NF_Form__c
+                WHERE NF_Key__c LIKE 'form%'
+            ]) {
+                if (row.Description__c == CONTACT_UPDATE_FORM_LABEL || row.Description__c == CASE_UPDATE_FORM_LABEL) {
+                    tracker.formIds.add(row.Id);
+                }
+            }
         }
 
         Set<Id> contactIds = new Set<Id>();
@@ -303,10 +327,10 @@ public with sharing class NativeFormsDemoDataService {
 
     private static void ensureCases(Map<String, Contact> contactsByEmail, DemoTracker tracker) {
         List<Case> seededCases = new List<Case>{
-            new Case(ContactId = contactsByEmail.get('ava.reynolds@example.com').Id, Subject = 'Laptop VPN issue', Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'New', 'Working', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Web', 'Email', 'Phone' }), Description = 'User cannot connect to VPN after password reset.'),
-            new Case(ContactId = contactsByEmail.get('ava.reynolds@example.com').Id, Subject = 'Benefits enrollment question', Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'Working', 'New', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Email', 'Web', 'Phone' }), Description = 'Needs help understanding medical coverage options.'),
-            new Case(ContactId = contactsByEmail.get('liam.carter@example.com').Id, Subject = 'Software installation request', Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'New', 'Working', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Phone', 'Web', 'Email' }), Description = 'Requests Adobe Acrobat installation on new laptop.'),
-            new Case(ContactId = contactsByEmail.get('liam.carter@example.com').Id, Subject = 'Monitor replacement', Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'Escalated', 'Working', 'New' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Web', 'Email', 'Phone' }), Description = 'Second monitor intermittently disconnects during workday.')
+            new Case(ContactId = contactsByEmail.get('ava.reynolds@example.com').Id, Subject = 'Laptop VPN issue', Priority = pickPreferredPicklistValue(Case.Priority, new List<String>{ 'High', 'Medium', 'Low' }), Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'New', 'Working', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Web', 'Email', 'Phone' }), Description = 'User cannot connect to VPN after password reset.'),
+            new Case(ContactId = contactsByEmail.get('ava.reynolds@example.com').Id, Subject = 'Benefits enrollment question', Priority = pickPreferredPicklistValue(Case.Priority, new List<String>{ 'Medium', 'High', 'Low' }), Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'Working', 'New', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Email', 'Web', 'Phone' }), Description = 'Needs help understanding medical coverage options.'),
+            new Case(ContactId = contactsByEmail.get('liam.carter@example.com').Id, Subject = 'Software installation request', Priority = pickPreferredPicklistValue(Case.Priority, new List<String>{ 'Low', 'Medium', 'High' }), Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'New', 'Working', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Phone', 'Web', 'Email' }), Description = 'Requests Adobe Acrobat installation on new laptop.'),
+            new Case(ContactId = contactsByEmail.get('liam.carter@example.com').Id, Subject = 'Monitor replacement', Priority = pickPreferredPicklistValue(Case.Priority, new List<String>{ 'High', 'Medium', 'Low' }), Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'Escalated', 'Working', 'New' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Web', 'Email', 'Phone' }), Description = 'Second monitor intermittently disconnects during workday.')
         };
 
         Map<String, Case> existingByKey = new Map<String, Case>();
@@ -340,26 +364,62 @@ public with sharing class NativeFormsDemoDataService {
     }
 
     private static void ensureDemoForms(Map<String, NF_Theme__c> themesByName, DemoTracker tracker) {
-        DemoFormContext contactUpdate = ensureFormRecord(CONTACT_UPDATE_FORM_KEY, 'Contact Update Demo seeded form with contact prefill and contact update submit.', themesByName.get('Clean Light'));
+        DemoFormKeyBundle formKeys = resolveDemoFormKeys();
+        DemoFormContext contactUpdate = ensureFormRecord(
+            formKeys.contactUpdateKey,
+            CONTACT_UPDATE_FORM_LABEL,
+            'Starter demo with contact prefill by URL parameter and find-or-create contact submit.',
+            themesByName.get('Clean Light'),
+            true,
+            'email'
+        );
         clearVersionArtifacts(contactUpdate.versionRecord.Id);
         insertContactUpdateArtifacts(contactUpdate, tracker);
 
-        DemoFormContext caseUpdate = ensureFormRecord(CASE_UPDATE_FORM_KEY, 'Case Update Demo seeded form with contact prefill and case repeat group editing.', themesByName.get('Ocean Blue'));
+        DemoFormContext caseUpdate = ensureFormRecord(
+            formKeys.caseUpdateKey,
+            CASE_UPDATE_FORM_LABEL,
+            'Starter demo with contact prefill and repeat-group case editing.',
+            themesByName.get('Ocean Blue'),
+            true,
+            'email'
+        );
         clearVersionArtifacts(caseUpdate.versionRecord.Id);
         insertCaseUpdateArtifacts(caseUpdate, tracker);
     }
 
-    private static DemoFormContext ensureFormRecord(String formKey, String description, NF_Theme__c themeRecord) {
+    private static DemoFormContext ensureFormRecord(
+        String formKey,
+        String displayName,
+        String description,
+        NF_Theme__c themeRecord,
+        Boolean captchaEnabled,
+        String prefillParamKey
+    ) {
         NF_Form__c formRecord;
-        List<NF_Form__c> forms = [SELECT Id, Theme__c, Description__c, Status__c, Current_Draft_Version__c FROM NF_Form__c WHERE NF_Key__c = :formKey LIMIT 1];
+        List<NF_Form__c> forms = [
+            SELECT Id, Theme__c, Description__c, Status__c, Current_Draft_Version__c, Enable_Captcha__c, NF_Key__c
+            FROM NF_Form__c
+            WHERE NF_Key__c = :formKey
+            ORDER BY LastModifiedDate DESC
+            LIMIT 1
+        ];
         if (forms.isEmpty()) {
-            formRecord = new NF_Form__c(NF_Key__c = formKey, Description__c = description, Status__c = 'Draft', Theme__c = themeRecord != null ? themeRecord.Id : null);
+            formRecord = new NF_Form__c(
+                NF_Key__c = formKey,
+                Description__c = displayName,
+                Status__c = 'Draft',
+                Theme__c = themeRecord != null ? themeRecord.Id : null,
+                Enable_Captcha__c = captchaEnabled == true
+            );
             insert formRecord;
         } else {
             formRecord = forms[0];
-            formRecord.Description__c = description;
+            formRecord.NF_Key__c = formKey;
+            formRecord.Description__c = displayName;
             formRecord.Status__c = 'Draft';
             formRecord.Theme__c = themeRecord != null ? themeRecord.Id : null;
+            formRecord.Enable_Captcha__c = captchaEnabled == true;
             update formRecord;
         }
 
@@ -372,7 +432,7 @@ public with sharing class NativeFormsDemoDataService {
                 Version_Status__c = 'Draft',
                 Publish_Status__c = 'Never Published',
                 Security_Mode__c = pickPreferredPicklistValue(NF_Form_Version__c.Security_Mode__c, new List<String>{ 'secure-edit', 'public-prefill', 'public-create' }),
-                Prefill_Params_JSON__c = '[{\"key\":\"email\",\"label\":\"Email\",\"required\":true}]'
+                Prefill_Params_JSON__c = '[{\"key\":\"' + escapeJsonValue(prefillParamKey) + '\",\"label\":\"Email\",\"required\":true}]'
             );
             insert versionRecord;
         } else {
@@ -380,7 +440,7 @@ public with sharing class NativeFormsDemoDataService {
             versionRecord.Version_Status__c = 'Draft';
             versionRecord.Publish_Status__c = 'Never Published';
             versionRecord.Security_Mode__c = pickPreferredPicklistValue(NF_Form_Version__c.Security_Mode__c, new List<String>{ 'secure-edit', 'public-prefill', 'public-create' });
-            versionRecord.Prefill_Params_JSON__c = '[{\"key\":\"email\",\"label\":\"Email\",\"required\":true}]';
+            versionRecord.Prefill_Params_JSON__c = '[{\"key\":\"' + escapeJsonValue(prefillParamKey) + '\",\"label\":\"Email\",\"required\":true}]';
             update versionRecord;
         }
 
@@ -406,7 +466,7 @@ public with sharing class NativeFormsDemoDataService {
 
     private static void insertContactUpdateArtifacts(DemoFormContext context, DemoTracker tracker) {
         List<NF_Form_Action__c> actions = new List<NF_Form_Action__c>{
-            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Prefill', Command_Key__c = 'prefillAction1', Command_Type__c = 'findOne', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'foundContact1', Order__c = 10, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Prefill', Command_Key__c = 'prefillAction1', Command_Type__c = 'findOne', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'PrefilContact', Order__c = 10, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
                 'where' => 'Email = {params.email}',
                 'conditions' => new List<Object>{
                     new Map<String, Object>{
@@ -420,17 +480,31 @@ public with sharing class NativeFormsDemoDataService {
                 'conditionExpression' => '1',
                 'onNotFound' => 'ignore'
             })),
-            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Submit', Command_Key__c = 'submitAction1', Command_Type__c = 'update', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'savedRecord1', Order__c = 20, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{ 'targetBy' => 'id', 'recordIdSource' => '{input.contactId}' }))
+            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Submit', Command_Key__c = 'submitAction1', Command_Type__c = 'findAndUpdate', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'SubmitContact', Order__c = 20, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'targetBy' => 'where',
+                'where' => 'Email = {input.email}',
+                'onNotFound' => 'create',
+                'conditions' => new List<Object>{
+                    new Map<String, Object>{
+                        'fieldApiName' => 'Email',
+                        'operator' => 'eq',
+                        'valueSource' => 'field',
+                        'valueText' => 'email'
+                    }
+                },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1'
+            }))
         };
         insert actions;
 
         List<NF_Form_Element__c> elements = new List<NF_Form_Element__c>{
-            element(context.versionRecord.Id, 'heading_contact_update', 'heading', 'contactUpdateHeading', 'Update Your Contact Details', 10, JSON.serializePretty(new Map<String, Object>{ 'html' => '<p>Update Your Contact Details</p>' }), null),
-            element(context.versionRecord.Id, 'contact_id', 'text', 'contactId', 'Contact Id', 20, fieldConfig('', 'above', 'hidden', true, 'foundContact1', 'Id', false, null, null), null),
-            element(context.versionRecord.Id, 'first_name', 'text', 'firstName', 'First Name', 30, fieldConfig('Enter first name', 'above', 'editable', true, 'foundContact1', 'FirstName', true, 'submitAction1', 'FirstName'), null),
-            element(context.versionRecord.Id, 'last_name', 'text', 'lastName', 'Last Name', 40, fieldConfig('Enter last name', 'above', 'editable', true, 'foundContact1', 'LastName', true, 'submitAction1', 'LastName'), null),
-            element(context.versionRecord.Id, 'email_address', 'email', 'email', 'Email', 50, fieldConfig('name@example.com', 'above', 'editable', true, 'foundContact1', 'Email', true, 'submitAction1', 'Email'), null),
-            element(context.versionRecord.Id, 'phone_number', 'tel', 'phone', 'Phone', 60, fieldConfig('Phone number', 'above', 'editable', true, 'foundContact1', 'Phone', true, 'submitAction1', 'Phone'), null)
+            element(context.versionRecord.Id, 'contact_details_section', 'section', 'contactDetailsSection', 'Contact details', 10, sectionConfig(2, true, true, ''), null),
+            element(context.versionRecord.Id, 'contact_first_name', 'text', 'firstName', 'First Name', 20, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'FirstName', true, 'submitAction1', 'FirstName'), 1), 'contact_details_section'),
+            element(context.versionRecord.Id, 'contact_last_name', 'text', 'lastName', 'Last Name', 30, withSectionColumn(fieldConfig('', 'above', 'editable', true, true, 'PrefilContact', 'LastName', true, 'submitAction1', 'LastName'), 2), 'contact_details_section'),
+            element(context.versionRecord.Id, 'contact_email', 'email', 'email', 'Email', 40, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'Email', true, 'submitAction1', 'Email'), 1), 'contact_details_section'),
+            element(context.versionRecord.Id, 'contact_phone', 'tel', 'phone', 'Phone', 50, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'Phone', true, 'submitAction1', 'Phone'), 2), 'contact_details_section'),
+            element(context.versionRecord.Id, 'contact_email_opt_in', 'checkbox', 'acceptEmails', 'I agree to accept emails', 60, withSectionColumn(checkboxConfig(false, false, false, null, null, false, null, null), 1), 'contact_details_section')
         };
         insert elements;
 
@@ -442,7 +516,7 @@ public with sharing class NativeFormsDemoDataService {
 
     private static void insertCaseUpdateArtifacts(DemoFormContext context, DemoTracker tracker) {
         List<NF_Form_Action__c> actions = new List<NF_Form_Action__c>{
-            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Prefill', Command_Key__c = 'prefillAction1', Command_Type__c = 'findOne', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'foundContact1', Order__c = 10, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Prefill', Command_Key__c = 'prefillAction1', Command_Type__c = 'findOne', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'PrefilContact', Order__c = 10, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
                 'where' => 'Email = {params.email}',
                 'conditions' => new List<Object>{
                     new Map<String, Object>{
@@ -456,14 +530,14 @@ public with sharing class NativeFormsDemoDataService {
                 'conditionExpression' => '1',
                 'onNotFound' => 'ignore'
             })),
-            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Prefill', Command_Key__c = 'prefillAction2', Command_Type__c = 'findMany', Object_Api_Name__c = 'Case', Store_Result_As__c = 'foundCases1', Order__c = 20, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
-                'where' => 'ContactId = {foundContact1.Id}',
+            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Prefill', Command_Key__c = 'prefillAction2', Command_Type__c = 'findMany', Object_Api_Name__c = 'Case', Store_Result_As__c = 'PrefilCase', Order__c = 20, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'where' => 'ContactId = {PrefilContact.Id}',
                 'conditions' => new List<Object>{
                     new Map<String, Object>{
                         'fieldApiName' => 'ContactId',
                         'operator' => 'eq',
                         'valueSource' => 'alias',
-                        'valueText' => 'foundContact1.Id'
+                        'valueText' => 'PrefilContact.Id'
                     }
                 },
                 'conditionLogic' => '1',
@@ -472,35 +546,49 @@ public with sharing class NativeFormsDemoDataService {
                 'orderBy' => 'CreatedDate DESC',
                 'limit' => 25
             })),
-            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Submit', Command_Key__c = 'submitAction1', Command_Type__c = 'upsertMany', Object_Api_Name__c = 'Case', Store_Result_As__c = 'savedRecord1', Order__c = 30, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
-                'repeatGroupKey' => 'existingCases',
+            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Submit', Command_Key__c = 'submitAction1', Command_Type__c = 'findAndUpdate', Object_Api_Name__c = 'Contact', Store_Result_As__c = 'SubmitContact', Order__c = 30, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'targetBy' => 'where',
+                'where' => 'Email = {input.email}',
+                'onNotFound' => 'create',
+                'conditions' => new List<Object>{
+                    new Map<String, Object>{
+                        'fieldApiName' => 'Email',
+                        'operator' => 'eq',
+                        'valueSource' => 'field',
+                        'valueText' => 'email'
+                    }
+                },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1'
+            })),
+            new NF_Form_Action__c(Form_Version__c = context.versionRecord.Id, Action_Scope__c = 'Submit', Command_Key__c = 'submitAction2', Command_Type__c = 'upsertMany', Object_Api_Name__c = 'Case', Store_Result_As__c = 'SubmitCase', Order__c = 40, Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'repeatGroupKey' => 'caseRecords',
                 'relationshipField' => 'ContactId',
-                'relationshipValueSource' => 'field',
-                'relationshipValueText' => 'ContactId',
+                'relationshipValueSource' => 'alias',
+                'relationshipValueText' => 'firstNotBlank(SubmitContact.Id, PrefilContact.Id)',
                 'allowDelete' => false
             }))
         };
         insert actions;
 
-        List<Object> statusOptions = new List<Object>();
-        for (String statusValue : getPicklistValues(Case.Status)) {
-            statusOptions.add(new Map<String, Object>{ 'label' => statusValue, 'value' => statusValue });
+        List<Object> priorityOptions = new List<Object>();
+        for (String priorityValue : getPicklistValues(Case.Priority)) {
+            priorityOptions.add(new Map<String, Object>{ 'label' => priorityValue, 'value' => priorityValue });
         }
-        if (statusOptions.isEmpty()) {
-            statusOptions.add(new Map<String, Object>{ 'label' => 'New', 'value' => 'New' });
+        if (priorityOptions.isEmpty()) {
+            priorityOptions.add(new Map<String, Object>{ 'label' => 'Medium', 'value' => 'Medium' });
         }
 
         List<NF_Form_Element__c> elements = new List<NF_Form_Element__c>{
-            element(context.versionRecord.Id, 'heading_case_update', 'heading', 'caseUpdateHeading', 'Review Your Cases', 10, JSON.serializePretty(new Map<String, Object>{ 'html' => '<p>Review Your Cases</p>' }), null),
-            element(context.versionRecord.Id, 'case_contact_email', 'email', 'email', 'Email', 20, fieldConfig('name@example.com', 'above', 'editable', false, null, null, false, null, null), null),
-            element(context.versionRecord.Id, 'case_contact_id', 'text', 'contactId', 'Contact Id', 30, fieldConfig('', 'above', 'hidden', true, 'foundContact1', 'Id', false, null, null), null),
-            element(context.versionRecord.Id, 'case_contact_name', 'text', 'contactName', 'Contact Name', 40, fieldConfig('', 'above', 'locked', true, 'foundContact1', 'Name', false, null, null), null),
-            element(context.versionRecord.Id, 'existing_cases_group', 'repeatGroup', 'existingCases', 'Existing Cases', 50, JSON.serializePretty(new Map<String, Object>{ 'showTitle' => true, 'boxed' => true, 'columns' => 2, 'repeatSourceAlias' => 'foundCases1', 'allowAddRows' => true, 'allowDeleteRows' => false }), null),
-            element(context.versionRecord.Id, 'case_row_id', 'text', 'id', 'Case Id', 60, fieldConfig('', 'above', 'hidden', true, 'foundCases1', 'Id', true, 'submitAction1', 'Id'), 'existing_cases_group'),
-            element(context.versionRecord.Id, 'case_row_number', 'text', 'caseNumber', 'Case Number', 70, fieldConfig('', 'above', 'locked', true, 'foundCases1', 'CaseNumber', false, null, null), 'existing_cases_group'),
-            element(context.versionRecord.Id, 'case_row_subject', 'text', 'subject', 'Subject', 80, fieldConfig('Enter subject', 'above', 'editable', true, 'foundCases1', 'Subject', true, 'submitAction1', 'Subject'), 'existing_cases_group'),
-            element(context.versionRecord.Id, 'case_row_status', 'select', 'status', 'Status', 90, selectConfig(statusOptions, true, 'foundCases1', 'Status', true, 'submitAction1', 'Status'), 'existing_cases_group'),
-            element(context.versionRecord.Id, 'case_row_description', 'textarea', 'description', 'Description', 100, textAreaConfig(4, true, 'foundCases1', 'Description', true, 'submitAction1', 'Description'), 'existing_cases_group')
+            element(context.versionRecord.Id, 'multi_contact_section', 'section', 'contactDetailsSection', 'Contact details', 10, sectionConfig(2, true, true, ''), null),
+            element(context.versionRecord.Id, 'multi_contact_first_name', 'text', 'firstName', 'First Name', 20, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'FirstName', true, 'submitAction1', 'FirstName'), 1), 'multi_contact_section'),
+            element(context.versionRecord.Id, 'multi_contact_last_name', 'text', 'lastName', 'Last Name', 30, withSectionColumn(fieldConfig('', 'above', 'editable', true, true, 'PrefilContact', 'LastName', true, 'submitAction1', 'LastName'), 2), 'multi_contact_section'),
+            element(context.versionRecord.Id, 'multi_contact_email', 'email', 'email', 'Email', 40, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'Email', true, 'submitAction1', 'Email'), 1), 'multi_contact_section'),
+            element(context.versionRecord.Id, 'multi_contact_phone', 'tel', 'phone', 'Phone', 50, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'Phone', true, 'submitAction1', 'Phone'), 2), 'multi_contact_section'),
+            element(context.versionRecord.Id, 'case_records_group', 'repeatGroup', 'caseRecords', 'Related Cases', 60, JSON.serializePretty(new Map<String, Object>{ 'showTitle' => true, 'boxed' => true, 'columns' => 2, 'repeatSourceAlias' => 'PrefilCase', 'allowAddRows' => true, 'allowDeleteRows' => false }), null),
+            element(context.versionRecord.Id, 'case_row_subject', 'text', 'subject', 'Subject', 70, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilCase', 'Subject', true, 'submitAction2', 'Subject'), 1), 'case_records_group'),
+            element(context.versionRecord.Id, 'case_row_priority', 'select', 'priority', 'Priority', 80, withSectionColumn(selectConfig(priorityOptions, false, true, 'PrefilCase', 'Priority', true, 'submitAction2', 'Priority'), 2), 'case_records_group'),
+            element(context.versionRecord.Id, 'case_row_id', 'text', 'caseId', 'Case Id', 90, withSectionColumn(fieldConfig('', 'above', 'hidden', false, true, 'PrefilCase', 'Id', true, 'submitAction2', 'Id'), 2), 'case_records_group')
         };
         insert elements;
 
@@ -514,8 +602,33 @@ public with sharing class NativeFormsDemoDataService {
         return new NF_Form_Element__c(Form_Version__c = versionId, Element_Id__c = elementId, Element_Type__c = elementType, Field_Key__c = fieldKey, Label__c = label, Config_JSON__c = configJson, Order__c = orderValue, Parent_Element_Id__c = parentElementId);
     }
 
-    private static String fieldConfig(String defaultValue, String labelPosition, String fieldBehavior, Boolean prefillEnabled, String prefillAlias, String prefillFieldPath, Boolean submitEnabled, String submitActionKey, String submitFieldPath) {
-        Map<String, Object> config = new Map<String, Object>{ 'defaultValue' => defaultValue, 'labelPosition' => labelPosition, 'fieldBehavior' => fieldBehavior };
+    private static String sectionConfig(Integer columns, Boolean showTitle, Boolean boxed, String text) {
+        return JSON.serializePretty(new Map<String, Object>{
+            'columns' => columns,
+            'showTitle' => showTitle,
+            'boxed' => boxed,
+            'text' => text
+        });
+    }
+
+    private static String fieldConfig(
+        String defaultValue,
+        String labelPosition,
+        String fieldBehavior,
+        Boolean required,
+        Boolean prefillEnabled,
+        String prefillAlias,
+        String prefillFieldPath,
+        Boolean submitEnabled,
+        String submitActionKey,
+        String submitFieldPath
+    ) {
+        Map<String, Object> config = new Map<String, Object>{
+            'defaultValue' => defaultValue,
+            'labelPosition' => labelPosition,
+            'fieldBehavior' => fieldBehavior,
+            'required' => required == true
+        };
         if (prefillEnabled) {
             config.put('prefillEnabled', true);
             config.put('prefillAlias', prefillAlias);
@@ -529,14 +642,41 @@ public with sharing class NativeFormsDemoDataService {
         return JSON.serializePretty(config);
     }
 
-    private static String textAreaConfig(Integer rows, Boolean prefillEnabled, String prefillAlias, String prefillFieldPath, Boolean submitEnabled, String submitActionKey, String submitFieldPath) {
-        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(fieldConfig('', 'above', 'editable', prefillEnabled, prefillAlias, prefillFieldPath, submitEnabled, submitActionKey, submitFieldPath));
+    private static String checkboxConfig(Boolean checked, Boolean required, Boolean prefillEnabled, String prefillAlias, String prefillFieldPath, Boolean submitEnabled, String submitActionKey, String submitFieldPath) {
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(fieldConfig(
+            checked == true ? 'true' : 'false',
+            'inline',
+            'editable',
+            required,
+            prefillEnabled,
+            prefillAlias,
+            prefillFieldPath,
+            submitEnabled,
+            submitActionKey,
+            submitFieldPath
+        ));
+        config.put('checked', checked == true);
+        return JSON.serializePretty(config);
+    }
+
+    private static String withSectionColumn(String rawConfig, Integer sectionColumn) {
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(String.isBlank(rawConfig) ? '{}' : rawConfig);
+        if (sectionColumn == null || sectionColumn < 1) {
+            config.remove('sectionColumn');
+        } else {
+            config.put('sectionColumn', sectionColumn);
+        }
+        return JSON.serializePretty(config);
+    }
+
+    private static String textAreaConfig(Integer rows, Boolean required, Boolean prefillEnabled, String prefillAlias, String prefillFieldPath, Boolean submitEnabled, String submitActionKey, String submitFieldPath) {
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(fieldConfig('', 'above', 'editable', required, prefillEnabled, prefillAlias, prefillFieldPath, submitEnabled, submitActionKey, submitFieldPath));
         config.put('rows', rows);
         return JSON.serializePretty(config);
     }
 
-    private static String selectConfig(List<Object> options, Boolean prefillEnabled, String prefillAlias, String prefillFieldPath, Boolean submitEnabled, String submitActionKey, String submitFieldPath) {
-        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(fieldConfig('', 'above', 'editable', prefillEnabled, prefillAlias, prefillFieldPath, submitEnabled, submitActionKey, submitFieldPath));
+    private static String selectConfig(List<Object> options, Boolean required, Boolean prefillEnabled, String prefillAlias, String prefillFieldPath, Boolean submitEnabled, String submitActionKey, String submitFieldPath) {
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(fieldConfig('', 'above', 'editable', required, prefillEnabled, prefillAlias, prefillFieldPath, submitEnabled, submitActionKey, submitFieldPath));
         config.put('options', options);
         if (!options.isEmpty()) {
             config.put('defaultValue', String.valueOf(((Map<String, Object>) options[0]).get('value')));
@@ -579,6 +719,71 @@ public with sharing class NativeFormsDemoDataService {
 
     private static String buildCaseKey(Id contactId, String subject) {
         return String.valueOf(contactId) + '::' + firstNonBlank(subject, '');
+    }
+
+    private static DemoFormKeyBundle resolveDemoFormKeys() {
+        DemoFormKeyBundle keys = new DemoFormKeyBundle();
+        Integer maxSuffix = 0;
+
+        for (NF_Form__c row : [
+            SELECT NF_Key__c
+            FROM NF_Form__c
+            WHERE NF_Key__c LIKE 'form%'
+        ]) {
+            maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(row.NF_Key__c));
+        }
+
+        List<NF_Form__c> existingDemoForms = [SELECT Id, NF_Key__c, Description__c FROM NF_Form__c WHERE NF_Key__c LIKE 'form%' ORDER BY CreatedDate ASC];
+
+        for (NF_Form__c formRecord : existingDemoForms) {
+            if (String.isBlank(keys.contactUpdateKey) && formRecord.Description__c == CONTACT_UPDATE_FORM_LABEL) {
+                keys.contactUpdateKey = normalizeOrAssignDemoFormKey(formRecord.NF_Key__c, maxSuffix + 1);
+                maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(keys.contactUpdateKey));
+            } else if (String.isBlank(keys.caseUpdateKey) && formRecord.Description__c == CASE_UPDATE_FORM_LABEL) {
+                keys.caseUpdateKey = normalizeOrAssignDemoFormKey(formRecord.NF_Key__c, maxSuffix + 1);
+                maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(keys.caseUpdateKey));
+            }
+        }
+
+        if (String.isBlank(keys.contactUpdateKey)) {
+            maxSuffix += 1;
+            keys.contactUpdateKey = 'form' + String.valueOf(maxSuffix);
+        }
+        if (String.isBlank(keys.caseUpdateKey)) {
+            maxSuffix += 1;
+            keys.caseUpdateKey = 'form' + String.valueOf(maxSuffix);
+        }
+
+        return keys;
+    }
+
+    private static String normalizeOrAssignDemoFormKey(String rawValue, Integer fallbackSuffix) {
+        Integer suffix = readAutoKeySuffix(rawValue);
+        if (suffix > 0) {
+            return 'form' + String.valueOf(suffix);
+        }
+        return 'form' + String.valueOf(fallbackSuffix == null || fallbackSuffix < 1 ? 1 : fallbackSuffix);
+    }
+
+    private static Integer readAutoKeySuffix(String value) {
+        if (String.isBlank(value)) {
+            return 0;
+        }
+
+        Matcher matcher = Pattern.compile('^form([0-9]+)$').matcher(value.trim().toLowerCase());
+        if (!matcher.matches()) {
+            return 0;
+        }
+
+        try {
+            return Integer.valueOf(matcher.group(1));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private static String escapeJsonValue(String value) {
+        return String.isBlank(value) ? '' : value.replace('\\', '\\\\').replace('"', '\\"');
     }
 
     private static List<String> getPicklistValues(Schema.SObjectField fieldToken) {

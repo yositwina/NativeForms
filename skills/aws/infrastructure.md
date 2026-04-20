@@ -12,11 +12,14 @@ Use for S3 website publishing, Lambda deployment targets, region-aware AWS chang
 - `twinaforms.com` content is published into path-style folders inside `nativeformspublish`.
 - Current upgrade page publish target is `s3://nativeformspublish/upgrade/`.
 - Published forms also use `nativeformspublish`, and the runtime public base URL in AWS is `https://forms.twinaforms.com`.
+- Pro V1 browser file uploads use presigned S3 `PUT` requests into `nativeformspublish`, so that bucket must allow CORS from `https://forms.twinaforms.com` for at least `PUT`, `GET`, and `HEAD`.
 - Confirmed deployed Lambda region is `eu-north-1`.
 - Confirmed Lambda function names used in this project include `NativeFormsBackend` and `NativeFormsAdminApi`.
 - Repo also contains the public runtime Lambdas `NativeForms-PrefillForm` and `NativeForms-SubmitForm`; do not change those without explicit user approval.
 - Known public web domains in this project include `twinaforms.com`, `admin.twinaforms.com`, and `forms.twinaforms.com`.
 - CloudFront distribution IDs and internal distribution names are not yet verified in-repo because the current IAM user cannot list CloudFront distributions.
+- On this workstation, the confirmed AWS CLI profile for Codex deploy work is `codex-nativeforms`.
+- The local AWS CLI config also contains a `nativeforms-codex` profile, but `codex-nativeforms` is the confirmed working profile used for Lambda deploys in this repo.
 
 ## Escalate When
 - A publish target is unclear between bucket root and prefix path.

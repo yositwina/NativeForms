@@ -65,6 +65,10 @@
         <apexClass>NativeFormsSubmissionLogsController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsSecretCodeApi</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
 
     <objectPermissions>
         <allowCreate>true</allowCreate>
@@ -133,6 +137,26 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>NativeForms_Config__c.Enable_Pro_Condition_Logic__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.NativeForms_Secret_Code__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.NativeForms_Secret_Code_Attempts__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.NativeForms_Secret_Code_Expires_At__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.NativeForms_Secret_Code_Verified_At__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

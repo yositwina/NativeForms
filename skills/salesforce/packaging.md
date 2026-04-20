@@ -14,6 +14,12 @@ Use for package-visible metadata, object changes, tabs/apps/pages, Apex/LWC chan
 - Starter package polish, demo quality, Apex tests, and install/post-install guidance are release-critical.
 - Default Salesforce deployment alias for this repo is `NativeFormsDev` unless the user explicitly asks for a different org.
 - When changing a Salesforce page design, bump the page version label shown in the UI (for example `Designer v9.4` in the top-left of the Designer page) so the rendered screen reflects the latest design revision.
+- In `nativeFormsDesigner`, new text-like property controls must use local draft state while typing and commit only on `blur` or explicit finish. Do not wire `oninput`, mid-typing `applyEditorDraft()`, or save-triggered rerenders for plain text inputs or plain textareas unless the user explicitly wants live preview.
+- For repeated property editors such as conditional rows, treat blank/new rows as draft UI state first and sanitize only when persisting. Do not round-trip blank draft rows through saved config too early, or `Add Condition` / selection flows will look broken.
+- When a Designer control feels jumpy, misses letters, loses first clicks, or makes buttons seem dead, assume the root cause is usually blur/save/rerender interference before trying layout-only fixes.
+- Branding rule: do not introduce new user-facing `NativeForms` text. Use `TwinaForms` in emails, labels, help text, and UI copy unless the user explicitly asks otherwise or the string is a fixed technical identifier.
+- Multilingual rule: do not introduce fixed English customer-facing text inside form canvas previews or published forms unless it is an error/debug message. If helper/action text is needed, make it configurable in Salesforce properties/settings or omit it. Preserve label-placement flexibility instead of compensating with hard-coded English guidance.
+- Secret-code rule: avoid fixed English-only preview/runtime copy such as `Locked Until Verified`, `Secret Code Verification`, or `Code step appears after the user presses Enter`. Public-form button labels should be configurable when they are part of the customer experience.
 
 ## Escalate When
 - A change introduces metadata or behavior that may fail in a clean org or subscriber org.

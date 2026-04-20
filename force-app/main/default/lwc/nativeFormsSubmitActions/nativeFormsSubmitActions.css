@@ -26,7 +26,7 @@
 .layout {
     display: grid;
     gap: 1rem;
-    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr) minmax(21rem, 24rem);
+    grid-template-columns: minmax(16rem, 19rem) minmax(0, 1fr) minmax(18rem, 21rem);
 }
 
 .pane {
@@ -142,20 +142,21 @@
 
 .condition-row {
     display: grid;
-    gap: 0.75rem;
+    gap: 0.55rem;
     align-items: end;
-    grid-template-columns: 3rem minmax(9rem, 11rem) minmax(9rem, 11rem) minmax(9rem, 11rem) minmax(9rem, 11rem) auto;
+    grid-template-columns: 2.5rem minmax(7.75rem, 9rem) minmax(7.25rem, 8.5rem) minmax(7.75rem, 9rem) minmax(7rem, 8rem) auto;
 }
 
 .condition-index {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 2.5rem;
+    height: 2.25rem;
     border-radius: 999px;
     background: #eef6ff;
     color: #0f6cbd;
     font-weight: 700;
+    font-size: 0.9rem;
 }
 
 .mapping-summary {

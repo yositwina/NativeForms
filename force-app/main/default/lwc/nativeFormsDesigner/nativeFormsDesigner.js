@@ -16,10 +16,12 @@ import updateElement from '@salesforce/apex/NativeFormsBuilderController.updateE
 import publishVersion from '@salesforce/apex/NativeFormsBuilderController.publishVersion';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
+const DESIGNER_FORM_KEY = 'nativeforms:selectedFormId';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
+const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v13.8';
+    designerVersion = 'v18.1';
     isLoading = true;
     errorMessage = '';
     selectedFormId;
@@ -35,9 +37,55 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedVersionName = '';
     selectedVersionStatus = '';
     selectedVersionSubmitSuccessMessage = 'Your form was submitted successfully.';
+    selectedVersionSubmitLabel = 'Submit';
     selectedVersionRtlEnabled = false;
+    selectedVersionPostSubmitAutoLinkEnabled = false;
+    selectedVersionPostSubmitUrlTemplate = '';
+    selectedVersionPostSubmitButtonLabel = 'Continue';
+    selectedVersionPostSubmitDelaySeconds = 0;
+    selectedVersionSecretCodeVerificationEnabled = false;
+    selectedVersionSecretCodeMatchField = 'Email';
+    selectedVersionSecretCodeIntroText = '';
+    selectedVersionSecretCodeSentMessage = '';
+    selectedVersionSecretCodeInvalidMessage = '';
+    selectedVersionSecretCodeVerifiedMessage = '';
+    selectedVersionSecretCodeSendButtonLabel = 'Enter';
+    selectedVersionSecretCodeVerifyButtonLabel = 'Verify';
+    selectedVersionSecretCodeResendButtonLabel = 'Resend Code';
+    selectedVersionSecretCodeExpiryMinutes = 10;
+    selectedVersionSecretCodeMaxAttempts = 5;
+    selectedVersionSecretCodeAllowResend = true;
+    selectedVersionSubmitConditionalEnabled = false;
+    selectedVersionSubmitConditionalFieldKey = '';
+    selectedVersionSubmitConditionalOperator = 'equals';
+    selectedVersionSubmitConditionalValue = '';
+    selectedVersionSubmitConditionalConditions = [];
+    selectedVersionSubmitConditionalExpression = '';
     draftSubmitSuccessMessage = 'Your form was submitted successfully.';
+    draftSubmitLabel = 'Submit';
     draftRtlEnabled = false;
+    draftPostSubmitAutoLinkEnabled = false;
+    draftPostSubmitUrlTemplate = '';
+    draftPostSubmitButtonLabel = 'Continue';
+    draftPostSubmitDelaySeconds = 0;
+    draftSecretCodeVerificationEnabled = false;
+    draftSecretCodeMatchField = 'Email';
+    draftSecretCodeIntroText = '';
+    draftSecretCodeSentMessage = '';
+    draftSecretCodeInvalidMessage = '';
+    draftSecretCodeVerifiedMessage = '';
+    draftSecretCodeSendButtonLabel = 'Enter';
+    draftSecretCodeVerifyButtonLabel = 'Verify';
+    draftSecretCodeResendButtonLabel = 'Resend Code';
+    draftSecretCodeExpiryMinutes = 10;
+    draftSecretCodeMaxAttempts = 5;
+    draftSecretCodeAllowResend = true;
+    draftSubmitConditionalEnabled = false;
+    draftSubmitConditionalFieldKey = '';
+    draftSubmitConditionalOperator = 'equals';
+    draftSubmitConditionalValue = '';
+    draftSubmitConditionalConditions = [];
+    draftSubmitConditionalExpression = '';
     selectedPublishedUrl = '';
     selectedTheme = null;
     draggedElementId = null;
@@ -58,7 +106,16 @@ export default class NativeFormsDesigner extends LightningElement {
     @track picklistFieldOptions = [];
     @track prefillAliasDetails = [];
     @track submitActionDetails = [];
+    enableProConditionLogic = false;
     enableProRepeatGroups = false;
+    enableProLoadFile = false;
+    enableProPostSubmitAutoLink = false;
+    enableProSfSecretCodeAuth = false;
+    selectedPostSubmitFormToken = '';
+    postSubmitUrlSelectionStart = 0;
+    postSubmitUrlSelectionEnd = 0;
+    postSubmitTokenInteraction = false;
+    postSubmitSettingsBlurTimeout;
 
     inputFieldType = 'text';
     displayElementType = 'section';
@@ -89,6 +146,8 @@ export default class NativeFormsDesigner extends LightningElement {
     editorConditionalFieldKey = '';
     editorConditionalOperator = 'equals';
     editorConditionalValue = '';
+    editorConditionalConditions = [];
+    editorConditionalExpression = '';
     editorMinValue = '';
     editorMaxValue = '';
     editorDateDisplayFormat = 'us';
@@ -104,6 +163,10 @@ export default class NativeFormsDesigner extends LightningElement {
     editorSubmitEnabled = false;
     editorSubmitActionKey = '';
     editorSubmitFieldPath = '';
+    editorAllowMultipleFiles = false;
+    editorAllowedExtensionsText = '';
+    editorMaxFileSizeMb = '10';
+    editorTargetSubmitActionKey = '';
 
     inputFieldOptions = [
         { label: 'Text', value: 'text' },
@@ -115,7 +178,8 @@ export default class NativeFormsDesigner extends LightningElement {
         { label: 'Radio groups', value: 'radio' },
         { label: 'Checkbox', value: 'checkbox' },
         { label: 'Text Area', value: 'textarea' },
-        { label: 'URL', value: 'url' }
+        { label: 'URL', value: 'url' },
+        { label: 'File Upload', value: 'fileUpload' }
     ];
 
     displayElementOptions = [
@@ -212,16 +276,23 @@ export default class NativeFormsDesigner extends LightningElement {
     ];
 
     connectedCallback() {
+        this.selectedFormId = this.loadStoredFormId();
         this.selectedVersionId = this.loadStoredVersionId();
         this.loadSalesforceObjectOptions();
         this.loadWorkspace(this.selectedFormId, this.selectedVersionId);
     }
 
     get selectedElement() {
+        if (this.selectedElementId === SUBMIT_BUTTON_ELEMENT_ID) {
+            return this.buildSubmitButtonCanvasElement();
+        }
         return this.elements.find((item) => item.id === this.selectedElementId);
     }
 
     get selectedElementFieldKey() {
+        if (this.selectedElementIsSubmitButton) {
+            return '';
+        }
         return this.selectedElement?.fieldKey || '';
     }
 
@@ -339,12 +410,20 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.publishResult?.success ? 'Open published form' : 'Open form';
     }
 
+    get defaultPostSubmitRedirectUrl() {
+        return 'https://forms.twinaforms.com/formX/?param1=';
+    }
+
     get newFormCreateDisabled() {
         return this.isCreatingForm || !String(this.newFormDescription || '').trim();
     }
 
     get isSelectedVersionReadOnly() {
         return this.selectedVersionStatus === 'Published';
+    }
+
+    get hasCanvasElements() {
+        return this.canvasElements.length > 0;
     }
 
     get readOnlyMessage() {
@@ -357,6 +436,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get selectedElementIsSection() {
         return this.selectedElement?.elementType === 'section';
+    }
+
+    get selectedElementIsSubmitButton() {
+        return this.selectedElement?.elementType === 'submitButton';
     }
 
     get selectedElementIsGroup() {
@@ -377,8 +460,24 @@ export default class NativeFormsDesigner extends LightningElement {
             : this.displayElementOptions.filter((option) => option.value !== 'repeatGroup');
     }
 
+    get availableInputFieldOptions() {
+        return this.enableProLoadFile
+            ? this.inputFieldOptions
+            : this.inputFieldOptions.filter((option) => option.value !== 'fileUpload');
+    }
+
+    get availableEditorElementTypeOptions() {
+        const allowedInputTypes = new Set(this.availableInputFieldOptions.map((option) => option.value));
+        return this.editorElementTypeOptions.filter((option) => {
+            if (this.inputFieldOptions.some((inputOption) => inputOption.value === option.value)) {
+                return allowedInputTypes.has(option.value);
+            }
+            return option.value !== 'repeatGroup' || this.enableProRepeatGroups;
+        });
+    }
+
     get selectedElementSupportsLabelPosition() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDefaultValue() {
@@ -390,11 +489,11 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsBoldLabel() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsRequired() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsFieldBehavior() {
@@ -417,6 +516,10 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorElementType === 'image';
     }
 
+    get selectedElementIsFileUpload() {
+        return this.editorElementType === 'fileUpload';
+    }
+
     get selectedElementIsPicklist() {
         return this.editorElementType === 'select';
     }
@@ -427,6 +530,11 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get selectedElementSupportsConditional() {
         return !['section', 'repeatGroup'].includes(this.editorElementType);
+    }
+
+    get submitButtonUsesConditionalValue() {
+        const first = this.draftSubmitConditionalConditions?.[0];
+        return this.conditionUsesValue(first?.operator || this.draftSubmitConditionalOperator);
     }
 
     get selectedElementSupportsSalesforceMapping() {
@@ -480,7 +588,70 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementUsesConditionalValue() {
-        return !['isTrue', 'isFalse', 'isBlank', 'isNotBlank'].includes(this.editorConditionalOperator);
+        const first = this.editorConditionalConditions?.[0];
+        return this.conditionUsesValue(first?.operator || this.editorConditionalOperator);
+    }
+
+    get showElementConditionExpression() {
+        return this.enableProConditionLogic && (this.editorConditionalConditions || []).length > 1;
+    }
+
+    get showSubmitConditionExpression() {
+        return this.enableProConditionLogic && (this.draftSubmitConditionalConditions || []).length > 1;
+    }
+
+    get canAddElementCondition() {
+        return this.enableProConditionLogic || (this.editorConditionalConditions || []).length === 0;
+    }
+
+    get canAddSubmitCondition() {
+        return this.enableProConditionLogic || (this.draftSubmitConditionalConditions || []).length === 0;
+    }
+
+    get editorConditionalRows() {
+        return this.buildConditionRows(this.editorConditionalConditions || [], 'element');
+    }
+
+    get submitConditionalRows() {
+        return this.buildConditionRows(this.draftSubmitConditionalConditions || [], 'submit');
+    }
+
+    get showPostSubmitAutoLinkSettings() {
+        return this.enableProPostSubmitAutoLink;
+    }
+
+    get showSecretCodeVerificationSettings() {
+        return this.enableProSfSecretCodeAuth;
+    }
+
+    get secretCodePreviewData() {
+        return {
+            introText: this.draftSecretCodeIntroText || 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.',
+            sentMessage: this.draftSecretCodeSentMessage || 'If we found a matching contact, we sent a 6-digit code to that email.',
+            verifiedMessage: this.draftSecretCodeVerifiedMessage || 'Code verified. You can continue with the form now.',
+            sendButtonLabel: this.draftSecretCodeSendButtonLabel || 'Enter',
+            verifyButtonLabel: this.draftSecretCodeVerifyButtonLabel || 'Verify',
+            resendButtonLabel: this.draftSecretCodeResendButtonLabel || 'Resend Code',
+            allowResend: this.draftSecretCodeAllowResend
+        };
+    }
+
+    get showCanvasSecretCodePreview() {
+        return this.draftSecretCodeVerificationEnabled;
+    }
+
+    get postSubmitFormFieldTokenOptions() {
+        return [{ label: 'Insert form field', value: '' }].concat(
+            this.elements
+                .filter((item) =>
+                    item.fieldKey &&
+                    ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
+                )
+                .map((item) => ({
+                    label: `${item.label} (${item.fieldKey})`,
+                    value: `{{field.${item.fieldKey}}}`
+                }))
+        );
     }
 
     get fieldBehaviorRadioOptions() {
@@ -508,6 +679,161 @@ export default class NativeFormsDesigner extends LightningElement {
                 label: `${item.label} (${item.fieldKey})`,
                 value: item.fieldKey
             }));
+    }
+
+    conditionUsesValue(operator) {
+        return !['isTrue', 'isFalse', 'isBlank', 'isNotBlank'].includes(operator);
+    }
+
+    createVisibilityCondition() {
+        return {
+            id: `cond-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            fieldKey: '',
+            operator: 'equals',
+            value: ''
+        };
+    }
+
+    normalizeVisibilityConditions(rawConditions, fallbackFieldKey = '', fallbackOperator = 'equals', fallbackValue = '') {
+        const normalized = Array.isArray(rawConditions)
+            ? rawConditions
+                .map((item, index) => ({
+                    id: item?.id || `cond-${Date.now()}-${index}`,
+                    fieldKey: item?.fieldKey || '',
+                    operator: item?.operator || 'equals',
+                    value: item?.value || ''
+                }))
+                .filter((item) => item.fieldKey && item.operator)
+            : [];
+        if (normalized.length) {
+            return normalized;
+        }
+        if (fallbackFieldKey) {
+            return [{
+                id: `cond-${Date.now()}-0`,
+                fieldKey: fallbackFieldKey,
+                operator: fallbackOperator || 'equals',
+                value: fallbackValue || ''
+            }];
+        }
+        return [];
+    }
+
+    sanitizeVisibilityConditions(conditions) {
+        return (conditions || [])
+            .filter((item) => item?.fieldKey && item?.operator)
+            .map((item) => ({
+                fieldKey: item.fieldKey,
+                operator: item.operator,
+                value: item.value || ''
+            }));
+    }
+
+    defaultVisibilityExpression(count) {
+        if (!count || count < 1) {
+            return '';
+        }
+        return Array.from({ length: count }, (_, index) => String(index + 1)).join(' AND ');
+    }
+
+    normalizeVisibilityExpression(expression, count) {
+        if (!count || count < 1) {
+            return '';
+        }
+        return (expression || '').trim() || this.defaultVisibilityExpression(count);
+    }
+
+    buildConditionRows(conditions, scope) {
+        return (conditions || []).map((condition, index) => ({
+            ...condition,
+            scope,
+            index,
+            rowKey: condition.id || `${scope}-${index}`,
+            displayIndex: index + 1,
+            usesValue: this.conditionUsesValue(condition.operator)
+        }));
+    }
+
+    validateVisibilityExpression(conditions, expression) {
+        const clauses = this.sanitizeVisibilityConditions(conditions);
+        if (!this.enableProConditionLogic || clauses.length <= 1) {
+            return '';
+        }
+        const raw = (expression || '').trim();
+        if (!raw) {
+            return 'Enter condition logic such as 1 AND (2 OR 3).';
+        }
+        const normalized = raw.replace(/\(/g, ' ( ').replace(/\)/g, ' ) ').replace(/\s+/g, ' ').trim();
+        const tokens = normalized.split(' ');
+        let depth = 0;
+        let expectOperand = true;
+        const maxNumber = clauses.length;
+        for (const token of tokens) {
+            if (!token) {
+                continue;
+            }
+            if (token === '(') {
+                if (!expectOperand) return 'Condition logic has invalid syntax.';
+                depth += 1;
+                continue;
+            }
+            if (token === ')') {
+                if (expectOperand || depth < 1) return 'Condition logic has invalid syntax.';
+                depth -= 1;
+                continue;
+            }
+            if (token === 'AND' || token === 'OR') {
+                if (expectOperand) return 'Condition logic has invalid syntax.';
+                expectOperand = true;
+                continue;
+            }
+            if (!/^\d+$/.test(token)) {
+                return 'Condition logic can contain only numbers, AND, OR, and parentheses.';
+            }
+            const number = Number(token);
+            if (number < 1 || number > maxNumber) {
+                return `Condition logic can only reference rows 1 to ${maxNumber}.`;
+            }
+            expectOperand = false;
+        }
+        if (expectOperand || depth !== 0) {
+            return 'Condition logic has invalid syntax.';
+        }
+        return '';
+    }
+
+    syncEditorConditionalLegacyFields() {
+        const first = (this.editorConditionalConditions || [])[0] || {};
+        this.editorConditionalFieldKey = first.fieldKey || '';
+        this.editorConditionalOperator = first.operator || 'equals';
+        this.editorConditionalValue = first.value || '';
+        this.editorConditionalExpression = this.normalizeVisibilityExpression(
+            this.editorConditionalExpression,
+            (this.editorConditionalConditions || []).length
+        );
+    }
+
+    syncSubmitConditionalLegacyFields() {
+        const first = (this.draftSubmitConditionalConditions || [])[0] || {};
+        this.draftSubmitConditionalFieldKey = first.fieldKey || '';
+        this.draftSubmitConditionalOperator = first.operator || 'equals';
+        this.draftSubmitConditionalValue = first.value || '';
+        this.draftSubmitConditionalExpression = this.normalizeVisibilityExpression(
+            this.draftSubmitConditionalExpression,
+            (this.draftSubmitConditionalConditions || []).length
+        );
+    }
+
+    ensureDraftElementConditionRow() {
+        if (this.editorConditionalEnabled && !(this.editorConditionalConditions || []).length) {
+            this.editorConditionalConditions = [this.createVisibilityCondition()];
+        }
+    }
+
+    ensureDraftSubmitConditionRow() {
+        if (this.draftSubmitConditionalEnabled && !(this.draftSubmitConditionalConditions || []).length) {
+            this.draftSubmitConditionalConditions = [this.createVisibilityCondition()];
+        }
     }
 
     get prefillAliasOptions() {
@@ -546,6 +872,17 @@ export default class NativeFormsDesigner extends LightningElement {
         return [{ label: 'Select Salesforce field', value: '' }].concat(match?.fieldOptions || []);
     }
 
+    get fileUploadTargetActionOptions() {
+        return [{ label: 'Select action', value: '' }].concat(
+            (this.submitActionDetails || [])
+                .filter((action) => ['create', 'update', 'findAndUpdate', 'updateById'].includes(action.commandType))
+                .map((action) => ({
+                    label: `${action.storeResultAs || action.actionKey} (${action.actionKey})`,
+                    value: action.actionKey
+                }))
+        );
+    }
+
     async loadWorkspace(formId = this.selectedFormId, versionId = this.selectedVersionId, silent = false) {
         if (!silent) {
             this.isLoading = true;
@@ -567,13 +904,83 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedVersionName = workspace.selectedVersionName;
             this.selectedVersionStatus = workspace.selectedVersionStatus;
             this.selectedVersionSubmitSuccessMessage = workspace.selectedVersionSubmitSuccessMessage || 'Your form was submitted successfully.';
+            this.selectedVersionSubmitLabel = workspace.selectedVersionSubmitLabel || 'Submit';
             this.selectedVersionRtlEnabled = !!workspace.selectedVersionRtlEnabled;
+            this.selectedVersionPostSubmitAutoLinkEnabled = !!workspace.selectedVersionPostSubmitAutoLinkEnabled;
+            this.selectedVersionPostSubmitUrlTemplate = workspace.selectedVersionPostSubmitUrlTemplate || '';
+            this.selectedVersionPostSubmitButtonLabel = workspace.selectedVersionPostSubmitButtonLabel || 'Continue';
+            this.selectedVersionPostSubmitDelaySeconds = Number.isFinite(Number(workspace.selectedVersionPostSubmitDelaySeconds))
+                ? Math.max(0, Number(workspace.selectedVersionPostSubmitDelaySeconds))
+                : 0;
+            this.selectedVersionSecretCodeVerificationEnabled = !!workspace.selectedVersionSecretCodeVerificationEnabled;
+            this.selectedVersionSecretCodeMatchField = workspace.selectedVersionSecretCodeMatchField || 'Email';
+            this.selectedVersionSecretCodeIntroText = workspace.selectedVersionSecretCodeIntroText || 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.';
+            this.selectedVersionSecretCodeSentMessage = workspace.selectedVersionSecretCodeSentMessage || 'If we found a matching contact, we sent a 6-digit code to that email.';
+            this.selectedVersionSecretCodeInvalidMessage = workspace.selectedVersionSecretCodeInvalidMessage || 'The code is invalid or expired. Try again or request a new code.';
+            this.selectedVersionSecretCodeVerifiedMessage = workspace.selectedVersionSecretCodeVerifiedMessage || 'Code verified. You can continue with the form now.';
+            this.selectedVersionSecretCodeSendButtonLabel = workspace.selectedVersionSecretCodeSendButtonLabel || 'Enter';
+            this.selectedVersionSecretCodeVerifyButtonLabel = workspace.selectedVersionSecretCodeVerifyButtonLabel || 'Verify';
+            this.selectedVersionSecretCodeResendButtonLabel = workspace.selectedVersionSecretCodeResendButtonLabel || 'Resend Code';
+            this.selectedVersionSecretCodeExpiryMinutes = Number.isFinite(Number(workspace.selectedVersionSecretCodeExpiryMinutes))
+                ? Math.max(1, Number(workspace.selectedVersionSecretCodeExpiryMinutes))
+                : 10;
+            this.selectedVersionSecretCodeMaxAttempts = Number.isFinite(Number(workspace.selectedVersionSecretCodeMaxAttempts))
+                ? Math.max(1, Number(workspace.selectedVersionSecretCodeMaxAttempts))
+                : 5;
+            this.selectedVersionSecretCodeAllowResend = workspace.selectedVersionSecretCodeAllowResend !== false;
+            this.selectedVersionSubmitConditionalEnabled = !!workspace.selectedVersionSubmitConditionalEnabled;
+            this.selectedVersionSubmitConditionalFieldKey = workspace.selectedVersionSubmitConditionalFieldKey || '';
+            this.selectedVersionSubmitConditionalOperator = workspace.selectedVersionSubmitConditionalOperator || 'equals';
+            this.selectedVersionSubmitConditionalValue = workspace.selectedVersionSubmitConditionalValue || '';
+            this.selectedVersionSubmitConditionalConditions = this.normalizeVisibilityConditions(
+                this.parseConfig(workspace.selectedVersionSubmitConditionalConditionsJson || '[]'),
+                this.selectedVersionSubmitConditionalFieldKey,
+                this.selectedVersionSubmitConditionalOperator,
+                this.selectedVersionSubmitConditionalValue
+            );
+            this.selectedVersionSubmitConditionalExpression = this.normalizeVisibilityExpression(
+                workspace.selectedVersionSubmitConditionalExpression || '',
+                this.selectedVersionSubmitConditionalConditions.length
+            );
             this.draftSubmitSuccessMessage = this.selectedVersionSubmitSuccessMessage;
+            this.draftSubmitLabel = this.selectedVersionSubmitLabel;
             this.draftRtlEnabled = this.selectedVersionRtlEnabled;
+            this.draftPostSubmitAutoLinkEnabled = this.selectedVersionPostSubmitAutoLinkEnabled;
+            this.draftPostSubmitUrlTemplate = this.selectedVersionPostSubmitUrlTemplate || this.defaultPostSubmitRedirectUrl;
+            this.draftPostSubmitButtonLabel = this.selectedVersionPostSubmitButtonLabel;
+            this.draftPostSubmitDelaySeconds = this.selectedVersionPostSubmitDelaySeconds;
+            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
+            this.draftSecretCodeMatchField = this.selectedVersionSecretCodeMatchField || 'Email';
+            this.draftSecretCodeIntroText = this.selectedVersionSecretCodeIntroText;
+            this.draftSecretCodeSentMessage = this.selectedVersionSecretCodeSentMessage;
+            this.draftSecretCodeInvalidMessage = this.selectedVersionSecretCodeInvalidMessage;
+            this.draftSecretCodeVerifiedMessage = this.selectedVersionSecretCodeVerifiedMessage;
+            this.draftSecretCodeSendButtonLabel = this.selectedVersionSecretCodeSendButtonLabel;
+            this.draftSecretCodeVerifyButtonLabel = this.selectedVersionSecretCodeVerifyButtonLabel;
+            this.draftSecretCodeResendButtonLabel = this.selectedVersionSecretCodeResendButtonLabel;
+            this.draftSecretCodeExpiryMinutes = this.selectedVersionSecretCodeExpiryMinutes;
+            this.draftSecretCodeMaxAttempts = this.selectedVersionSecretCodeMaxAttempts;
+            this.draftSecretCodeAllowResend = this.selectedVersionSecretCodeAllowResend;
+            this.draftSubmitConditionalEnabled = this.selectedVersionSubmitConditionalEnabled;
+            this.draftSubmitConditionalFieldKey = this.selectedVersionSubmitConditionalFieldKey;
+            this.draftSubmitConditionalOperator = this.selectedVersionSubmitConditionalOperator;
+            this.draftSubmitConditionalValue = this.selectedVersionSubmitConditionalValue;
+            this.draftSubmitConditionalConditions = [...this.selectedVersionSubmitConditionalConditions];
+            this.draftSubmitConditionalExpression = this.selectedVersionSubmitConditionalExpression;
+            this.ensureDraftSubmitConditionRow();
             this.selectedPublishedUrl = workspace.selectedPublishedUrl || '';
             this.prefillAliasDetails = workspace.prefillAliases || [];
             this.submitActionDetails = workspace.submitActions || [];
+            this.enableProConditionLogic = !!workspace.enableProConditionLogic;
             this.enableProRepeatGroups = !!workspace.enableProRepeatGroups;
+            this.enableProLoadFile = !!workspace.enableProLoadFile;
+            this.enableProPostSubmitAutoLink = !!workspace.enableProPostSubmitAutoLink;
+            this.enableProSfSecretCodeAuth = !!workspace.enableProSfSecretCodeAuth;
+            if (this.selectedFormId) {
+                this.storeSelectedForm(this.selectedFormId);
+            } else {
+                this.clearStoredForm();
+            }
             if (this.selectedVersionId) {
                 this.storeSelectedVersion(this.selectedVersionId);
             } else {
@@ -712,8 +1119,46 @@ export default class NativeFormsDesigner extends LightningElement {
         const sortByOrder = (a, b) => (a.orderValue || 0) - (b.orderValue || 0);
         topLevel.sort(sortByOrder);
         byParent.forEach((items) => items.sort(sortByOrder));
+        const rendered = topLevel.map((item) => this.decorateCanvasElement(item, byParent));
+        rendered.push(this.buildSubmitButtonCanvasElement());
+        return rendered;
+    }
 
-        return topLevel.map((item) => this.decorateCanvasElement(item, byParent));
+    buildSubmitButtonCanvasElement() {
+        const conditionalEnabled = !!this.draftSubmitConditionalEnabled;
+        const conditionalConditions = this.sanitizeVisibilityConditions(this.draftSubmitConditionalConditions);
+        const conditionalExpression = this.normalizeVisibilityExpression(
+            this.draftSubmitConditionalExpression,
+            conditionalConditions.length
+        );
+        const firstCondition = conditionalConditions[0] || {};
+        const conditionalSummary = conditionalEnabled && conditionalConditions.length
+            ? this.buildConditionalSummaryFromConditions(conditionalConditions, conditionalExpression)
+            : '';
+        const selected = this.selectedElementId === SUBMIT_BUTTON_ELEMENT_ID;
+        return {
+            id: SUBMIT_BUTTON_ELEMENT_ID,
+            elementId: SUBMIT_BUTTON_ELEMENT_ID,
+            label: this.draftSubmitLabel || 'Submit',
+            elementType: 'submitButton',
+            fieldKey: '',
+            configJson: JSON.stringify({
+                submitLabel: this.draftSubmitLabel || 'Submit',
+                conditionalEnabled,
+                conditionalFieldKey: firstCondition.fieldKey || '',
+                conditionalOperator: firstCondition.operator || 'equals',
+                conditionalValue: firstCondition.value || '',
+                conditionalConditions,
+                conditionalExpression
+            }),
+            isSubmitButton: true,
+            cardClass: `designer-node designer-node--field designer-node--submit-button${selected ? ' designer-node--selected' : ''}`,
+            previewButtonLabel: this.draftSubmitLabel || 'Submit',
+            showConditionalBadge: !!conditionalSummary,
+            conditionalSummary,
+            showHiddenBadge: conditionalEnabled && !conditionalConditions.length,
+            fieldPreviewClass: 'preview-field preview-field--submit-button'
+        };
     }
 
     decorateRenderableElement(item, isChild) {
@@ -736,6 +1181,7 @@ export default class NativeFormsDesigner extends LightningElement {
             isUrl: effectiveType === 'url',
             isSelect: effectiveType === 'select',
             isRadio: effectiveType === 'radio',
+            isFileUpload: effectiveType === 'fileUpload',
             isHidden: item.elementType === 'hidden',
             isHeading: effectiveType === 'heading',
             isImage: effectiveType === 'image',
@@ -752,6 +1198,9 @@ export default class NativeFormsDesigner extends LightningElement {
             previewImageFit: this.previewImageFit(item),
             previewImageWidthPercent: this.previewImageWidthPercent(item),
             previewInputType: this.previewInputType(item),
+            previewFileAccept: this.previewFileAccept(item),
+            previewFileAllowMultiple: this.previewFileAllowMultiple(item),
+            previewUploadActionLabel: this.previewUploadActionLabel(item),
             validationPattern: this.validationPattern(item),
             conditionalSummary: this.conditionalSummary(item),
             showTitle: this.sectionShowTitle(item),
@@ -880,7 +1329,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     supportsRequiredMarker(item) {
         const effectiveType = item?.elementType === 'hidden' ? 'text' : item?.elementType;
-        if (!['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(effectiveType)) {
+        if (!['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(effectiveType)) {
             return false;
         }
         const config = this.parseConfig(item?.configJson);
@@ -957,6 +1406,21 @@ export default class NativeFormsDesigner extends LightningElement {
         return ['text', 'number', 'date', 'email', 'tel', 'url'].includes(effectiveType) ? effectiveType : 'text';
     }
 
+    previewFileAccept(item) {
+        const config = this.parseConfig(item.configJson);
+        return this.allowedExtensionsToAccept(config.allowedExtensions);
+    }
+
+    previewFileAllowMultiple(item) {
+        const config = this.parseConfig(item.configJson);
+        return config.allowMultiple === true;
+    }
+
+    previewUploadActionLabel(item) {
+        const config = this.parseConfig(item.configJson);
+        return config.allowMultiple === true ? 'Browse files' : 'Browse file';
+    }
+
     previewInputDirection(item) {
         return ['number', 'date', 'email', 'tel', 'url'].includes(item?.elementType) ? 'ltr' : null;
     }
@@ -982,6 +1446,21 @@ export default class NativeFormsDesigner extends LightningElement {
             }
             return parts.join(' • ');
         }
+        if (item.elementType === 'fileUpload') {
+            const parts = [];
+            const extensions = this.normalizeAllowedExtensions(config.allowedExtensions);
+            if (extensions.length) {
+                parts.push(`Types: ${extensions.join(', ')}`);
+            }
+            const maxFileSizeMb = Number(config.maxFileSizeMb);
+            if (Number.isFinite(maxFileSizeMb) && maxFileSizeMb > 0) {
+                parts.push(`Max ${maxFileSizeMb} MB`);
+            }
+            if (config.allowMultiple === true) {
+                parts.push('Multiple files allowed');
+            }
+            return parts.join(' • ');
+        }
         const parts = [];
         if (config.minValue !== null && config.minValue !== undefined && String(config.minValue) !== '') {
             parts.push(`Min ${config.minValue}`);
@@ -994,14 +1473,39 @@ export default class NativeFormsDesigner extends LightningElement {
 
     conditionalSummary(item) {
         const config = this.parseConfig(item.configJson);
-        if (!config.conditionalEnabled || !config.conditionalFieldKey) {
+        const conditions = this.normalizeVisibilityConditions(
+            config.conditionalConditions,
+            config.conditionalFieldKey,
+            config.conditionalOperator,
+            config.conditionalValue
+        );
+        if (!config.conditionalEnabled || !conditions.length) {
             return '';
         }
-        let summary = `Show when ${config.conditionalFieldKey} ${config.conditionalOperator || 'equals'}`;
-        if (!['isTrue', 'isFalse', 'isBlank', 'isNotBlank'].includes(config.conditionalOperator) && config.conditionalValue) {
-            summary += ` ${config.conditionalValue}`;
+        return this.buildConditionalSummaryFromConditions(
+            conditions,
+            this.normalizeVisibilityExpression(config.conditionalExpression, conditions.length)
+        );
+    }
+
+    buildConditionalSummary(fieldKey, operator, compareValue) {
+        let summary = `Show when ${fieldKey} ${operator || 'equals'}`;
+        if (!['isTrue', 'isFalse', 'isBlank', 'isNotBlank'].includes(operator) && compareValue) {
+            summary += ` ${compareValue}`;
         }
         return summary;
+    }
+
+    buildConditionalSummaryFromConditions(conditions, expression) {
+        const sanitized = this.sanitizeVisibilityConditions(conditions);
+        if (!sanitized.length) {
+            return '';
+        }
+        if (sanitized.length === 1) {
+            const first = sanitized[0];
+            return this.buildConditionalSummary(first.fieldKey, first.operator, first.value);
+        }
+        return `Show when ${this.normalizeVisibilityExpression(expression, sanitized.length)}`;
     }
 
     labelBold(item) {
@@ -1022,7 +1526,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleFormChange(event) {
         this.selectedFormId = event.detail.value;
+        this.storeSelectedForm(this.selectedFormId);
         this.selectedVersionId = null;
+        this.clearStoredVersion();
         this.selectedElementId = null;
         this.loadWorkspace(this.selectedFormId, null);
     }
@@ -1068,6 +1574,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedVersionId = result.versionId;
             this.selectedElementId = null;
             this.publishResult = null;
+            this.storeSelectedForm(result.formId);
             this.storeSelectedVersion(result.versionId);
             this.showNewFormModal = false;
             this.newFormDescription = '';
@@ -1080,31 +1587,145 @@ export default class NativeFormsDesigner extends LightningElement {
         }
     }
 
-    async saveFormSettings(nextValues, successMessage) {
+    async saveFormSettings(nextValues, successMessage, options = {}) {
         if (!this.selectedFormId) {
             return;
         }
+        const mergedValues = {
+            formName: this.draftFormName,
+            themeId: this.selectedThemeId || '',
+            enableCaptcha: this.selectedFormCaptchaEnabled,
+            submitSuccessMessage: this.draftSubmitSuccessMessage,
+            rtlEnabled: this.draftRtlEnabled,
+            postSubmitAutoLinkEnabled: this.draftPostSubmitAutoLinkEnabled,
+            postSubmitUrlTemplate: this.draftPostSubmitUrlTemplate,
+            postSubmitButtonLabel: 'Continue',
+            postSubmitDelaySeconds: 0,
+            secretCodeVerificationEnabled: this.draftSecretCodeVerificationEnabled,
+            secretCodeMatchField: this.draftSecretCodeMatchField || 'Email',
+            secretCodeIntroText: this.draftSecretCodeIntroText,
+            secretCodeSentMessage: this.draftSecretCodeSentMessage,
+            secretCodeInvalidMessage: this.draftSecretCodeInvalidMessage,
+            secretCodeVerifiedMessage: this.draftSecretCodeVerifiedMessage,
+            secretCodeSendButtonLabel: this.draftSecretCodeSendButtonLabel,
+            secretCodeVerifyButtonLabel: this.draftSecretCodeVerifyButtonLabel,
+            secretCodeResendButtonLabel: this.draftSecretCodeResendButtonLabel,
+            secretCodeExpiryMinutes: this.draftSecretCodeExpiryMinutes,
+            secretCodeMaxAttempts: this.draftSecretCodeMaxAttempts,
+            secretCodeAllowResend: this.draftSecretCodeAllowResend,
+            submitLabel: this.draftSubmitLabel,
+            submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+            submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+            submitConditionalOperator: this.draftSubmitConditionalOperator,
+            submitConditionalValue: this.draftSubmitConditionalValue,
+            submitConditionalConditionsJson: JSON.stringify(this.sanitizeVisibilityConditions(this.draftSubmitConditionalConditions)),
+            submitConditionalExpression: this.normalizeVisibilityExpression(
+                this.draftSubmitConditionalExpression,
+                this.sanitizeVisibilityConditions(this.draftSubmitConditionalConditions).length
+            ),
+            ...(nextValues || {})
+        };
         this.isLoading = true;
         this.errorMessage = '';
         try {
             await updateFormSettings({
                 formId: this.selectedFormId,
                 versionId: this.selectedVersionId,
-                formName: (nextValues.formName || '').trim(),
-                themeId: nextValues.themeId === '' ? null : nextValues.themeId,
-                enableCaptcha: !!nextValues.enableCaptcha,
-                submitSuccessMessage: nextValues.submitSuccessMessage || '',
-                rtlEnabled: !!nextValues.rtlEnabled
+                formName: (mergedValues.formName || '').trim(),
+                themeId: mergedValues.themeId === '' ? null : mergedValues.themeId,
+                enableCaptcha: !!mergedValues.enableCaptcha,
+                submitSuccessMessage: mergedValues.submitSuccessMessage || '',
+                rtlEnabled: !!mergedValues.rtlEnabled,
+                postSubmitAutoLinkEnabled: !!mergedValues.postSubmitAutoLinkEnabled,
+                postSubmitUrlTemplate: mergedValues.postSubmitUrlTemplate || '',
+                postSubmitButtonLabel: 'Continue',
+                postSubmitDelaySeconds: 0,
+                secretCodeVerificationEnabled: !!mergedValues.secretCodeVerificationEnabled,
+                secretCodeMatchField: mergedValues.secretCodeMatchField || 'Email',
+                secretCodeIntroText: mergedValues.secretCodeIntroText || '',
+                secretCodeSentMessage: mergedValues.secretCodeSentMessage || '',
+                secretCodeInvalidMessage: mergedValues.secretCodeInvalidMessage || '',
+                secretCodeVerifiedMessage: mergedValues.secretCodeVerifiedMessage || '',
+                secretCodeSendButtonLabel: mergedValues.secretCodeSendButtonLabel || '',
+                secretCodeVerifyButtonLabel: mergedValues.secretCodeVerifyButtonLabel || '',
+                secretCodeResendButtonLabel: mergedValues.secretCodeResendButtonLabel || '',
+                secretCodeExpiryMinutes: Number(mergedValues.secretCodeExpiryMinutes) || 10,
+                secretCodeMaxAttempts: Number(mergedValues.secretCodeMaxAttempts) || 5,
+                secretCodeAllowResend: mergedValues.secretCodeAllowResend !== false,
+                submitLabel: mergedValues.submitLabel || '',
+                submitConditionalEnabled: !!mergedValues.submitConditionalEnabled,
+                submitConditionalFieldKey: mergedValues.submitConditionalFieldKey || '',
+                submitConditionalOperator: mergedValues.submitConditionalOperator || 'equals',
+                submitConditionalValue: mergedValues.submitConditionalValue || '',
+                submitConditionalConditionsJson: mergedValues.submitConditionalConditionsJson || '[]',
+                submitConditionalExpression: mergedValues.submitConditionalExpression || ''
             });
-            this.selectedFormName = (nextValues.formName || '').trim();
+            this.selectedFormName = (mergedValues.formName || '').trim();
             this.selectedFormDescription = this.selectedFormName;
             this.draftFormName = this.selectedFormName;
-            this.selectedThemeId = nextValues.themeId || '';
-            this.selectedFormCaptchaEnabled = !!nextValues.enableCaptcha;
-            this.selectedVersionSubmitSuccessMessage = nextValues.submitSuccessMessage || 'Your form was submitted successfully.';
-            this.selectedVersionRtlEnabled = !!nextValues.rtlEnabled;
+            this.selectedThemeId = mergedValues.themeId || '';
+            this.selectedFormCaptchaEnabled = !!mergedValues.enableCaptcha;
+            this.selectedVersionSubmitSuccessMessage = mergedValues.submitSuccessMessage || 'Your form was submitted successfully.';
+            this.selectedVersionSubmitLabel = mergedValues.submitLabel || 'Submit';
+            this.selectedVersionRtlEnabled = !!mergedValues.rtlEnabled;
+            this.selectedVersionPostSubmitAutoLinkEnabled = !!mergedValues.postSubmitAutoLinkEnabled;
+            this.selectedVersionPostSubmitUrlTemplate = (mergedValues.postSubmitUrlTemplate || '').trim();
+            this.selectedVersionPostSubmitButtonLabel = 'Continue';
+            this.selectedVersionPostSubmitDelaySeconds = 0;
+            this.selectedVersionSecretCodeVerificationEnabled = !!mergedValues.secretCodeVerificationEnabled;
+            this.selectedVersionSecretCodeMatchField = mergedValues.secretCodeMatchField || 'Email';
+            this.selectedVersionSecretCodeIntroText = mergedValues.secretCodeIntroText || 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.';
+            this.selectedVersionSecretCodeSentMessage = mergedValues.secretCodeSentMessage || 'If we found a matching contact, we sent a 6-digit code to that email.';
+            this.selectedVersionSecretCodeInvalidMessage = mergedValues.secretCodeInvalidMessage || 'The code is invalid or expired. Try again or request a new code.';
+            this.selectedVersionSecretCodeVerifiedMessage = mergedValues.secretCodeVerifiedMessage || 'Code verified. You can continue with the form now.';
+            this.selectedVersionSecretCodeSendButtonLabel = mergedValues.secretCodeSendButtonLabel || 'Enter';
+            this.selectedVersionSecretCodeVerifyButtonLabel = mergedValues.secretCodeVerifyButtonLabel || 'Verify';
+            this.selectedVersionSecretCodeResendButtonLabel = mergedValues.secretCodeResendButtonLabel || 'Resend Code';
+            this.selectedVersionSecretCodeExpiryMinutes = Math.max(1, Number(mergedValues.secretCodeExpiryMinutes) || 10);
+            this.selectedVersionSecretCodeMaxAttempts = Math.max(1, Number(mergedValues.secretCodeMaxAttempts) || 5);
+            this.selectedVersionSecretCodeAllowResend = mergedValues.secretCodeAllowResend !== false;
+            this.selectedVersionSubmitConditionalEnabled = !!mergedValues.submitConditionalEnabled;
+            this.selectedVersionSubmitConditionalFieldKey = mergedValues.submitConditionalFieldKey || '';
+            this.selectedVersionSubmitConditionalOperator = mergedValues.submitConditionalOperator || 'equals';
+            this.selectedVersionSubmitConditionalValue = mergedValues.submitConditionalValue || '';
+            this.selectedVersionSubmitConditionalConditions = this.normalizeVisibilityConditions(
+                this.parseConfig(mergedValues.submitConditionalConditionsJson || '[]'),
+                this.selectedVersionSubmitConditionalFieldKey,
+                this.selectedVersionSubmitConditionalOperator,
+                this.selectedVersionSubmitConditionalValue
+            );
+            this.selectedVersionSubmitConditionalExpression = this.normalizeVisibilityExpression(
+                mergedValues.submitConditionalExpression || '',
+                this.selectedVersionSubmitConditionalConditions.length
+            );
+            this.draftSubmitSuccessMessage = this.selectedVersionSubmitSuccessMessage;
+            this.draftSubmitLabel = this.selectedVersionSubmitLabel;
             this.draftRtlEnabled = this.selectedVersionRtlEnabled;
-            await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
+            this.draftPostSubmitAutoLinkEnabled = this.selectedVersionPostSubmitAutoLinkEnabled;
+            this.draftPostSubmitUrlTemplate = this.selectedVersionPostSubmitUrlTemplate || this.defaultPostSubmitRedirectUrl;
+            this.draftPostSubmitButtonLabel = this.selectedVersionPostSubmitButtonLabel;
+            this.draftPostSubmitDelaySeconds = this.selectedVersionPostSubmitDelaySeconds;
+            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
+            this.draftSecretCodeMatchField = this.selectedVersionSecretCodeMatchField;
+            this.draftSecretCodeIntroText = this.selectedVersionSecretCodeIntroText;
+            this.draftSecretCodeSentMessage = this.selectedVersionSecretCodeSentMessage;
+            this.draftSecretCodeInvalidMessage = this.selectedVersionSecretCodeInvalidMessage;
+            this.draftSecretCodeVerifiedMessage = this.selectedVersionSecretCodeVerifiedMessage;
+            this.draftSecretCodeSendButtonLabel = this.selectedVersionSecretCodeSendButtonLabel;
+            this.draftSecretCodeVerifyButtonLabel = this.selectedVersionSecretCodeVerifyButtonLabel;
+            this.draftSecretCodeResendButtonLabel = this.selectedVersionSecretCodeResendButtonLabel;
+            this.draftSecretCodeExpiryMinutes = this.selectedVersionSecretCodeExpiryMinutes;
+            this.draftSecretCodeMaxAttempts = this.selectedVersionSecretCodeMaxAttempts;
+            this.draftSecretCodeAllowResend = this.selectedVersionSecretCodeAllowResend;
+            this.draftSubmitConditionalEnabled = this.selectedVersionSubmitConditionalEnabled;
+            this.draftSubmitConditionalFieldKey = this.selectedVersionSubmitConditionalFieldKey;
+            this.draftSubmitConditionalOperator = this.selectedVersionSubmitConditionalOperator;
+            this.draftSubmitConditionalValue = this.selectedVersionSubmitConditionalValue;
+            this.draftSubmitConditionalConditions = [...this.selectedVersionSubmitConditionalConditions];
+            this.draftSubmitConditionalExpression = this.selectedVersionSubmitConditionalExpression;
+            if (!options.skipReload) {
+                await this.loadWorkspace(this.selectedFormId, this.selectedVersionId, true);
+            }
             if (successMessage) {
                 this.showToast('Form settings saved', successMessage, 'success');
             }
@@ -1122,7 +1743,12 @@ export default class NativeFormsDesigner extends LightningElement {
                 formName: this.draftFormName,
                 enableCaptcha: this.selectedFormCaptchaEnabled,
                 submitSuccessMessage: this.draftSubmitSuccessMessage,
-                rtlEnabled: this.draftRtlEnabled
+                rtlEnabled: this.draftRtlEnabled,
+                submitLabel: this.draftSubmitLabel,
+                submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+                submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+                submitConditionalOperator: this.draftSubmitConditionalOperator,
+                submitConditionalValue: this.draftSubmitConditionalValue
             },
             'Form theme updated.'
         );
@@ -1135,9 +1761,15 @@ export default class NativeFormsDesigner extends LightningElement {
                 formName: this.draftFormName,
                 enableCaptcha: event.target.checked,
                 submitSuccessMessage: this.draftSubmitSuccessMessage,
-                rtlEnabled: this.draftRtlEnabled
+                rtlEnabled: this.draftRtlEnabled,
+                submitLabel: this.draftSubmitLabel,
+                submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+                submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+                submitConditionalOperator: this.draftSubmitConditionalOperator,
+                submitConditionalValue: this.draftSubmitConditionalValue
             },
-            event.target.checked ? 'CAPTCHA enabled for this form.' : 'CAPTCHA disabled for this form.'
+            event.target.checked ? 'CAPTCHA enabled for this form.' : 'CAPTCHA disabled for this form.',
+            { skipReload: true }
         );
     }
 
@@ -1149,10 +1781,134 @@ export default class NativeFormsDesigner extends LightningElement {
                 formName: this.draftFormName,
                 enableCaptcha: this.selectedFormCaptchaEnabled,
                 submitSuccessMessage: this.draftSubmitSuccessMessage,
-                rtlEnabled: this.draftRtlEnabled
+                rtlEnabled: this.draftRtlEnabled,
+                submitLabel: this.draftSubmitLabel,
+                submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+                submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+                submitConditionalOperator: this.draftSubmitConditionalOperator,
+                submitConditionalValue: this.draftSubmitConditionalValue
             },
             this.draftRtlEnabled ? 'RTL enabled for this form.' : 'RTL disabled for this form.'
         );
+    }
+
+    handleSecretCodeVerificationEnabledChange(event) {
+        this.draftSecretCodeVerificationEnabled = event.target.checked;
+    }
+
+    async handleSecretCodeVerificationEnabledCommit() {
+        if (this.draftSecretCodeVerificationEnabled === this.selectedVersionSecretCodeVerificationEnabled) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeIntroTextInput(event) {
+        this.draftSecretCodeIntroText = event.target.value || '';
+    }
+
+    async handleSecretCodeIntroTextBlur(event) {
+        this.draftSecretCodeIntroText = event.target.value || '';
+        if ((this.draftSecretCodeIntroText || '').trim() === (this.selectedVersionSecretCodeIntroText || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeSentMessageInput(event) {
+        this.draftSecretCodeSentMessage = event.target.value || '';
+    }
+
+    async handleSecretCodeSentMessageBlur(event) {
+        this.draftSecretCodeSentMessage = event.target.value || '';
+        if ((this.draftSecretCodeSentMessage || '').trim() === (this.selectedVersionSecretCodeSentMessage || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeInvalidMessageInput(event) {
+        this.draftSecretCodeInvalidMessage = event.target.value || '';
+    }
+
+    async handleSecretCodeInvalidMessageBlur(event) {
+        this.draftSecretCodeInvalidMessage = event.target.value || '';
+        if ((this.draftSecretCodeInvalidMessage || '').trim() === (this.selectedVersionSecretCodeInvalidMessage || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeVerifiedMessageInput(event) {
+        this.draftSecretCodeVerifiedMessage = event.target.value || '';
+    }
+
+    async handleSecretCodeVerifiedMessageBlur(event) {
+        this.draftSecretCodeVerifiedMessage = event.target.value || '';
+        if ((this.draftSecretCodeVerifiedMessage || '').trim() === (this.selectedVersionSecretCodeVerifiedMessage || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeSendButtonLabelInput(event) {
+        this.draftSecretCodeSendButtonLabel = event.target.value || '';
+    }
+
+    async handleSecretCodeSendButtonLabelBlur(event) {
+        this.draftSecretCodeSendButtonLabel = event.target.value || '';
+        if ((this.draftSecretCodeSendButtonLabel || '').trim() === (this.selectedVersionSecretCodeSendButtonLabel || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeVerifyButtonLabelInput(event) {
+        this.draftSecretCodeVerifyButtonLabel = event.target.value || '';
+    }
+
+    async handleSecretCodeVerifyButtonLabelBlur(event) {
+        this.draftSecretCodeVerifyButtonLabel = event.target.value || '';
+        if ((this.draftSecretCodeVerifyButtonLabel || '').trim() === (this.selectedVersionSecretCodeVerifyButtonLabel || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handleSecretCodeResendButtonLabelInput(event) {
+        this.draftSecretCodeResendButtonLabel = event.target.value || '';
+    }
+
+    async handleSecretCodeResendButtonLabelBlur(event) {
+        this.draftSecretCodeResendButtonLabel = event.target.value || '';
+        if ((this.draftSecretCodeResendButtonLabel || '').trim() === (this.selectedVersionSecretCodeResendButtonLabel || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    async handleSecretCodeExpiryMinutesBlur(event) {
+        this.draftSecretCodeExpiryMinutes = Math.max(1, Number(event.target.value) || 10);
+        if (this.draftSecretCodeExpiryMinutes === this.selectedVersionSecretCodeExpiryMinutes) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    async handleSecretCodeMaxAttemptsBlur(event) {
+        this.draftSecretCodeMaxAttempts = Math.max(1, Number(event.target.value) || 5);
+        if (this.draftSecretCodeMaxAttempts === this.selectedVersionSecretCodeMaxAttempts) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    async handleSecretCodeAllowResendChange(event) {
+        this.draftSecretCodeAllowResend = !!event.target.checked;
+        if (this.draftSecretCodeAllowResend === this.selectedVersionSecretCodeAllowResend) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
     }
 
     handleSubmitSuccessMessageInput(event) {
@@ -1179,7 +1935,12 @@ export default class NativeFormsDesigner extends LightningElement {
                 themeId: this.selectedThemeId || '',
                 enableCaptcha: this.selectedFormCaptchaEnabled,
                 submitSuccessMessage: this.draftSubmitSuccessMessage,
-                rtlEnabled: this.draftRtlEnabled
+                rtlEnabled: this.draftRtlEnabled,
+                submitLabel: this.draftSubmitLabel,
+                submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+                submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+                submitConditionalOperator: this.draftSubmitConditionalOperator,
+                submitConditionalValue: this.draftSubmitConditionalValue
             },
             null
         );
@@ -1197,10 +1958,227 @@ export default class NativeFormsDesigner extends LightningElement {
                 formName: this.draftFormName,
                 enableCaptcha: this.selectedFormCaptchaEnabled,
                 submitSuccessMessage: nextMessage,
-                rtlEnabled: this.draftRtlEnabled
+                rtlEnabled: this.draftRtlEnabled,
+                submitLabel: this.draftSubmitLabel,
+                submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+                submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+                submitConditionalOperator: this.draftSubmitConditionalOperator,
+                submitConditionalValue: this.draftSubmitConditionalValue
             },
             null
         );
+    }
+
+    handlePostSubmitAutoLinkChange(event) {
+        this.draftPostSubmitAutoLinkEnabled = event.target.checked;
+        if (this.draftPostSubmitAutoLinkEnabled && !(this.draftPostSubmitUrlTemplate || '').trim()) {
+            this.draftPostSubmitUrlTemplate = this.defaultPostSubmitRedirectUrl;
+        }
+    }
+
+    async handlePostSubmitAutoLinkCommit() {
+        if (this.draftPostSubmitAutoLinkEnabled === this.selectedVersionPostSubmitAutoLinkEnabled) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    handlePostSubmitUrlTemplateInput(event) {
+        this.draftPostSubmitUrlTemplate = event.target.value || '';
+        this.capturePostSubmitUrlSelection(event);
+    }
+
+    capturePostSubmitUrlSelection(event) {
+        const target = event.target;
+        this.postSubmitUrlSelectionStart = target?.selectionStart ?? this.draftPostSubmitUrlTemplate.length;
+        this.postSubmitUrlSelectionEnd = target?.selectionEnd ?? this.postSubmitUrlSelectionStart;
+    }
+
+    handlePostSubmitUrlTemplateBlur(event) {
+        this.draftPostSubmitUrlTemplate = event.target.value || '';
+    }
+
+    async handlePostSubmitUrlTemplateChange(event) {
+        this.draftPostSubmitUrlTemplate = event.target.value || '';
+        if (this.postSubmitTokenInteraction) {
+            return;
+        }
+        if ((this.draftPostSubmitUrlTemplate || '').trim() === (this.selectedVersionPostSubmitUrlTemplate || '').trim()) {
+            return;
+        }
+        await this.saveFormSettings({}, null, { skipReload: true });
+    }
+
+    markPostSubmitTokenInteraction() {
+        this.postSubmitTokenInteraction = true;
+    }
+
+    clearPostSubmitTokenInteraction() {
+        window.setTimeout(() => {
+            this.postSubmitTokenInteraction = false;
+        }, 0);
+    }
+
+    handlePostSubmitFormTokenChange(event) {
+        this.selectedPostSubmitFormToken = event.detail.value || '';
+    }
+
+    insertTokenIntoPostSubmitUrl(token) {
+        if (!token) {
+            return;
+        }
+        const textarea = this.template.querySelector('[data-id="post-submit-url-template"]');
+        const sourceValue = textarea ? (textarea.value || '') : (this.draftPostSubmitUrlTemplate || '');
+        const start = textarea?.selectionStart ?? this.postSubmitUrlSelectionStart ?? sourceValue.length;
+        const end = textarea?.selectionEnd ?? this.postSubmitUrlSelectionEnd ?? start;
+        const nextValue = `${sourceValue.slice(0, start)}${token}${sourceValue.slice(end)}`;
+        const nextCursor = start + token.length;
+        this.draftPostSubmitUrlTemplate = nextValue;
+        this.postSubmitUrlSelectionStart = nextCursor;
+        this.postSubmitUrlSelectionEnd = nextCursor;
+        if (textarea) {
+            textarea.value = nextValue;
+            requestAnimationFrame(() => {
+                textarea.focus();
+                textarea.setSelectionRange(nextCursor, nextCursor);
+            });
+        }
+    }
+
+    handleInsertPostSubmitFormToken() {
+        if (!this.selectedPostSubmitFormToken) {
+            this.clearPostSubmitTokenInteraction();
+            return;
+        }
+        this.insertTokenIntoPostSubmitUrl(this.selectedPostSubmitFormToken);
+        this.selectedPostSubmitFormToken = '';
+        this.clearPostSubmitTokenInteraction();
+    }
+
+
+    handleSubmitButtonLabelInput(event) {
+        this.draftSubmitLabel = event.target.value || '';
+        this.syncSelectedState();
+    }
+
+    async persistSubmitButtonSettings() {
+        this.syncSubmitConditionalLegacyFields();
+        await this.saveFormSettings({
+            formName: this.draftFormName,
+            themeId: this.selectedThemeId || '',
+            enableCaptcha: this.selectedFormCaptchaEnabled,
+            submitSuccessMessage: this.draftSubmitSuccessMessage,
+            rtlEnabled: this.draftRtlEnabled,
+            submitLabel: this.draftSubmitLabel,
+            submitConditionalEnabled: this.draftSubmitConditionalEnabled,
+            submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
+            submitConditionalOperator: this.draftSubmitConditionalOperator,
+            submitConditionalValue: this.draftSubmitConditionalValue,
+            submitConditionalConditionsJson: JSON.stringify(this.sanitizeVisibilityConditions(this.draftSubmitConditionalConditions)),
+            submitConditionalExpression: this.normalizeVisibilityExpression(
+                this.draftSubmitConditionalExpression,
+                this.sanitizeVisibilityConditions(this.draftSubmitConditionalConditions).length
+            )
+        }, null);
+    }
+
+    async handleSubmitButtonLabelBlur(event) {
+        const nextLabel = (event.target.value || '').trim() || 'Submit';
+        this.draftSubmitLabel = nextLabel;
+        if (nextLabel === (this.selectedVersionSubmitLabel || 'Submit')) {
+            this.syncSelectedState();
+            return;
+        }
+        await this.persistSubmitButtonSettings();
+    }
+
+    handleSubmitButtonConditionalEnabledChange(event) {
+        this.draftSubmitConditionalEnabled = event.target.checked;
+        if (this.draftSubmitConditionalEnabled && !(this.draftSubmitConditionalConditions || []).length) {
+            this.draftSubmitConditionalConditions = [this.createVisibilityCondition()];
+        }
+        if (!this.draftSubmitConditionalEnabled) {
+            this.draftSubmitConditionalExpression = '';
+        }
+        this.syncSubmitConditionalLegacyFields();
+        this.syncSelectedState();
+    }
+
+    async handleSubmitButtonConditionalEnabledCommit() {
+        if (this.draftSubmitConditionalEnabled === this.selectedVersionSubmitConditionalEnabled) {
+            return;
+        }
+        await this.persistSubmitButtonSettings();
+    }
+
+    handleSubmitConditionRowChange(event) {
+        const index = Number(event.target.dataset.index);
+        const field = event.target.dataset.field;
+        const value = event.detail?.value ?? event.target.value ?? '';
+        const next = [...(this.draftSubmitConditionalConditions || [])];
+        if (!next[index]) {
+            return;
+        }
+        next[index] = {
+            ...next[index],
+            [field]: value
+        };
+        if (field === 'operator' && !this.conditionUsesValue(value)) {
+            next[index].value = '';
+        }
+        this.draftSubmitConditionalConditions = next;
+        this.syncSubmitConditionalLegacyFields();
+        this.syncSelectedState();
+    }
+
+    handleSubmitConditionControlBlur(event) {
+        if (event.relatedTarget?.dataset?.conditionAction) {
+            return;
+        }
+        this.handleSubmitConditionRowCommit();
+    }
+
+    handleSubmitConditionValueBlur(event) {
+        this.handleSubmitConditionRowChange(event);
+        if (event.relatedTarget?.dataset?.conditionAction) {
+            return;
+        }
+        this.handleSubmitConditionRowCommit();
+    }
+
+    async handleSubmitConditionRowCommit() {
+        await this.persistSubmitButtonSettings();
+    }
+
+    async handleAddSubmitCondition() {
+        if (!this.canAddSubmitCondition) {
+            return;
+        }
+        this.draftSubmitConditionalConditions = [...(this.draftSubmitConditionalConditions || []), this.createVisibilityCondition()];
+        this.draftSubmitConditionalExpression = this.defaultVisibilityExpression(this.draftSubmitConditionalConditions.length);
+        this.syncSubmitConditionalLegacyFields();
+        this.syncSelectedState();
+    }
+
+    async handleDeleteSubmitCondition(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        this.draftSubmitConditionalConditions = (this.draftSubmitConditionalConditions || []).filter((_, rowIndex) => rowIndex !== index);
+        this.draftSubmitConditionalExpression = this.normalizeVisibilityExpression(
+            '',
+            this.draftSubmitConditionalConditions.length
+        );
+        this.syncSubmitConditionalLegacyFields();
+        this.syncSelectedState();
+        await this.persistSubmitButtonSettings();
+    }
+
+    handleSubmitConditionalExpressionInput(event) {
+        this.draftSubmitConditionalExpression = event.target.value || '';
+    }
+
+    async handleSubmitConditionalExpressionBlur(event) {
+        this.draftSubmitConditionalExpression = event.target.value || '';
+        await this.persistSubmitButtonSettings();
     }
 
     handleInputTypeChange(event) {
@@ -1226,6 +2204,10 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         if (elementType === 'repeatGroup' && !this.enableProRepeatGroups) {
             this.showToast('Pro feature', 'Enable Pro Repeat Groups in TwinaForms Admin Features first.', 'warning');
+            return;
+        }
+        if (elementType === 'fileUpload' && !this.enableProLoadFile) {
+            this.showToast('Pro feature', 'Enable Pro File Uploads in your AWS plan entitlements first.', 'warning');
             return;
         }
         await this.addElementType(elementType);
@@ -1436,7 +2418,14 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorConditionalEnabledChange(event) {
         this.editorConditionalEnabled = event.target.checked;
-        this.applyEditorDraft(false);
+        if (this.editorConditionalEnabled && !(this.editorConditionalConditions || []).length) {
+            this.editorConditionalConditions = [this.createVisibilityCondition()];
+        }
+        if (!this.editorConditionalEnabled) {
+            this.editorConditionalExpression = '';
+        }
+        this.syncEditorConditionalLegacyFields();
+        this.applyEditorDraft(false, true);
         this.flushEditorDraftSave();
     }
 
@@ -1444,19 +2433,71 @@ export default class NativeFormsDesigner extends LightningElement {
         this.flushEditorDraftSave();
     }
 
-    handleEditorConditionalFieldChange(event) {
-        this.editorConditionalFieldKey = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorConditionRowChange(event) {
+        const index = Number(event.target.dataset.index);
+        const field = event.target.dataset.field;
+        const value = event.detail?.value ?? event.target.value ?? '';
+        const next = [...(this.editorConditionalConditions || [])];
+        if (!next[index]) {
+            return;
+        }
+        next[index] = {
+            ...next[index],
+            [field]: value
+        };
+        if (field === 'operator' && !this.conditionUsesValue(value)) {
+            next[index].value = '';
+        }
+        this.editorConditionalConditions = next;
+        this.syncEditorConditionalLegacyFields();
+        this.applyEditorDraft(false, true);
     }
 
-    handleEditorConditionalOperatorChange(event) {
-        this.editorConditionalOperator = event.detail.value;
-        this.applyEditorDraft();
+    handleEditorConditionControlBlur(event) {
+        if (event.relatedTarget?.dataset?.conditionAction) {
+            return;
+        }
+        this.handleEditorConditionRowCommit();
     }
 
-    handleEditorConditionalValueCommit(event) {
-        this.editorConditionalValue = event.target.value;
-        this.applyEditorDraft(false);
+    handleEditorConditionValueBlur(event) {
+        this.handleEditorConditionRowChange(event);
+        if (event.relatedTarget?.dataset?.conditionAction) {
+            return;
+        }
+        this.handleEditorConditionRowCommit();
+    }
+
+    handleEditorConditionRowCommit() {
+        this.flushEditorDraftSave();
+    }
+
+    handleAddEditorCondition() {
+        if (!this.canAddElementCondition) {
+            return;
+        }
+        this.editorConditionalConditions = [...(this.editorConditionalConditions || []), this.createVisibilityCondition()];
+        this.editorConditionalExpression = this.defaultVisibilityExpression(this.editorConditionalConditions.length);
+        this.syncEditorConditionalLegacyFields();
+        this.applyEditorDraft(false, true);
+    }
+
+    handleDeleteEditorCondition(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        this.editorConditionalConditions = (this.editorConditionalConditions || []).filter((_, rowIndex) => rowIndex !== index);
+        this.editorConditionalExpression = this.normalizeVisibilityExpression('', this.editorConditionalConditions.length);
+        this.syncEditorConditionalLegacyFields();
+        this.applyEditorDraft(false, true);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorConditionalExpressionInput(event) {
+        this.editorConditionalExpression = event.target.value || '';
+    }
+
+    handleEditorConditionalExpressionBlur(event) {
+        this.editorConditionalExpression = event.target.value || '';
+        this.applyEditorDraft(false, true);
         this.flushEditorDraftSave();
     }
 
@@ -1551,6 +2592,27 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorSubmitFieldChange(event) {
         this.editorSubmitFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorAllowMultipleFilesChange(event) {
+        this.editorAllowMultipleFiles = event.target.checked;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorAllowedExtensionsCommit(event) {
+        this.editorAllowedExtensionsText = event.target.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorMaxFileSizeCommit(event) {
+        this.editorMaxFileSizeMb = event.target.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorTargetSubmitActionChange(event) {
+        this.editorTargetSubmitActionKey = event.detail.value;
         this.applyEditorDraft();
     }
 
@@ -1747,7 +2809,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async handleDeleteSelected() {
-        if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.isSelectedVersionReadOnly || this.selectedElementIsSubmitButton) {
             return;
         }
 
@@ -1798,6 +2860,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorRequired = false;
             this.editorFieldBehavior = 'editable';
             this.editorConditionalEnabled = false;
+            this.editorConditionalConditions = [];
+            this.editorConditionalExpression = '';
             this.editorConditionalFieldKey = '';
             this.editorConditionalOperator = 'equals';
             this.editorConditionalValue = '';
@@ -1816,6 +2880,13 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorSubmitEnabled = false;
             this.editorSubmitActionKey = '';
             this.editorSubmitFieldPath = '';
+            this.picklistFieldOptions = [];
+            return;
+        }
+
+        if (this.selectedElementIsSubmitButton) {
+            this.editorLabel = '';
+            this.editorElementType = '';
             this.picklistFieldOptions = [];
             return;
         }
@@ -1845,9 +2916,18 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorRequired = config.required === true;
         this.editorFieldBehavior = config.fieldBehavior || (selected.elementType === 'hidden' ? 'hidden' : 'editable');
         this.editorConditionalEnabled = config.conditionalEnabled === true;
-        this.editorConditionalFieldKey = config.conditionalFieldKey || '';
-        this.editorConditionalOperator = config.conditionalOperator || 'equals';
-        this.editorConditionalValue = config.conditionalValue || '';
+        this.editorConditionalConditions = this.normalizeVisibilityConditions(
+            config.conditionalConditions,
+            config.conditionalFieldKey,
+            config.conditionalOperator,
+            config.conditionalValue
+        );
+        this.editorConditionalExpression = this.normalizeVisibilityExpression(
+            config.conditionalExpression,
+            this.editorConditionalConditions.length
+        );
+        this.ensureDraftElementConditionRow();
+        this.syncEditorConditionalLegacyFields();
         this.editorMinValue = config.minValue === null || config.minValue === undefined ? '' : String(config.minValue);
         this.editorMaxValue = config.maxValue === null || config.maxValue === undefined ? '' : String(config.maxValue);
         this.editorDateDisplayFormat = config.dateDisplayFormat || 'us';
@@ -1863,6 +2943,10 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorSubmitEnabled = !!config.submitEnabled || !!config.submitActionKey || !!config.submitFieldPath;
         this.editorSubmitActionKey = config.submitActionKey || '';
         this.editorSubmitFieldPath = config.submitFieldPath || '';
+        this.editorAllowMultipleFiles = config.allowMultiple === true;
+        this.editorAllowedExtensionsText = this.allowedExtensionsText(config.allowedExtensions);
+        this.editorMaxFileSizeMb = config.maxFileSizeMb == null ? '10' : String(config.maxFileSizeMb);
+        this.editorTargetSubmitActionKey = config.targetSubmitActionKey || '';
         if (this.selectedElementIsPicklist && this.editorPicklistObject) {
             this.loadPicklistFieldOptions(this.editorPicklistObject, this.editorPicklistField);
         } else {
@@ -1909,6 +2993,18 @@ export default class NativeFormsDesigner extends LightningElement {
             nextConfig.imageWidthPercent = this.editorImageWidthPercent || '100';
         }
 
+        if (this.selectedElementIsFileUpload) {
+            nextConfig.allowMultiple = this.editorAllowMultipleFiles === true;
+            nextConfig.allowedExtensions = this.parseAllowedExtensionsText(this.editorAllowedExtensionsText);
+            nextConfig.maxFileSizeMb = this.parsePositiveInteger(this.editorMaxFileSizeMb, 10);
+            nextConfig.targetSubmitActionKey = this.editorTargetSubmitActionKey || '';
+        } else {
+            delete nextConfig.allowMultiple;
+            delete nextConfig.allowedExtensions;
+            delete nextConfig.maxFileSizeMb;
+            delete nextConfig.targetSubmitActionKey;
+        }
+
         if (this.selectedElementIsPicklist) {
             nextConfig.sourceObjectApiName = this.editorPicklistObject || '';
             nextConfig.sourcePicklistFieldApiName = this.editorPicklistField || '';
@@ -1940,15 +3036,24 @@ export default class NativeFormsDesigner extends LightningElement {
         }
 
         if (this.selectedElementSupportsConditional) {
+            this.syncEditorConditionalLegacyFields();
+            const conditionalConditions = this.sanitizeVisibilityConditions(this.editorConditionalConditions);
             nextConfig.conditionalEnabled = this.editorConditionalEnabled;
             nextConfig.conditionalFieldKey = this.editorConditionalFieldKey || '';
             nextConfig.conditionalOperator = this.editorConditionalOperator || 'equals';
             nextConfig.conditionalValue = this.editorConditionalValue || '';
+            nextConfig.conditionalConditions = conditionalConditions;
+            nextConfig.conditionalExpression = this.normalizeVisibilityExpression(
+                this.editorConditionalExpression,
+                conditionalConditions.length
+            );
         } else {
             delete nextConfig.conditionalEnabled;
             delete nextConfig.conditionalFieldKey;
             delete nextConfig.conditionalOperator;
             delete nextConfig.conditionalValue;
+            delete nextConfig.conditionalConditions;
+            delete nextConfig.conditionalExpression;
         }
 
         if (this.selectedElementIsNumber || this.selectedElementIsDate) {
@@ -2043,10 +3148,18 @@ export default class NativeFormsDesigner extends LightningElement {
         });
     }
 
-    applyEditorDraft(shouldAutoSave = true) {
+    applyEditorDraft(shouldAutoSave = true, preserveConditionalDraft = false) {
         if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
             return;
         }
+
+        const preservedConditionalState = preserveConditionalDraft
+            ? {
+                enabled: this.editorConditionalEnabled,
+                conditions: (this.editorConditionalConditions || []).map((item) => ({ ...item })),
+                expression: this.editorConditionalExpression || ''
+            }
+            : null;
 
         const nextConfig = this.buildEditorConfig();
         this.elements = this.elements.map((item) => {
@@ -2054,7 +3167,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 return item;
             }
 
-            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup'].includes(this.editorElementType)
+            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup', 'fileUpload'].includes(this.editorElementType)
                 ? (item.fieldKey || this.generatedFieldKey(this.editorElementType))
                 : null;
 
@@ -2067,6 +3180,12 @@ export default class NativeFormsDesigner extends LightningElement {
             });
         });
         this.syncSelectedState();
+        if (preservedConditionalState && this.selectedElementSupportsConditional && !this.selectedElementIsSubmitButton) {
+            this.editorConditionalEnabled = preservedConditionalState.enabled;
+            this.editorConditionalConditions = preservedConditionalState.conditions;
+            this.editorConditionalExpression = preservedConditionalState.expression;
+            this.syncEditorConditionalLegacyFields();
+        }
         if (shouldAutoSave) {
             this.scheduleAutoSave();
         }
@@ -2296,6 +3415,52 @@ export default class NativeFormsDesigner extends LightningElement {
         }));
     }
 
+    normalizeAllowedExtensions(rawValue) {
+        if (!Array.isArray(rawValue)) {
+            return [];
+        }
+        const seen = new Set();
+        return rawValue
+            .map((value) => String(value || '').trim().toLowerCase().replace(/^\./, ''))
+            .filter((value) => value)
+            .filter((value) => {
+                if (seen.has(value)) {
+                    return false;
+                }
+                seen.add(value);
+                return true;
+            });
+    }
+
+    allowedExtensionsText(rawValue) {
+        return this.normalizeAllowedExtensions(rawValue).join(', ');
+    }
+
+    parseAllowedExtensionsText(rawText) {
+        const seen = new Set();
+        return String(rawText || '')
+            .split(',')
+            .map((value) => value.trim().toLowerCase().replace(/^\./, ''))
+            .filter((value) => value)
+            .filter((value) => {
+                if (seen.has(value)) {
+                    return false;
+                }
+                seen.add(value);
+                return true;
+            });
+    }
+
+    allowedExtensionsToAccept(rawValue) {
+        const extensions = this.normalizeAllowedExtensions(rawValue);
+        return extensions.map((value) => `.${value}`).join(',');
+    }
+
+    parsePositiveInteger(rawValue, fallbackValue) {
+        const parsed = Number.parseInt(rawValue, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackValue;
+    }
+
     showToast(title, message, variant) {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
     }
@@ -2358,7 +3523,7 @@ export default class NativeFormsDesigner extends LightningElement {
     storeSelectedVersion(versionId) {
         try {
             if (versionId) {
-                window.sessionStorage.setItem(DESIGNER_VERSION_KEY, versionId);
+                window.localStorage.setItem(DESIGNER_VERSION_KEY, versionId);
             }
         } catch (e) {
             // ignore browser storage failures
@@ -2367,7 +3532,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     loadStoredVersionId() {
         try {
-            return window.sessionStorage.getItem(DESIGNER_VERSION_KEY);
+            return window.localStorage.getItem(DESIGNER_VERSION_KEY);
         } catch (e) {
             return null;
         }
@@ -2375,9 +3540,40 @@ export default class NativeFormsDesigner extends LightningElement {
 
     clearStoredVersion() {
         try {
-            window.sessionStorage.removeItem(DESIGNER_VERSION_KEY);
+            window.localStorage.removeItem(DESIGNER_VERSION_KEY);
+        } catch (e) {
+            // ignore browser storage failures
+        }
+    }
+
+    storeSelectedForm(formId) {
+        try {
+            if (formId) {
+                window.localStorage.setItem(DESIGNER_FORM_KEY, formId);
+            }
+        } catch (e) {
+            // ignore browser storage failures
+        }
+    }
+
+    loadStoredFormId() {
+        try {
+            return window.localStorage.getItem(DESIGNER_FORM_KEY);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    clearStoredForm() {
+        try {
+            window.localStorage.removeItem(DESIGNER_FORM_KEY);
         } catch (e) {
             // ignore browser storage failures
         }
     }
 }
+
+
+
+
+

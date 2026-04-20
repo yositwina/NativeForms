@@ -53,8 +53,8 @@ const FEATURE_FLAG_METADATA = {
     description: "Add an extra verification step with a secret code for more sensitive workflows."
   },
   enableProLoadFile: {
-    label: "File Load Support",
-    description: "Support advanced file-loading behavior as part of the form experience and submission flow."
+    label: "File Uploads",
+    description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
@@ -972,6 +972,9 @@ function buildTenantDetail(tenant, plansByCode) {
     companyName: normalizedTenant.companyName || "Unknown Tenant",
     adminEmail: normalizedTenant.adminEmail || "",
     loginBaseUrl: normalizedTenant.loginBaseUrl || "",
+    country: normalizedTenant.country || "",
+    state: normalizedTenant.state || "",
+    city: normalizedTenant.city || "",
     status: normalizedTenant.status,
     isActive: normalizedTenant.isActive,
     planCode,

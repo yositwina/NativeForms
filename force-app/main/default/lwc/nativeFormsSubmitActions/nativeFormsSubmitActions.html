@@ -66,8 +66,8 @@
                             <p><strong>Update by record Id</strong> updates one row using an Id already available on the form.</p>
                             <p><strong>Find and update existing record</strong> first searches by your match conditions, then updates the record if found.</p>
                             <p><strong>If no matching record is found</strong> controls whether the hosted form should show an error or create a new record instead.</p>
-                            <p><strong>Value Source</strong> can come from a URL parameter, a form field, a literal value, or a previous <strong>Prefill Alias Field</strong>.</p>
-                            <p><strong>Prefill Alias Field</strong> is a Pro feature. Choose a prefill alias first, then choose one of that alias's Salesforce fields, such as <code>Contact</code> + <code>Id</code>.</p>
+                            <p><strong>Value Source</strong> can come from a URL parameter, a form field, a literal value, or a previous <strong>Result Alias Field</strong>.</p>
+                            <p><strong>Result Alias Field</strong> is a Pro feature. Choose a prefill alias or an earlier submit alias first, then choose one of that alias's Salesforce fields, such as <code>Contact</code> + <code>Id</code>.</p>
                             <p><strong>Upsert repeat group</strong> is a Pro feature for repeatable rows. Existing rows with an Id update, and rows without an Id create new records.</p>
                         </div>
                     </section>
@@ -172,7 +172,7 @@
                                                         <lightning-combobox
                                                             data-index={index}
                                                             name="aliasName"
-                                                            label="Prefill Alias"
+                                                            label="Result Alias"
                                                             value={row.selectedAliasName}
                                                             options={row.aliasOptions}
                                                             onchange={handleConditionChange}>
@@ -262,7 +262,7 @@
                                                 <template if:true={isRepeatRelationshipValueAlias}>
                                                     <lightning-combobox
                                                         name="relationshipAliasName"
-                                                        label="Prefill Alias"
+                                                        label="Result Alias"
                                                         value={selectedRelationshipAliasName}
                                                         options={prefillAliasOptions}
                                                         onchange={handleRepeatRelationshipChange}>

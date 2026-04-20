@@ -8,6 +8,9 @@ public with sharing class NativeFormsSetupController {
         @AuraEnabled public String orgName { get; set; }
         @AuraEnabled public String adminEmail { get; set; }
         @AuraEnabled public String loginBaseUrl { get; set; }
+        @AuraEnabled public String country { get; set; }
+        @AuraEnabled public String state { get; set; }
+        @AuraEnabled public String city { get; set; }
     }
 
     public class RegistrationRequest {
@@ -22,6 +25,9 @@ public with sharing class NativeFormsSetupController {
         @AuraEnabled public String subscriptionEndDate { get; set; }
         @AuraEnabled public Boolean isActive { get; set; }
         @AuraEnabled public String status { get; set; }
+        @AuraEnabled public String country { get; set; }
+        @AuraEnabled public String state { get; set; }
+        @AuraEnabled public String city { get; set; }
     }
 
     public class ClientCredentialsRequest {
@@ -69,11 +75,14 @@ public with sharing class NativeFormsSetupController {
         context.loginBaseUrl = URL.getOrgDomainUrl().toExternalForm();
 
         Organization orgRecord = [
-            SELECT Name
+            SELECT Name, City, State, Country
             FROM Organization
             LIMIT 1
         ];
         context.orgName = orgRecord.Name;
+        context.country = orgRecord.Country;
+        context.state = orgRecord.State;
+        context.city = orgRecord.City;
 
         return context;
     }

@@ -65,6 +65,9 @@ public with sharing class NativeFormsSubmitActionsController {
         @AuraEnabled public String alias { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
         @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
+        @AuraEnabled public String actionScope { get; set; }
+        @AuraEnabled public Id actionId { get; set; }
+        @AuraEnabled public Integer orderValue { get; set; }
     }
 
     public class MappingRecord {
@@ -106,6 +109,7 @@ public with sharing class NativeFormsSubmitActionsController {
                    Version_Number__c,
                    Version_Status__c,
                    Form__r.Name,
+                   Form__r.Description__c,
                    LastModifiedDate
             FROM NF_Form_Version__c
             ORDER BY LastModifiedDate DESC
@@ -115,7 +119,9 @@ public with sharing class NativeFormsSubmitActionsController {
         for (NF_Form_Version__c versionRecord : versions) {
             VersionOption option = new VersionOption();
             option.value = versionRecord.Id;
-            option.label = versionRecord.Form__r.Name + ' - ' + formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
+            option.label = displayFormName(versionRecord.Form__r.Description__c, versionRecord.Form__r.Name)
+                + ' - '
+                + formatVersionDisplay(versionRecord.Version_Number__c, versionRecord.Name);
             option.status = versionRecord.Version_Status__c;
             workspace.versions.add(option);
         }
@@ -129,7 +135,7 @@ public with sharing class NativeFormsSubmitActionsController {
         }
 
         NF_Form_Version__c selectedVersion = [
-            SELECT Id, Name, Version_Number__c, Version_Status__c, Form__r.Name
+            SELECT Id, Name, Version_Number__c, Version_Status__c, Form__r.Name, Form__r.Description__c
             FROM NF_Form_Version__c
             WHERE Id = :effectiveVersionId
             LIMIT 1
@@ -137,10 +143,10 @@ public with sharing class NativeFormsSubmitActionsController {
         workspace.selectedVersionId = selectedVersion.Id;
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
-        workspace.selectedFormName = selectedVersion.Form__r.Name;
+        workspace.selectedFormName = displayFormName(selectedVersion.Form__r.Description__c, selectedVersion.Form__r.Name);
 
         for (NF_Form_Action__c actionRecord : [
-            SELECT Store_Result_As__c, Object_Api_Name__c
+            SELECT Id, Store_Result_As__c, Object_Api_Name__c, Order__c
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Prefill'
@@ -152,6 +158,29 @@ public with sharing class NativeFormsSubmitActionsController {
                 aliasDetail.alias = actionRecord.Store_Result_As__c;
                 aliasDetail.objectApiName = actionRecord.Object_Api_Name__c;
                 aliasDetail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
+                aliasDetail.actionScope = 'Prefill';
+                aliasDetail.actionId = actionRecord.Id;
+                aliasDetail.orderValue = actionRecord.Order__c == null ? null : Integer.valueOf(String.valueOf(actionRecord.Order__c));
+                workspace.prefillAliasDetails.add(aliasDetail);
+            }
+        }
+
+        for (NF_Form_Action__c actionRecord : [
+            SELECT Id, Store_Result_As__c, Object_Api_Name__c, Order__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :effectiveVersionId
+              AND Action_Scope__c = 'Submit'
+              AND Store_Result_As__c != null
+            ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            if (String.isNotBlank(actionRecord.Store_Result_As__c) && String.isNotBlank(actionRecord.Object_Api_Name__c)) {
+                PrefillAliasDetail aliasDetail = new PrefillAliasDetail();
+                aliasDetail.alias = actionRecord.Store_Result_As__c;
+                aliasDetail.objectApiName = actionRecord.Object_Api_Name__c;
+                aliasDetail.fieldOptions = getReadableFieldOptions(actionRecord.Object_Api_Name__c);
+                aliasDetail.actionScope = 'Submit';
+                aliasDetail.actionId = actionRecord.Id;
+                aliasDetail.orderValue = actionRecord.Order__c == null ? null : Integer.valueOf(String.valueOf(actionRecord.Order__c));
                 workspace.prefillAliasDetails.add(aliasDetail);
             }
         }
@@ -417,6 +446,10 @@ public with sharing class NativeFormsSubmitActionsController {
             return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
         }
         return fallbackName;
+    }
+
+    private static String displayFormName(String descriptionValue, String fallbackName) {
+        return String.isBlank(descriptionValue) ? fallbackName : descriptionValue;
     }
 
     private static Map<String, Object> parseJsonMap(String rawJson) {

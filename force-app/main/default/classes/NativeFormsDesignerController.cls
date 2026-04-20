@@ -111,7 +111,30 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedVersionName { get; set; }
         @AuraEnabled public String selectedVersionStatus { get; set; }
         @AuraEnabled public String selectedVersionSubmitSuccessMessage { get; set; }
+        @AuraEnabled public String selectedVersionSubmitLabel { get; set; }
         @AuraEnabled public Boolean selectedVersionRtlEnabled { get; set; }
+        @AuraEnabled public Boolean selectedVersionPostSubmitAutoLinkEnabled { get; set; }
+        @AuraEnabled public String selectedVersionPostSubmitUrlTemplate { get; set; }
+        @AuraEnabled public String selectedVersionPostSubmitButtonLabel { get; set; }
+        @AuraEnabled public Integer selectedVersionPostSubmitDelaySeconds { get; set; }
+        @AuraEnabled public Boolean selectedVersionSecretCodeVerificationEnabled { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeMatchField { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeIntroText { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeSentMessage { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeInvalidMessage { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeVerifiedMessage { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeSendButtonLabel { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeVerifyButtonLabel { get; set; }
+        @AuraEnabled public String selectedVersionSecretCodeResendButtonLabel { get; set; }
+        @AuraEnabled public Integer selectedVersionSecretCodeExpiryMinutes { get; set; }
+        @AuraEnabled public Integer selectedVersionSecretCodeMaxAttempts { get; set; }
+        @AuraEnabled public Boolean selectedVersionSecretCodeAllowResend { get; set; }
+        @AuraEnabled public Boolean selectedVersionSubmitConditionalEnabled { get; set; }
+        @AuraEnabled public String selectedVersionSubmitConditionalFieldKey { get; set; }
+        @AuraEnabled public String selectedVersionSubmitConditionalOperator { get; set; }
+        @AuraEnabled public String selectedVersionSubmitConditionalValue { get; set; }
+        @AuraEnabled public String selectedVersionSubmitConditionalConditionsJson { get; set; }
+        @AuraEnabled public String selectedVersionSubmitConditionalExpression { get; set; }
         @AuraEnabled public String selectedPublishedUrl { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
@@ -120,7 +143,11 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public List<ElementRecord> elements { get; set; }
         @AuraEnabled public List<PrefillAliasDetail> prefillAliases { get; set; }
         @AuraEnabled public List<SubmitActionDetail> submitActions { get; set; }
+        @AuraEnabled public Boolean enableProConditionLogic { get; set; }
         @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
+        @AuraEnabled public Boolean enableProLoadFile { get; set; }
+        @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
+        @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
     }
 
     public class NewFormResult {
@@ -231,7 +258,11 @@ public with sharing class NativeFormsDesignerController {
         workspace.elements = new List<ElementRecord>();
         workspace.prefillAliases = new List<PrefillAliasDetail>();
         workspace.submitActions = new List<SubmitActionDetail>();
+        workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
         workspace.enableProRepeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
+        workspace.enableProLoadFile = NativeFormsFeatureFlags.isProLoadFileEnabled();
+        workspace.enableProPostSubmitAutoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
+        workspace.enableProSfSecretCodeAuth = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
 
         List<NF_Form__c> forms = [
             SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c, Enable_Captcha__c
@@ -344,7 +375,71 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedVersionSubmitSuccessMessage = defaultSubmitSuccessMessage(
             stringValue(versionUiSettings.get('submitSuccessMessage'))
         );
+        workspace.selectedVersionSubmitLabel = defaultSubmitLabel(
+            stringValue(versionUiSettings.get('submitLabel'))
+        );
         workspace.selectedVersionRtlEnabled = booleanValue(versionUiSettings.get('rtlEnabled'));
+        workspace.selectedVersionPostSubmitAutoLinkEnabled = booleanValue(versionUiSettings.get('postSubmitAutoLinkEnabled'));
+        workspace.selectedVersionPostSubmitUrlTemplate = defaultPostSubmitUrlTemplate(
+            stringValue(versionUiSettings.get('postSubmitUrlTemplate'))
+        );
+        workspace.selectedVersionPostSubmitButtonLabel = defaultPostSubmitButtonLabel(
+            stringValue(versionUiSettings.get('postSubmitButtonLabel'))
+        );
+        workspace.selectedVersionPostSubmitDelaySeconds = defaultPostSubmitDelaySeconds(
+            versionUiSettings.get('postSubmitDelaySeconds')
+        );
+        workspace.selectedVersionSecretCodeVerificationEnabled = booleanValue(versionUiSettings.get('secretCodeVerificationEnabled'));
+        workspace.selectedVersionSecretCodeMatchField = defaultSecretCodeMatchField(
+            stringValue(versionUiSettings.get('secretCodeMatchField'))
+        );
+        workspace.selectedVersionSecretCodeIntroText = defaultSecretCodeIntroText(
+            stringValue(versionUiSettings.get('secretCodeIntroText'))
+        );
+        workspace.selectedVersionSecretCodeSentMessage = defaultSecretCodeSentMessage(
+            stringValue(versionUiSettings.get('secretCodeSentMessage'))
+        );
+        workspace.selectedVersionSecretCodeInvalidMessage = defaultSecretCodeInvalidMessage(
+            stringValue(versionUiSettings.get('secretCodeInvalidMessage'))
+        );
+        workspace.selectedVersionSecretCodeVerifiedMessage = defaultSecretCodeVerifiedMessage(
+            stringValue(versionUiSettings.get('secretCodeVerifiedMessage'))
+        );
+        workspace.selectedVersionSecretCodeSendButtonLabel = defaultSecretCodeSendButtonLabel(
+            stringValue(versionUiSettings.get('secretCodeSendButtonLabel'))
+        );
+        workspace.selectedVersionSecretCodeVerifyButtonLabel = defaultSecretCodeVerifyButtonLabel(
+            stringValue(versionUiSettings.get('secretCodeVerifyButtonLabel'))
+        );
+        workspace.selectedVersionSecretCodeResendButtonLabel = defaultSecretCodeResendButtonLabel(
+            stringValue(versionUiSettings.get('secretCodeResendButtonLabel'))
+        );
+        workspace.selectedVersionSecretCodeExpiryMinutes = defaultSecretCodeExpiryMinutes(
+            versionUiSettings.get('secretCodeExpiryMinutes')
+        );
+        workspace.selectedVersionSecretCodeMaxAttempts = defaultSecretCodeMaxAttempts(
+            versionUiSettings.get('secretCodeMaxAttempts')
+        );
+        workspace.selectedVersionSecretCodeAllowResend = defaultSecretCodeAllowResend(
+            versionUiSettings.get('secretCodeAllowResend')
+        );
+        workspace.selectedVersionSubmitConditionalEnabled = booleanValue(versionUiSettings.get('submitConditionalEnabled'));
+        workspace.selectedVersionSubmitConditionalFieldKey = stringValue(versionUiSettings.get('submitConditionalFieldKey'));
+        workspace.selectedVersionSubmitConditionalOperator = defaultConditionalOperator(
+            stringValue(versionUiSettings.get('submitConditionalOperator'))
+        );
+        workspace.selectedVersionSubmitConditionalValue = stringValue(versionUiSettings.get('submitConditionalValue'));
+        List<Object> submitConditionalConditions = normalizeConditionalConditions(
+            parseJsonList(versionUiSettings.get('submitConditionalConditions')),
+            workspace.selectedVersionSubmitConditionalFieldKey,
+            workspace.selectedVersionSubmitConditionalOperator,
+            workspace.selectedVersionSubmitConditionalValue
+        );
+        workspace.selectedVersionSubmitConditionalConditionsJson = JSON.serialize(submitConditionalConditions);
+        workspace.selectedVersionSubmitConditionalExpression = defaultConditionalExpression(
+            stringValue(versionUiSettings.get('submitConditionalExpression')),
+            submitConditionalConditions.size()
+        );
         List<NF_Form_Publication__c> publicationRows = [
             SELECT Generated_HTML_Ref__c
             FROM NF_Form_Publication__c
@@ -405,7 +500,38 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static void updateFormSettings(Id formId, Id versionId, String formName, Id themeId, Boolean enableCaptcha, String submitSuccessMessage, Boolean rtlEnabled) {
+    public static void updateFormSettings(
+        Id formId,
+        Id versionId,
+        String formName,
+        Id themeId,
+        Boolean enableCaptcha,
+        String submitSuccessMessage,
+        Boolean rtlEnabled,
+        Boolean postSubmitAutoLinkEnabled,
+        String postSubmitUrlTemplate,
+        String postSubmitButtonLabel,
+        Integer postSubmitDelaySeconds,
+        Boolean secretCodeVerificationEnabled,
+        String secretCodeMatchField,
+        String secretCodeIntroText,
+        String secretCodeSentMessage,
+        String secretCodeInvalidMessage,
+        String secretCodeVerifiedMessage,
+        String secretCodeSendButtonLabel,
+        String secretCodeVerifyButtonLabel,
+        String secretCodeResendButtonLabel,
+        Integer secretCodeExpiryMinutes,
+        Integer secretCodeMaxAttempts,
+        Boolean secretCodeAllowResend,
+        String submitLabel,
+        Boolean submitConditionalEnabled,
+        String submitConditionalFieldKey,
+        String submitConditionalOperator,
+        String submitConditionalValue,
+        String submitConditionalConditionsJson,
+        String submitConditionalExpression
+    ) {
         if (formId == null) {
             throw new AuraHandledException('Form id is required.');
         }
@@ -438,6 +564,38 @@ public with sharing class NativeFormsDesignerController {
             Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
             uiSettings.put('submitSuccessMessage', defaultSubmitSuccessMessage(submitSuccessMessage));
             uiSettings.put('rtlEnabled', rtlEnabled == true);
+            uiSettings.put('postSubmitAutoLinkEnabled', postSubmitAutoLinkEnabled == true);
+            uiSettings.put('postSubmitUrlTemplate', defaultPostSubmitUrlTemplate(postSubmitUrlTemplate));
+            uiSettings.put('postSubmitButtonLabel', defaultPostSubmitButtonLabel(postSubmitButtonLabel));
+            uiSettings.put('postSubmitDelaySeconds', defaultPostSubmitDelaySeconds(postSubmitDelaySeconds));
+            uiSettings.put('secretCodeVerificationEnabled', secretCodeVerificationEnabled == true);
+            uiSettings.put('secretCodeMatchField', defaultSecretCodeMatchField(secretCodeMatchField));
+            uiSettings.put('secretCodeIntroText', defaultSecretCodeIntroText(secretCodeIntroText));
+            uiSettings.put('secretCodeSentMessage', defaultSecretCodeSentMessage(secretCodeSentMessage));
+            uiSettings.put('secretCodeInvalidMessage', defaultSecretCodeInvalidMessage(secretCodeInvalidMessage));
+            uiSettings.put('secretCodeVerifiedMessage', defaultSecretCodeVerifiedMessage(secretCodeVerifiedMessage));
+            uiSettings.put('secretCodeSendButtonLabel', defaultSecretCodeSendButtonLabel(secretCodeSendButtonLabel));
+            uiSettings.put('secretCodeVerifyButtonLabel', defaultSecretCodeVerifyButtonLabel(secretCodeVerifyButtonLabel));
+            uiSettings.put('secretCodeResendButtonLabel', defaultSecretCodeResendButtonLabel(secretCodeResendButtonLabel));
+            uiSettings.put('secretCodeExpiryMinutes', defaultSecretCodeExpiryMinutes(secretCodeExpiryMinutes));
+            uiSettings.put('secretCodeMaxAttempts', defaultSecretCodeMaxAttempts(secretCodeMaxAttempts));
+            uiSettings.put('secretCodeAllowResend', defaultSecretCodeAllowResend(secretCodeAllowResend));
+            uiSettings.put('submitLabel', defaultSubmitLabel(submitLabel));
+            uiSettings.put('submitConditionalEnabled', submitConditionalEnabled == true);
+            uiSettings.put('submitConditionalFieldKey', stringValue(submitConditionalFieldKey));
+            uiSettings.put('submitConditionalOperator', defaultConditionalOperator(submitConditionalOperator));
+            uiSettings.put('submitConditionalValue', stringValue(submitConditionalValue));
+            List<Object> normalizedConditions = normalizeConditionalConditions(
+                parseJsonList(submitConditionalConditionsJson),
+                submitConditionalFieldKey,
+                submitConditionalOperator,
+                submitConditionalValue
+            );
+            uiSettings.put('submitConditionalConditions', normalizedConditions);
+            uiSettings.put(
+                'submitConditionalExpression',
+                defaultConditionalExpression(submitConditionalExpression, normalizedConditions.size())
+            );
             versionRecord.UI_Settings_JSON__c = JSON.serializePretty(uiSettings);
             recordsToUpdate.add(versionRecord);
         }
@@ -517,11 +675,14 @@ public with sharing class NativeFormsDesignerController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Choose an element type first.');
         }
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
             throw new AuraHandledException('Repeat Groups are not available on your current TwinaForms plan.');
+        }
+        if (elementType == 'fileUpload' && !NativeFormsFeatureFlags.isProLoadFileEnabled()) {
+            throw new AuraHandledException('File Uploads are not available on your current TwinaForms plan.');
         }
 
         NF_Form_Version__c versionRecord = [
@@ -894,6 +1055,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'group') return 'Group';
         if (elementType == 'heading') return 'Display Text';
         if (elementType == 'image') return 'Image';
+        if (elementType == 'fileUpload') return 'File Upload';
         if (elementType == 'checkbox') return 'Checkbox';
         if (elementType == 'textarea') return 'Textarea';
         if (elementType == 'number') return 'Number';
@@ -907,7 +1069,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'repeatGroup' }.contains(elementType)) {
             return null;
         }
         String prefix = 'field';
@@ -920,6 +1082,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'url') prefix = 'url';
         if (elementType == 'select') prefix = 'picklist';
         if (elementType == 'radio') prefix = 'radio';
+        if (elementType == 'fileUpload') prefix = 'file';
         if (elementType == 'text') prefix = 'text';
         if (elementType == 'repeatGroup') prefix = 'repeatGroup';
         Integer safeIndex = elementIndex == null || elementIndex <= 0 ? 1 : elementIndex;
@@ -990,6 +1153,14 @@ public with sharing class NativeFormsDesignerController {
                 new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
             });
         }
+        if (elementType == 'fileUpload') {
+            config.put('labelPosition', 'above');
+            config.put('required', false);
+            config.put('allowMultiple', false);
+            config.put('allowedExtensions', new List<Object>{ 'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx' });
+            config.put('maxFileSizeMb', 10);
+            config.put('targetSubmitActionKey', '');
+        }
         if (elementType == 'section') {
             config.put('text', 'Section description');
             config.put('columns', 2);
@@ -1044,10 +1215,137 @@ public with sharing class NativeFormsDesignerController {
         return String.valueOf(value).toLowerCase() == 'true';
     }
 
+    private static Integer integerValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        try {
+            return Integer.valueOf(String.valueOf(value).trim());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     private static String defaultSubmitSuccessMessage(String value) {
         return String.isBlank(value)
             ? 'Your form was submitted successfully.'
             : value.trim();
+    }
+
+    private static String defaultSubmitLabel(String value) {
+        return String.isBlank(value)
+            ? 'Submit'
+            : value.trim();
+    }
+
+    private static String defaultPostSubmitUrlTemplate(String value) {
+        return String.isBlank(value) ? '' : value.trim();
+    }
+
+    private static String defaultSecretCodeMatchField(String value) {
+        return 'Email';
+    }
+
+    private static String defaultSecretCodeIntroText(String value) {
+        return String.isBlank(value)
+            ? 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.'
+            : value.trim();
+    }
+
+    private static String defaultSecretCodeSentMessage(String value) {
+        return String.isBlank(value)
+            ? 'If we found a matching contact, we sent a 6-digit code to that email.'
+            : value.trim();
+    }
+
+    private static String defaultSecretCodeInvalidMessage(String value) {
+        return String.isBlank(value)
+            ? 'The code is invalid or expired. Try again or request a new code.'
+            : value.trim();
+    }
+
+    private static String defaultSecretCodeVerifiedMessage(String value) {
+        return String.isBlank(value)
+            ? 'Code verified. You can continue with the form now.'
+            : value.trim();
+    }
+
+    private static String defaultSecretCodeSendButtonLabel(String value) {
+        return String.isBlank(value)
+            ? 'Enter'
+            : value.trim();
+    }
+
+    private static String defaultSecretCodeVerifyButtonLabel(String value) {
+        return String.isBlank(value)
+            ? 'Verify'
+            : value.trim();
+    }
+
+    private static String defaultSecretCodeResendButtonLabel(String value) {
+        return String.isBlank(value)
+            ? 'Resend Code'
+            : value.trim();
+    }
+
+    private static Integer defaultSecretCodeExpiryMinutes(Object value) {
+        Integer parsedValue = integerValue(value);
+        return parsedValue == null || parsedValue < 1 ? 10 : parsedValue;
+    }
+
+    private static Integer defaultSecretCodeMaxAttempts(Object value) {
+        Integer parsedValue = integerValue(value);
+        return parsedValue == null || parsedValue < 1 ? 5 : parsedValue;
+    }
+
+    private static Boolean defaultSecretCodeAllowResend(Object value) {
+        return value == null ? true : booleanValue(value);
+    }
+
+    private static String defaultPostSubmitButtonLabel(String value) {
+        return String.isBlank(value)
+            ? 'Continue'
+            : value.trim();
+    }
+
+    private static Integer defaultPostSubmitDelaySeconds(Object value) {
+        if (value == null) {
+            return 3;
+        }
+        Integer parsedValue;
+        if (value instanceof Integer) {
+            parsedValue = (Integer) value;
+        } else {
+            try {
+                parsedValue = Integer.valueOf(String.valueOf(value).trim());
+            } catch (Exception ignored) {
+                parsedValue = 3;
+            }
+        }
+        return parsedValue < 0 ? 0 : parsedValue;
+    }
+
+    private static String defaultConditionalOperator(String value) {
+        String normalized = String.isBlank(value) ? 'equals' : value.trim();
+        Set<String> allowed = new Set<String>{ 'equals', 'notEquals', 'isTrue', 'isFalse', 'isBlank', 'isNotBlank' };
+        return allowed.contains(normalized) ? normalized : 'equals';
+    }
+
+    private static String defaultConditionalExpression(String value, Integer conditionCount) {
+        if (conditionCount == null || conditionCount < 1) {
+            return '';
+        }
+        if (String.isNotBlank(value)) {
+            return value.trim();
+        }
+        List<String> references = new List<String>();
+        for (Integer index = 1; index <= conditionCount; index += 1) {
+            references.add(String.valueOf(index));
+        }
+        return String.join(references, ' AND ');
     }
 
     private static Map<String, Object> parseJsonMap(String rawJson) {
@@ -1059,6 +1357,60 @@ public with sharing class NativeFormsDesignerController {
         } catch (Exception e) {
             return new Map<String, Object>();
         }
+    }
+
+    private static List<Object> parseJsonList(Object rawValue) {
+        if (rawValue == null) {
+            return new List<Object>();
+        }
+        if (rawValue instanceof List<Object>) {
+            return (List<Object>) rawValue;
+        }
+        String rawJson = String.valueOf(rawValue);
+        if (String.isBlank(rawJson)) {
+            return new List<Object>();
+        }
+        try {
+            Object parsed = JSON.deserializeUntyped(rawJson);
+            return parsed instanceof List<Object> ? (List<Object>) parsed : new List<Object>();
+        } catch (Exception e) {
+            return new List<Object>();
+        }
+    }
+
+    private static List<Object> normalizeConditionalConditions(
+        List<Object> rawConditions,
+        String fallbackFieldKey,
+        String fallbackOperator,
+        String fallbackValue
+    ) {
+        List<Object> normalized = new List<Object>();
+        if (rawConditions != null) {
+            for (Object rawCondition : rawConditions) {
+                if (!(rawCondition instanceof Map<String, Object>)) {
+                    continue;
+                }
+                Map<String, Object> condition = (Map<String, Object>) rawCondition;
+                String fieldKey = stringValue(condition.get('fieldKey'));
+                String operator = defaultConditionalOperator(stringValue(condition.get('operator')));
+                if (String.isBlank(fieldKey) || String.isBlank(operator)) {
+                    continue;
+                }
+                normalized.add(new Map<String, Object>{
+                    'fieldKey' => fieldKey,
+                    'operator' => operator,
+                    'value' => stringValue(condition.get('value'))
+                });
+            }
+        }
+        if (normalized.isEmpty() && String.isNotBlank(fallbackFieldKey)) {
+            normalized.add(new Map<String, Object>{
+                'fieldKey' => fallbackFieldKey,
+                'operator' => defaultConditionalOperator(fallbackOperator),
+                'value' => stringValue(fallbackValue)
+            });
+        }
+        return normalized;
     }
 
     private static Integer readSectionColumn(String rawJson) {
@@ -1082,6 +1434,9 @@ public with sharing class NativeFormsDesignerController {
         }
         if (sectionRecord.Element_Type__c == 'repeatGroup' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup')) {
             throw new AuraHandledException('Repeat groups can contain fields and display elements, but not other containers.');
+        }
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'fileUpload') {
+            throw new AuraHandledException('File Upload fields are not supported inside repeat groups in Pro V1.');
         }
         if (sectionRecord.Element_Type__c == 'group' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group')) {
             throw new AuraHandledException('Groups can contain fields and display elements, but not other containers.');

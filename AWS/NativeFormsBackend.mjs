@@ -61,8 +61,8 @@ const FEATURE_FLAG_METADATA = {
     description: "Add an extra verification step with a secret code for more sensitive workflows."
   },
   enableProLoadFile: {
-    label: "File Load Support",
-    description: "Support advanced file-loading behavior as part of the form experience and submission flow."
+    label: "File Uploads",
+    description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
@@ -377,6 +377,132 @@ function sanitizeFormSecurityRecord(record) {
   return safe;
 }
 
+function ensurePublishedFormToken(formSecurity, publishToken) {
+  if (!publishToken) {
+    const error = new Error("Missing required field: publishToken");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!formSecurity || formSecurity.status !== "published") {
+    const error = new Error("Form is not published");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (formSecurity.tokenHash !== hashToken(publishToken)) {
+    const error = new Error("Unauthorized: invalid publish token");
+    error.statusCode = 401;
+    throw error;
+  }
+}
+
+function normalizeFileName(fileName) {
+  return String(fileName || "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getFileExtension(fileName) {
+  const normalized = normalizeFileName(fileName);
+  const dotIndex = normalized.lastIndexOf(".");
+  if (dotIndex <= 0 || dotIndex === normalized.length - 1) {
+    return "";
+  }
+  return normalized.slice(dotIndex + 1).toLowerCase();
+}
+
+function normalizeUploadFieldList(uploadFields) {
+  return Array.isArray(uploadFields) ? uploadFields.filter((item) => item && typeof item === "object") : [];
+}
+
+function findUploadFieldDefinition(formSecurity, fieldKey) {
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!normalizedFieldKey) {
+    return null;
+  }
+  return normalizeUploadFieldList(formSecurity?.uploadFields).find((item) => String(item.fieldKey || "").trim() === normalizedFieldKey) || null;
+}
+
+function getUploadSigningSecret(tenantRecord) {
+  const signingSecret = String(tenantRecord?.secret || "");
+  if (!signingSecret) {
+    const error = new Error("Owning tenant is missing an upload signing secret");
+    error.statusCode = 500;
+    throw error;
+  }
+  return signingSecret;
+}
+
+function base64UrlEncodeUtf8(value) {
+  return Buffer.from(String(value), "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function createUploadReferenceToken(payload, tenantRecord) {
+  const encodedPayload = base64UrlEncodeUtf8(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac("sha256", getUploadSigningSecret(tenantRecord))
+    .update(encodedPayload)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return `${encodedPayload}.${signature}`;
+}
+
+function buildUploadObjectKey(formSecurity, fieldKey, sessionId, fileName) {
+  const safeSessionId = String(sessionId || "").trim() || crypto.randomUUID();
+  const safeFieldKey = String(fieldKey || "").trim() || "file";
+  const normalizedFileName = normalizeFileName(fileName) || "upload.bin";
+  const uniquePrefix = crypto.randomUUID();
+  const companySlug = String(formSecurity?.companySlug || "org").trim();
+  const formSlug = String(formSecurity?.formSlug || formSecurity?.formId || "form").trim();
+  return `${companySlug}/${formSlug}/_uploads/${safeSessionId}/${safeFieldKey}/${uniquePrefix}-${normalizedFileName}`;
+}
+
+function validateUploadFieldRules(uploadField, payload) {
+  const normalizedFileName = normalizeFileName(payload.fileName);
+  if (!normalizedFileName) {
+    const error = new Error("Missing required field: fileName");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const fileSize = Number(payload.fileSize);
+  if (!Number.isFinite(fileSize) || fileSize <= 0) {
+    const error = new Error("fileSize must be a positive number");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const maxFileSizeMb = Number(uploadField?.maxFileSizeMb);
+  if (Number.isFinite(maxFileSizeMb) && maxFileSizeMb > 0) {
+    const maxBytes = maxFileSizeMb * 1024 * 1024;
+    if (fileSize > maxBytes) {
+      const error = new Error(`This file is larger than the allowed size of ${maxFileSizeMb} MB.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  const allowedExtensions = Array.isArray(uploadField?.allowedExtensions)
+    ? uploadField.allowedExtensions.map((value) => String(value || "").trim().toLowerCase().replace(/^\./, "")).filter(Boolean)
+    : [];
+  if (allowedExtensions.length > 0) {
+    const extension = getFileExtension(normalizedFileName);
+    if (!extension || !allowedExtensions.includes(extension)) {
+      const error = new Error("This file type is not allowed.");
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+}
+
 function normalizeSubscriptionState(payload, existing = null) {
   return {
     subscriptionState: payload.subscriptionState || existing?.subscriptionState || "trial",
@@ -595,6 +721,39 @@ async function loadAdminSettings() {
     console.warn("Admin settings lookup failed for home summary; falling back to defaults.", error?.name || error?.message || error);
     return null;
   }
+}
+
+function normalizeOptionalString(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+}
+
+function getTodayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysToIsoDate(isoDate, days) {
+  const baseDate = new Date(`${isoDate}T00:00:00.000Z`);
+  baseDate.setUTCDate(baseDate.getUTCDate() + days);
+  return baseDate.toISOString().slice(0, 10);
+}
+
+function buildTrialLifecycleDates() {
+  const startDate = getTodayIsoDate();
+  const endDate = addDaysToIsoDate(startDate, 30);
+
+  return {
+    planCode: "trial",
+    subscriptionState: "trial",
+    subscriptionStartDate: startDate,
+    subscriptionEndDate: endDate,
+    trialStartedAt: startDate,
+    trialEndsAt: endDate
+  };
 }
 
 function buildIncludedFeatures(featureFlags) {
@@ -939,6 +1098,92 @@ NativeForms`
   return true;
 }
 
+async function sendNewTrialAdminEmail(recipient, tenantRecord) {
+  const normalizedRecipient = normalizeOptionalString(recipient);
+  if (!normalizedRecipient || !SES_FROM) {
+    return false;
+  }
+
+  const createdAtDisplay = tenantRecord.createdAt
+    ? new Date(tenantRecord.createdAt).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        timeZone: "UTC",
+        timeZoneName: "short"
+      })
+    : "";
+  const lines = [
+    "Hi Yosi,",
+    "",
+    "A new NativeForms trial tenant was created.",
+    "",
+    `Company Name: ${tenantRecord.companyName || ""}`,
+    `Org Id: ${tenantRecord.orgId || ""}`,
+    `Admin Email: ${tenantRecord.adminEmail || ""}`,
+    `Login Base URL: ${tenantRecord.loginBaseUrl || ""}`,
+    `Plan Code: ${tenantRecord.planCode || ""}`,
+    `Subscription State: ${tenantRecord.subscriptionState || ""}`,
+    `Trial Start Date: ${tenantRecord.trialStartedAt || tenantRecord.subscriptionStartDate || ""}`,
+    `Trial End Date: ${tenantRecord.trialEndsAt || tenantRecord.subscriptionEndDate || ""}`,
+    `Country: ${tenantRecord.country || ""}`,
+    `State: ${tenantRecord.state || ""}`,
+    `City: ${tenantRecord.city || ""}`,
+    `Created At: ${createdAtDisplay}`,
+    "",
+    "TwinaForms Automation"
+  ];
+  const htmlBody = `
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #16325c; line-height: 1.6;">
+        <p>Hi Yosi,</p>
+        <p>A new <strong>NativeForms trial tenant</strong> was created.</p>
+        <p>
+          <strong>Company Name:</strong> ${tenantRecord.companyName || ""}<br>
+          <strong>Org Id:</strong> ${tenantRecord.orgId || ""}<br>
+          <strong>Admin Email:</strong> ${tenantRecord.adminEmail || ""}<br>
+          <strong>Login Base URL:</strong> ${tenantRecord.loginBaseUrl || ""}<br>
+          <strong>Plan Code:</strong> ${tenantRecord.planCode || ""}<br>
+          <strong>Subscription State:</strong> ${tenantRecord.subscriptionState || ""}<br>
+          <strong>Trial Start Date:</strong> ${tenantRecord.trialStartedAt || tenantRecord.subscriptionStartDate || ""}<br>
+          <strong>Trial End Date:</strong> ${tenantRecord.trialEndsAt || tenantRecord.subscriptionEndDate || ""}<br>
+          <strong>Country:</strong> ${tenantRecord.country || ""}<br>
+          <strong>State:</strong> ${tenantRecord.state || ""}<br>
+          <strong>City:</strong> ${tenantRecord.city || ""}<br>
+          <strong>Created At:</strong> ${createdAtDisplay}
+        </p>
+        <p>TwinaForms Automation</p>
+      </body>
+    </html>
+  `;
+
+  await sesClient.send(new SendEmailCommand({
+    Source: SES_FROM,
+    Destination: {
+      ToAddresses: [normalizedRecipient]
+    },
+    Message: {
+      Subject: {
+        Data: `New NativeForms trial tenant: ${tenantRecord.companyName || tenantRecord.orgId || "Unknown tenant"}`
+      },
+      Body: {
+        Html: {
+          Data: htmlBody
+        },
+        Text: {
+          Data: lines.join("\n")
+        }
+      }
+    }
+  }));
+
+  return true;
+}
+
 async function requireTenantAuth(headers, orgId) {
   const normalizedOrgId = normalizeOrgId(orgId);
 
@@ -1027,6 +1272,9 @@ function validateFormSecurityPayload(payload) {
   if (!Array.isArray(payload.submitDefinition.commands)) {
     throw new Error("Missing required field: submitDefinition.commands");
   }
+  if (payload.uploadFields != null && !Array.isArray(payload.uploadFields)) {
+    throw new Error("uploadFields must be an array when provided");
+  }
 }
 
 function validatePublishPresignPayload(payload) {
@@ -1035,6 +1283,14 @@ function validatePublishPresignPayload(payload) {
   if (!payload?.formId) throw new Error("Missing required field: formId");
   if (!payload?.formSlug) throw new Error("Missing required field: formSlug");
   if (!payload?.fileName) throw new Error("Missing required field: fileName");
+}
+
+function validateUploadInitPayload(payload) {
+  if (!payload?.formId) throw new Error("Missing required field: formId");
+  if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
+  if (!payload?.fieldKey) throw new Error("Missing required field: fieldKey");
+  if (!payload?.fileName) throw new Error("Missing required field: fileName");
+  if (!payload?.sessionId) throw new Error("Missing required field: sessionId");
 }
 
 function buildTenantSetupState(tenantRecord, connectionRecord) {
@@ -1632,17 +1888,32 @@ export const handler = async (event) => {
       const existing = await getTenantRecord(orgId);
       const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
       const tenantSecret = existing?.secret || generateSecret();
-      const subscription = normalizeSubscriptionState(payload, existing);
+      const trialLifecycle = !existing ? buildTrialLifecycleDates() : null;
+      const subscription = existing
+        ? normalizeSubscriptionState(payload, existing)
+        : {
+            subscriptionState: trialLifecycle.subscriptionState,
+            subscriptionStartDate: trialLifecycle.subscriptionStartDate,
+            subscriptionEndDate: trialLifecycle.subscriptionEndDate,
+            isActive: true,
+            status: payload.status || "active"
+          };
       const tenantRecord = {
         orgId,
         adminEmail: payload.adminEmail,
         companyName: payload.companyName,
         loginBaseUrl: payload.loginBaseUrl,
+        country: normalizeOptionalString(payload.country) ?? normalizeOptionalString(existing?.country),
+        state: normalizeOptionalString(payload.state) ?? normalizeOptionalString(existing?.state),
+        city: normalizeOptionalString(payload.city) ?? normalizeOptionalString(existing?.city),
         secret: tenantSecret,
+        planCode: existing?.planCode || trialLifecycle?.planCode || normalizePlanCode(payload.subscriptionState, existing),
         status: subscription.status,
         subscriptionState: subscription.subscriptionState,
         subscriptionStartDate: subscription.subscriptionStartDate,
         subscriptionEndDate: subscription.subscriptionEndDate,
+        trialStartedAt: existing?.trialStartedAt || trialLifecycle?.trialStartedAt || null,
+        trialEndsAt: existing?.trialEndsAt || trialLifecycle?.trialEndsAt || null,
         isActive: subscription.isActive,
         salesforceConnectionStatus: existing?.salesforceConnectionStatus || "not-connected",
         salesforceConnectionUpdatedAt: existing?.salesforceConnectionUpdatedAt || null,
@@ -1671,6 +1942,14 @@ export const handler = async (event) => {
           console.error("Failed to send tenant secret email:", error);
           return false;
         });
+      const adminSettings = !existing ? await loadAdminSettings() : null;
+      const adminTrialEmailSent = !existing
+        ? await sendNewTrialAdminEmail(adminSettings?.statusAlertEmailRecipient, tenantRecord)
+          .catch((error) => {
+            console.error("Failed to send new trial admin email:", error);
+            return false;
+          })
+        : false;
 
       return jsonResponse(200, {
         success: true,
@@ -1680,7 +1959,8 @@ export const handler = async (event) => {
         tenant: sanitizeTenantRecord(tenantRecord),
         tenantSecret,
         connectUrl: baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(orgId)}` : null,
-        emailSent
+        emailSent,
+        adminTrialEmailSent
       });
     } catch (e) {
       return jsonResponse(400, {
@@ -1767,6 +2047,8 @@ export const handler = async (event) => {
         generatedHtmlRef: payload.generatedHtmlRef || null,
         publicUrl: payload.publicUrl || null,
         captcha: payload.captcha || null,
+        uploadFields: Array.isArray(payload.uploadFields) ? payload.uploadFields : [],
+        secretCodeConfig: payload.secretCodeConfig || null,
         prefillPolicy: payload.prefillPolicy,
         submitPolicy: payload.submitPolicy,
         prefillDefinition: payload.prefillDefinition,
@@ -1827,6 +2109,83 @@ export const handler = async (event) => {
         companySlug,
         formSlug,
         expiresAt: Date.now() + expiresIn * 1000
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/forms/upload/init" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateUploadInitPayload(payload);
+      const formSecurity = await getFormSecurityRecord(payload.formId);
+      ensurePublishedFormToken(formSecurity, payload.publishToken);
+
+      const tenantRecord = await getTenantRecord(formSecurity.orgId);
+      assertTenantIsActive(tenantRecord);
+      const planResult = await loadPlanDefinitions();
+      const selectedPlan = getPlanByCode(planResult.items, normalizePlanCode(null, tenantRecord));
+      const effectiveFeatureFlags = getEffectivePlanFeatures(tenantRecord, selectedPlan);
+      if (effectiveFeatureFlags?.enableProLoadFile !== true) {
+        const error = new Error("File Uploads are not available for this tenant.");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      const uploadField = findUploadFieldDefinition(formSecurity, payload.fieldKey);
+      if (!uploadField) {
+        const error = new Error("File Upload is not configured for this field.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      validateUploadFieldRules(uploadField, payload);
+
+      if (!PUBLISH_BUCKET) {
+        throw new Error("Server misconfigured: PUBLISH_BUCKET is required");
+      }
+
+      const normalizedFileName = normalizeFileName(payload.fileName);
+      const objectKey = buildUploadObjectKey(formSecurity, payload.fieldKey, payload.sessionId, normalizedFileName);
+      const contentType = String(payload.contentType || "application/octet-stream").trim() || "application/octet-stream";
+      const expiresIn = 900;
+      const putCommand = new PutObjectCommand({
+        Bucket: PUBLISH_BUCKET,
+        Key: objectKey,
+        ContentType: contentType
+      });
+      const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn });
+
+      const uploadTokenPayload = {
+        kind: "fileUpload",
+        orgId: formSecurity.orgId,
+        formId: formSecurity.formId,
+        publishedVersionId: formSecurity.publishedVersionId || null,
+        fieldKey: String(payload.fieldKey),
+        sessionId: String(payload.sessionId),
+        objectKey,
+        fileName: normalizedFileName,
+        contentType,
+        fileSize: Number(payload.fileSize),
+        exp: Math.floor(Date.now() / 1000) + expiresIn
+      };
+
+      return jsonResponse(200, {
+        success: true,
+        uploadUrl,
+        uploadToken: createUploadReferenceToken(uploadTokenPayload, tenantRecord),
+        expiresAt: Date.now() + (expiresIn * 1000),
+        fileName: normalizedFileName,
+        fieldKey: String(payload.fieldKey),
+        contentType,
+        fileSize: Number(payload.fileSize)
       });
     } catch (e) {
       return jsonResponse(e.statusCode || 400, {

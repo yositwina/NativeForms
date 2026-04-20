@@ -25,6 +25,9 @@ export default class NativeFormsConnect extends LightningElement {
     subscriptionStartDate = '';
     subscriptionEndDate = '';
     isActive = true;
+    country = '';
+    state = '';
+    city = '';
 
     tenantSecret = '';
     connectUrl = '';
@@ -72,6 +75,9 @@ export default class NativeFormsConnect extends LightningElement {
             this.companyName = context.orgName || 'TwinaForms Tenant';
             this.adminEmail = context.adminEmail || '';
             this.loginBaseUrl = context.loginBaseUrl || '';
+            this.country = context.country || '';
+            this.state = context.state || '';
+            this.city = context.city || '';
             this.restoreConnectState(this.orgId);
             await this.loadConnectionStatus();
         } catch (error) {
@@ -337,7 +343,10 @@ export default class NativeFormsConnect extends LightningElement {
             subscriptionStartDate: this.subscriptionStartDate || null,
             subscriptionEndDate: this.subscriptionEndDate || null,
             isActive: this.isActive,
-            status: 'active'
+            status: 'active',
+            country: this.country || null,
+            state: this.state || null,
+            city: this.city || null
         };
     }
 

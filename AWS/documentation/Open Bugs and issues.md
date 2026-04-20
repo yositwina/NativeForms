@@ -94,3 +94,17 @@ Consumer Secret
 
 oUo_ZuXUW3jIUQgQ-jehIo5oyXhLiQfa7sXmLdT-TQY
 plese delete the code after 5 minutes and nevert show it again 9add text that explain this), teh code is in teh email box of admin
+
+- [ ] BUG-007 Repeat group new contact/new case relation missing
+  - Status: Open
+  - Severity: High
+  - Area: Submit lambda / repeat group submit
+  - File: `AWS/NativeForms-SubmitForm.mjs`
+  - Description: When a repeat-group form is submitted with no existing Contact and no existing Cases, and the user enters new contact details and adds one new Case row, the submit succeeds but the created Case is not related to the newly created Contact.
+  - Repro:
+  - Open the demo repeat-group form with no matching prefill data.
+  - Enter new contact details.
+  - Add one new case row with Subject and Priority.
+  - Submit the form.
+  - Actual: Submit succeeds. Contact is created. Case is created. Case is not linked to the created Contact.
+  - Expected: If submit creates a new Contact in the same flow, new Case rows in the repeat group should be created with `ContactId` pointing to that created Contact.

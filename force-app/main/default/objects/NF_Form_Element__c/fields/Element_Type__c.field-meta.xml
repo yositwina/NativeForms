@@ -23,6 +23,7 @@
             <value><fullName>select</fullName><default>false</default><label>Select</label></value>
             <value><fullName>checkbox</fullName><default>false</default><label>Checkbox</label></value>
             <value><fullName>radio</fullName><default>false</default><label>Radio</label></value>
+            <value><fullName>fileUpload</fullName><default>false</default><label>File Upload</label></value>
             <value><fullName>image</fullName><default>false</default><label>Image</label></value>
             <value><fullName>section</fullName><default>false</default><label>Section</label></value>
             <value><fullName>group</fullName><default>false</default><label>Group</label></value>

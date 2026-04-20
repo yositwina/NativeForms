@@ -284,11 +284,33 @@ public with sharing class NativeFormsBuilderController {
         ];
 
         elementRecord.Label__c = inputValue.label;
-        elementRecord.Field_Key__c = inputValue.fieldKey;
+        if (String.isNotBlank(inputValue.fieldKey)) {
+            elementRecord.Field_Key__c = inputValue.fieldKey;
+        } else if (String.isBlank(elementRecord.Field_Key__c)) {
+            elementRecord.Field_Key__c = defaultFieldKeyForType(
+                String.isNotBlank(inputValue.elementType) ? inputValue.elementType : elementRecord.Element_Type__c,
+                elementRecord.Element_Index__c == null ? 1 : Integer.valueOf(String.valueOf(elementRecord.Element_Index__c))
+            );
+        }
         elementRecord.Config_JSON__c = String.isBlank(inputValue.configJson) ? '{}' : inputValue.configJson;
         if (String.isNotBlank(inputValue.elementType)) {
+            if (inputValue.elementType == 'fileUpload' && !NativeFormsFeatureFlags.isProLoadFileEnabled()) {
+                throw new AuraHandledException('File Uploads are not available on your current TwinaForms plan.');
+            }
+            if (inputValue.elementType == 'fileUpload' && String.isNotBlank(elementRecord.Parent_Element_Id__c)) {
+                List<NF_Form_Element__c> parentRows = [
+                    SELECT Id, Element_Type__c
+                    FROM NF_Form_Element__c
+                    WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
+                    LIMIT 1
+                ];
+                if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
+                    throw new AuraHandledException('File Upload fields are not supported inside repeat groups in Pro V1.');
+                }
+            }
             elementRecord.Element_Type__c = inputValue.elementType;
         }
+        validateElementBeforeSave(elementRecord);
         update elementRecord;
 
         return toElementRecord(elementRecord);
@@ -486,6 +508,26 @@ public with sharing class NativeFormsBuilderController {
         }
 
         return JSON.serializePretty(config);
+    }
+
+    private static void validateElementBeforeSave(NF_Form_Element__c elementRecord) {
+        if (elementRecord == null || elementRecord.Element_Type__c != 'fileUpload') {
+            return;
+        }
+
+        if (String.isBlank(elementRecord.Field_Key__c)) {
+            throw new AuraHandledException('File Upload fields must keep a field key.');
+        }
+
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(
+            String.isBlank(elementRecord.Config_JSON__c) ? '{}' : elementRecord.Config_JSON__c
+        );
+        String targetSubmitActionKey = config != null && config.containsKey('targetSubmitActionKey')
+            ? String.valueOf(config.get('targetSubmitActionKey'))
+            : '';
+        if (String.isBlank(targetSubmitActionKey)) {
+            throw new AuraHandledException('Choose a target submit action for the File Upload field before saving.');
+        }
     }
 
     private static List<SelectOption> getReadableFieldOptions(String objectApiName) {

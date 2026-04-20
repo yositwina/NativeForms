@@ -458,7 +458,7 @@ Based on the current NativeForms Admin Features page, these flags belong in the 
 - `enableProFormulaFields`
 - `enableProPostSubmitAutoLink`
 - `enableProSfSecretCodeAuth`
-- `enableProLoadFile`
+- `enableProLoadFile` internally, shown to admins/customers as `File Uploads`
 
 These should be treated as:
 

@@ -573,7 +573,23 @@ function applyResponseMapping(responseMapping, context) {
   return output;
 }
 
-function buildPrefillResponse({ formId, mapped, results }) {
+function buildPrefillAliases(commands, context) {
+  const aliases = {};
+
+  for (const command of commands || []) {
+    const alias = command?.storeResultAs;
+    if (!alias) {
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(context || {}, alias)) {
+      aliases[alias] = context[alias];
+    }
+  }
+
+  return aliases;
+}
+
+function buildPrefillResponse({ formId, mapped, results, aliases }) {
   return {
     success: true,
     formId,
@@ -581,6 +597,7 @@ function buildPrefillResponse({ formId, mapped, results }) {
     hidden: mapped.hidden || {},
     meta: mapped.meta || {},
     repeatGroups: mapped.repeatGroups || {},
+    aliases: aliases || {},
     output: mapped,
     results
   };
@@ -983,7 +1000,8 @@ export const handler = async (event) => {
     return jsonResponse(200, buildPrefillResponse({
       formId: request.formId,
       mapped,
-      results
+      results,
+      aliases: buildPrefillAliases(prefillDefinition.commands, context)
     }));
 
   } catch (error) {

@@ -92,7 +92,7 @@
                         <div class="add-block">
                             <h3>Input Field</h3>
                             <div class="builder-list" role="list">
-                                <template for:each={inputFieldOptions} for:item="option">
+                                <template for:each={availableInputFieldOptions} for:item="option">
                                     <div key={option.value} class="builder-list__row" role="listitem">
                                         <span class="builder-list__label">{option.label}</span>
                                         <button
@@ -129,7 +129,7 @@
                     </section>
 
                     <section class="pane pane-center">
-                        <template if:true={elements.length}>
+                        <template if:true={hasCanvasElements}>
                             <div class="designer-canvas-shell" style={designerCanvasThemeStyle}>
                                 <div class={designerFormSurfaceClass} dir={designerFormDirection}>
                                 <div class="designer-form-toolbar">
@@ -146,6 +146,24 @@
                                     </div>
                                 </template>
                                 <div class="designer-canvas" onclick={handleCanvasClick}>
+                                <template if:true={showCanvasSecretCodePreview}>
+                                    <article class="designer-secret-preview" aria-hidden="true">
+                                        <p class="designer-secret-preview__copy">{secretCodePreviewData.introText}</p>
+                                        <div class="designer-secret-preview__row">
+                                            <input type="email" disabled />
+                                            <button type="button" disabled>{secretCodePreviewData.sendButtonLabel}</button>
+                                        </div>
+                                        <p class="designer-secret-preview__hint">{secretCodePreviewData.sentMessage}</p>
+                                        <div class="designer-secret-preview__row designer-secret-preview__row--ghost">
+                                            <input type="text" disabled />
+                                            <button type="button" disabled>{secretCodePreviewData.verifyButtonLabel}</button>
+                                        </div>
+                                        <template if:true={secretCodePreviewData.allowResend}>
+                                            <button type="button" class="designer-secret-preview__resend" disabled>{secretCodePreviewData.resendButtonLabel}</button>
+                                        </template>
+                                        <p class="designer-secret-preview__verified">{secretCodePreviewData.verifiedMessage}</p>
+                                    </article>
+                                </template>
                                 <template for:each={canvasRows} for:item="row">
                                     <div
                                         key={row.dropKey}
@@ -235,6 +253,21 @@
                                                                                             <span>{child.previewText}</span>
                                                                                         </template>
                                                                                     </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isFileUpload}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-file-upload">
+                                                                                        <div class="preview-file-upload__surface">
+                                                                                            <div class="preview-file-upload__action">{child.previewUploadActionLabel}</div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <template if:true={child.validationPattern}>
+                                                                                        <div class="preview-validation-hint">{child.validationPattern}</div>
+                                                                                    </template>
                                                                                 </div>
                                                                             </template>
                                                                             <template lwc:elseif={child.isSelect}>
@@ -379,6 +412,21 @@
                                                                                     </div>
                                                                                 </div>
                                                                             </template>
+                                                                            <template lwc:elseif={child.isFileUpload}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-file-upload">
+                                                                                        <div class="preview-file-upload__surface">
+                                                                                            <div class="preview-file-upload__action">{child.previewUploadActionLabel}</div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <template if:true={child.validationPattern}>
+                                                                                        <div class="preview-validation-hint">{child.validationPattern}</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
                                                                             <template lwc:elseif={child.isSelect}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
@@ -462,6 +510,28 @@
                                                         <span>Image placeholder</span>
                                                     </template>
                                                 </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isFileUpload}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
+                                                </template>
+                                                <div class="preview-file-upload">
+                                                    <div class="preview-file-upload__surface">
+                                                        <div class="preview-file-upload__action">{row.item.previewUploadActionLabel}</div>
+                                                    </div>
+                                                </div>
+                                                <template if:true={row.item.validationPattern}>
+                                                    <div class="preview-validation-hint">{row.item.validationPattern}</div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isSubmitButton}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <button type="button" class="preview-button" disabled>{row.item.previewButtonLabel}</button>
                                             </div>
                                         </template>
 
@@ -550,6 +620,98 @@
                         </template>
                         <template if:true={selectedElement}>
                             <template if:false={isSelectedVersionReadOnly}>
+                            <template if:true={selectedElementIsSubmitButton}>
+                            <div class="selection-card">
+                                <p class="selection-label">Display Settings</p>
+
+                                <lightning-input
+                                    label="Submit Button Text"
+                                    value={draftSubmitLabel}
+                                    oninput={handleSubmitButtonLabelInput}
+                                    onblur={handleSubmitButtonLabelBlur}>
+                                </lightning-input>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Behavior</p>
+
+                                <lightning-input
+                                    type="checkbox"
+                                    label="Show Conditionally"
+                                    checked={draftSubmitConditionalEnabled}
+                                    onchange={handleSubmitButtonConditionalEnabledChange}
+                                    onblur={handleSubmitButtonConditionalEnabledCommit}>
+                                </lightning-input>
+                                <template if:true={draftSubmitConditionalEnabled}>
+                                    <div class="conditional-editor">
+                                        <template for:each={submitConditionalRows} for:item="row">
+                                            <div key={row.rowKey} class="conditional-editor__row">
+                                                <div class="conditional-editor__top">
+                                                    <div class="conditional-editor__index">{row.displayIndex}</div>
+                                                    <div class="conditional-editor__cell conditional-editor__cell--source">
+                                                        <lightning-combobox
+                                                            variant="label-hidden"
+                                                            label="Source Field"
+                                                            data-index={row.index}
+                                                            data-field="fieldKey"
+                                                            value={row.fieldKey}
+                                                            options={conditionalFieldOptions}
+                                                            onchange={handleSubmitConditionRowChange}
+                                                            onblur={handleSubmitConditionControlBlur}>
+                                                        </lightning-combobox>
+                                                    </div>
+                                                    <div class="conditional-editor__cell conditional-editor__cell--operator">
+                                                        <lightning-combobox
+                                                            variant="label-hidden"
+                                                            label="Operator"
+                                                            data-index={row.index}
+                                                            data-field="operator"
+                                                            value={row.operator}
+                                                            options={conditionalOperatorOptions}
+                                                            onchange={handleSubmitConditionRowChange}
+                                                            onblur={handleSubmitConditionControlBlur}>
+                                                        </lightning-combobox>
+                                                    </div>
+                                                </div>
+                                                <div class="conditional-editor__bottom">
+                                                    <div class="conditional-editor__bottom-spacer"></div>
+                                                    <div class="conditional-editor__cell conditional-editor__cell--value conditional-editor__cell--value-wide">
+                                                            <template if:true={row.usesValue}>
+                                                                <lightning-input
+                                                                    variant="label-hidden"
+                                                                    label="Compare Value"
+                                                                    data-index={row.index}
+                                                                    data-field="value"
+                                                                    value={row.value}
+                                                                    onblur={handleSubmitConditionValueBlur}>
+                                                                </lightning-input>
+                                                            </template>
+                                                        </div>
+                                                    <template if:true={enableProConditionLogic}>
+                                                        <button type="button" class="conditional-editor__delete" data-condition-action="delete" data-index={row.index} onclick={handleDeleteSubmitCondition}>Delete</button>
+                                                    </template>
+                                                </div>
+                                                <template if:true={canAddSubmitCondition}>
+                                                    <div class="conditional-editor__actions">
+                                                        <button type="button" class="conditional-editor__add" data-condition-action="add" onclick={handleAddSubmitCondition}>Add Condition</button>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template if:true={showSubmitConditionExpression}>
+                                            <lightning-input
+                                                label="Condition Logic"
+                                                value={draftSubmitConditionalExpression}
+                                                oninput={handleSubmitConditionalExpressionInput}
+                                                onblur={handleSubmitConditionalExpressionBlur}>
+                                            </lightning-input>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            </template>
+
+                            <template if:false={selectedElementIsSubmitButton}>
                             <div class="selection-card">
                                 <p class="selection-label">Field Type</p>
                                 <div class="property-inline-row property-inline-row--type property-inline-row--top">
@@ -558,7 +720,7 @@
                                             variant="label-hidden"
                                             label="Field Type"
                                             value={editorElementType}
-                                            options={editorElementTypeOptions}
+                                            options={availableEditorElementTypeOptions}
                                             onchange={handleEditorTypeChange}>
                                         </lightning-combobox>
                                     </div>
@@ -713,6 +875,14 @@
                                         onchange={handleEditorColumnsChange}>
                                     </lightning-combobox>
                                 </template>
+
+                                <div class="selection-actions">
+                                    <lightning-button
+                                        variant="destructive-text"
+                                        label="Delete Item"
+                                        onclick={handleDeleteSelected}>
+                                    </lightning-button>
+                                </div>
                             </div>
 
                             <div class="selection-card">
@@ -792,25 +962,70 @@
                                         onchange={handleEditorConditionalEnabledChange}>
                                     </lightning-input>
                                     <template if:true={editorConditionalEnabled}>
-                                        <lightning-combobox
-                                            label="Source Field"
-                                            value={editorConditionalFieldKey}
-                                            options={conditionalFieldOptions}
-                                            onchange={handleEditorConditionalFieldChange}>
-                                        </lightning-combobox>
-                                        <lightning-combobox
-                                            label="Operator"
-                                            value={editorConditionalOperator}
-                                            options={conditionalOperatorOptions}
-                                            onchange={handleEditorConditionalOperatorChange}>
-                                        </lightning-combobox>
-                                        <template if:true={selectedElementUsesConditionalValue}>
-                                            <lightning-input
-                                                label="Compare Value"
-                                                value={editorConditionalValue}
-                                                onblur={handleEditorConditionalValueCommit}>
-                                            </lightning-input>
-                                        </template>
+                                        <div class="conditional-editor">
+                                            <template for:each={editorConditionalRows} for:item="row">
+                                                <div key={row.rowKey} class="conditional-editor__row">
+                                                    <div class="conditional-editor__top">
+                                                        <div class="conditional-editor__index">{row.displayIndex}</div>
+                                                        <div class="conditional-editor__cell conditional-editor__cell--source">
+                                                            <lightning-combobox
+                                                                variant="label-hidden"
+                                                                label="Source Field"
+                                                                data-index={row.index}
+                                                                data-field="fieldKey"
+                                                                value={row.fieldKey}
+                                                                options={conditionalFieldOptions}
+                                                                onchange={handleEditorConditionRowChange}
+                                                                onblur={handleEditorConditionControlBlur}>
+                                                            </lightning-combobox>
+                                                        </div>
+                                                        <div class="conditional-editor__cell conditional-editor__cell--operator">
+                                                            <lightning-combobox
+                                                                variant="label-hidden"
+                                                                label="Operator"
+                                                                data-index={row.index}
+                                                                data-field="operator"
+                                                                value={row.operator}
+                                                                options={conditionalOperatorOptions}
+                                                                onchange={handleEditorConditionRowChange}
+                                                                onblur={handleEditorConditionControlBlur}>
+                                                            </lightning-combobox>
+                                                        </div>
+                                                    </div>
+                                                    <div class="conditional-editor__bottom">
+                                                        <div class="conditional-editor__bottom-spacer"></div>
+                                                        <div class="conditional-editor__cell conditional-editor__cell--value conditional-editor__cell--value-wide">
+                                                            <template if:true={row.usesValue}>
+                                                                <lightning-input
+                                                                    variant="label-hidden"
+                                                                    label="Compare Value"
+                                                                    data-index={row.index}
+                                                                    data-field="value"
+                                                                    value={row.value}
+                                                                    onblur={handleEditorConditionValueBlur}>
+                                                                </lightning-input>
+                                                            </template>
+                                                        </div>
+                                                        <template if:true={enableProConditionLogic}>
+                                                            <button type="button" class="conditional-editor__delete" data-condition-action="delete" data-index={row.index} onclick={handleDeleteEditorCondition}>Delete</button>
+                                                        </template>
+                                                    </div>
+                                                    <template if:true={canAddElementCondition}>
+                                                        <div class="conditional-editor__actions">
+                                                            <button type="button" class="conditional-editor__add" data-condition-action="add" onclick={handleAddEditorCondition}>Add Condition</button>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <template if:true={showElementConditionExpression}>
+                                                <lightning-input
+                                                    label="Condition Logic"
+                                                    value={editorConditionalExpression}
+                                                    oninput={handleEditorConditionalExpressionInput}
+                                                    onblur={handleEditorConditionalExpressionBlur}>
+                                                </lightning-input>
+                                            </template>
+                                        </div>
                                     </template>
                                 </template>
 
@@ -878,6 +1093,34 @@
                                     </lightning-input>
                                 </template>
 
+                                <template if:true={selectedElementIsFileUpload}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Allow Multiple Files"
+                                        checked={editorAllowMultipleFiles}
+                                        onchange={handleEditorAllowMultipleFilesChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        label="Allowed Extensions"
+                                        value={editorAllowedExtensionsText}
+                                        message-when-bad-input="Use comma-separated values like pdf, jpg, png"
+                                        onblur={handleEditorAllowedExtensionsCommit}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="number"
+                                        label="Max File Size (MB)"
+                                        min="1"
+                                        value={editorMaxFileSizeMb}
+                                        onblur={handleEditorMaxFileSizeCommit}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Target Submit Action"
+                                        value={editorTargetSubmitActionKey}
+                                        options={fileUploadTargetActionOptions}
+                                        onchange={handleEditorTargetSubmitActionChange}>
+                                    </lightning-combobox>
+                                </template>
+
                                 <template if:true={selectedElementIsRepeatGroup}>
                                     <lightning-combobox
                                         label="Source Prefill Alias"
@@ -904,18 +1147,10 @@
                                         onchange={handleEditorShowLabelsOnEachRowChange}>
                                     </lightning-input>
                                 </template>
-
-                                <div class="selection-actions">
-                                    <lightning-button
-                                        variant="destructive-text"
-                                        label="Delete Item"
-                                        onclick={handleDeleteSelected}>
-                                    </lightning-button>
-                                </div>
                             </div>
 
                             <template if:true={selectedElementSupportsSalesforceMapping}>
-                                <div class="selection-card">
+                                <div class="selection-card selection-card--salesforce">
                                     <p class="selection-label">Salesforce Integration</p>
 
                                     <lightning-input
@@ -934,12 +1169,14 @@
                                             options={prefillAliasOptions}
                                             onchange={handleEditorPrefillAliasChange}>
                                         </lightning-combobox>
-                                        <lightning-combobox
-                                            label="Salesforce Field"
-                                            value={editorPrefillFieldPath}
-                                            options={prefillFieldOptions}
-                                            onchange={handleEditorPrefillFieldChange}>
-                                        </lightning-combobox>
+                                        <div class="selection-card__tail-field">
+                                            <lightning-combobox
+                                                label="Salesforce Field"
+                                                value={editorPrefillFieldPath}
+                                                options={prefillFieldOptions}
+                                                onchange={handleEditorPrefillFieldChange}>
+                                            </lightning-combobox>
+                                        </div>
                                     </template>
 
                                     <lightning-input
@@ -955,20 +1192,24 @@
                                             options={submitActionOptions}
                                             onchange={handleEditorSubmitActionChange}>
                                         </lightning-combobox>
-                                        <lightning-combobox
-                                            label="Salesforce Field"
-                                            value={editorSubmitFieldPath}
-                                            options={submitFieldOptions}
+                                        <div class="selection-card__tail-field">
+                                            <lightning-combobox
+                                                label="Salesforce Field"
+                                                value={editorSubmitFieldPath}
+                                                options={submitFieldOptions}
                                             onchange={handleEditorSubmitFieldChange}>
-                                        </lightning-combobox>
+                                            </lightning-combobox>
+                                        </div>
                                     </template>
+                                    <div class="selection-card__bottom-lines" aria-hidden="true">&nbsp;</div>
                                 </div>
+                            </template>
                             </template>
                             </template>
                         </template>
                         <template if:false={selectedElement}>
                             <div class="selection-card">
-                                <p class="selection-label">General</p>
+                                <p class="selection-label">Display Settings</p>
 
                                 <lightning-input
                                     type="text"
@@ -984,21 +1225,6 @@
                                     options={themeOptions}
                                     onchange={handleThemeChange}>
                                 </lightning-combobox>
-                            </div>
-
-                            <div class="selection-card">
-                                <p class="selection-label">Security</p>
-
-                                <lightning-input
-                                    type="checkbox"
-                                    label="Enable CAPTCHA"
-                                    checked={selectedFormCaptchaEnabled}
-                                    onchange={handleFormCaptchaChange}>
-                                </lightning-input>
-                            </div>
-
-                            <div class="selection-card">
-                                <p class="selection-label">Direction</p>
 
                                 <lightning-input
                                     type="checkbox"
@@ -1016,9 +1242,175 @@
                                     value={draftSubmitSuccessMessage}
                                     max-length="255"
                                     message-when-too-long="Keep the success message under 255 characters."
-                                    oninput={handleSubmitSuccessMessageInput}
                                     onblur={handleSubmitSuccessMessageBlur}>
                                 </lightning-textarea>
+
+                                <template if:true={showPostSubmitAutoLinkSettings}>
+                                    <div class="settings-divider"></div>
+
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Enable Post Submit Auto Link"
+                                        checked={draftPostSubmitAutoLinkEnabled}
+                                        onchange={handlePostSubmitAutoLinkChange}
+                                        onblur={handlePostSubmitAutoLinkCommit}>
+                                    </lightning-input>
+
+                                    <template if:true={draftPostSubmitAutoLinkEnabled}>
+                                        <div class="post-submit-settings" data-id="post-submit-settings">
+                                            <div class="post-submit-settings__field">
+                                                <label class="post-submit-settings__label" for="post-submit-url-template">URL Redirect</label>
+                                                <textarea
+                                                    id="post-submit-url-template"
+                                                    class="slds-textarea post-submit-settings__textarea"
+                                                    data-id="post-submit-url-template"
+                                                    oninput={handlePostSubmitUrlTemplateInput}
+                                                    onfocus={capturePostSubmitUrlSelection}
+                                                    onkeyup={capturePostSubmitUrlSelection}
+                                                    onclick={capturePostSubmitUrlSelection}
+                                                    onselect={capturePostSubmitUrlSelection}
+                                                    onmouseup={capturePostSubmitUrlSelection}
+                                                    onchange={handlePostSubmitUrlTemplateChange}
+                                                    onblur={handlePostSubmitUrlTemplateBlur}>{draftPostSubmitUrlTemplate}</textarea>
+                                            </div>
+
+                                            <div class="post-submit-settings__hint">
+                                                Change <strong>formX</strong> to the target form key. Example: https://forms.twinaforms.com/formX/?param1=&#123;&#123;field.text1&#125;&#125;&amp;param2=&#123;&#123;field.text12&#125;&#125;
+                                            </div>
+
+                                            <div class="post-submit-token-row" onmousedown={markPostSubmitTokenInteraction}>
+                                                <lightning-combobox
+                                                    label="Insert Form Field"
+                                                    value={selectedPostSubmitFormToken}
+                                                    options={postSubmitFormFieldTokenOptions}
+                                                    onchange={handlePostSubmitFormTokenChange}>
+                                                </lightning-combobox>
+                                                <button
+                                                    type="button"
+                                                    class="post-submit-token-row__button"
+                                                    data-token-action="form"
+                                                    onclick={handleInsertPostSubmitFormToken}>
+                                                    Insert
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </template>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Security</p>
+
+                                <lightning-input
+                                    type="checkbox"
+                                    label="Enable CAPTCHA"
+                                    checked={selectedFormCaptchaEnabled}
+                                    onchange={handleFormCaptchaChange}>
+                                </lightning-input>
+
+                                <template if:true={showSecretCodeVerificationSettings}>
+                                    <div class="settings-divider"></div>
+
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Enable Secret Code Verification"
+                                        checked={draftSecretCodeVerificationEnabled}
+                                        onchange={handleSecretCodeVerificationEnabledChange}
+                                        onblur={handleSecretCodeVerificationEnabledCommit}>
+                                    </lightning-input>
+
+                                    <template if:true={draftSecretCodeVerificationEnabled}>
+                                        <div class="secret-code-settings">
+                                            <p class="secret-code-settings__hint">
+                                                Default Salesforce email template:
+                                                <strong>NativeForms Secret Code Default</strong>.
+                                                You can edit or replace it later in Salesforce.
+                                            </p>
+
+                                            <lightning-input
+                                                type="text"
+                                                label="Contact Match Field"
+                                                value={draftSecretCodeMatchField}
+                                                disabled>
+                                            </lightning-input>
+
+                                            <lightning-textarea
+                                                label="Verification Intro Text"
+                                                value={draftSecretCodeIntroText}
+                                                oninput={handleSecretCodeIntroTextInput}
+                                                onblur={handleSecretCodeIntroTextBlur}>
+                                            </lightning-textarea>
+
+                                            <lightning-textarea
+                                                label="Code Sent Message"
+                                                value={draftSecretCodeSentMessage}
+                                                oninput={handleSecretCodeSentMessageInput}
+                                                onblur={handleSecretCodeSentMessageBlur}>
+                                            </lightning-textarea>
+
+                                            <lightning-textarea
+                                                label="Invalid Code Message"
+                                                value={draftSecretCodeInvalidMessage}
+                                                oninput={handleSecretCodeInvalidMessageInput}
+                                                onblur={handleSecretCodeInvalidMessageBlur}>
+                                            </lightning-textarea>
+
+                                            <lightning-textarea
+                                                label="Verified Message"
+                                                value={draftSecretCodeVerifiedMessage}
+                                                oninput={handleSecretCodeVerifiedMessageInput}
+                                                onblur={handleSecretCodeVerifiedMessageBlur}>
+                                            </lightning-textarea>
+
+                                            <lightning-input
+                                                type="text"
+                                                label="Send Button Label"
+                                                value={draftSecretCodeSendButtonLabel}
+                                                oninput={handleSecretCodeSendButtonLabelInput}
+                                                onblur={handleSecretCodeSendButtonLabelBlur}>
+                                            </lightning-input>
+
+                                            <lightning-input
+                                                type="text"
+                                                label="Verify Button Label"
+                                                value={draftSecretCodeVerifyButtonLabel}
+                                                oninput={handleSecretCodeVerifyButtonLabelInput}
+                                                onblur={handleSecretCodeVerifyButtonLabelBlur}>
+                                            </lightning-input>
+
+                                            <lightning-input
+                                                type="text"
+                                                label="Resend Button Label"
+                                                value={draftSecretCodeResendButtonLabel}
+                                                oninput={handleSecretCodeResendButtonLabelInput}
+                                                onblur={handleSecretCodeResendButtonLabelBlur}>
+                                            </lightning-input>
+
+                                            <lightning-input
+                                                type="number"
+                                                label="Code Expiry Minutes"
+                                                value={draftSecretCodeExpiryMinutes}
+                                                min="1"
+                                                onblur={handleSecretCodeExpiryMinutesBlur}>
+                                            </lightning-input>
+
+                                            <lightning-input
+                                                type="number"
+                                                label="Max Attempts"
+                                                value={draftSecretCodeMaxAttempts}
+                                                min="1"
+                                                onblur={handleSecretCodeMaxAttemptsBlur}>
+                                            </lightning-input>
+
+                                            <lightning-input
+                                                type="checkbox"
+                                                label="Allow Resend Code"
+                                                checked={draftSecretCodeAllowResend}
+                                                onchange={handleSecretCodeAllowResendChange}>
+                                            </lightning-input>
+                                        </div>
+                                    </template>
+                                </template>
                             </div>
                         </template>
                     </section>

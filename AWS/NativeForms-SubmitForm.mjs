@@ -98,6 +98,7 @@ import https from "https";
 import querystring from "querystring";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import crypto from "crypto";
 
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
@@ -105,12 +106,14 @@ const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const CAPTCHA_SECRET_KEY = String(process.env.CAPTCHA_SECRET_KEY || "").trim();
+const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "nativeformspublish";
 const SALESFORCE_API_VERSION = "v60.0";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SUBMISSION_LOG_SCHEMA_VERSION = "v2";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
+const s3Client = new S3Client({});
 const salesforceDescribeCache = new Map();
 
 function jsonResponse(statusCode, payload) {
@@ -657,7 +660,8 @@ function deriveTenantRuntimeStatus(tenantRecord) {
   };
 }
 
-function ensureFormToken(formSecurity, publishToken) {
+function ensureFormToken(formSecurity, publishToken, options = {}) {
+  const requireSubmitDefinition = options.requireSubmitDefinition !== false;
   if (!publishToken) {
     throw buildFailureError("Missing required field: publishToken", 401, "validation");
   }
@@ -670,11 +674,14 @@ function ensureFormToken(formSecurity, publishToken) {
     throw buildFailureError("Unauthorized: invalid publish token", 401, "validation");
   }
 
-  if (!formSecurity.submitPolicy) {
+  if (requireSubmitDefinition && !formSecurity.submitPolicy) {
     throw buildFailureError("Submit policy is not configured for this form", 403, "mapping");
   }
 
-  if (!formSecurity.submitDefinition || !Array.isArray(formSecurity.submitDefinition.commands)) {
+  if (
+    requireSubmitDefinition &&
+    (!formSecurity.submitDefinition || !Array.isArray(formSecurity.submitDefinition.commands))
+  ) {
     throw buildFailureError("Submit definition is not configured for this form", 403, "mapping");
   }
 }
@@ -800,6 +807,262 @@ function assertSecret(secret) {
   if (!secret.client_id || !secret.client_secret || !secret.refresh_token || !secret.instance_url) {
     throw new Error("Secret is missing required fields");
   }
+}
+
+function base64UrlEncode(value) {
+  return Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value) {
+  const normalized = String(value || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return Buffer.from(normalized + padding, "base64").toString("utf8");
+}
+
+function buildUploadSigningSecret(tenantRecord) {
+  return String(tenantRecord?.secret || "");
+}
+
+function verifySignedUploadToken(tenantRecord, token) {
+  const signingSecret = buildUploadSigningSecret(tenantRecord);
+  if (!signingSecret) {
+    return null;
+  }
+
+  const parts = String(token || "").split(".");
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const [encodedPayload, signature] = parts;
+  const expectedSignature = crypto
+    .createHmac("sha256", signingSecret)
+    .update(encodedPayload)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(base64UrlDecode(encodedPayload));
+  } catch (error) {
+    return null;
+  }
+}
+
+function getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition) {
+  return {
+    ...(planDefinition?.featureFlags || {}),
+    ...(tenantRecord?.planFeatureFlags || {}),
+    ...(tenantRecord?.featureFlags || {}),
+    ...(tenantRecord?.planOverrides?.featureFlags || {}),
+    ...(tenantRecord?.effectiveFeatureFlags || {})
+  };
+}
+
+function getUploadFieldDefinition(formSecurity, fieldKey) {
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!normalizedFieldKey) {
+    return null;
+  }
+  const uploadFields = Array.isArray(formSecurity?.uploadFields) ? formSecurity.uploadFields : [];
+  return uploadFields.find((item) => String(item?.fieldKey || "").trim() === normalizedFieldKey) || null;
+}
+
+function normalizeSubmittedUploadMap(fileUploads) {
+  if (!fileUploads || typeof fileUploads !== "object" || Array.isArray(fileUploads)) {
+    return {};
+  }
+  return fileUploads;
+}
+
+function resolveUploadTargetRecordId(targetSubmitActionKey, results) {
+  if (!targetSubmitActionKey) {
+    return null;
+  }
+
+  const exactMatch = (results || []).find((result) => result?.commandKey === targetSubmitActionKey && result?.id);
+  if (exactMatch?.id) {
+    return exactMatch.id;
+  }
+
+  const createFallback = (results || []).find((result) => result?.commandKey === `${targetSubmitActionKey}_create` && result?.id);
+  if (createFallback?.id) {
+    return createFallback.id;
+  }
+
+  const prefixFallback = [...(results || [])]
+    .reverse()
+    .find((result) => String(result?.commandKey || "").startsWith(`${targetSubmitActionKey}`) && result?.id);
+  return prefixFallback?.id || null;
+}
+
+function streamToBuffer(streamBody) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    streamBody.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    streamBody.on("error", reject);
+    streamBody.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+}
+
+function normalizeSecretCodeConfig(formSecurity) {
+  const raw = formSecurity?.secretCodeConfig;
+  if (!raw || typeof raw !== "object") {
+    return {
+      enabled: false,
+      expiryMinutes: 10,
+      maxAttempts: 5,
+      allowResend: true
+    };
+  }
+
+  const expiryMinutes = parsePositiveInteger(raw.expiryMinutes) || 10;
+  const maxAttempts = parsePositiveInteger(raw.maxAttempts) || 5;
+
+  return {
+    enabled: raw.enabled === true,
+    expiryMinutes,
+    maxAttempts,
+    allowResend: raw.allowResend !== false,
+    introText: typeof raw.introText === "string" ? raw.introText : "",
+    sentMessage: typeof raw.sentMessage === "string" ? raw.sentMessage : "",
+    invalidMessage: typeof raw.invalidMessage === "string" ? raw.invalidMessage : "",
+    verifiedMessage: typeof raw.verifiedMessage === "string" ? raw.verifiedMessage : ""
+  };
+}
+
+function normalizeSecretCodeAction(action) {
+  const normalized = String(action || "").trim();
+  return normalized === "sendCode" || normalized === "verifyCode" ? normalized : "";
+}
+
+async function callSalesforceApex(instanceUrl, accessToken, path, payload) {
+  const url = new URL(instanceUrl);
+  const body = JSON.stringify(payload || {});
+  const response = await httpsRequest(
+    {
+      hostname: url.hostname,
+      path,
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body)
+      }
+    },
+    body
+  );
+
+  let data = {};
+  try {
+    data = response.body ? JSON.parse(response.body) : {};
+  } catch (error) {
+    data = {};
+  }
+
+  if (response.statusCode < 200 || response.statusCode >= 300 || data?.success === false) {
+    throw buildFailureError(
+      data?.message || `Apex request failed. Status: ${response.statusCode}.`,
+      response.statusCode >= 500 ? 502 : 400,
+      "salesforce",
+      {
+        responseBody: response.body
+      }
+    );
+  }
+
+  return data;
+}
+
+function buildSecretVerificationSigningSecret(secret) {
+  return String(secret?.client_secret || "");
+}
+
+function createSecretVerificationToken(formSecurity, email, sessionId, secret) {
+  const signingSecret = buildSecretVerificationSigningSecret(secret);
+  if (!signingSecret) {
+    throw buildFailureError("Secret verification signing secret is missing", 500, "system");
+  }
+
+  const expiryMinutes = Math.max(5, normalizeSecretCodeConfig(formSecurity).expiryMinutes);
+  const payload = {
+    kind: "secretVerification",
+    orgId: formSecurity.orgId,
+    formId: formSecurity.formId,
+    publishedVersionId: formSecurity.publishedVersionId || null,
+    email: String(email || "").trim().toLowerCase(),
+    sessionId: String(sessionId || "").trim(),
+    exp: Math.floor(Date.now() / 1000) + (expiryMinutes * 60)
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac("sha256", signingSecret)
+    .update(encodedPayload)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifySecretVerificationToken(formSecurity, token, sessionId, secret, email) {
+  const signingSecret = buildSecretVerificationSigningSecret(secret);
+  if (!signingSecret) {
+    return false;
+  }
+
+  const parts = String(token || "").split(".");
+  if (parts.length !== 2) {
+    return false;
+  }
+
+  const [encodedPayload, signature] = parts;
+  const expectedSignature = crypto
+    .createHmac("sha256", signingSecret)
+    .update(encodedPayload)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  if (signature !== expectedSignature) {
+    return false;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(base64UrlDecode(encodedPayload));
+  } catch (error) {
+    return false;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return (
+    payload?.kind === "secretVerification" &&
+    payload?.orgId === formSecurity.orgId &&
+    payload?.formId === formSecurity.formId &&
+    String(payload?.publishedVersionId || "") === String(formSecurity.publishedVersionId || "") &&
+    String(payload?.sessionId || "") === String(sessionId || "") &&
+    String(payload?.email || "").trim().toLowerCase() === String(email || "").trim().toLowerCase() &&
+    Number(payload?.exp || 0) > nowSeconds
+  );
+}
+
+function ensureSecretVerificationAllowed(formSecurity) {
+  const secretCodeConfig = normalizeSecretCodeConfig(formSecurity);
+  if (!secretCodeConfig.enabled) {
+    throw buildFailureError("Secret code verification is not enabled for this form.", 403, "validation");
+  }
+  return secretCodeConfig;
 }
 
 function escapeSoqlValue(value) {
@@ -1300,6 +1563,119 @@ async function deleteSalesforceRecord(instanceUrl, accessToken, objectApiName, i
   return { id, success: true };
 }
 
+async function createSalesforceFileVersion(instanceUrl, accessToken, fields) {
+  return createSalesforceRecord(instanceUrl, accessToken, "ContentVersion", fields);
+}
+
+async function finalizeUploadedFiles({
+  tenantRecord,
+  formSecurity,
+  inputPayload,
+  results,
+  sf
+}) {
+  const fileUploadSessionId = String(inputPayload?.input?.fileUploadSessionId || "").trim();
+  const submittedUploadMap = normalizeSubmittedUploadMap(inputPayload?.input?.fileUploads);
+  const fieldKeys = Object.keys(submittedUploadMap);
+  if (!fieldKeys.length) {
+    return [];
+  }
+
+  const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+  const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
+  if (effectiveFeatureFlags.enableProLoadFile !== true) {
+    throw buildFailureError("File Uploads are not available for this tenant.", 403, "validation");
+  }
+
+  const finalizedFiles = [];
+  for (const fieldKey of fieldKeys) {
+    const uploadField = getUploadFieldDefinition(formSecurity, fieldKey);
+    if (!uploadField) {
+      throw buildFailureError(`File Upload is not configured for field '${fieldKey}'.`, 400, "mapping");
+    }
+
+    const targetRecordId = resolveUploadTargetRecordId(uploadField.targetSubmitActionKey, results);
+    if (!targetRecordId) {
+      throw buildFailureError(
+        `No saved record was available for file upload field '${fieldKey}'.`,
+        400,
+        "mapping"
+      );
+    }
+
+    const uploadRefs = Array.isArray(submittedUploadMap[fieldKey]) ? submittedUploadMap[fieldKey] : [];
+    for (const uploadRef of uploadRefs) {
+      const uploadToken = String(uploadRef?.uploadToken || "").trim();
+      const uploadTokenPayload = verifySignedUploadToken(tenantRecord, uploadToken);
+      if (!uploadTokenPayload) {
+        throw buildFailureError("One of the uploaded files has an invalid upload token.", 400, "validation");
+      }
+
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      if (Number(uploadTokenPayload.exp || 0) <= nowSeconds) {
+        throw buildFailureError("One of the uploaded files has expired. Please upload it again.", 400, "validation");
+      }
+
+      if (
+        uploadTokenPayload.kind !== "fileUpload" ||
+        uploadTokenPayload.orgId !== formSecurity.orgId ||
+        uploadTokenPayload.formId !== formSecurity.formId ||
+        String(uploadTokenPayload.publishedVersionId || "") !== String(formSecurity.publishedVersionId || "") ||
+        String(uploadTokenPayload.fieldKey || "") !== String(fieldKey) ||
+        String(uploadTokenPayload.sessionId || "") !== fileUploadSessionId
+      ) {
+        throw buildFailureError("One of the uploaded files does not belong to this form submission.", 400, "validation");
+      }
+
+      const objectKey = String(uploadTokenPayload.objectKey || "").trim();
+      if (!objectKey) {
+        throw buildFailureError("One of the uploaded files is missing its staged object reference.", 400, "validation");
+      }
+
+      const s3Object = await s3Client.send(new GetObjectCommand({
+        Bucket: PUBLISH_BUCKET,
+        Key: objectKey
+      }));
+      const fileBuffer = await streamToBuffer(s3Object.Body);
+      if (!fileBuffer.length) {
+        throw buildFailureError("One of the uploaded files is empty.", 400, "validation");
+      }
+
+      const fileName = String(uploadTokenPayload.fileName || uploadRef?.fileName || "upload.bin");
+      const dotIndex = fileName.lastIndexOf(".");
+      const title = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+      const versionResult = await createSalesforceFileVersion(
+        sf.instanceUrl,
+        sf.accessToken,
+        {
+          Title: title,
+          PathOnClient: fileName,
+          VersionData: fileBuffer.toString("base64"),
+          FirstPublishLocationId: targetRecordId
+        }
+      );
+
+      finalizedFiles.push({
+        fieldKey,
+        fileName,
+        targetRecordId,
+        contentVersionId: versionResult.id
+      });
+
+      try {
+        await s3Client.send(new DeleteObjectCommand({
+          Bucket: PUBLISH_BUCKET,
+          Key: objectKey
+        }));
+      } catch (error) {
+        console.warn("Failed to delete staged upload after Salesforce finalization:", objectKey, error);
+      }
+    }
+  }
+
+  return finalizedFiles;
+}
+
 async function executeUpsertManyCommand(command, context, sf) {
   const { instanceUrl, accessToken } = sf;
 
@@ -1599,9 +1975,11 @@ export const handler = async (event) => {
       });
     }
 
+    const requestedSecretAction = normalizeSecretCodeAction(inputPayload.action);
     formSecurity = await getFormSecurityRecord(inputPayload.formId);
-    ensureFormToken(formSecurity, inputPayload.publishToken);
-    await verifyCaptcha(formSecurity, inputPayload, event);
+    ensureFormToken(formSecurity, inputPayload.publishToken, {
+      requireSubmitDefinition: !requestedSecretAction
+    });
     tenantRecord = await getTenantRecord(formSecurity.orgId);
     const runtimeStatus = deriveTenantRuntimeStatus(tenantRecord);
     if (runtimeStatus.status === "blocked") {
@@ -1611,12 +1989,89 @@ export const handler = async (event) => {
         "system"
       );
     }
-    const submitCommands = formSecurity.submitDefinition.commands;
 
     const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
     assertSecret(secret);
+    const loginBaseUrl = tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com";
+    const accessToken = await refreshAccessToken(secret, loginBaseUrl);
 
-    const accessToken = await refreshAccessToken(secret, tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com");
+    if (requestedSecretAction) {
+      const secretCodeConfig = ensureSecretVerificationAllowed(formSecurity);
+      const apexPayload = {
+        action: requestedSecretAction,
+        publishedVersionId: inputPayload.publishedVersionId || formSecurity.publishedVersionId,
+        email: inputPayload.email || inputPayload?.input?.email || "",
+        code: inputPayload.code || inputPayload?.input?.code || "",
+        expiryMinutes: secretCodeConfig.expiryMinutes,
+        maxAttempts: secretCodeConfig.maxAttempts
+      };
+      const apexResult = await callSalesforceApex(
+        secret.instance_url,
+        accessToken,
+        `/services/apexrest/nativeforms/secret-code`,
+        apexPayload
+      );
+
+      if (requestedSecretAction === "verifyCode" && apexResult.approved === true) {
+        const normalizedEmail = String(apexResult.normalizedEmail || apexPayload.email || "").trim().toLowerCase();
+        const sessionId =
+          inputPayload.sessionId ||
+          inputPayload.secretVerificationSessionId ||
+          crypto.randomUUID();
+        const verificationToken = createSecretVerificationToken(
+          formSecurity,
+          normalizedEmail,
+          sessionId,
+          secret
+        );
+
+        return jsonResponse(200, {
+          success: true,
+          approved: true,
+          normalizedEmail,
+          message: apexResult.message || "Code verified successfully.",
+          verificationToken,
+          sessionId
+        });
+      }
+
+      return jsonResponse(200, {
+        success: true,
+        approved: apexResult.approved === true,
+        emailSent: apexResult.emailSent === true,
+        normalizedEmail: apexResult.normalizedEmail || apexPayload.email || "",
+        lockedOut: apexResult.lockedOut === true,
+        expired: apexResult.expired === true,
+        message: apexResult.message || (requestedSecretAction === "sendCode"
+          ? "If we found a matching contact, a code was sent."
+          : "The verification code is invalid.")
+      });
+    }
+
+    await verifyCaptcha(formSecurity, inputPayload, event);
+    const submitCommands = formSecurity.submitDefinition.commands;
+    const secretCodeConfig = normalizeSecretCodeConfig(formSecurity);
+    if (secretCodeConfig.enabled) {
+      const verifiedEmail =
+        inputPayload?.input?.secretVerificationEmail ||
+        inputPayload?.secretVerificationEmail ||
+        "";
+      const sessionId =
+        inputPayload?.input?.secretVerificationSessionId ||
+        inputPayload?.secretVerificationSessionId ||
+        "";
+      const verificationToken =
+        inputPayload?.input?.secretVerificationToken ||
+        inputPayload?.secretVerificationToken ||
+        "";
+      if (!verifySecretVerificationToken(formSecurity, verificationToken, sessionId, secret, verifiedEmail)) {
+        throw buildFailureError(
+          secretCodeConfig.invalidMessage || "Verify the secret code before continuing.",
+          403,
+          "validation"
+        );
+      }
+    }
 
     const context = {
       input: inputPayload.input || {}
@@ -1664,7 +2119,11 @@ export const handler = async (event) => {
           if (result.type === "findOne") {
             context[command.storeResultAs] = result.record;
           } else {
-            context[command.storeResultAs] = result;
+            const storedResult = { ...result };
+            if (storedResult.id != null && storedResult.Id == null) {
+              storedResult.Id = storedResult.id;
+            }
+            context[command.storeResultAs] = storedResult;
           }
         }
 
@@ -1726,6 +2185,27 @@ export const handler = async (event) => {
           partialResults: results
         });
       }
+    }
+
+    const finalizedFiles = await finalizeUploadedFiles({
+      tenantRecord,
+      formSecurity,
+      inputPayload,
+      results,
+      sf: {
+        instanceUrl: secret.instance_url,
+        accessToken
+      }
+    });
+    if (finalizedFiles.length) {
+      results.push({
+        commandKey: "__fileUploads__",
+        type: "fileUploadFinalize",
+        processedCount: finalizedFiles.length,
+        files: finalizedFiles,
+        skipped: false,
+        success: true
+      });
     }
 
     await writeSubmissionLogSafely({
