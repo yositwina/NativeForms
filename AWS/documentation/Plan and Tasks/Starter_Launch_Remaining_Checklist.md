@@ -301,7 +301,8 @@ Best next step:
 
 That means:
 
-- polish the NativeForms Salesforce screens
+- Option to delete forms  (or move to archive)
+= polish the NativeForms Salesforce screens
 - lock the production/domain approach
 - remove hardcoded temporary runtime URLs from published forms
 - finish thank-you page support

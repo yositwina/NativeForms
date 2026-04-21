@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Writing Formulas — TwinaForms Help</title>
+  <meta name="description" content="How to write formulas in TwinaForms. Field references, operators, built-in functions, and real-world examples.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/help/styles.css?v=20260421-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Writing formulas in TwinaForms.</h1>
+      <p class="hero-copy">Formulas compute a field's value live as users fill the form &mdash; from simple concatenations like a full name, to totals, date math, and conditional messages. This page is a practical reference with copy-paste examples.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#where">Where they work</a>
+        <a href="#syntax">Syntax</a>
+        <a href="#operators">Operators</a>
+        <a href="#functions">Functions</a>
+        <a href="#examples">Examples</a>
+        <a href="#gotchas">Limits &amp; gotchas</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+    <section class="section" id="where">
+      <h2>Where formulas work</h2>
+      <p>Turn any <strong>Text</strong> or <strong>Number</strong> field into a formula field from the Designer's Element Properties panel. The field becomes read-only in the published form and recomputes every time a source field changes.</p>
+      <ul>
+        <li><strong>Recalculates live</strong> as the user types.</li>
+        <li><strong>Submits the computed value</strong> to Salesforce along with everything else.</li>
+        <li>Formulas can reference input fields, but <strong>not other formula fields</strong> (no formula&#8209;to&#8209;formula chains in v1).</li>
+        <li>Not yet available inside <strong>repeat groups</strong>.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="syntax">
+      <h2>Syntax basics</h2>
+
+      <h3>Field references</h3>
+      <p>Wrap a field's <strong>Internal Name (ID)</strong> in curly braces. Internal IDs are auto-generated and look like <span class="inline">text2</span>, <span class="inline">number4</span>, <span class="inline">email5</span>, <span class="inline">checkbox11</span>, <span class="inline">radio10</span> &mdash; <em>not</em> the friendly label you typed.</p>
+      <pre class="code-block">{text2}
+{number4}
+{checkbox11}</pre>
+      <p>You don't have to type them. In the formula editor use the <strong>Insert field</strong> dropdown (the list shows each field's friendly label with its internal ID in parentheses) and click <strong>Insert</strong> &mdash; the correct reference is placed at the cursor.</p>
+
+      <h3>Literals</h3>
+      <ul>
+        <li><span class="inline">"Hello"</span> &mdash; string (double quotes).</li>
+        <li><span class="inline">42</span>, <span class="inline">3.14</span>, <span class="inline">-1</span> &mdash; numbers.</li>
+        <li><span class="inline">true</span>, <span class="inline">false</span> &mdash; booleans.</li>
+      </ul>
+
+      <h3>Function calls</h3>
+      <p>Function names are uppercase. Arguments are separated by commas.</p>
+      <pre class="code-block">IF({isVip}, "Priority", "Standard")
+CONCAT({firstName}, " ", {lastName})</pre>
+
+      <div class="callout">
+        <strong>Common pitfall with IF:</strong> use <span class="inline">==</span> for equality, not a single <span class="inline">=</span>. A single equals sign is not a valid operator here and the formula will fail.<br>
+        &#10060; <span class="inline">IF({status} = "Open", "Yes", "No")</span><br>
+        &#9989; <span class="inline">IF({status} == "Open", "Yes", "No")</span>
+      </div>
+    </section>
+
+    <section class="section" id="operators">
+      <h2>Operators</h2>
+
+      <h3>Arithmetic</h3>
+      <div class="pill-row">
+        <span class="pill">+</span>
+        <span class="pill">-</span>
+        <span class="pill">*</span>
+        <span class="pill">/</span>
+      </div>
+      <pre class="code-block">{quantity} * {unitPrice}
+({subtotal} + {tax}) - {discount}</pre>
+
+      <h3>Comparison</h3>
+      <div class="pill-row">
+        <span class="pill">==</span>
+        <span class="pill">!=</span>
+        <span class="pill">&lt;</span>
+        <span class="pill">&gt;</span>
+        <span class="pill">&lt;=</span>
+        <span class="pill">&gt;=</span>
+      </div>
+      <p>String comparisons are <strong>case-sensitive</strong>. Use <span class="inline">IF({rating} == "Hot", &hellip;)</span> with the exact picklist value.</p>
+
+      <h3>Logical</h3>
+      <div class="pill-row">
+        <span class="pill">and</span>
+        <span class="pill">or</span>
+        <span class="pill">not</span>
+      </div>
+      <pre class="code-block">IF({total} &gt; 100 and {isMember}, "Member discount", "")</pre>
+    </section>
+
+    <section class="section" id="examples">
+      <h2>Examples</h2>
+      <p class="lead">Copy, paste into a Text or Number formula field, and replace the field references with yours.</p>
+      <div class="callout">
+        <strong>Field names in these examples are placeholders.</strong> Below we use readable names like <span class="inline">{firstName}</span> or <span class="inline">{quantity}</span> to make the logic easy to follow. In your form, the real references look like <span class="inline">{text2}</span>, <span class="inline">{number4}</span>, etc. Use the <strong>Insert field</strong> dropdown in the Designer to pick the right one &mdash; it inserts the correct internal ID for you.
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Full name from two fields</p>
+        <p class="example-subtitle">Text formula. Uses <span class="inline">CONCAT</span> so "John" + " " + "Doe" becomes "John Doe".</p>
+        <pre class="code-block">CONCAT({firstName}, " ", {lastName})</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Line total</p>
+        <p class="example-subtitle">Number formula. Multiplies quantity by unit price.</p>
+        <pre class="code-block">{quantity} * {unitPrice}</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Line total with tax, rounded to cents</p>
+        <p class="example-subtitle">Number formula. The outer <span class="inline">ROUND</span> keeps the result to two decimals.</p>
+        <pre class="code-block">ROUND({quantity} * {unitPrice} * 1.17, 2)</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Equality check &mdash; <span class="inline">IF(A == B, &hellip;)</span></p>
+        <p class="example-subtitle">Text formula. Compare a field to a literal value using <span class="inline">==</span>. String comparisons are case&#8209;sensitive, so match the exact picklist or input value.</p>
+        <pre class="code-block">IF({rating} == "Hot", "Contact today", "Regular follow-up")</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">VIP greeting</p>
+        <p class="example-subtitle">Text formula. Shows a personalized line only for members.</p>
+        <pre class="code-block">IF({isMember},
+   CONCAT("Welcome back, ", {firstName}, "!"),
+   CONCAT("Hello, ", {firstName}))</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Default to "N/A" when a field is empty</p>
+        <p class="example-subtitle">Text formula. <span class="inline">COALESCE</span> returns the first non-blank argument.</p>
+        <pre class="code-block">COALESCE({nickname}, {firstName}, "N/A")</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Age from a date of birth</p>
+        <p class="example-subtitle">Number formula. Approximate age using year difference.</p>
+        <pre class="code-block">YEAR(TODAY()) - YEAR({dateOfBirth})</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Discount band</p>
+        <p class="example-subtitle">Text formula. Nested <span class="inline">IF</span> forms a simple tiered rule.</p>
+        <pre class="code-block">IF({orderTotal} &gt;= 1000, "Gold",
+ IF({orderTotal} &gt;= 500, "Silver",
+ IF({orderTotal} &gt;= 100, "Bronze", "Standard")))</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Shipping fee rule</p>
+        <p class="example-subtitle">Number formula. Free shipping above $100, otherwise flat $9.90.</p>
+        <pre class="code-block">IF({orderTotal} &gt;= 100, 0, 9.90)</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Case reference</p>
+        <p class="example-subtitle">Text formula. Builds a unique-looking id the user can quote in support.</p>
+        <pre class="code-block">CONCAT("REF-", YEAR(TODAY()), "-", {email})</pre>
+      </div>
+    </section>
+
+    <section class="section" id="gotchas">
+      <h2>Limits &amp; gotchas</h2>
+      <ul>
+        <li><strong>String comparisons are case-sensitive.</strong> <span class="inline">"Hot" == "hot"</span> is <span class="inline">false</span>.</li>
+        <li><strong>Empty fields become <span class="inline">null</span></strong>, not an empty string. Wrap with <span class="inline">COALESCE({field}, "")</span> if you need a safe default.</li>
+        <li><strong>Dates are browser-local.</strong> A user in Tel Aviv and one in New York can see different <span class="inline">TODAY()</span> values for a few hours each day.</li>
+        <li><strong>No formula-to-formula references.</strong> If you need a nested calculation, inline it in a single expression.</li>
+        <li><strong>No support inside repeat groups yet.</strong> Place formulas on top-level fields only.</li>
+        <li><strong>Formula fields ignore prefill.</strong> The source fields prefill normally and the formula recalculates from them.</li>
+        <li><strong>Invalid input returns <span class="inline">null</span>.</strong> <span class="inline">VALUE("hello")</span> is blank, not zero.</li>
+      </ul>
+
+      <div class="callout">
+        <strong>Tip:</strong> Build formulas incrementally. Start with the simplest case, publish, fill the form, confirm the computed value in the Submission Logs, then extend. Logs show the final computed value as submitted, which makes it easy to spot where a nested expression went wrong.
+      </div>
+    </section>
+    </div>
+
+    <aside class="layout__aside">
+    <section class="section layout__aside-section" id="functions">
+      <h2>Built-in functions</h2>
+      <p class="lead">Every function is uppercase. Arguments that are blank become <span class="inline">null</span>; conversion functions return <span class="inline">null</span> on invalid input.</p>
+
+      <h3>Logic</h3>
+      <div class="fn-grid">
+        <div class="fn-card">
+          <span class="fn-name">IF(cond, ifTrue, ifFalse)</span>
+          <p class="fn-desc">Returns <em>ifTrue</em> when the condition is truthy, otherwise <em>ifFalse</em>.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">COALESCE(a, b, c, &hellip;)</span>
+          <p class="fn-desc">First argument that is not blank.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">ISBLANK(value)</span>
+          <p class="fn-desc">True when the value is empty, null, or whitespace-only.</p>
+        </div>
+      </div>
+
+      <h3>Text</h3>
+      <div class="fn-grid">
+        <div class="fn-card">
+          <span class="fn-name">CONCAT(&hellip;)</span>
+          <p class="fn-desc">Joins all arguments as text. Use with strings, field refs, or numbers.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">TEXT(value)</span>
+          <p class="fn-desc">Converts any value to its text representation.</p>
+        </div>
+      </div>
+
+      <h3>Numbers</h3>
+      <div class="fn-grid">
+        <div class="fn-card">
+          <span class="fn-name">VALUE(text)</span>
+          <p class="fn-desc">Parses text into a number. Returns blank if the text isn't a valid number.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">ROUND(num, digits)</span>
+          <p class="fn-desc">Rounds <em>num</em> to the given number of decimal places.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">ABS(num)</span>
+          <p class="fn-desc">Absolute value.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">MIN(&hellip;), MAX(&hellip;)</span>
+          <p class="fn-desc">Smallest / largest value among the arguments.</p>
+        </div>
+      </div>
+
+      <h3>Date &amp; time</h3>
+      <div class="fn-grid">
+        <div class="fn-card">
+          <span class="fn-name">TODAY()</span>
+          <p class="fn-desc">Current date as <span class="inline">YYYY-MM-DD</span> (browser local time).</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">NOW()</span>
+          <p class="fn-desc">Current timestamp as <span class="inline">YYYY-MM-DDTHH:mm:ss</span>.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">YEAR(date)</span>
+          <p class="fn-desc">Four-digit year from a date.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">MONTH(date)</span>
+          <p class="fn-desc">Month as 1&ndash;12.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">DAY(date)</span>
+          <p class="fn-desc">Day of month as 1&ndash;31.</p>
+        </div>
+      </div>
+    </section>
+    </aside>
+    </div>
+  </main>
+</body>
+</html>

@@ -32,10 +32,15 @@ These are explicitly deferred beyond Pro V1:
 
 The following stay outside the current File Uploads V1 scope:
 
-- richer submission logs and filters
++ Major
+- export logs to CSV
+- Signature add on as an item to forms = saved with detailed and served as an electornic signature / or create pdf with signatured
+- Form Journey, two column page, on eleft forms name, on right attibutesm , each arrtibute can call to new form. If so its automatically created on cavs with arrow
++ Minor 
+- richer submission filters
 - chained logic based on prior prefill or submit outcomes
-- more advanced post-submit navigation options
-- more advanced verification and secure access flows
+- more advanced post-submit navigation options (part of journey)
+- more advanced verification and secure access flows (part of Hourney)
 - broader admin and commercial control tooling
 
 ---

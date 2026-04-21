@@ -49,3 +49,16 @@ Wire `AWS/admin-console/app.js` to:
 - `GET /admin/plans`
 
 That will turn the S3 static shell into a real read-only admin console first.
+
+## Hosting target
+
+The live `admin.twinaforms.com` CloudFront distribution currently points to:
+
+- bucket: `nativeformspublish`
+- origin path: `/admin-console/dev`
+
+So admin-console static deploys must publish to:
+
+- `s3://nativeformspublish/admin-console/dev/`
+
+Updating a local file under `AWS/admin-console/` is not enough by itself. The matching file must be uploaded to that exact S3 prefix, and HTML changes may still require a CloudFront invalidation for `/index.html`.

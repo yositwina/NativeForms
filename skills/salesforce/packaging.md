@@ -13,6 +13,8 @@ Use for package-visible metadata, object changes, tabs/apps/pages, Apex/LWC chan
 - Assume clean-org validation matters; package work is not done until setup, connect, publish, and core usage make sense without internal knowledge.
 - Starter package polish, demo quality, Apex tests, and install/post-install guidance are release-critical.
 - Default Salesforce deployment alias for this repo is `NativeFormsDev` unless the user explicitly asks for a different org.
+- Permission-set split rule: keep ordinary customer access and support/debug admin access separate. `TwinaForms User` should be the counted customer-facing seat, while `TwinaForms Admin` should stay a separate support/debug permission set and app-access path.
+- Permission-set management location rule: manage `TwinaForms User` / `TwinaForms Admin` assignment from the `TwinaForms Connect` page, not `TwinaForms Home`, so setup/access troubleshooting stays in one place.
 - When changing a Salesforce page design, bump the page version label shown in the UI (for example `Designer v9.4` in the top-left of the Designer page) so the rendered screen reflects the latest design revision.
 - In `nativeFormsDesigner`, new text-like property controls must use local draft state while typing and commit only on `blur` or explicit finish. Do not wire `oninput`, mid-typing `applyEditorDraft()`, or save-triggered rerenders for plain text inputs or plain textareas unless the user explicitly wants live preview.
 - For repeated property editors such as conditional rows, treat blank/new rows as draft UI state first and sanitize only when persisting. Do not round-trip blank draft rows through saved config too early, or `Add Condition` / selection flows will look broken.

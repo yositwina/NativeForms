@@ -165,7 +165,12 @@ public with sharing class NativeFormsPublisher {
                 'formSlug' => formSlug,
                 'captcha' => captchaConfig,
                 'uploadFields' => buildPublishedUploadFields(publishElements),
-                'secretCodeConfig' => buildPublishedSecretCodeConfig(parseJsonMap(versionRecord.UI_Settings_JSON__c)),
+                'secretCodeConfig' => buildPublishedSecretCodeConfig(
+                    parseJsonMap(versionRecord.UI_Settings_JSON__c),
+                    NativeFormsRuntimeI18n.normalizeLanguageCode(
+                        stringValue(parseJsonMap(versionRecord.UI_Settings_JSON__c).get('languageCode'))
+                    )
+                ),
                 'prefillPolicy' => buildPolicy(filterReferencedActions(actions, 'Prefill', publishElements), publishElements, true),
                 'submitPolicy' => buildPolicy(filterReferencedActions(actions, 'Submit', publishElements), publishElements, false),
                 'prefillDefinition' => buildDefinition(filterReferencedActions(actions, 'Prefill', publishElements), true, publishElements),
@@ -1339,6 +1344,8 @@ public with sharing class NativeFormsPublisher {
     private static String buildHtml(NF_Form_Version__c versionRecord, List<NF_Form_Element__c> elements, String formId, String publishToken, Map<String, Object> captchaConfig) {
         Map<String, Object> theme = buildPublishedTheme(versionRecord);
         Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        String languageCode = NativeFormsRuntimeI18n.normalizeLanguageCode(stringValue(uiSettings.get('languageCode')));
+        Map<String, Object> runtimeText = NativeFormsRuntimeI18n.runtimeText(languageCode);
         Boolean captchaEnabled = captchaConfig != null && booleanValue(captchaConfig.get('enabled'));
         String captchaSiteKey = captchaEnabled ? stringValue(captchaConfig.get('siteKey')) : '';
         String themeLogoUrl = buildPublishedThemeLogoUrl(versionRecord);
@@ -1351,16 +1358,26 @@ public with sharing class NativeFormsPublisher {
             stringValue(uiSettings.get('introText')),
             ''
         );
-        String submitLabel = firstNonBlank(
-            stringValue(uiSettings.get('submitLabel')),
+        String submitLabel = localizedFormUiSettingValue(
+            uiSettings,
+            'submitLabel',
+            languageCode,
             'Submit'
         );
-        String submitSuccessMessage = firstNonBlank(
-            stringValue(uiSettings.get('submitSuccessMessage')),
+        String submitSuccessMessage = localizedFormUiSettingValue(
+            uiSettings,
+            'submitSuccessMessage',
+            languageCode,
             'Your form was submitted successfully.'
         );
+        String postSubmitButtonLabel = localizedFormUiSettingValue(
+            uiSettings,
+            'postSubmitButtonLabel',
+            languageCode,
+            'Continue'
+        );
         Boolean rtlEnabled = booleanValue(uiSettings.get('rtlEnabled'));
-        Map<String, Object> secretCodeConfig = buildPublishedSecretCodeConfig(uiSettings);
+        Map<String, Object> secretCodeConfig = buildPublishedSecretCodeConfig(uiSettings, languageCode);
         Boolean secretCodeEnabled = booleanValue(secretCodeConfig.get('enabled'));
         Map<String, Object> submitButtonConfig = new Map<String, Object>{
             'conditionalEnabled' => booleanValue(uiSettings.get('submitConditionalEnabled')),
@@ -1448,6 +1465,8 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-field label{display:block;font-weight:400;color:var(--nf-text);}';
         html += '.nf-required-marker{color:#b42318;margin-left:4px;font-weight:700;}';
         html += '.nf-field label.nf-label--bold{font-weight:700;}';
+        html += '.nf-field label.nf-label--italic{font-style:italic;}';
+        html += '.nf-field label.nf-label--underline{text-decoration:underline;}';
         html += '.nf-field--above{grid-template-columns:minmax(0,1fr);}';
         html += '.nf-field--left{grid-template-columns:140px minmax(0,1fr);column-gap:12px;}';
         html += '.nf-field--left label{padding-top:12px;word-break:break-word;}';
@@ -1472,8 +1491,9 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-upload__file-status{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:rgba(22,91,51,0.08);color:#165b33;font-size:0.82em;font-weight:700;}';
         html += '.nf-field button[data-file-upload-clear]{justify-self:start;margin-top:2px;border:1px solid var(--nf-input-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:8px 12px;font:inherit;cursor:pointer;}';
         html += '.nf-field--radio-group{display:grid;gap:10px;}';
-        html += '.nf-radio-option{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid #d8dde6;border-radius:var(--nf-field-radius);background:#fff;}';
-        html += '.nf-radio-option input{width:auto;margin:0;}';
+        html += '.nf-radio-option{display:flex;gap:16px;align-items:center;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);background:var(--nf-input-bg);color:var(--nf-text);box-sizing:border-box;font:inherit;}';
+        html += '.nf-radio-option input{width:auto;margin:0;flex:0 0 auto;}';
+        html += '.nf-radio-option span{flex:1 1 auto;margin-left:8px;}';
         html += '.nf-status{margin-top:16px;padding:12px 14px;border-radius:12px;display:none;}';
         html += '.nf-status--success{display:block;background:#e8f6ee;color:#165b33;border:1px solid #b8e0c7;}';
         html += '.nf-status--error{display:block;background:#fde7e9;color:#7f1d1d;border:1px solid #f5c2c7;}';
@@ -1531,6 +1551,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-shell[dir="rtl"] .nf-field--right label{margin:0;white-space:normal;overflow-wrap:anywhere;text-align:right;line-height:1.35;padding-top:12px;}';
         html += '.nf-shell[dir="rtl"] .nf-field--right input,.nf-shell[dir="rtl"] .nf-field--right textarea,.nf-shell[dir="rtl"] .nf-field--right select,.nf-shell[dir="rtl"] .nf-field--right .nf-field--radio-group{grid-column:2;grid-row:1;}';
         html += '.nf-shell[dir="rtl"] .nf-field--checkbox label,.nf-shell[dir="rtl"] .nf-radio-option{flex-direction:row-reverse;justify-content:flex-end;}';
+        html += '.nf-shell[dir="rtl"] .nf-radio-option span{margin-left:0;margin-right:8px;}';
         html += '.nf-shell[dir="rtl"] .nf-captcha,.nf-shell[dir="rtl"] .nf-actions,.nf-shell[dir="rtl"] .nf-repeat__actions{direction:rtl;justify-content:flex-start;}';
         html += '.nf-shell[dir="rtl"] input.nf-control--ltr,.nf-shell[dir="rtl"] textarea.nf-control--ltr,.nf-shell[dir="rtl"] select.nf-control--ltr{direction:ltr;text-align:left;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left input:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--left textarea:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--left select:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--right input:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--right textarea:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--right select:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--above input:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--above textarea:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--above select:not(.nf-control--ltr){text-align:right;padding-right:18px;padding-left:14px;}';
@@ -1618,7 +1639,7 @@ public with sharing class NativeFormsPublisher {
         }
 
         for (NF_Form_Element__c elementRecord : topLevelElements) {
-            html += renderElement(elementRecord, childrenByParent, rtlEnabled);
+            html += renderElement(elementRecord, childrenByParent, rtlEnabled, languageCode);
         }
 
         if (captchaEnabled) {
@@ -1643,19 +1664,25 @@ public with sharing class NativeFormsPublisher {
                 'enabled' => false,
                 'provider' => stringValue(captchaConfig.get('provider'))
             };
+        Map<String, Object> publishedUiSettings = new Map<String, Object>(uiSettings);
+        publishedUiSettings.put('submitLabel', submitLabel);
+        publishedUiSettings.put('submitSuccessMessage', submitSuccessMessage);
+        publishedUiSettings.put('postSubmitButtonLabel', postSubmitButtonLabel);
         html += '<script>window.NativeFormsConfig=' + JSON.serialize(new Map<String, Object>{
             'versionId' => (String) versionRecord.Id,
             'formId' => formId,
             'publishToken' => publishToken,
+            'languageCode' => languageCode,
+            'runtimeText' => runtimeText,
             'prefillUrl' => TEMP_PREFILL_URL,
             'submitUrl' => TEMP_SUBMIT_URL,
             'uploadInitUrl' => TEMP_UPLOAD_INIT_URL,
             'captcha' => publicCaptchaConfig,
             'secretCode' => secretCodeConfig,
             'theme' => theme,
-            'uiSettings' => uiSettings
+            'uiSettings' => publishedUiSettings
         }) + ';</script>';
-        html += '<script>(function(){';
+        html += '<script>' + NativeFormsFormulaExprEval.browserBundle() + ';(function(){';
         html += 'const config=window.NativeFormsConfig||{};';
         html += 'const form=document.querySelector("form[data-nativeforms-version]");';
         html += 'const shellEl=document.querySelector(".nf-shell");';
@@ -1663,6 +1690,28 @@ public with sharing class NativeFormsPublisher {
         html += 'const resultEl=document.querySelector("[data-nativeforms-result]");';
         html += 'const statusEl=document.querySelector("[data-nativeforms-status]");';
         html += 'if(!form||!config.submitUrl||!runtimeEl||!resultEl){return;}';
+        html += 'const runtimeText=(config.runtimeText&&typeof config.runtimeText==="object")?config.runtimeText:{};';
+        html += 'function t(key,fallback){const value=runtimeText[key];return typeof value==="string"&&value!==""?value:fallback;}';
+        html += 'function interpolate(template,replacements){let output=String(template==null?"":template);const values=replacements||{};Object.keys(values).forEach(function(key){output=output.replace(new RegExp("\\\\{"+key+"\\\\}","g"),String(values[key]));});return output;}';
+        html += 'const FORMULA_SOURCE_REGEX=/\\{([A-Za-z0-9_]+)\\}/g;';
+        html += 'function formulaFieldControls(){return Array.from(form.querySelectorAll("[data-formula-target=\'true\']"));}';
+        html += 'function formulaSafeVarName(fieldKey){return "field_"+String(fieldKey||"").replace(/[^A-Za-z0-9_]/g,"_");}';
+        html += 'function normalizeFormulaExpression(expression){return String(expression||"").replace(/\\bAND\\b/g,"and").replace(/\\bOR\\b/g,"or").replace(/\\bTRUE\\b/g,"true").replace(/\\bFALSE\\b/g,"false").trim();}';
+        html += 'function formulaIsBlank(value){return value===null||value===undefined||String(value)==="";}';
+        html += 'function formulaToText(value){return formulaIsBlank(value)?"":String(value);}';
+        html += 'function formulaToNumber(value){if(value===null||value===undefined||value===""){return null;}const parsed=Number(value);return Number.isFinite(parsed)?parsed:null;}';
+        html += 'function formulaNormalizeComparable(value){if(typeof value==="string"){const trimmed=value.trim().toLowerCase();if(trimmed==="true"){return true;}if(trimmed==="false"){return false;}}return value;}';
+        html += 'function formulaPad2(value){return String(value).padStart(2,"0");}';
+        html += 'function formulaIsoLocalDate(dateValue){return dateValue.getFullYear()+"-"+formulaPad2(dateValue.getMonth()+1)+"-"+formulaPad2(dateValue.getDate());}';
+        html += 'function formulaIsoLocalDateTime(dateValue){return formulaIsoLocalDate(dateValue)+"T"+formulaPad2(dateValue.getHours())+":"+formulaPad2(dateValue.getMinutes())+":"+formulaPad2(dateValue.getSeconds());}';
+        html += 'function formulaParseIsoDateLike(rawValue){const value=String(rawValue||"").trim();if(!value){return null;}const parsed=new Date(value);return Number.isNaN(parsed.getTime())?null:parsed;}';
+        html += 'function createFormulaParser(){if(!(window.exprEval&&window.exprEval.Parser)){return null;}const parser=new window.exprEval.Parser({operators:{add:true,subtract:true,multiply:true,divide:true,remainder:false,power:false,factorial:false,comparison:true,logical:true,conditional:true,concatenate:false,assignment:false,array:false,fndef:false,in:false},allowMemberAccess:false});parser.unaryOps={"-":function(value){return-Number(value);},"+":Number,not:function(value){return!value;}};parser.binaryOps={"+":function(left,right){return Number(left)+Number(right);},"-":function(left,right){return Number(left)-Number(right);},"*":function(left,right){return Number(left)*Number(right);},"/":function(left,right){return Number(left)/Number(right);},"==":function(left,right){return formulaNormalizeComparable(left)===formulaNormalizeComparable(right);},"!=":function(left,right){return formulaNormalizeComparable(left)!==formulaNormalizeComparable(right);},">":function(left,right){return left>right;},"<":function(left,right){return left<right;},">=":function(left,right){return left>=right;},"<=":function(left,right){return left<=right;},and:function(left,right){return Boolean(left&&right);},or:function(left,right){return Boolean(left||right);}};parser.ternaryOps={"?":function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;}};parser.functions={CONCAT:function(){return Array.prototype.slice.call(arguments).map(formulaToText).join("");},IF:function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;},COALESCE:function(){for(let index=0;index<arguments.length;index+=1){if(!formulaIsBlank(arguments[index])){return arguments[index];}}return null;},ISBLANK:function(value){return formulaIsBlank(value);},VALUE:function(value){return formulaToNumber(value);},TEXT:function(value){return formulaToText(value);},ROUND:function(value,digits){const numericValue=formulaToNumber(value);const numericDigits=Number.isFinite(Number(digits))?Number(digits):0;if(numericValue===null){return null;}const factor=Math.pow(10,numericDigits);return Math.round(numericValue*factor)/factor;},ABS:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.abs(numericValue);},MIN:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.min.apply(Math,values):null;},MAX:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.max.apply(Math,values):null;},TODAY:function(){return formulaIsoLocalDate(new Date());},NOW:function(){return formulaIsoLocalDateTime(new Date());},YEAR:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getFullYear():null;},MONTH:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getMonth()+1:null;},DAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDate():null;}};parser.consts={true:true,false:false};return parser;}';
+        html += 'const formulaParser=createFormulaParser();';
+        html += 'function formulaFieldKeySet(){return new Set(formulaFieldControls().map(function(control){return String(control.name||control.dataset.formulaFieldKey||"");}).filter(function(value){return !!value;}));}';
+        html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}return first.value||"";}';
+        html += 'function normalizeFormulaResult(targetType,value){if(targetType==="number"){return formulaToNumber(value);}if(value===null||value===undefined){return "";}return String(value);}';
+        html += 'function evaluateFormulaControl(control){if(!control||!formulaParser){return;}const expression=normalizeFormulaExpression(control.dataset.formulaExpression||"");if(!expression){control.value="";return;}const variableMap={};let normalizedExpression=expression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=readRuntimeFieldValue(fieldKey);});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const normalizedValue=normalizeFormulaResult(control.dataset.formulaType||"text",rawValue);control.value=normalizedValue===null||normalizedValue===undefined?"":String(normalizedValue);}catch(error){control.value="";}}';
+        html += 'function evaluateAllFormulaFields(){formulaFieldControls().forEach(function(control){evaluateFormulaControl(control);});}';
         html += 'const captchaConfig=config.captcha||{};';
         html += 'const captchaEnabled=!!captchaConfig.enabled;';
         html += 'const defaultSubmitLabel=(form.querySelector("button[type=\'submit\']")||{}).textContent||"Submit";';
@@ -1671,7 +1720,7 @@ public with sharing class NativeFormsPublisher {
         html += 'const secretCodeEnabled=!!secretCodeConfig.enabled;';
         html += 'const postSubmitAutoLinkEnabled=!!(config.uiSettings&&config.uiSettings.postSubmitAutoLinkEnabled);';
         html += 'const postSubmitUrlTemplate=String((config.uiSettings&&config.uiSettings.postSubmitUrlTemplate)||"").trim();';
-        html += 'const postSubmitButtonLabel=String((config.uiSettings&&config.uiSettings.postSubmitButtonLabel)||"Continue").trim()||"Continue";';
+        html += 'const postSubmitButtonLabel=String((config.uiSettings&&config.uiSettings.postSubmitButtonLabel)||"' + escapeJsString(postSubmitButtonLabel) + '").trim()||"' + escapeJsString(postSubmitButtonLabel) + '";';
         html += 'const postSubmitDelaySeconds=Math.max(0,parseInt((config.uiSettings&&config.uiSettings.postSubmitDelaySeconds)!=null?config.uiSettings.postSubmitDelaySeconds:3,10)||0);';
         html += 'let postSubmitRedirectTimer=null;let postSubmitRedirectCountdownTimer=null;let activePostSubmitRedirectUrl="";';
         html += 'const secretVerifyEl=document.querySelector("[data-secret-verification]");';
@@ -1684,10 +1733,10 @@ public with sharing class NativeFormsPublisher {
         html += 'function fileUploadControls(){return Array.from(form.querySelectorAll("input[data-nativeforms-file=\'true\']"));}';
         html += 'function fileUploadFieldKey(control){return control&&control.name?String(control.name):"";}';
         html += 'function fileUploadElements(control){const fieldWrap=control?control.closest(".nf-field"):null;return{feedback:fieldWrap?fieldWrap.querySelector("[data-file-upload-feedback]"):null,list:fieldWrap?fieldWrap.querySelector("[data-file-upload-list]"):null};}';
-        html += 'function renderFileUploadState(control){if(!control){return;}const fieldKey=fileUploadFieldKey(control);const refs=uploadedFilesByField[fieldKey]||[];const state=fileUploadStateByField[fieldKey]||{};const targets=fileUploadElements(control);if(targets.feedback){const message=state.error||state.message||"";targets.feedback.textContent=message;targets.feedback.style.color=state.error?"#b42318":"";}if(targets.list){if(!refs.length){targets.list.innerHTML="";return;}const items=refs.map(function(item){return \'<div class="nf-upload__file"><span class="nf-upload__file-name">\'+escapeHtml(item.fileName||"Uploaded file")+\'</span><span class="nf-upload__file-status">Ready</span></div>\';}).join("");const clearLabel=refs.length===1?"Remove file":"Remove files";const clearButton=\'<button type="button" data-file-upload-clear="\'+escapeHtml(fieldKey)+\'">\'+clearLabel+\'</button>\';targets.list.innerHTML=items+clearButton;}}';
+        html += 'function renderFileUploadState(control){if(!control){return;}const fieldKey=fileUploadFieldKey(control);const refs=uploadedFilesByField[fieldKey]||[];const state=fileUploadStateByField[fieldKey]||{};const targets=fileUploadElements(control);if(targets.feedback){const message=state.error||state.message||"";targets.feedback.textContent=message;targets.feedback.style.color=state.error?"#b42318":"";}if(targets.list){if(!refs.length){targets.list.innerHTML="";return;}const items=refs.map(function(item){return \'<div class="nf-upload__file"><span class="nf-upload__file-name">\'+escapeHtml(item.fileName||t("fileUploadedFallbackName","Uploaded file"))+\'</span><span class="nf-upload__file-status">\'+escapeHtml(t("fileReady","Ready"))+\'</span></div>\';}).join("");const clearLabel=refs.length===1?t("fileRemoveSingle","Remove file"):t("fileRemoveMultiple","Remove files");const clearButton=\'<button type="button" data-file-upload-clear="\'+escapeHtml(fieldKey)+\'">\'+escapeHtml(clearLabel)+\'</button>\';targets.list.innerHTML=items+clearButton;}}';
         html += 'function clearFileUploadField(fieldKey){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={message:"",error:""};const control=fileUploadControls().find(function(item){return fileUploadFieldKey(item)===fieldKey;});if(control){control.value="";renderFileUploadState(control);}}';
-        html += 'async function uploadSelectedFiles(control){const fieldKey=fileUploadFieldKey(control);const files=Array.from((control&&control.files)||[]);if(!fieldKey){return;}if(!files.length){clearFileUploadField(fieldKey);return;}if(!config.uploadInitUrl){throw new Error("File Uploads are not configured for this published form.");}uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:true,message:"Uploading files...",error:""};renderFileUploadState(control);try{const uploaded=[];for(let index=0;index<files.length;index+=1){const file=files[index];const initResponse=await fetch(config.uploadInitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,fileName:file.name,contentType:file.type||"application/octet-stream",fileSize:file.size,sessionId:fileUploadSessionId})});const initData=await initResponse.json();if(!initResponse.ok||initData.success===false){throw new Error(initData.error||"We could not upload this file. Please try again.");}const uploadResponse=await fetch(initData.uploadUrl,{method:"PUT",headers:{"Content-Type":initData.contentType||file.type||"application/octet-stream"},body:file});if(!uploadResponse.ok){throw new Error("We could not upload this file. Please try again.");}uploaded.push({uploadToken:initData.uploadToken,fileName:initData.fileName||file.name,contentType:initData.contentType||file.type||"application/octet-stream",fileSize:initData.fileSize||file.size});}uploadedFilesByField[fieldKey]=uploaded;fileUploadStateByField[fieldKey]={uploading:false,message:uploaded.length?uploaded.length+" file(s) ready.":"",error:""};renderFileUploadState(control);}catch(error){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:false,message:"",error:error&&error.message?error.message:"We could not upload this file. Please try again."};renderFileUploadState(control);throw error;}}';
-        html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading){return{valid:false,message:"Please wait for file uploads to finish."};}if(control.required&&refs.length===0){return{valid:false,message:"Please upload the required file before submitting."};}}return{valid:true,message:""};}';
+        html += 'async function uploadSelectedFiles(control){const fieldKey=fileUploadFieldKey(control);const files=Array.from((control&&control.files)||[]);if(!fieldKey){return;}if(!files.length){clearFileUploadField(fieldKey);return;}if(!config.uploadInitUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:true,message:t("fileUploading","Uploading files..."),error:""};renderFileUploadState(control);try{const uploaded=[];for(let index=0;index<files.length;index+=1){const file=files[index];const initResponse=await fetch(config.uploadInitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,fileName:file.name,contentType:file.type||"application/octet-stream",fileSize:file.size,sessionId:fileUploadSessionId})});const initData=await initResponse.json();if(!initResponse.ok||initData.success===false){throw new Error(initData.error||t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadResponse=await fetch(initData.uploadUrl,{method:"PUT",headers:{"Content-Type":initData.contentType||file.type||"application/octet-stream"},body:file});if(!uploadResponse.ok){throw new Error(t("fileUploadFailed","We could not upload this file. Please try again."));}uploaded.push({uploadToken:initData.uploadToken,fileName:initData.fileName||file.name,contentType:initData.contentType||file.type||"application/octet-stream",fileSize:initData.fileSize||file.size});}uploadedFilesByField[fieldKey]=uploaded;fileUploadStateByField[fieldKey]={uploading:false,message:uploaded.length?interpolate(t("fileReadyCount","{count} file(s) ready."),{count:String(uploaded.length)}):"",error:""};renderFileUploadState(control);}catch(error){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:false,message:"",error:error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again.")};renderFileUploadState(control);throw error;}}';
+        html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading){return{valid:false,message:t("fileUploadPleaseWait","Please wait for file uploads to finish.")};}if(control.required&&refs.length===0){return{valid:false,message:t("fileUploadRequired","Please upload the required file before submitting.")};}}return{valid:true,message:""};}';
         html += 'function clearAllUploadedFiles(){fileUploadControls().forEach(function(control){clearFileUploadField(fileUploadFieldKey(control));});}';
         html += 'function setSecretVerificationMessage(message,kind){if(!secretVerifyEl){return;}const target=secretVerifyEl.querySelector("[data-secret-message]");if(!target){return;}target.className="nf-secret-verify__message"+(kind==="success"?" nf-secret-verify__message--success":kind==="error"?" nf-secret-verify__message--error":"");target.textContent=message||"";}';
         html += 'function setSecretGatedState(unlocked){if(secretGatedEl){secretGatedEl.hidden=!unlocked;secretGatedEl.querySelectorAll("input,textarea,select,button").forEach(function(control){control.disabled=!unlocked;});}secretVerificationApproved=!!unlocked;}';
@@ -1699,13 +1748,13 @@ public with sharing class NativeFormsPublisher {
         html += 'async function sendSecretCodeRequest(action,payload){const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,formId:config.formId,publishToken:config.publishToken,publishedVersionId:config.versionId},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Secret code request failed");}return data;}';
         html += 'function clearPostSubmitRedirect(){if(postSubmitRedirectTimer){window.clearTimeout(postSubmitRedirectTimer);postSubmitRedirectTimer=null;}if(postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}activePostSubmitRedirectUrl="";}';
         html += 'function clearResult(){if(!resultEl){return;}clearPostSubmitRedirect();resultEl.hidden=true;resultEl.innerHTML="";form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}';
-        html += 'function setSubmitting(isSubmitting){const submitButton=form.querySelector("button[type=\'submit\']");if(!submitButton){return;}submitButton.disabled=!!isSubmitting;submitButton.textContent=isSubmitting?"Submitting...":defaultSubmitLabel;}';
+        html += 'function setSubmitting(isSubmitting){const submitButton=form.querySelector("button[type=\'submit\']");if(!submitButton){return;}submitButton.disabled=!!isSubmitting;submitButton.textContent=isSubmitting?t("submitting","Submitting..."):defaultSubmitLabel;}';
         html += 'function failureBucket(errorPayload){const message=String((errorPayload&&errorPayload.message)||errorPayload||"").toLowerCase();const commandType=String((errorPayload&&errorPayload.commandType)||"").toLowerCase();const isConfigIssue=message.includes("mapping")||message.includes("definition")||message.includes("not allowed")||message.includes("not configured")||message.includes("missing required field")||message.includes("invalid publish token")||message.includes("form is not published")||message.includes("prefill policy")||message.includes("submit policy")||message.includes("unauthorized");const isSalesforceIssue=message.includes("create failed")||message.includes("update failed")||message.includes("delete failed")||message.includes("query failed")||message.includes("describe failed")||message.includes("status:")||["create","update","delete","findone","findmany","getbyid"].includes(commandType);if(isSalesforceIssue&&!isConfigIssue){return{label:"Salesforce rejected the request",detail:"Salesforce could not accept this submission. Check required fields, validation rules, or object permissions."};}return{label:"Form logic/configuration issue",detail:"This submit could not complete because of a form or runtime configuration issue."};}';
         html += 'function readPathValue(source,path){if(!source||!path){return source;}return String(path).split(".").reduce(function(current,segment){if(current==null){return undefined;}return current[segment];},source);}';
         html += 'function isAbsoluteHttpUrl(value){try{const parsed=new URL(value);return parsed.protocol==="http:"||parsed.protocol==="https:";}catch(error){return false;}}';
         html += 'function resolvePostSubmitUrl(template,fieldValues,prefillPayload){const sourceTemplate=String(template||"").trim();if(!sourceTemplate){return "";}const aliases=(prefillPayload&&prefillPayload.aliases&&typeof prefillPayload.aliases==="object")?prefillPayload.aliases:{};const resolved=sourceTemplate.replace(/\\{\\{\\s*(field|prefill)\\.([^}]+?)\\s*\\}\\}/g,function(_,kind,path){let rawValue="";if(kind==="field"){rawValue=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,path)?fieldValues[path]:"";}else{const pieces=String(path||"").split(".");const aliasName=pieces.shift();rawValue=readPathValue(aliases[aliasName],pieces.join("."));}if(rawValue===undefined||rawValue===null){return "";}if(typeof rawValue==="object"){try{return encodeURIComponent(JSON.stringify(rawValue));}catch(error){return "";}}return encodeURIComponent(String(rawValue));});return isAbsoluteHttpUrl(resolved)?resolved:"";}';
         html += 'function startPostSubmitRedirect(url,delaySeconds){clearPostSubmitRedirect();activePostSubmitRedirectUrl=url||"";if(!activePostSubmitRedirectUrl){return;}const continueButton=resultEl.querySelector("[data-post-submit-continue]");if(continueButton){continueButton.addEventListener("click",function(){if(activePostSubmitRedirectUrl){window.location.assign(activePostSubmitRedirectUrl);}});}const countdownEl=resultEl.querySelector("[data-post-submit-countdown]");let remaining=Math.max(0,Number(delaySeconds)||0);if(countdownEl){countdownEl.textContent=String(remaining);}if(remaining<=0){window.location.assign(activePostSubmitRedirectUrl);return;}postSubmitRedirectTimer=window.setTimeout(function(){if(activePostSubmitRedirectUrl){window.location.assign(activePostSubmitRedirectUrl);}},remaining*1000);if(countdownEl){postSubmitRedirectCountdownTimer=window.setInterval(function(){remaining=Math.max(remaining-1,0);countdownEl.textContent=String(remaining);if(remaining<=0&&postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}},1000);}}';
-        html += 'function renderResult(kind,options){if(!resultEl){return;}const opts=options||{};clearPostSubmitRedirect();if(kind==="success"){const hasRedirect=!!opts.redirectUrl;const countdownText=hasRedirect?\'<p class="nf-result__meta">Continuing in <span data-post-submit-countdown>\'+escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0)))+\'</span> seconds...</p>\':"";const actionText=hasRedirect?\'<div class="nf-result__actions"><button type="button" data-post-submit-continue>\'+escapeHtml(opts.redirectButtonLabel||postSubmitButtonLabel)+\'</button></div>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--success"><h2 class="nf-result__title">Submitted successfully</h2><p class="nf-result__message">\'+escapeHtml(opts.message||submitSuccessMessage)+\'</p>\'+countdownText+actionText+\'</div>\';form.hidden=true;form.style.display="none";if(shellEl){shellEl.classList.add("nf-shell--result-only");}if(hasRedirect){startPostSubmitRedirect(opts.redirectUrl,opts.redirectDelaySeconds);}}else if(kind==="error"){const bucket=opts.bucket||failureBucket(opts.errorPayload);const detailsText=opts.detailsText?\'<details class="nf-result__details"><summary>Technical details</summary><pre>\'+escapeHtml(opts.detailsText)+\'</pre></details>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--error"><h2 class="nf-result__title">Submit failed</h2><p class="nf-result__message">\'+escapeHtml(bucket.detail)+\'</p><p class="nf-result__subtitle">\'+escapeHtml(bucket.label)+\'</p>\'+detailsText+\'</div>\';form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}resultEl.hidden=false;}';
+        html += 'function renderResult(kind,options){if(!resultEl){return;}const opts=options||{};clearPostSubmitRedirect();if(kind==="success"){const hasRedirect=!!opts.redirectUrl;const countdownLabel=interpolate(t("postSubmitContinuingIn","Continuing in {seconds} seconds..."),{seconds:String(Math.max(0,Number(opts.redirectDelaySeconds)||0))});const countdownText=hasRedirect?\'<p class="nf-result__meta">\'+escapeHtml(countdownLabel).replace(escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0))),\'<span data-post-submit-countdown>\'+escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0)))+\'</span>\')+\'</p>\':"";const actionText=hasRedirect?\'<div class="nf-result__actions"><button type="button" data-post-submit-continue>\'+escapeHtml(opts.redirectButtonLabel||postSubmitButtonLabel)+\'</button></div>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--success"><h2 class="nf-result__title">\'+escapeHtml(t("submitSuccessTitle","Submitted successfully"))+\'</h2><p class="nf-result__message">\'+escapeHtml(opts.message||submitSuccessMessage)+\'</p>\'+countdownText+actionText+\'</div>\';form.hidden=true;form.style.display="none";if(shellEl){shellEl.classList.add("nf-shell--result-only");}if(hasRedirect){startPostSubmitRedirect(opts.redirectUrl,opts.redirectDelaySeconds);}}else if(kind==="error"){const bucket=opts.bucket||failureBucket(opts.errorPayload);const detailsText=opts.detailsText?\'<details class="nf-result__details"><summary>Technical details</summary><pre>\'+escapeHtml(opts.detailsText)+\'</pre></details>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--error"><h2 class="nf-result__title">\'+escapeHtml(t("submitErrorTitle","Submit failed"))+\'</h2><p class="nf-result__message">\'+escapeHtml(bucket.detail)+\'</p><p class="nf-result__subtitle">\'+escapeHtml(bucket.label)+\'</p>\'+detailsText+\'</div>\';form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}resultEl.hidden=false;}';
         html += 'function getCaptchaToken(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");return responseField?responseField.value||"":"";}';
         html += 'function resetCaptcha(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");if(responseField){responseField.value="";}if(window.grecaptcha&&typeof window.grecaptcha.reset==="function"){try{window.grecaptcha.reset();}catch(e){}}}';
         html += 'function dateFormatHint(format){return format==="eu"?"DD/MM/YYYY":"MM/DD/YYYY";}';
@@ -1713,12 +1762,12 @@ public with sharing class NativeFormsPublisher {
         html += 'function parseDateValue(value,format){const raw=String(value||"").trim();if(!raw){return null;}let match=raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);if(match){const year=Number(match[1]);const month=Number(match[2]);const day=Number(match[3]);if(!isValidDateParts(year,month,day)){return null;}return{year:year,month:month,day:day,iso:match[1]+"-"+match[2]+"-"+match[3]};}const normalized=raw.replace(/[.\\-]/g,"/");match=normalized.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);if(!match){return null;}const first=Number(match[1]);const second=Number(match[2]);const year=Number(match[3]);const month=format==="eu"?second:first;const day=format==="eu"?first:second;if(!isValidDateParts(year,month,day)){return null;}const monthText=String(month).padStart(2,"0");const dayText=String(day).padStart(2,"0");return{year:year,month:month,day:day,iso:String(year).padStart(4,"0")+"-"+monthText+"-"+dayText};}';
         html += 'function formatParsedDate(parsed,format){if(!parsed){return "";}const day=String(parsed.day).padStart(2,"0");const month=String(parsed.month).padStart(2,"0");const year=String(parsed.year).padStart(4,"0");return format==="eu"?day+"/"+month+"/"+year:month+"/"+day+"/"+year;}';
         html += 'function formatDateForField(value,field){const format=field&&field.dataset&&field.dataset.dateFormat?field.dataset.dateFormat:"us";const parsed=parseDateValue(value,format)||parseDateValue(value,"us")||parseDateValue(value,"eu");return parsed?formatParsedDate(parsed,format):value==null?"":String(value);}';
-        html += 'function validateDateField(el,showMessage){if(!el||el.dataset.nativeformsDate!=="true"){return true;}const format=el.dataset.dateFormat||"us";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseDateValue(raw,format);if(!parsed){el.setCustomValidity("Please enter a valid date in "+dateFormatHint(format)+" format.");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}const minDate=el.dataset.effectiveMinDate||"";const maxDate=el.dataset.effectiveMaxDate||"";if(minDate&&parsed.iso<minDate){el.setCustomValidity("Please enter a date on or after "+formatDateForField(minDate,el)+".");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}if(maxDate&&parsed.iso>maxDate){el.setCustomValidity("Please enter a date on or before "+formatDateForField(maxDate,el)+".");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
+        html += 'function validateDateField(el,showMessage){if(!el||el.dataset.nativeformsDate!=="true"){return true;}const format=el.dataset.dateFormat||"us";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseDateValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("dateInvalid","Please enter a valid date in {format} format."),{format:dateFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}const minDate=el.dataset.effectiveMinDate||"";const maxDate=el.dataset.effectiveMaxDate||"";if(minDate&&parsed.iso<minDate){el.setCustomValidity(interpolate(t("dateMin","Please enter a date on or after {date}."),{date:formatDateForField(minDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}if(maxDate&&parsed.iso>maxDate){el.setCustomValidity(interpolate(t("dateMax","Please enter a date on or before {date}."),{date:formatDateForField(maxDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
         html += 'function evaluateSingleCondition(condition){if(!condition||!condition.fieldKey||!condition.operator){return true;}const actual=readFieldValue(condition.fieldKey);const compare=condition.value||"";if(condition.operator==="equals"){return String(actual)===compare;}if(condition.operator==="notEquals"){return String(actual)!==compare;}if(condition.operator==="isTrue"){return actual===true||String(actual).toLowerCase()==="true";}if(condition.operator==="isFalse"){return actual===false||String(actual).toLowerCase()==="false"||String(actual)==="";}if(condition.operator==="isBlank"){return String(actual)==="";}if(condition.operator==="isNotBlank"){return String(actual)!=="";}return true;}';
         html += 'function evaluateConditionExpression(results,expression){if(!results.length){return true;}if(results.length===1){return results[0];}const normalized=((expression||"").trim()||results.map(function(_,index){return String(index+1);}).join(" AND ")).replace(/\\(/g," ( ").replace(/\\)/g," ) ").replace(/\\s+/g," ").trim();const tokens=normalized?normalized.split(" "):[];const values=[];const operators=[];function applyOperator(){if(values.length<2||!operators.length){return;}const operator=operators.pop();const right=values.pop();const left=values.pop();values.push(operator==="AND"?(left&&right):(left||right));}function precedence(operator){return operator==="AND"?2:1;}for(let index=0;index<tokens.length;index+=1){const token=tokens[index];if(!token){continue;}if(token==="("){operators.push(token);continue;}if(token===")"){while(operators.length&&operators[operators.length-1]!=="("){applyOperator();}if(operators.length&&operators[operators.length-1]==="("){operators.pop();}continue;}if(token==="AND"||token==="OR"){while(operators.length&&operators[operators.length-1]!=="("&&precedence(operators[operators.length-1])>=precedence(token)){applyOperator();}operators.push(token);continue;}if(/^\\d+$/.test(token)){const refIndex=Number(token)-1;values.push(refIndex>=0&&refIndex<results.length?results[refIndex]:false);}}while(operators.length){applyOperator();}return values.length?!!values[0]:false;}';
         html += 'function evaluateElementConditions(el){let conditions=[];try{conditions=JSON.parse(el.dataset.conditions||"[]")||[];}catch(error){conditions=[];}if(!conditions.length&&el.dataset.conditionSource){conditions=[{fieldKey:el.dataset.conditionSource,operator:el.dataset.conditionOperator,value:el.dataset.conditionValue||""}];}if(!conditions.length){return true;}const results=conditions.map(function(condition){return evaluateSingleCondition(condition);});return evaluateConditionExpression(results,el.dataset.conditionExpression||"");}';
-        html += 'function setFieldValue(fieldKey,value){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else{el.value=value==null?"":value;}});}';
         html += 'const repeatDeleteState={};';
         html += 'let lastPrefillPayload=null;';
         html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}return first.value||"";}';
@@ -1731,32 +1780,35 @@ public with sharing class NativeFormsPublisher {
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
         html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let hasValue=false;if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
         html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
-        html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});applyLockedFields();evaluateConditions();}';
+        html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});evaluateAllFormulaFields();applyLockedFields();evaluateConditions();}';
         html += 'async function runPrefill(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}await runPrefillWithParams(params);}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("[data-nativeforms-date=\'true\']").forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
         html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
         html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}const events=el.dataset.nativeformsDate==="true"?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
-        html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!validateDateField(el,true)){return{success:false,message:el.validationMessage||"Please review the date fields and try again.",values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
+        html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!validateDateField(el,true)){return{success:false,message:el.validationMessage||t("dateReview","Please review the date fields and try again."),values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
         html += 'function evaluateConditions(){form.querySelectorAll("[data-conditions],[data-condition-source]").forEach(function(el){el.style.display=evaluateElementConditions(el)?"":"none";});}';
         html += 'applyDateConstraints();';
         html += 'wireLiveValidation();';
-        html += 'fileUploadControls().forEach(function(control){renderFileUploadState(control);control.addEventListener("change",function(){uploadSelectedFiles(control).catch(function(error){setStatus("error",error&&error.message?error.message:"We could not upload this file. Please try again.");});});});';
+        html += 'fileUploadControls().forEach(function(control){renderFileUploadState(control);control.addEventListener("change",function(){uploadSelectedFiles(control).catch(function(error){setStatus("error",error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again."));});});});';
         html += 'form.addEventListener("click",function(event){const clearButton=event.target.closest("[data-file-upload-clear]");if(!clearButton){return;}event.preventDefault();clearFileUploadField(clearButton.getAttribute("data-file-upload-clear"));});';
-        html += 'form.addEventListener("change",evaluateConditions);';
+        html += 'function handleRuntimeStateChange(){evaluateAllFormulaFields();evaluateConditions();}';
+        html += 'form.addEventListener("input",handleRuntimeStateChange);';
+        html += 'form.addEventListener("change",handleRuntimeStateChange);';
+        html += 'evaluateAllFormulaFields();';
         html += 'evaluateConditions();';
         html += 'setSecretGatedState(!secretCodeEnabled);';
         html += 'setSecretCodeStepVisible(false);';
-        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage("Enter your email first.","error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||"If we found a matching contact, we sent a 6-digit code to that email.","");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:"We could not send the code right now.","error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(secretCodeConfig.invalidMessage||"Enter your email and code first.","error");return;}verifyButton.disabled=true;try{const data=await sendSecretCodeRequest("verifyCode",{email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId});if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||"Code verified. You can continue with the form now.","success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);runPrefillWithParams({email:secretVerifiedEmail}).catch(function(){setStatus("error","We could not load prefill data for this form.");});}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||"The code is invalid or expired. Try again or request a new code.","error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:"We could not verify the code right now.","error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage("Enter your email first.","error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||"If we found a matching contact, we sent a 6-digit code to that email.","");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:"We could not send the code right now.","error");}finally{resendButton.disabled=false;}});}}';
-        html += 'runPrefill().catch(function(){setStatus("error","We could not load prefill data for this form.");});';
+        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const data=await sendSecretCodeRequest("verifyCode",{email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId});if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);runPrefillWithParams({email:secretVerifiedEmail}).catch(function(){setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
+        html += 'runPrefill().catch(function(){setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
-        html += 'if(secretCodeEnabled&&!secretVerificationApproved){setStatus("error",secretCodeConfig.invalidMessage||"Verify the secret code before continuing.");return;}';
+        html += 'if(secretCodeEnabled&&!secretVerificationApproved){setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
         html += 'if(!form.reportValidity()){return;}';
-        html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){setStatus("error",uploadValidation.message||"Please review the uploaded files and try again.");return;}';
-        html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error","Please complete the CAPTCHA.");return;}';
+        html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){setStatus("error",uploadValidation.message||t("fileUploadReview","Please review the uploaded files and try again."));return;}';
+        html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error",t("captchaRequired","Please complete the CAPTCHA."));return;}';
         html += 'setSubmitting(true);';
-        html += 'try{const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
+        html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
         html += 'form.querySelectorAll("input[type=\'checkbox\'][name]").forEach(function(el){input[el.name]=!!el.checked;});';
         html += 'Object.keys(normalizedDates.values).forEach(function(key){input[key]=normalizedDates.values[key];});';
         html += 'const uploadedFieldKeys=Object.keys(uploadedFilesByField).filter(function(key){return Array.isArray(uploadedFilesByField[key])&&uploadedFilesByField[key].length;});if(uploadedFieldKeys.length){input.fileUploads={};uploadedFieldKeys.forEach(function(key){input.fileUploads[key]=uploadedFilesByField[key];});input.fileUploadSessionId=fileUploadSessionId;}';
@@ -1768,7 +1820,7 @@ public with sharing class NativeFormsPublisher {
         html += 'if(!response.ok||data.success===false){renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
         html += 'const resolvedPostSubmitUrl=postSubmitAutoLinkEnabled?resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload):"";';
         html += 'form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
-        html += '}catch(error){renderResult("error",{errorPayload:{message:"We could not submit this form right now. Please try again."},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
+        html += '}catch(error){renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
         html += '});';
         html += '})();</script>';
         if (String.isNotBlank(versionRecord.Custom_JS__c)) {
@@ -1778,14 +1830,26 @@ public with sharing class NativeFormsPublisher {
         return html;
     }
 
-    private static String renderElement(NF_Form_Element__c elementRecord, Map<String, List<NF_Form_Element__c>> childrenByParent, Boolean rtlEnabled) {
+    private static String renderElement(NF_Form_Element__c elementRecord, Map<String, List<NF_Form_Element__c>> childrenByParent, Boolean rtlEnabled, String languageCode) {
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         String typeValue = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
         String fieldName = String.isNotBlank(elementRecord.Field_Key__c) ? elementRecord.Field_Key__c : String.valueOf(elementRecord.Id);
         String label = String.isNotBlank(elementRecord.Label__c) ? elementRecord.Label__c : fieldName;
         String placeholder = config.containsKey('placeholder') ? String.valueOf(config.get('placeholder')) : '';
         Boolean required = config.containsKey('required') ? Boolean.valueOf(String.valueOf(config.get('required'))) : false;
-        String defaultValue = config.containsKey('defaultValue') ? String.valueOf(config.get('defaultValue')) : '';
+        String rawDefaultValue = config.containsKey('defaultValue') ? String.valueOf(config.get('defaultValue')) : '';
+        String defaultValue = normalizeLegacySeedDefaultValue(
+            typeValue,
+            rawDefaultValue
+        );
+        Boolean isFormula = booleanValue(config.get('isFormula')) && (typeValue == 'text' || typeValue == 'number');
+        if (isFormula) {
+            defaultValue = '';
+            placeholder = '';
+        }
+        if (String.isBlank(placeholder) && isLegacySeedDefaultValue(typeValue, rawDefaultValue)) {
+            placeholder = localizedPlaceholderForType(typeValue, languageCode, config);
+        }
         Boolean checkedByDefault = config.containsKey('checked') ? Boolean.valueOf(String.valueOf(config.get('checked'))) : false;
         String hiddenValue = config.containsKey('value') ? String.valueOf(config.get('value')) : '';
         String requiredAttr = required ? ' required' : '';
@@ -1803,18 +1867,18 @@ public with sharing class NativeFormsPublisher {
         String safeLabelWithRequired = appendRequiredMarker(safeLabel, required);
         String safeElementId = escapeHtml(String.isNotBlank(elementRecord.Element_Id__c) ? elementRecord.Element_Id__c : String.valueOf(elementRecord.Id));
         String wrapperAttrs = conditionalDataAttrs(config) + hiddenBehaviorStyle(config);
+        String formulaAttrs = isFormula ? formulaDataAttrs(fieldName, typeValue, config) : '';
         String lockOnPrefillAttr = lockOnPrefillDataAttr(config);
         if (String.isNotBlank(lockOnPrefillAttr)) {
             wrapperAttrs += lockOnPrefillAttr;
         }
         String labelPosition = normalizedLabelPosition(config);
-        Boolean labelBold = booleanValue(config.get('labelBold'));
-        String labelClassAttr = labelBold ? ' class="nf-label--bold"' : '';
+        String labelClassAttr = labelClassAttr(config);
         Boolean hiddenByBehavior = isHiddenBehavior(config);
 
         if (hiddenByBehavior && typeValue != 'repeatGroup' && typeValue != 'group' && typeValue != 'section' && typeValue != 'sectionBreak') {
             String hiddenDefaultValue = String.isNotBlank(hiddenValue) ? hiddenValue : defaultValue;
-            return '<input type="hidden" data-element-id="' + safeElementId + '" name="' + safeName + '" value="' + escapeHtml(hiddenDefaultValue) + '"' + lockOnPrefillAttr + '>';
+            return '<input type="hidden" data-element-id="' + safeElementId + '" name="' + safeName + '" value="' + escapeHtml(hiddenDefaultValue) + '"' + lockOnPrefillAttr + formulaAttrs + '>';
         }
 
         if (typeValue == 'repeatGroup') {
@@ -1851,9 +1915,8 @@ public with sharing class NativeFormsPublisher {
                                 continue;
                             }
                             String childLabel = String.isNotBlank(childElement.Label__c) ? childElement.Label__c : childElement.Field_Key__c;
-                            Boolean childLabelBold = booleanValue(childConfig.get('labelBold'));
                             Boolean childRequired = booleanValue(childConfig.get('required'));
-                            repeatHtml += '<div class="nf-field"><label' + (childLabelBold ? ' class="nf-label--bold"' : '') + '>' + appendRequiredMarker(escapeHtml(childLabel), childRequired) + '</label></div>';
+                            repeatHtml += '<div class="nf-field"><label' + labelClassAttr(childConfig) + '>' + appendRequiredMarker(escapeHtml(childLabel), childRequired) + '</label></div>';
                         }
                     }
                     repeatHtml += '</div>';
@@ -1862,7 +1925,7 @@ public with sharing class NativeFormsPublisher {
             }
             repeatHtml += '<div class="nf-repeat__rows" data-repeat-rows="' + escapeHtml(repeatGroupKey) + '"></div>';
             if (allowAddRows) {
-                repeatHtml += '<div class="nf-repeat__actions"><button type="button" data-repeat-add="' + escapeHtml(repeatGroupKey) + '">Add Row</button></div>';
+                repeatHtml += '<div class="nf-repeat__actions"><button type="button" data-repeat-add="' + escapeHtml(repeatGroupKey) + '">' + escapeHtml(runtimeTextValue(languageCode, 'repeatAddRow', 'Add Row')) + '</button></div>';
             }
             repeatHtml += '</div>';
             repeatHtml += '<template data-repeat-template="' + escapeHtml(repeatGroupKey) + '">';
@@ -1877,7 +1940,7 @@ public with sharing class NativeFormsPublisher {
                     repeatHtml += '<div class="nf-section__column">';
                     for (NF_Form_Element__c childElement : childElements) {
                         if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
-                            repeatHtml += renderRepeatGroupChildElement(childElement, repeatAlias, showLabelsOnEachRow, rtlEnabled);
+                            repeatHtml += renderRepeatGroupChildElement(childElement, repeatAlias, showLabelsOnEachRow, rtlEnabled, languageCode);
                         }
                     }
                     repeatHtml += '</div>';
@@ -1898,7 +1961,7 @@ public with sharing class NativeFormsPublisher {
             if (childElements != null && !childElements.isEmpty()) {
                 if (columnCount <= 1) {
                     for (NF_Form_Element__c childElement : childElements) {
-                        groupHtml += renderElement(childElement, childrenByParent, rtlEnabled);
+                        groupHtml += renderElement(childElement, childrenByParent, rtlEnabled, languageCode);
                     }
                 } else {
                     groupHtml += '<div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
@@ -1906,7 +1969,7 @@ public with sharing class NativeFormsPublisher {
                         groupHtml += '<div class="nf-section__column">';
                         for (NF_Form_Element__c childElement : childElements) {
                             if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
-                                groupHtml += renderElement(childElement, childrenByParent, rtlEnabled);
+                                groupHtml += renderElement(childElement, childrenByParent, rtlEnabled, languageCode);
                             }
                         }
                         groupHtml += '</div>';
@@ -1939,7 +2002,7 @@ public with sharing class NativeFormsPublisher {
                     sectionHtml += '<div class="nf-section__column">';
                     for (NF_Form_Element__c childElement : childElements) {
                         if (readSectionColumn(childElement.Config_JSON__c) == columnIndex) {
-                            sectionHtml += renderElement(childElement, childrenByParent, rtlEnabled);
+                            sectionHtml += renderElement(childElement, childrenByParent, rtlEnabled, languageCode);
                         }
                     }
                     sectionHtml += '</div>';
@@ -1994,7 +2057,7 @@ public with sharing class NativeFormsPublisher {
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
         if (typeValue == 'select' && config.containsKey('options')) {
-            String optionsHtml = '<option value="">Select...</option>';
+            String optionsHtml = '<option value="">' + escapeHtml(runtimeTextValue(languageCode, 'selectPlaceholder', 'Select...')) + '</option>';
             for (Object rawOption : (List<Object>) config.get('options')) {
                 if (rawOption instanceof Map<String, Object>) {
                     Map<String, Object> option = (Map<String, Object>) rawOption;
@@ -2055,8 +2118,10 @@ public with sharing class NativeFormsPublisher {
             String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String acceptAttr = fileAcceptAttr(config);
             String multipleAttr = booleanValue(config.get('allowMultiple')) ? ' multiple' : '';
-            String helpText = fileUploadHelpText(config);
-            String browseLabel = booleanValue(config.get('allowMultiple')) ? 'Browse files' : 'Browse file';
+            String helpText = fileUploadHelpText(config, languageCode);
+            String browseLabel = booleanValue(config.get('allowMultiple'))
+                ? runtimeTextValue(languageCode, 'fileBrowseMultiple', 'Browse files')
+                : runtimeTextValue(languageCode, 'fileBrowseSingle', 'Browse file');
             String controlHtml = '<div class="nf-upload">';
             controlHtml += '<input class="nf-upload__input" type="file" id="' + safeName + '" name="' + safeName + '" data-nativeforms-file="true"' + acceptAttr + multipleAttr + requiredAttr + '>';
             controlHtml += '<label class="nf-upload__surface" for="' + safeName + '">';
@@ -2074,11 +2139,12 @@ public with sharing class NativeFormsPublisher {
         String htmlType = normalizeInputType(typeValue);
         String valueAttr = String.isNotBlank(defaultValue) ? ' value="' + escapeHtml(defaultValue) + '"' : '';
         String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
-        String controlHtml = '<input' + inputDirectionClassAttr(typeValue) + ' type="' + escapeHtml(htmlType) + '" id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + placeholderAttr + valueAttr + requiredAttr + minAttr + maxAttr + dateRangeAttrs + patternAttr + '>';
+        String formulaReadonlyAttr = isFormula ? ' readonly' : '';
+        String controlHtml = '<input' + inputDirectionClassAttr(typeValue) + ' type="' + escapeHtml(htmlType) + '" id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + formulaAttrs + formulaReadonlyAttr + placeholderAttr + valueAttr + requiredAttr + minAttr + maxAttr + dateRangeAttrs + patternAttr + '>';
         return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
     }
 
-    private static String renderRepeatGroupChildElement(NF_Form_Element__c elementRecord, String repeatAlias, Boolean showLabels, Boolean rtlEnabled) {
+    private static String renderRepeatGroupChildElement(NF_Form_Element__c elementRecord, String repeatAlias, Boolean showLabels, Boolean rtlEnabled, String languageCode) {
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         String typeValue = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
         String fieldKey = String.isNotBlank(elementRecord.Field_Key__c) ? elementRecord.Field_Key__c : String.valueOf(elementRecord.Id);
@@ -2089,10 +2155,14 @@ public with sharing class NativeFormsPublisher {
         sourceField = String.isBlank(sourceField) ? fieldKey : sourceField;
         String label = String.isNotBlank(elementRecord.Label__c) ? elementRecord.Label__c : fieldKey;
         String placeholder = stringValue(config.get('placeholder'));
+        String rawDefaultValue = stringValue(config.get('defaultValue'));
+        if (String.isBlank(placeholder) && isLegacySeedDefaultValue(typeValue, rawDefaultValue)) {
+            placeholder = localizedPlaceholderForType(typeValue, languageCode, config);
+        }
         String labelPosition = showLabels ? normalizedLabelPosition(config) : 'hidden';
-        String labelClassAttr = booleanValue(config.get('labelBold')) ? ' class="nf-label--bold"' : '';
+        String labelClassAttr = labelClassAttr(config);
         String repeatLabelClassAttr = labelPosition == 'hidden'
-            ? ' class="nf-repeat-mobile-label' + (booleanValue(config.get('labelBold')) ? ' nf-label--bold' : '') + '"'
+            ? repeatMobileLabelClassAttr(config)
             : labelClassAttr;
         String sourceAttr = ' data-repeat-source-field="' + escapeHtml(sourceField) + '"';
         String keyAttr = ' data-repeat-field-key="' + escapeHtml(fieldKey) + '"';
@@ -2123,7 +2193,7 @@ public with sharing class NativeFormsPublisher {
         }
 
         if (typeValue == 'select' && config.containsKey('options')) {
-            String optionsHtml = '<option value="">Select...</option>';
+            String optionsHtml = '<option value="">' + escapeHtml(runtimeTextValue(languageCode, 'selectPlaceholder', 'Select...')) + '</option>';
             for (Object rawOption : (List<Object>) config.get('options')) {
                 if (rawOption instanceof Map<String, Object>) {
                     Map<String, Object> option = (Map<String, Object>) rawOption;
@@ -2171,8 +2241,10 @@ public with sharing class NativeFormsPublisher {
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String acceptAttr = fileAcceptAttr(config);
             String multipleAttr = booleanValue(config.get('allowMultiple')) ? ' multiple' : '';
-            String helpText = fileUploadHelpText(config);
-            String browseLabel = booleanValue(config.get('allowMultiple')) ? 'Browse files' : 'Browse file';
+            String helpText = fileUploadHelpText(config, languageCode);
+            String browseLabel = booleanValue(config.get('allowMultiple'))
+                ? runtimeTextValue(languageCode, 'fileBrowseMultiple', 'Browse files')
+                : runtimeTextValue(languageCode, 'fileBrowseSingle', 'Browse file');
             String controlHtml = '<div class="nf-upload">';
             controlHtml += '<input class="nf-upload__input" type="file" id="' + baseId + '"' + keyAttr + sourceAttr + ' data-nativeforms-file="true"' + acceptAttr + multipleAttr + requiredAttr + '>';
             controlHtml += '<label class="nf-upload__surface" for="' + baseId + '">';
@@ -2247,6 +2319,15 @@ public with sharing class NativeFormsPublisher {
         return html;
     }
 
+    private static String runtimeTextValue(String languageCode, String key, String fallback) {
+        Map<String, Object> runtimeText = NativeFormsRuntimeI18n.runtimeText(languageCode);
+        if (runtimeText == null || !runtimeText.containsKey(key)) {
+            return fallback;
+        }
+        String value = stringValue(runtimeText.get(key));
+        return String.isBlank(value) ? fallback : value;
+    }
+
     private static String normalizedLabelPosition(Map<String, Object> config) {
         String rawPosition = stringValue(config.get('labelPosition'));
         if (rawPosition == 'left' || rawPosition == 'right' || rawPosition == 'hidden') {
@@ -2314,7 +2395,7 @@ public with sharing class NativeFormsPublisher {
         return tokens.isEmpty() ? '' : ' accept="' + escapeHtml(String.join(tokens, ',')) + '"';
     }
 
-    private static String fileUploadHelpText(Map<String, Object> config) {
+    private static String fileUploadHelpText(Map<String, Object> config, String languageCode) {
         if (config == null) {
             return '';
         }
@@ -2334,17 +2415,23 @@ public with sharing class NativeFormsPublisher {
                 extensions.add(normalizedValue);
             }
             if (!extensions.isEmpty()) {
-                parts.add('Allowed: ' + String.join(extensions, ', '));
+                parts.add(
+                    runtimeTextValue(languageCode, 'fileAllowedTypes', 'Allowed: {types}')
+                        .replace('{types}', String.join(extensions, ', '))
+                );
             }
         }
         Integer maxFileSizeMb = integerValue(config.get('maxFileSizeMb'));
         if (maxFileSizeMb != null && maxFileSizeMb > 0) {
-            parts.add('Max size: ' + String.valueOf(maxFileSizeMb) + ' MB');
+            parts.add(
+                runtimeTextValue(languageCode, 'fileMaxSize', 'Max size: {size} MB')
+                    .replace('{size}', String.valueOf(maxFileSizeMb))
+            );
         }
         if (booleanValue(config.get('allowMultiple'))) {
-            parts.add('Multiple files allowed');
+            parts.add(runtimeTextValue(languageCode, 'fileMultipleAllowed', 'Multiple files allowed'));
         }
-        return String.join(parts, ' • ');
+        return String.join(parts, ' | ');
     }
 
     private static String mimeTypeFromFileName(String fileName) {
@@ -2371,6 +2458,67 @@ public with sharing class NativeFormsPublisher {
         String attrs = ' data-conditions="' + escapeHtml(JSON.serialize(conditions)) + '"';
         attrs += ' data-condition-expression="' + escapeHtml(defaultConditionalExpression(stringValue(config.get('conditionalExpression')), conditions.size())) + '"';
         return attrs;
+    }
+
+    private static String labelCssClasses(Map<String, Object> config) {
+        if (config == null) {
+            return '';
+        }
+        List<String> classes = new List<String>();
+        if (booleanValue(config.get('labelBold'))) {
+            classes.add('nf-label--bold');
+        }
+        if (booleanValue(config.get('labelItalic'))) {
+            classes.add('nf-label--italic');
+        }
+        if (booleanValue(config.get('labelUnderline'))) {
+            classes.add('nf-label--underline');
+        }
+        return String.join(classes, ' ');
+    }
+
+    private static String labelClassAttr(Map<String, Object> config) {
+        String classes = labelCssClasses(config);
+        return String.isBlank(classes) ? '' : ' class="' + classes + '"';
+    }
+
+    private static String repeatMobileLabelClassAttr(Map<String, Object> config) {
+        String classes = labelCssClasses(config);
+        classes = String.isBlank(classes) ? 'nf-repeat-mobile-label' : 'nf-repeat-mobile-label ' + classes;
+        return ' class="' + classes + '"';
+    }
+
+    private static String formulaDataAttrs(String fieldKey, String typeValue, Map<String, Object> config) {
+        if (String.isBlank(fieldKey) || config == null || !booleanValue(config.get('isFormula'))) {
+            return '';
+        }
+        String expression = stringValue(config.get('formulaExpression'));
+        if (String.isBlank(expression)) {
+            return '';
+        }
+        return ' data-formula-target="true"'
+            + ' data-formula-field-key="' + escapeHtml(fieldKey) + '"'
+            + ' data-formula-type="' + escapeHtml(typeValue) + '"'
+            + ' data-formula-expression="' + escapeHtml(expression) + '"'
+            + ' data-formula-sources="' + escapeHtml(String.join(extractFormulaReferences(expression), ',')) + '"';
+    }
+
+    private static List<String> extractFormulaReferences(String expression) {
+        List<String> references = new List<String>();
+        if (String.isBlank(expression)) {
+            return references;
+        }
+        Set<String> seen = new Set<String>();
+        Matcher matcher = Pattern.compile('\\{([A-Za-z0-9_]+)\\}').matcher(expression);
+        while (matcher.find()) {
+            String fieldKey = matcher.group(1);
+            if (String.isBlank(fieldKey) || seen.contains(fieldKey)) {
+                continue;
+            }
+            seen.add(fieldKey);
+            references.add(fieldKey);
+        }
+        return references;
     }
 
     private static List<Object> buildPublishedUploadFields(List<NF_Form_Element__c> elements) {
@@ -2418,22 +2566,77 @@ public with sharing class NativeFormsPublisher {
         return uploadFields;
     }
 
-    private static Map<String, Object> buildPublishedSecretCodeConfig(Map<String, Object> uiSettings) {
+    private static Map<String, Object> buildPublishedSecretCodeConfig(Map<String, Object> uiSettings, String languageCode) {
         uiSettings = uiSettings == null ? new Map<String, Object>() : uiSettings;
+        String normalizedLanguageCode = NativeFormsRuntimeI18n.normalizeLanguageCode(languageCode);
         return new Map<String, Object>{
             'enabled' => booleanValue(uiSettings.get('secretCodeVerificationEnabled')),
             'matchField' => 'Email',
-            'introText' => firstNonBlank(stringValue(uiSettings.get('secretCodeIntroText')), 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.'),
-            'sentMessage' => firstNonBlank(stringValue(uiSettings.get('secretCodeSentMessage')), 'If we found a matching contact, we sent a 6-digit code to that email.'),
-            'invalidMessage' => firstNonBlank(stringValue(uiSettings.get('secretCodeInvalidMessage')), 'The code is invalid or expired. Try again or request a new code.'),
-            'verifiedMessage' => firstNonBlank(stringValue(uiSettings.get('secretCodeVerifiedMessage')), 'Code verified. You can continue with the form now.'),
-            'sendButtonLabel' => firstNonBlank(stringValue(uiSettings.get('secretCodeSendButtonLabel')), 'Enter'),
-            'verifyButtonLabel' => firstNonBlank(stringValue(uiSettings.get('secretCodeVerifyButtonLabel')), 'Verify'),
-            'resendButtonLabel' => firstNonBlank(stringValue(uiSettings.get('secretCodeResendButtonLabel')), 'Resend Code'),
+            'introText' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeIntroText', normalizedLanguageCode, 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.'),
+            'sentMessage' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeSentMessage', normalizedLanguageCode, 'If we found a matching contact, we sent a 6-digit code to that email.'),
+            'invalidMessage' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeInvalidMessage', normalizedLanguageCode, 'The code is invalid or expired. Try again or request a new code.'),
+            'verifiedMessage' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeVerifiedMessage', normalizedLanguageCode, 'Code verified. You can continue with the form now.'),
+            'sendButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeSendButtonLabel', normalizedLanguageCode, 'Enter'),
+            'verifyButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeVerifyButtonLabel', normalizedLanguageCode, 'Verify'),
+            'resendButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeResendButtonLabel', normalizedLanguageCode, 'Resend Code'),
             'expiryMinutes' => integerValue(uiSettings.get('secretCodeExpiryMinutes')) == null ? 10 : Math.max(1, integerValue(uiSettings.get('secretCodeExpiryMinutes'))),
             'maxAttempts' => integerValue(uiSettings.get('secretCodeMaxAttempts')) == null ? 5 : Math.max(1, integerValue(uiSettings.get('secretCodeMaxAttempts'))),
             'allowResend' => uiSettings.containsKey('secretCodeAllowResend') ? booleanValue(uiSettings.get('secretCodeAllowResend')) : true
         };
+    }
+
+    private static String localizedSecretCodeConfigValue(Map<String, Object> uiSettings, String key, String languageCode, String fallback) {
+        String rawValue = stringValue(uiSettings.get(key));
+        if (String.isBlank(rawValue) || NativeFormsRuntimeI18n.matchesAnyLanguageValue(key, rawValue)) {
+            return NativeFormsRuntimeI18n.text(languageCode, key, fallback);
+        }
+        return rawValue;
+    }
+
+    private static String localizedFormUiSettingValue(Map<String, Object> uiSettings, String key, String languageCode, String fallback) {
+        String rawValue = stringValue(uiSettings.get(key));
+        if (String.isBlank(rawValue) || matchesLocalizedFormUiDefault(key, rawValue)) {
+            return localizedFormUiDefault(key, languageCode, fallback);
+        }
+        return rawValue;
+    }
+
+    private static Boolean matchesLocalizedFormUiDefault(String key, String candidate) {
+        String trimmedCandidate = String.isBlank(candidate) ? '' : candidate.trim();
+        if (String.isBlank(trimmedCandidate)) {
+            return false;
+        }
+        for (String languageCode : new List<String>{ 'en', 'he', 'es' }) {
+            if (localizedFormUiDefault(key, languageCode, '') == trimmedCandidate) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String localizedFormUiDefault(String key, String languageCode, String fallback) {
+        String normalizedLanguageCode = NativeFormsRuntimeI18n.normalizeLanguageCode(languageCode);
+        if (key == 'submitLabel') {
+            if (normalizedLanguageCode == 'he') return 'שלח';
+            if (normalizedLanguageCode == 'es') return 'Enviar';
+            return 'Submit';
+        }
+        if (key == 'submitSuccessMessage') {
+            if (normalizedLanguageCode == 'he') return 'הטופס נשלח בהצלחה.';
+            if (normalizedLanguageCode == 'es') return 'Tu formulario se envió correctamente.';
+            return 'Your form was submitted successfully.';
+        }
+        if (key == 'postSubmitButtonLabel') {
+            if (normalizedLanguageCode == 'he') return 'המשך';
+            if (normalizedLanguageCode == 'es') return 'Continuar';
+            return 'Continue';
+        }
+        if (key == 'submitFailedMessage') {
+            if (normalizedLanguageCode == 'he') return 'לא הצלחנו לשלוח את הטופס כרגע. נסו שוב.';
+            if (normalizedLanguageCode == 'es') return 'No pudimos enviar este formulario ahora mismo. Inténtalo de nuevo.';
+            return 'We could not submit this form right now. Please try again.';
+        }
+        return fallback;
     }
 
     private static String renderSecretCodeVerificationBlock(Map<String, Object> config) {
@@ -2583,6 +2786,52 @@ public with sharing class NativeFormsPublisher {
         return normalizedDateDisplayFormat(config) == 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy';
     }
 
+    private static Boolean isLegacySeedDefaultValue(String typeValue, String defaultValue) {
+        String trimmedValue = String.isBlank(defaultValue) ? '' : defaultValue.trim();
+        if (String.isBlank(trimmedValue)) {
+            return false;
+        }
+        Map<String, String> legacySeedDefaults = new Map<String, String>{
+            'text' => 'Enter text',
+            'textarea' => 'Enter longer text',
+            'number' => 'Enter number',
+            'email' => 'name@example.com',
+            'tel' => 'Phone number',
+            'url' => 'https://example.com'
+        };
+        return legacySeedDefaults.containsKey(typeValue) && legacySeedDefaults.get(typeValue) == trimmedValue;
+    }
+
+    private static String localizedPlaceholderForType(String typeValue, String languageCode, Map<String, Object> config) {
+        if (typeValue == 'date') {
+            return datePlaceholder(config);
+        }
+        Map<String, String> placeholderKeys = new Map<String, String>{
+            'text' => 'placeholderText',
+            'textarea' => 'placeholderTextarea',
+            'number' => 'placeholderNumber',
+            'email' => 'placeholderEmail',
+            'tel' => 'placeholderPhone',
+            'url' => 'placeholderUrl'
+        };
+        Map<String, String> fallbackValues = new Map<String, String>{
+            'text' => 'Enter text',
+            'textarea' => 'Enter longer text',
+            'number' => 'Enter number',
+            'email' => 'name@example.com',
+            'tel' => 'Phone number',
+            'url' => 'https://example.com'
+        };
+        if (!placeholderKeys.containsKey(typeValue)) {
+            return '';
+        }
+        return runtimeTextValue(languageCode, placeholderKeys.get(typeValue), fallbackValues.get(typeValue));
+    }
+
+    private static String normalizeLegacySeedDefaultValue(String typeValue, String defaultValue) {
+        return isLegacySeedDefaultValue(typeValue, defaultValue) ? '' : defaultValue;
+    }
+
     private static String formatDateDefaultValue(String value, Map<String, Object> config) {
         if (String.isBlank(value)) {
             return '';
@@ -2626,6 +2875,18 @@ public with sharing class NativeFormsPublisher {
             .replace('>', '&gt;')
             .replace('"', '&quot;')
             .replace('\'', '&#39;');
+    }
+
+    private static String escapeJsString(String value) {
+        if (value == null) {
+            return '';
+        }
+
+        return value
+            .replace('\\', '\\\\')
+            .replace('"', '\\"')
+            .replace('\r', '\\r')
+            .replace('\n', '\\n');
     }
 
     private static Map<String, Object> buildPublishedTheme(NF_Form_Version__c versionRecord) {

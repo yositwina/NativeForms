@@ -100,9 +100,11 @@ public with sharing class NativeFormsDesignerController {
     }
 
     public class DesignerWorkspace {
+        @AuraEnabled public Id selectedProjectId { get; set; }
         @AuraEnabled public Id selectedFormId { get; set; }
         @AuraEnabled public Id selectedVersionId { get; set; }
         @AuraEnabled public Id selectedThemeId { get; set; }
+        @AuraEnabled public String selectedProjectName { get; set; }
         @AuraEnabled public String selectedFormName { get; set; }
         @AuraEnabled public String selectedFormKey { get; set; }
         @AuraEnabled public String selectedFormDescription { get; set; }
@@ -110,6 +112,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean captchaKeysConfigured { get; set; }
         @AuraEnabled public String selectedVersionName { get; set; }
         @AuraEnabled public String selectedVersionStatus { get; set; }
+        @AuraEnabled public String selectedVersionLanguageCode { get; set; }
         @AuraEnabled public String selectedVersionSubmitSuccessMessage { get; set; }
         @AuraEnabled public String selectedVersionSubmitLabel { get; set; }
         @AuraEnabled public Boolean selectedVersionRtlEnabled { get; set; }
@@ -136,6 +139,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedVersionSubmitConditionalConditionsJson { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalExpression { get; set; }
         @AuraEnabled public String selectedPublishedUrl { get; set; }
+        @AuraEnabled public List<SelectOption> projects { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<SelectOption> themes { get; set; }
@@ -146,14 +150,30 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean enableProConditionLogic { get; set; }
         @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
         @AuraEnabled public Boolean enableProLoadFile { get; set; }
+        @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
         @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
     }
 
     public class NewFormResult {
+        @AuraEnabled public Id projectId { get; set; }
         @AuraEnabled public Id formId { get; set; }
         @AuraEnabled public Id versionId { get; set; }
         @AuraEnabled public String formName { get; set; }
+    }
+
+    private static Id normalizeProjectSelection(Id requestedProjectId) {
+        Id defaultProjectId = NativeFormsProjectService.ensureDefaultProjectAndBackfillForms();
+        if (requestedProjectId == null) {
+            return defaultProjectId;
+        }
+        List<NF_Project__c> matchingProjects = [
+            SELECT Id
+            FROM NF_Project__c
+            WHERE Id = :requestedProjectId
+            LIMIT 1
+        ];
+        return matchingProjects.isEmpty() ? defaultProjectId : matchingProjects[0].Id;
     }
 
     @AuraEnabled(cacheable=true)
@@ -250,8 +270,9 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static DesignerWorkspace getWorkspace(Id formId, Id versionId) {
+    public static DesignerWorkspace getWorkspace(Id projectId, Id formId, Id versionId) {
         DesignerWorkspace workspace = new DesignerWorkspace();
+        workspace.projects = new List<SelectOption>();
         workspace.forms = new List<SelectOption>();
         workspace.versions = new List<VersionOption>();
         workspace.themes = new List<SelectOption>();
@@ -261,17 +282,43 @@ public with sharing class NativeFormsDesignerController {
         workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
         workspace.enableProRepeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
         workspace.enableProLoadFile = NativeFormsFeatureFlags.isProLoadFileEnabled();
+        workspace.enableProFormulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         workspace.enableProPostSubmitAutoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
         workspace.enableProSfSecretCodeAuth = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
 
+        Id effectiveProjectId = normalizeProjectSelection(projectId);
+        workspace.captchaKeysConfigured = NativeFormsPublisher.hasSharedCaptchaSiteKey();
+
+        List<NF_Project__c> projectRecords = [
+            SELECT Id, Name
+            FROM NF_Project__c
+            ORDER BY Name ASC
+            LIMIT 500
+        ];
+        Map<Id, NF_Project__c> projectsById = new Map<Id, NF_Project__c>(projectRecords);
+        if (!projectsById.containsKey(effectiveProjectId)) {
+            effectiveProjectId = NativeFormsProjectService.ensureDefaultProjectId();
+        }
+        workspace.selectedProjectId = effectiveProjectId;
+        workspace.selectedProjectName = projectsById.containsKey(effectiveProjectId)
+            ? projectsById.get(effectiveProjectId).Name
+            : NativeFormsProjectService.DEFAULT_PROJECT_NAME;
+        for (NF_Project__c projectRecord : projectRecords) {
+            SelectOption option = new SelectOption();
+            option.label = projectRecord.Name;
+            option.value = (String) projectRecord.Id;
+            workspace.projects.add(option);
+        }
+        sortOptionsByLabel(workspace.projects);
+
         List<NF_Form__c> forms = [
-            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c, Enable_Captcha__c
+            SELECT Id, Name, NF_Key__c, Description__c, Status__c, Current_Published_Version__c, Theme__c,
+                   Enable_Captcha__c, Project__c, Project__r.Name
             FROM NF_Form__c
+            WHERE Project__c = :effectiveProjectId
             ORDER BY Name ASC
             LIMIT 200
         ];
-
-        workspace.captchaKeysConfigured = NativeFormsPublisher.hasSharedCaptchaSiteKey();
 
         for (NF_Form__c formRecord : forms) {
             SelectOption option = new SelectOption();
@@ -295,6 +342,8 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form__c selectedForm = formsById.get(effectiveFormId);
+        workspace.selectedProjectId = selectedForm.Project__c;
+        workspace.selectedProjectName = selectedForm.Project__r == null ? workspace.selectedProjectName : selectedForm.Project__r.Name;
         workspace.selectedFormId = selectedForm.Id;
         workspace.selectedFormName = selectedForm.Description__c;
         workspace.selectedFormKey = selectedForm.NF_Key__c;
@@ -372,11 +421,16 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
         workspace.selectedVersionStatus = selectedVersion.Version_Status__c;
         Map<String, Object> versionUiSettings = parseJsonMap(selectedVersion.UI_Settings_JSON__c);
+        workspace.selectedVersionLanguageCode = defaultLanguageCode(
+            stringValue(versionUiSettings.get('languageCode'))
+        );
         workspace.selectedVersionSubmitSuccessMessage = defaultSubmitSuccessMessage(
-            stringValue(versionUiSettings.get('submitSuccessMessage'))
+            stringValue(versionUiSettings.get('submitSuccessMessage')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSubmitLabel = defaultSubmitLabel(
-            stringValue(versionUiSettings.get('submitLabel'))
+            stringValue(versionUiSettings.get('submitLabel')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionRtlEnabled = booleanValue(versionUiSettings.get('rtlEnabled'));
         workspace.selectedVersionPostSubmitAutoLinkEnabled = booleanValue(versionUiSettings.get('postSubmitAutoLinkEnabled'));
@@ -384,7 +438,8 @@ public with sharing class NativeFormsDesignerController {
             stringValue(versionUiSettings.get('postSubmitUrlTemplate'))
         );
         workspace.selectedVersionPostSubmitButtonLabel = defaultPostSubmitButtonLabel(
-            stringValue(versionUiSettings.get('postSubmitButtonLabel'))
+            stringValue(versionUiSettings.get('postSubmitButtonLabel')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionPostSubmitDelaySeconds = defaultPostSubmitDelaySeconds(
             versionUiSettings.get('postSubmitDelaySeconds')
@@ -394,25 +449,32 @@ public with sharing class NativeFormsDesignerController {
             stringValue(versionUiSettings.get('secretCodeMatchField'))
         );
         workspace.selectedVersionSecretCodeIntroText = defaultSecretCodeIntroText(
-            stringValue(versionUiSettings.get('secretCodeIntroText'))
+            stringValue(versionUiSettings.get('secretCodeIntroText')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeSentMessage = defaultSecretCodeSentMessage(
-            stringValue(versionUiSettings.get('secretCodeSentMessage'))
+            stringValue(versionUiSettings.get('secretCodeSentMessage')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeInvalidMessage = defaultSecretCodeInvalidMessage(
-            stringValue(versionUiSettings.get('secretCodeInvalidMessage'))
+            stringValue(versionUiSettings.get('secretCodeInvalidMessage')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeVerifiedMessage = defaultSecretCodeVerifiedMessage(
-            stringValue(versionUiSettings.get('secretCodeVerifiedMessage'))
+            stringValue(versionUiSettings.get('secretCodeVerifiedMessage')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeSendButtonLabel = defaultSecretCodeSendButtonLabel(
-            stringValue(versionUiSettings.get('secretCodeSendButtonLabel'))
+            stringValue(versionUiSettings.get('secretCodeSendButtonLabel')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeVerifyButtonLabel = defaultSecretCodeVerifyButtonLabel(
-            stringValue(versionUiSettings.get('secretCodeVerifyButtonLabel'))
+            stringValue(versionUiSettings.get('secretCodeVerifyButtonLabel')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeResendButtonLabel = defaultSecretCodeResendButtonLabel(
-            stringValue(versionUiSettings.get('secretCodeResendButtonLabel'))
+            stringValue(versionUiSettings.get('secretCodeResendButtonLabel')),
+            workspace.selectedVersionLanguageCode
         );
         workspace.selectedVersionSecretCodeExpiryMinutes = defaultSecretCodeExpiryMinutes(
             versionUiSettings.get('secretCodeExpiryMinutes')
@@ -504,8 +566,10 @@ public with sharing class NativeFormsDesignerController {
         Id formId,
         Id versionId,
         String formName,
+        Id projectId,
         Id themeId,
         Boolean enableCaptcha,
+        String languageCode,
         String submitSuccessMessage,
         Boolean rtlEnabled,
         Boolean postSubmitAutoLinkEnabled,
@@ -541,12 +605,13 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form__c formRecord = [
-            SELECT Id, Theme__c, Enable_Captcha__c, Description__c
+            SELECT Id, Theme__c, Enable_Captcha__c, Description__c, Project__c
             FROM NF_Form__c
             WHERE Id = :formId
             LIMIT 1
         ];
         formRecord.Description__c = normalizedFormName;
+        formRecord.Project__c = projectId == null ? NativeFormsProjectService.ensureDefaultProjectId() : projectId;
         formRecord.Theme__c = themeId;
         formRecord.Enable_Captcha__c = enableCaptcha == true;
 
@@ -562,25 +627,27 @@ public with sharing class NativeFormsDesignerController {
                 throw new AuraHandledException('Selected version does not belong to the selected form.');
             }
             Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
-            uiSettings.put('submitSuccessMessage', defaultSubmitSuccessMessage(submitSuccessMessage));
+            String normalizedLanguageCode = defaultLanguageCode(languageCode);
+            uiSettings.put('languageCode', normalizedLanguageCode);
+            uiSettings.put('submitSuccessMessage', defaultSubmitSuccessMessage(submitSuccessMessage, normalizedLanguageCode));
             uiSettings.put('rtlEnabled', rtlEnabled == true);
             uiSettings.put('postSubmitAutoLinkEnabled', postSubmitAutoLinkEnabled == true);
             uiSettings.put('postSubmitUrlTemplate', defaultPostSubmitUrlTemplate(postSubmitUrlTemplate));
-            uiSettings.put('postSubmitButtonLabel', defaultPostSubmitButtonLabel(postSubmitButtonLabel));
+            uiSettings.put('postSubmitButtonLabel', defaultPostSubmitButtonLabel(postSubmitButtonLabel, normalizedLanguageCode));
             uiSettings.put('postSubmitDelaySeconds', defaultPostSubmitDelaySeconds(postSubmitDelaySeconds));
             uiSettings.put('secretCodeVerificationEnabled', secretCodeVerificationEnabled == true);
             uiSettings.put('secretCodeMatchField', defaultSecretCodeMatchField(secretCodeMatchField));
-            uiSettings.put('secretCodeIntroText', defaultSecretCodeIntroText(secretCodeIntroText));
-            uiSettings.put('secretCodeSentMessage', defaultSecretCodeSentMessage(secretCodeSentMessage));
-            uiSettings.put('secretCodeInvalidMessage', defaultSecretCodeInvalidMessage(secretCodeInvalidMessage));
-            uiSettings.put('secretCodeVerifiedMessage', defaultSecretCodeVerifiedMessage(secretCodeVerifiedMessage));
-            uiSettings.put('secretCodeSendButtonLabel', defaultSecretCodeSendButtonLabel(secretCodeSendButtonLabel));
-            uiSettings.put('secretCodeVerifyButtonLabel', defaultSecretCodeVerifyButtonLabel(secretCodeVerifyButtonLabel));
-            uiSettings.put('secretCodeResendButtonLabel', defaultSecretCodeResendButtonLabel(secretCodeResendButtonLabel));
+            uiSettings.put('secretCodeIntroText', defaultSecretCodeIntroText(secretCodeIntroText, normalizedLanguageCode));
+            uiSettings.put('secretCodeSentMessage', defaultSecretCodeSentMessage(secretCodeSentMessage, normalizedLanguageCode));
+            uiSettings.put('secretCodeInvalidMessage', defaultSecretCodeInvalidMessage(secretCodeInvalidMessage, normalizedLanguageCode));
+            uiSettings.put('secretCodeVerifiedMessage', defaultSecretCodeVerifiedMessage(secretCodeVerifiedMessage, normalizedLanguageCode));
+            uiSettings.put('secretCodeSendButtonLabel', defaultSecretCodeSendButtonLabel(secretCodeSendButtonLabel, normalizedLanguageCode));
+            uiSettings.put('secretCodeVerifyButtonLabel', defaultSecretCodeVerifyButtonLabel(secretCodeVerifyButtonLabel, normalizedLanguageCode));
+            uiSettings.put('secretCodeResendButtonLabel', defaultSecretCodeResendButtonLabel(secretCodeResendButtonLabel, normalizedLanguageCode));
             uiSettings.put('secretCodeExpiryMinutes', defaultSecretCodeExpiryMinutes(secretCodeExpiryMinutes));
             uiSettings.put('secretCodeMaxAttempts', defaultSecretCodeMaxAttempts(secretCodeMaxAttempts));
             uiSettings.put('secretCodeAllowResend', defaultSecretCodeAllowResend(secretCodeAllowResend));
-            uiSettings.put('submitLabel', defaultSubmitLabel(submitLabel));
+            uiSettings.put('submitLabel', defaultSubmitLabel(submitLabel, normalizedLanguageCode));
             uiSettings.put('submitConditionalEnabled', submitConditionalEnabled == true);
             uiSettings.put('submitConditionalFieldKey', stringValue(submitConditionalFieldKey));
             uiSettings.put('submitConditionalOperator', defaultConditionalOperator(submitConditionalOperator));
@@ -604,15 +671,17 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static NewFormResult createFormWithDraftVersion(String description, Id themeId) {
+    public static NewFormResult createFormWithDraftVersion(String description, Id projectId, String newProjectName, Id themeId) {
         String normalizedDescription = String.isBlank(description) ? null : description.trim();
         if (String.isBlank(normalizedDescription)) {
             throw new AuraHandledException('Description is required.');
         }
+        Id effectiveProjectId = NativeFormsProjectService.resolveProjectId(projectId, newProjectName);
 
         NF_Form__c formRecord = new NF_Form__c(
             Description__c = normalizedDescription,
             Status__c = 'Draft',
+            Project__c = effectiveProjectId,
             Theme__c = themeId
         );
         insert formRecord;
@@ -634,6 +703,7 @@ public with sharing class NativeFormsDesignerController {
         update formRecord;
 
         NewFormResult result = new NewFormResult();
+        result.projectId = effectiveProjectId;
         result.formId = formRecord.Id;
         result.versionId = versionRecord.Id;
         result.formName = normalizedDescription;
@@ -679,18 +749,21 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
-            throw new AuraHandledException('Repeat Groups are not available on your current TwinaForms plan.');
+            throw new AuraHandledException('Records List is not available on your current TwinaForms plan.');
         }
         if (elementType == 'fileUpload' && !NativeFormsFeatureFlags.isProLoadFileEnabled()) {
             throw new AuraHandledException('File Uploads are not available on your current TwinaForms plan.');
         }
 
         NF_Form_Version__c versionRecord = [
-            SELECT Id, Form__c
+            SELECT Id, Form__c, UI_Settings_JSON__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
             LIMIT 1
         ];
+        String languageCode = NativeFormsRuntimeI18n.normalizeLanguageCode(
+            stringValue(parseJsonMap(versionRecord.UI_Settings_JSON__c).get('languageCode'))
+        );
 
         Integer nextOrder = 10;
         AggregateResult[] maxRows = [
@@ -711,7 +784,7 @@ public with sharing class NativeFormsDesignerController {
             Field_Key__c = defaultFieldKeyForType(elementType, nextElementIndex),
             Element_Index__c = nextElementIndex,
             Label__c = defaultLabelForType(elementType),
-            Config_JSON__c = defaultConfigJsonForType(elementType),
+            Config_JSON__c = defaultConfigJsonForType(elementType, languageCode),
             Order__c = nextOrder
         );
         insert elementRecord;
@@ -1051,7 +1124,7 @@ public with sharing class NativeFormsDesignerController {
 
     private static String defaultLabelForType(String elementType) {
         if (elementType == 'section') return 'Section';
-        if (elementType == 'repeatGroup') return 'Repeat Group';
+        if (elementType == 'repeatGroup') return 'Records List';
         if (elementType == 'group') return 'Group';
         if (elementType == 'heading') return 'Display Text';
         if (elementType == 'image') return 'Image';
@@ -1089,26 +1162,33 @@ public with sharing class NativeFormsDesignerController {
         return prefix + String.valueOf(safeIndex);
     }
 
-    private static String defaultConfigJsonForType(String elementType) {
+    private static String defaultConfigJsonForType(String elementType, String languageCode) {
         Map<String, Object> config = new Map<String, Object>();
         if (elementType == 'text') {
-            config.put('defaultValue', 'Enter text');
+            config.put('defaultValue', '');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderText', 'Enter text'));
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
+            config.put('isFormula', false);
+            config.put('formulaExpression', '');
         }
         if (elementType == 'textarea') {
-            config.put('defaultValue', 'Enter longer text');
+            config.put('defaultValue', '');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderTextarea', 'Enter longer text'));
             config.put('labelPosition', 'above');
             config.put('rows', 4);
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
         }
         if (elementType == 'number') {
-            config.put('defaultValue', 'Enter number');
+            config.put('defaultValue', '');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderNumber', 'Enter number'));
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
+            config.put('isFormula', false);
+            config.put('formulaExpression', '');
         }
         if (elementType == 'date') {
             config.put('defaultValue', '');
@@ -1119,19 +1199,22 @@ public with sharing class NativeFormsDesignerController {
             config.put('required', false);
         }
         if (elementType == 'email') {
-            config.put('defaultValue', 'name@example.com');
+            config.put('defaultValue', '');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderEmail', 'name@example.com'));
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
         }
         if (elementType == 'tel') {
-            config.put('defaultValue', 'Phone number');
+            config.put('defaultValue', '');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderPhone', 'Phone number'));
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
         }
         if (elementType == 'url') {
-            config.put('defaultValue', 'https://example.com');
+            config.put('defaultValue', '');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderUrl', 'https://example.com'));
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
@@ -1229,16 +1312,28 @@ public with sharing class NativeFormsDesignerController {
         }
     }
 
-    private static String defaultSubmitSuccessMessage(String value) {
-        return String.isBlank(value)
-            ? 'Your form was submitted successfully.'
-            : value.trim();
+    private static String defaultSubmitSuccessMessage(String value, String languageCode) {
+        return localizedFormSettingValue(
+            value,
+            languageCode,
+            'submitSuccessMessage',
+            'Your form was submitted successfully.'
+        );
     }
 
-    private static String defaultSubmitLabel(String value) {
-        return String.isBlank(value)
-            ? 'Submit'
-            : value.trim();
+    private static String defaultLanguageCode(String value) {
+        String normalized = String.isBlank(value) ? 'en' : value.trim().toLowerCase();
+        Set<String> allowed = new Set<String>{ 'en', 'he', 'es' };
+        return allowed.contains(normalized) ? normalized : 'en';
+    }
+
+    private static String defaultSubmitLabel(String value, String languageCode) {
+        return localizedFormSettingValue(
+            value,
+            languageCode,
+            'submitLabel',
+            'Submit'
+        );
     }
 
     private static String defaultPostSubmitUrlTemplate(String value) {
@@ -1249,46 +1344,75 @@ public with sharing class NativeFormsDesignerController {
         return 'Email';
     }
 
-    private static String defaultSecretCodeIntroText(String value) {
-        return String.isBlank(value)
-            ? 'Enter your email and click Enter. We will send you a 6-digit code before you can continue.'
-            : value.trim();
+    private static String defaultSecretCodeIntroText(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeIntroText',
+            'Enter your email and click Enter. We will send you a 6-digit code before you can continue.'
+        );
     }
 
-    private static String defaultSecretCodeSentMessage(String value) {
-        return String.isBlank(value)
-            ? 'If we found a matching contact, we sent a 6-digit code to that email.'
-            : value.trim();
+    private static String defaultSecretCodeSentMessage(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeSentMessage',
+            'If we found a matching contact, we sent a 6-digit code to that email.'
+        );
     }
 
-    private static String defaultSecretCodeInvalidMessage(String value) {
-        return String.isBlank(value)
-            ? 'The code is invalid or expired. Try again or request a new code.'
-            : value.trim();
+    private static String defaultSecretCodeInvalidMessage(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeInvalidMessage',
+            'The code is invalid or expired. Try again or request a new code.'
+        );
     }
 
-    private static String defaultSecretCodeVerifiedMessage(String value) {
-        return String.isBlank(value)
-            ? 'Code verified. You can continue with the form now.'
-            : value.trim();
+    private static String defaultSecretCodeVerifiedMessage(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeVerifiedMessage',
+            'Code verified. You can continue with the form now.'
+        );
     }
 
-    private static String defaultSecretCodeSendButtonLabel(String value) {
-        return String.isBlank(value)
-            ? 'Enter'
-            : value.trim();
+    private static String defaultSecretCodeSendButtonLabel(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeSendButtonLabel',
+            'Enter'
+        );
     }
 
-    private static String defaultSecretCodeVerifyButtonLabel(String value) {
-        return String.isBlank(value)
-            ? 'Verify'
-            : value.trim();
+    private static String defaultSecretCodeVerifyButtonLabel(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeVerifyButtonLabel',
+            'Verify'
+        );
     }
 
-    private static String defaultSecretCodeResendButtonLabel(String value) {
-        return String.isBlank(value)
-            ? 'Resend Code'
-            : value.trim();
+    private static String defaultSecretCodeResendButtonLabel(String value, String languageCode) {
+        return localizedSecretCodeValue(
+            value,
+            languageCode,
+            'secretCodeResendButtonLabel',
+            'Resend Code'
+        );
+    }
+
+    private static String localizedSecretCodeValue(String value, String languageCode, String key, String fallback) {
+        String trimmedValue = String.isBlank(value) ? '' : value.trim();
+        if (String.isBlank(trimmedValue) || NativeFormsRuntimeI18n.matchesAnyLanguageValue(key, trimmedValue)) {
+            return NativeFormsRuntimeI18n.text(languageCode, key, fallback);
+        }
+        return trimmedValue;
     }
 
     private static Integer defaultSecretCodeExpiryMinutes(Object value) {
@@ -1305,10 +1429,54 @@ public with sharing class NativeFormsDesignerController {
         return value == null ? true : booleanValue(value);
     }
 
-    private static String defaultPostSubmitButtonLabel(String value) {
-        return String.isBlank(value)
-            ? 'Continue'
-            : value.trim();
+    private static String defaultPostSubmitButtonLabel(String value, String languageCode) {
+        return localizedFormSettingValue(
+            value,
+            languageCode,
+            'postSubmitButtonLabel',
+            'Continue'
+        );
+    }
+
+    private static String localizedFormSettingValue(String value, String languageCode, String key, String fallback) {
+        String trimmedValue = String.isBlank(value) ? '' : value.trim();
+        if (String.isBlank(trimmedValue) || matchesLocalizedFormSettingDefault(key, trimmedValue)) {
+            return localizedFormSettingDefault(key, languageCode, fallback);
+        }
+        return trimmedValue;
+    }
+
+    private static Boolean matchesLocalizedFormSettingDefault(String key, String candidate) {
+        String trimmedCandidate = String.isBlank(candidate) ? '' : candidate.trim();
+        if (String.isBlank(trimmedCandidate)) {
+            return false;
+        }
+        for (String languageCode : new List<String>{ 'en', 'he', 'es' }) {
+            if (localizedFormSettingDefault(key, languageCode, '') == trimmedCandidate) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String localizedFormSettingDefault(String key, String languageCode, String fallback) {
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
+        if (key == 'submitLabel') {
+            if (normalizedLanguageCode == 'he') return 'שלח';
+            if (normalizedLanguageCode == 'es') return 'Enviar';
+            return 'Submit';
+        }
+        if (key == 'submitSuccessMessage') {
+            if (normalizedLanguageCode == 'he') return 'הטופס נשלח בהצלחה.';
+            if (normalizedLanguageCode == 'es') return 'Tu formulario se envió correctamente.';
+            return 'Your form was submitted successfully.';
+        }
+        if (key == 'postSubmitButtonLabel') {
+            if (normalizedLanguageCode == 'he') return 'המשך';
+            if (normalizedLanguageCode == 'es') return 'Continuar';
+            return 'Continue';
+        }
+        return fallback;
     }
 
     private static Integer defaultPostSubmitDelaySeconds(Object value) {

@@ -486,6 +486,10 @@ public with sharing class NativeFormsBuilderController {
         if (elementType == 'textarea' || elementType == 'text' || elementType == 'input') {
             config.put('placeholder', 'Enter a value');
         }
+        if (elementType == 'text' || elementType == 'number') {
+            config.put('isFormula', false);
+            config.put('formulaExpression', '');
+        }
         if (elementType == 'checkbox') {
             config.put('checked', false);
         }
@@ -511,23 +515,60 @@ public with sharing class NativeFormsBuilderController {
     }
 
     private static void validateElementBeforeSave(NF_Form_Element__c elementRecord) {
-        if (elementRecord == null || elementRecord.Element_Type__c != 'fileUpload') {
+        if (elementRecord == null) {
+            return;
+        }
+
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(
+            String.isBlank(elementRecord.Config_JSON__c) ? '{}' : elementRecord.Config_JSON__c
+        );
+
+        if (booleanValue(config.get('isFormula'))) {
+            if (!NativeFormsFeatureFlags.isProFormulaFieldsEnabled()) {
+                throw new AuraHandledException('Formula Fields are not available on your current TwinaForms plan.');
+            }
+            if (elementRecord.Element_Type__c != 'text' && elementRecord.Element_Type__c != 'number') {
+                throw new AuraHandledException('Only Text and Number fields can use formulas in Pro V1.');
+            }
+            if (String.isBlank(elementRecord.Field_Key__c)) {
+                throw new AuraHandledException('Formula fields must keep a field key.');
+            }
+            if (String.isNotBlank(elementRecord.Parent_Element_Id__c)) {
+                List<NF_Form_Element__c> parentRows = [
+                    SELECT Id, Element_Type__c
+                    FROM NF_Form_Element__c
+                    WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
+                    LIMIT 1
+                ];
+                if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
+                    throw new AuraHandledException('Formula fields are not supported inside repeat groups in Pro V1.');
+                }
+            }
+        }
+
+        if (elementRecord.Element_Type__c != 'fileUpload') {
             return;
         }
 
         if (String.isBlank(elementRecord.Field_Key__c)) {
             throw new AuraHandledException('File Upload fields must keep a field key.');
         }
-
-        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(
-            String.isBlank(elementRecord.Config_JSON__c) ? '{}' : elementRecord.Config_JSON__c
-        );
         String targetSubmitActionKey = config != null && config.containsKey('targetSubmitActionKey')
             ? String.valueOf(config.get('targetSubmitActionKey'))
             : '';
         if (String.isBlank(targetSubmitActionKey)) {
             throw new AuraHandledException('Choose a target submit action for the File Upload field before saving.');
         }
+    }
+
+    private static Boolean booleanValue(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        return String.valueOf(value).toLowerCase() == 'true';
     }
 
     private static List<SelectOption> getReadableFieldOptions(String objectApiName) {

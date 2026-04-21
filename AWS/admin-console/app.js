@@ -643,7 +643,10 @@ async function saveTenantProfile(form) {
     trialStartedAt: String(formData.get("trialStartedAt") || "").trim() || null,
     trialEndsAt: String(formData.get("trialEndsAt") || "").trim() || null,
     supportStatus: String(formData.get("supportStatus") || "normal"),
-    internalNotes: String(formData.get("internalNotes") || "")
+    internalNotes: String(formData.get("internalNotes") || ""),
+    supportFlags: {
+      enableSalesforceAdminApp: formData.get("enableSalesforceAdminApp") === "on"
+    }
   };
 
   state.isSavingTenant = true;
@@ -933,7 +936,7 @@ function renderBanner() {
 
   if (state.view === "plans") {
     refs.heroCopy.textContent = state.planStorageMode === "dynamodb"
-      ? "Plan changes save directly into the NativeFormsPlans DynamoDB table and can immediately influence customer limits."
+      ? "Plan changes save directly into the TwinaForms plan storage and can immediately influence customer limits."
       : "The live plan endpoint is reachable, but plan storage is currently unavailable or unhealthy.";
     return;
   }
@@ -1138,6 +1141,10 @@ function renderDetail(items) {
           selectedTenant.country
         ].filter(Boolean).join(", ") || "Not set")}</p>
       </div>
+      <div class="detail-block">
+        <p class="detail-block__label">Salesforce Admin App</p>
+        <p class="detail-block__value">${selectedTenant.supportFlags?.enableSalesforceAdminApp ? "Open for support/debug" : "Closed by default"}</p>
+      </div>
     </div>
 
     <section class="detail-section">
@@ -1179,6 +1186,13 @@ function renderDetail(items) {
               <option value="watch" ${selectedTenant.supportStatus === "watch" ? "selected" : ""}>Watch</option>
               <option value="priority" ${selectedTenant.supportStatus === "priority" ? "selected" : ""}>Priority</option>
             </select>
+          </label>
+        </div>
+        <div class="field field--checkbox">
+          <span class="field__label">Salesforce Admin App</span>
+          <label class="checkbox-row">
+            <input type="checkbox" name="enableSalesforceAdminApp" ${selectedTenant.supportFlags?.enableSalesforceAdminApp ? "checked" : ""}>
+            <span>Open TwinaForms Admin in Salesforce for support/debug use</span>
           </label>
         </div>
         <div class="inline-fields">
@@ -1320,7 +1334,7 @@ function renderPlans() {
   refs.planNotice.hidden = false;
   refs.planNotice.className = `notice-banner ${planStorageReady ? "notice-banner--success" : "notice-banner--warning"}`;
   refs.planNotice.innerHTML = planStorageReady
-    ? "<strong>Plan storage is live.</strong><span>Changes on this screen save into the NativeFormsPlans DynamoDB table.</span>"
+    ? "<strong>Plan storage is live.</strong><span>Changes on this screen save into the TwinaForms plan storage.</span>"
     : "<strong>Plan storage is currently unavailable.</strong><span>The live API could not confirm DynamoDB-backed plan storage. Check the Admin API health and table access.</span>";
 
   refs.planList.innerHTML = `

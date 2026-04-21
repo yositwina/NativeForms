@@ -10,8 +10,8 @@
   - Actual: Partial
   - Notes: keep simple
 
-- [ ] BUG-002 error messgae on fail submit form
-  - Status: Open
+- [X] BUG-002 error messgae on fail submit form
+  - Status: Solved
   - Severity: High
   - Area: Submit-lambda
   - File: lambda/submit/index.mjs
@@ -23,6 +23,9 @@
   - Expected friendly message : We could not match the submitted record in Salesforce. Please check the form mapping or contact support.
   - Example : Update failed. Status: 400. Body: [{"message":"Cannot deserialize instance of date from VALUE_STRING value or request may be missing a required field at [line:1, column:16]","errorCode":"JSON_PARSER_ERROR"}] Reference: NF-20260415130755-3EE40D
   - Expected friendly message : One of the date values in this form is not in a valid format. Please review the date field and try again.
+  - Actual:
+    - Published runtime now shows customer-safe primary error messages instead of leading with raw backend or Salesforce text.
+    - Submit failures are bucketed into clearer product-facing messages, with technical detail treated as secondary troubleshooting information.
   
 - [X] BUG-003 NF themes Object fiels deiplays
   - Status: Solved
@@ -95,8 +98,8 @@ Consumer Secret
 oUo_ZuXUW3jIUQgQ-jehIo5oyXhLiQfa7sXmLdT-TQY
 plese delete the code after 5 minutes and nevert show it again 9add text that explain this), teh code is in teh email box of admin
 
-- [ ] BUG-007 Repeat group new contact/new case relation missing
-  - Status: Open
+- [X] BUG-007 Repeat group new contact/new case relation missing
+  - Status: Solved
   - Severity: High
   - Area: Submit lambda / repeat group submit
   - File: `AWS/NativeForms-SubmitForm.mjs`
@@ -106,5 +109,5 @@ plese delete the code after 5 minutes and nevert show it again 9add text that ex
   - Enter new contact details.
   - Add one new case row with Subject and Priority.
   - Submit the form.
-  - Actual: Submit succeeds. Contact is created. Case is created. Case is not linked to the created Contact.
+  - Actual: Solved in the demo repeat-group flow after the submit mapping was updated to use the created Contact id when present.
   - Expected: If submit creates a new Contact in the same flow, new Case rows in the repeat group should be created with `ContactId` pointing to that created Contact.

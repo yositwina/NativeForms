@@ -17,6 +17,12 @@ Use for Home, Connect, setup flows, demo data, thank-you behavior, upgrade frami
 - Form experiences must stay multilingual-safe. Avoid fixed English instructional/decorative copy in the public form when the admin has not explicitly configured it.
 - If a form element already has a configurable label, prefer no extra fixed helper headline. File upload and secret-code experiences should be structurally clear without relying on English-only filler text.
 - Customer-visible button labels that appear in published forms should be configurable where practical, not hard-coded in English by default.
+- Multi-form organization should use a first-class `Project` model above forms, not tags or reused categories.
+- The primary create flow should stay lightweight: admins create projects inline from `+ New Form`, and the Designer should filter forms by the selected project.
+- Seeded system projects should include `General` for active forms and an empty `Archive` project for later cleanup/organization.
+- Formula Fields are a Pro feature. In V1, only `text` and `number` fields can be formula targets, the target field is system-controlled, and any customer-visible runtime formula copy must stay multilingual-safe.
+- `Radio Group` should be treated as a Salesforce-backed picklist presentation, not as a separate free-text option list. `Picklist` and `Radio Group` should use the same Salesforce value source, with only the UI presentation differing.
+- the technical element type remains `repeatGroup`, but customer-facing Builder / setup UI should label it as `Records List`
 
 ## Escalate When
 - A screen feels internal, technical, or debug-oriented instead of customer-ready.

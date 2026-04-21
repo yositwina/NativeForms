@@ -170,4 +170,5 @@ export default class NativeFormsHome extends NavigationMixin(LightningElement) {
     get planMaxFormsLabel() {
         return this.plan.maxForms == null ? 'Unlimited' : String(this.plan.maxForms);
     }
+
 }

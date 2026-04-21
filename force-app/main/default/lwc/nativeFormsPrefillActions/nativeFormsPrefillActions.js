@@ -7,7 +7,7 @@ import deletePrefillAction from '@salesforce/apex/NativeFormsPrefillActionsContr
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
-const PAGE_VERSION = 'Prefill v1.0';
+const PAGE_VERSION = 'Prefill v1.2';
 
 export default class NativeFormsPrefillActions extends LightningElement {
     isLoading = true;
@@ -50,14 +50,78 @@ export default class NativeFormsPrefillActions extends LightningElement {
         return PAGE_VERSION;
     }
 
+    get refreshFromDesignerHelpText() {
+        return 'Reloads the latest version context and field mappings from TwinaForms Designer.';
+    }
+
+    get resultAliasHelpText() {
+        return 'Name used later in the form’s element properties when mapping prefill values.';
+    }
+
+    get salesforceObjectHelpText() {
+        return 'Choose which Salesforce object this prefill action should query.';
+    }
+
+    get prefillModeHelpText() {
+        return 'Find one record or return multiple records.';
+    }
+
+    get ifNoRecordFoundHelpText() {
+        return 'Choose whether the form should continue without prefill or stop with an error.';
+    }
+
+    get salesforceFieldHelpText() {
+        return 'Field on the selected Salesforce object used in this match condition.';
+    }
+
+    get operatorHelpText() {
+        return 'How the Salesforce field should be compared to the incoming value.';
+    }
+
+    get valueSourceHelpText() {
+        return 'Choose where the value comes from: URL, form field, fixed value, or earlier alias.';
+    }
+
+    get prefillAliasHelpText() {
+        return 'Choose an earlier prefill result to read from.';
+    }
+
+    get aliasFieldHelpText() {
+        return 'Salesforce field from the selected alias result.';
+    }
+
+    get conditionLogicHelpText() {
+        return 'Use expressions like 1 AND 2, or 1 AND (2 OR 3).';
+    }
+
+    get orderByHelpText() {
+        return 'Used only when returning multiple records.';
+    }
+
+    get sortDirectionHelpText() {
+        return 'Choose whether records are returned lowest-to-highest or highest-to-lowest.';
+    }
+
+    get limitHelpText() {
+        return 'Maximum number of records returned by findMany.';
+    }
+
+    get actionKeyHelpText() {
+        return 'System key used internally for mappings and publish output.';
+    }
+
+    get configJsonHelpText() {
+        return 'Read-only advanced view of the saved prefill definition.';
+    }
+
     commandTypeOptions = [
-        { label: 'findOne', value: 'findOne' },
-        { label: 'findMany', value: 'findMany' }
+        { label: 'Find one record', value: 'findOne' },
+        { label: 'Find multiple records', value: 'findMany' }
     ];
 
     notFoundOptions = [
-        { label: 'ignore', value: 'ignore' },
-        { label: 'error', value: 'error' }
+        { label: 'Continue without prefill', value: 'ignore' },
+        { label: 'Show error', value: 'error' }
     ];
 
     orderDirectionOptions = [

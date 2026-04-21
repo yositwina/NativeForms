@@ -1042,6 +1042,27 @@ button:focus-visible {
   color: var(--text-soft);
 }
 
+.field--checkbox {
+  gap: 0.55rem;
+}
+
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.checkbox-row input {
+  accent-color: var(--brand);
+  margin: 0;
+}
+
 .toggle-field {
   display: flex;
   gap: 0.7rem;

@@ -149,6 +149,10 @@ Elements can define optional conditional visibility rules.
 }
 ```
 
+Customer-facing naming:
+- the technical element type remains `repeatGroup`
+- the Builder / setup UI should label this element as `Records List`
+
 ### Table Rendering Rules
 - `viewMode: "table"` renders repeat-group rows in a grid instead of stacked cards.
 - Each visible field becomes a column.

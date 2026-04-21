@@ -8,11 +8,12 @@
             <div class="instruction-box slds-m-bottom_medium">
                 <p class="instruction-title">Before You Connect</p>
                 <ol class="instruction-list">
-                    <li>Open the <strong>TwinaForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
+                    <li>Open the <strong>TwinaForms User</strong> permission set and assign it to the people who will use the main TwinaForms workspace.</li>
                     <li>Inside that permission set, open <strong>External Credential Principal Access</strong> and enable both principals:
                         <div class="instruction-detail">`TwinaForms Bootstrap / NativeFormsBootstrapPrincipal`</div>
                         <div class="instruction-detail">`TwinaForms Shared Secret / NativeFormsSharedSecret`</div>
                     </li>
+                    <li>If you plan to use <strong>TwinaForms Admin</strong> for support/debug access, enable the same two principals there too.</li>
                     <li>Open <strong>External Client App Manager</strong>, open <strong>NativForms</strong>, go to <strong>Auth Settings</strong>, click <strong>Consumer Key and Secret</strong>, and copy both values.</li>
                     <li>Paste the client id and client secret below, then click <strong>Connect TwinaForms</strong>.</li>
                     <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>TwinaForms</strong>, then open its <strong>External Credential</strong>.</li>

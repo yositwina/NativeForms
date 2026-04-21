@@ -38,6 +38,7 @@ public with sharing class NativeFormsSubmissionLogsController {
         @AuraEnabled public String submissionRef { get; set; }
         @AuraEnabled public String formId { get; set; }
         @AuraEnabled public String formVersionId { get; set; }
+        @AuraEnabled public String formDescription { get; set; }
         @AuraEnabled public String submittedAt { get; set; }
         @AuraEnabled public String outcome { get; set; }
         @AuraEnabled public String failureStage { get; set; }
@@ -273,6 +274,7 @@ public with sharing class NativeFormsSubmissionLogsController {
                     result.logs.add(toSummary((Map<String, Object>) entry));
                 }
             }
+            hydrateSummaryDescriptions(result.logs);
             result.errorMessage = result.success ? null : stringValue(responseBody, 'error');
         } catch (Exception e) {
             result.success = false;
@@ -460,6 +462,46 @@ public with sharing class NativeFormsSubmissionLogsController {
         return cachedLogsNc;
     }
 
+    private static void hydrateSummaryDescriptions(List<SubmissionLogSummary> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+        Set<Id> versionIds = new Set<Id>();
+        for (SubmissionLogSummary summary : logs) {
+            if (summary == null || String.isBlank(summary.formVersionId)) {
+                continue;
+            }
+            try {
+                versionIds.add((Id) summary.formVersionId);
+            } catch (Exception e) {
+                // ignore non-Id values
+            }
+        }
+        if (versionIds.isEmpty()) {
+            return;
+        }
+        Map<Id, NF_Form_Version__c> byId = new Map<Id, NF_Form_Version__c>([
+            SELECT Id, Form__r.Description__c
+            FROM NF_Form_Version__c
+            WHERE Id IN :versionIds
+        ]);
+        for (SubmissionLogSummary summary : logs) {
+            if (summary == null || String.isBlank(summary.formVersionId)) {
+                continue;
+            }
+            NF_Form_Version__c versionRecord;
+            try {
+                versionRecord = byId.get((Id) summary.formVersionId);
+            } catch (Exception e) {
+                continue;
+            }
+            if (versionRecord == null) {
+                continue;
+            }
+            summary.formDescription = versionRecord.Form__r.Description__c;
+        }
+    }
+
     private static void hydrateFormMetadata(LogDetailResult result, String formVersionId) {
         if (result == null || String.isBlank(formVersionId)) {
             return;
@@ -467,7 +509,7 @@ public with sharing class NativeFormsSubmissionLogsController {
 
         try {
             NF_Form_Version__c versionRecord = [
-                SELECT Id, Name, Form__r.Name
+                SELECT Id, Name, Form__r.Name, Form__r.Description__c
                 FROM NF_Form_Version__c
                 WHERE Id = :formVersionId
                 LIMIT 1
@@ -475,6 +517,9 @@ public with sharing class NativeFormsSubmissionLogsController {
             result.formTitle = String.isNotBlank(versionRecord.Form__r.Name)
                 ? versionRecord.Form__r.Name
                 : versionRecord.Name;
+            if (result.log != null) {
+                result.log.formDescription = versionRecord.Form__r.Description__c;
+            }
         } catch (Exception e) {
             result.formTitle = null;
         }

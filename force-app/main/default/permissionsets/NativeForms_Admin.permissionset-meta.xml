@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Administrative access for the TwinaForms package baseline objects.</description>
+    <description>Support and debug access for the separate TwinaForms Admin app and raw package objects.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>TwinaForms Admin</label>
+    <externalCredentialPrincipalAccesses>
+        <enabled>true</enabled>
+        <externalCredentialPrincipal>NativeFormsBootstrap-NativeFormsBootstrapPrincipal</externalCredentialPrincipal>
+    </externalCredentialPrincipalAccesses>
+    <externalCredentialPrincipalAccesses>
+        <enabled>true</enabled>
+        <externalCredentialPrincipal>NativeFormsLambdaAuth-NativeFormsSharedSecret</externalCredentialPrincipal>
+    </externalCredentialPrincipalAccesses>
 
     <applicationVisibilities>
         <application>NativeForms</application>
@@ -15,6 +23,10 @@
 
     <classAccesses>
         <apexClass>NativeFormsAdminController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>NativeFormsHomeController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -86,6 +98,15 @@
         <allowRead>true</allowRead>
         <modifyAllRecords>true</modifyAllRecords>
         <object>NF_Theme__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <object>NF_Project__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
     <objectPermissions>
@@ -197,6 +218,11 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>NF_Form__c.Enable_Captcha__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NF_Project__c.Description__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -367,6 +393,11 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>NF_Form__c.Description__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NF_Form__c.Project__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -600,11 +631,23 @@
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
-        <tab>NF_Theme__c</tab>
+        <tab>NativeForms_Submit_Actions</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
-        <tab>NativeForms_Submit_Actions</tab>
+        <tab>NativeForms_Connect</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NativeForms_Submission_Logs</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NativeForms_Guided_Setup</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>NF_Project__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
@@ -628,19 +671,7 @@
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
-        <tab>NativeForms_Connect</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>NativeForms_Submission_Logs</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>NativeForms_Guided_Setup</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
-        <tab>NativeForms_Setup</tab>
+        <tab>NF_Theme__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
 </PermissionSet>

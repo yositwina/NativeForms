@@ -3,8 +3,9 @@ import getSetupContext from '@salesforce/apex/NativeFormsSetupController.getSetu
 import getConnectionStatus from '@salesforce/apex/NativeFormsSetupController.getConnectionStatus';
 import registerOrg from '@salesforce/apex/NativeFormsSetupController.registerOrg';
 import saveClientCredentials from '@salesforce/apex/NativeFormsSetupController.saveClientCredentials';
-import step1Image from '@salesforce/resourceUrl/nativeFormsConnectStep1';
-import step2Image from '@salesforce/resourceUrl/nativeFormsConnectStep2';
+import getAccessManagementView from '@salesforce/apex/NativeFormsHomeController.getAccessManagementView';
+import updatePermissionSetAccess from '@salesforce/apex/NativeFormsHomeController.updatePermissionSetAccess';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import step3Image from '@salesforce/resourceUrl/nativeFormsConnectStep3';
 
 const CONNECT_STATE_KEY = 'nativeforms:connectState';
@@ -14,7 +15,7 @@ const STEP1_PLACEHOLDER_CLIENT_ID = 'nativeforms-step1-placeholder-client-id';
 const STEP1_PLACEHOLDER_CLIENT_SECRET = 'nativeforms-step1-placeholder-client-secret';
 
 export default class NativeFormsConnect extends LightningElement {
-    connectVersion = 'v2.2';
+    connectVersion = 'v2.7';
     orgId = '';
     adminEmail = '';
     companyName = '';
@@ -37,6 +38,7 @@ export default class NativeFormsConnect extends LightningElement {
     isBusy = false;
     isInitializing = true;
     showPrincipalAccessHelp = false;
+    hasBlockingSetupAccessIssue = false;
     tenantAuthVerified = false;
     tenantAuthStatus = 'not_checked';
     tenantAuthErrorMessage = '';
@@ -47,9 +49,11 @@ export default class NativeFormsConnect extends LightningElement {
     hasClientCredentials = false;
     tenantTestMessage = '';
     tenantTestMessageVariant = '';
+    accessView;
+    isUpdatingAccess = false;
+    selectedUserGrantId = '';
+    selectedAdminGrantId = '';
     expandedImageSections = {
-        step1: false,
-        step2: false,
         step3: false
     };
 
@@ -80,6 +84,7 @@ export default class NativeFormsConnect extends LightningElement {
             this.city = context.city || '';
             this.restoreConnectState(this.orgId);
             await this.loadConnectionStatus();
+            await this.loadAccessSummary();
         } catch (error) {
             this.errorMessage = `Unable to load org setup details.\n\n${this.formatError(error)}`;
         } finally {
@@ -125,20 +130,13 @@ export default class NativeFormsConnect extends LightningElement {
             normalized.includes('permission set access');
 
         this.showPrincipalAccessHelp = isPrincipalAccessIssue;
+        this.hasBlockingSetupAccessIssue = isPrincipalAccessIssue;
 
         if (isPrincipalAccessIssue) {
             return 'TwinaForms could not connect yet because the required permission-set access is not fully enabled.';
         }
 
         return rawMessage;
-    }
-
-    get step1ImageUrl() {
-        return step1Image;
-    }
-
-    get step2ImageUrl() {
-        return step2Image;
     }
 
     get step3ImageUrl() {
@@ -166,11 +164,11 @@ export default class NativeFormsConnect extends LightningElement {
     }
 
     get tenantSetupComplete() {
-        return this.tenantAuthVerified;
+        return this.tenantAuthVerified && !this.hasBlockingSetupAccessIssue;
     }
 
     get showTenantSetupStage() {
-        return !this.tenantSetupComplete;
+        return this.hasBlockingSetupAccessIssue || !this.tenantAuthVerified;
     }
 
     get showTenantSetupCompleteBanner() {
@@ -198,7 +196,7 @@ export default class NativeFormsConnect extends LightningElement {
     }
 
     get showOauthStage() {
-        return this.tenantSetupComplete && !this.isConnected;
+        return this.tenantSetupComplete && !this.isConnected && !this.hasBlockingSetupAccessIssue;
     }
 
     get showOauthCompleteBanner() {
@@ -277,6 +275,80 @@ export default class NativeFormsConnect extends LightningElement {
         return false;
     }
 
+    get access() {
+        return this.accessView?.access || {};
+    }
+
+    get usage() {
+        return this.accessView?.usage || {};
+    }
+
+    get accessUsers() {
+        return this.access.users || [];
+    }
+
+    get adminAppOpen() {
+        return this.access.adminAppOpen === true;
+    }
+
+    get adminAppStatusLabel() {
+        return this.adminAppOpen ? 'Open for support/debug' : 'Closed by default';
+    }
+
+    get adminAppStatusClass() {
+        return this.adminAppOpen ? 'status-pill status-pill--success' : 'status-pill status-pill--warning';
+    }
+
+    get showAccessSection() {
+        return this.accessUsers.length > 0;
+    }
+
+    get userAssignments() {
+        return this.accessUsers.filter((item) => item.hasTwinaFormsUser);
+    }
+
+    get adminAssignments() {
+        return this.accessUsers.filter((item) => item.hasTwinaFormsAdmin);
+    }
+
+    get hasUserAssignments() {
+        return this.userAssignments.length > 0;
+    }
+
+    get hasAdminAssignments() {
+        return this.adminAssignments.length > 0;
+    }
+
+    get availableUserGrantOptions() {
+        return this.accessUsers
+            .filter((item) => !item.hasTwinaFormsUser)
+            .map((item) => ({
+                label: item.displayLabel,
+                value: item.userId
+            }));
+    }
+
+    get availableAdminGrantOptions() {
+        return this.accessUsers
+            .filter((item) => !item.hasTwinaFormsAdmin)
+            .map((item) => ({
+                label: item.displayLabel,
+                value: item.userId
+            }));
+    }
+
+    get userGrantDisabled() {
+        return this.isInitializing || this.isUpdatingAccess || !this.selectedUserGrantId;
+    }
+
+    get adminGrantDisabled() {
+        return this.isInitializing || this.isUpdatingAccess || !this.selectedAdminGrantId || !this.adminAppOpen;
+    }
+
+    get adminGrantComboboxDisabled() {
+        return this.isUpdatingAccess || !this.adminAppOpen;
+    }
+
     get showTenantTestMessage() {
         return !!this.tenantTestMessage;
     }
@@ -295,6 +367,34 @@ export default class NativeFormsConnect extends LightningElement {
         this[field] = event.target.value;
     }
 
+    handleUserGrantSelection(event) {
+        this.selectedUserGrantId = event.detail.value;
+    }
+
+    handleAdminGrantSelection(event) {
+        this.selectedAdminGrantId = event.detail.value;
+    }
+
+    async handleGrantUserAccess() {
+        await this.changeAccess(this.selectedUserGrantId, 'user', true, 'TwinaForms User granted.');
+        this.selectedUserGrantId = '';
+    }
+
+    async handleGrantAdminAccess() {
+        await this.changeAccess(this.selectedAdminGrantId, 'admin', true, 'TwinaForms Admin granted.');
+        this.selectedAdminGrantId = '';
+    }
+
+    async handleToggleAccess(event) {
+        const userId = event.currentTarget.dataset.userId;
+        const accessType = event.currentTarget.dataset.accessType;
+        const enabled = event.currentTarget.dataset.enabled === 'true';
+        const successToastMessage = enabled
+            ? `${accessType === 'admin' ? 'TwinaForms Admin' : 'TwinaForms User'} granted.`
+            : `${accessType === 'admin' ? 'TwinaForms Admin' : 'TwinaForms User'} removed.`;
+        await this.changeAccess(userId, accessType, enabled, successToastMessage);
+    }
+
     handleToggleImage(event) {
         const section = event.target.dataset.section;
         if (!section) {
@@ -307,24 +407,8 @@ export default class NativeFormsConnect extends LightningElement {
         };
     }
 
-    get showStep1Image() {
-        return this.expandedImageSections.step1;
-    }
-
-    get showStep2Image() {
-        return this.expandedImageSections.step2;
-    }
-
     get showStep3Image() {
         return this.expandedImageSections.step3;
-    }
-
-    get step1ImageButtonLabel() {
-        return this.showStep1Image ? 'Hide example image' : 'Show example image';
-    }
-
-    get step2ImageButtonLabel() {
-        return this.showStep2Image ? 'Hide example image' : 'Show example image';
     }
 
     get step3ImageButtonLabel() {
@@ -367,6 +451,7 @@ export default class NativeFormsConnect extends LightningElement {
         this.tenantTestMessage = '';
         this.tenantTestMessageVariant = '';
         this.showPrincipalAccessHelp = false;
+        this.hasBlockingSetupAccessIssue = false;
         this.isBusy = true;
 
         try {
@@ -416,6 +501,7 @@ export default class NativeFormsConnect extends LightningElement {
         this.errorMessage = '';
         this.successMessage = '';
         this.showPrincipalAccessHelp = false;
+        this.hasBlockingSetupAccessIssue = false;
         this.isBusy = true;
         const oauthWindow = window.open('', '_blank');
 
@@ -458,8 +544,37 @@ export default class NativeFormsConnect extends LightningElement {
 
         try {
             await this.loadConnectionStatus();
+            await this.loadAccessSummary();
         } finally {
             this.isBusy = false;
+        }
+    }
+
+    async loadAccessSummary() {
+        const result = await getAccessManagementView();
+        this.accessView = result || {};
+    }
+
+    async changeAccess(userId, accessType, enabled, successToastMessage) {
+        if (!userId || this.isUpdatingAccess) {
+            return;
+        }
+
+        this.isUpdatingAccess = true;
+        this.errorMessage = '';
+        this.successMessage = '';
+        try {
+            const result = await updatePermissionSetAccess({ userId, accessType, enabled });
+            this.accessView = result || {};
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'User access updated',
+                message: successToastMessage,
+                variant: 'success'
+            }));
+        } catch (error) {
+            this.errorMessage = this.formatError(error);
+        } finally {
+            this.isUpdatingAccess = false;
         }
     }
 
@@ -467,12 +582,18 @@ export default class NativeFormsConnect extends LightningElement {
         try {
             const status = await getConnectionStatus({ orgId: this.orgId });
             if (status?.success !== true) {
+                this.tenantAuthVerified = false;
+                this.tenantAuthStatus = 'not_verified';
+                this.tenantAuthErrorMessage = '';
+                this.isAwaitingOauthReturn = false;
+                this.successMessage = '';
                 this.errorMessage = this.normalizeRegistrationError(
                     new Error(status?.errorMessage || 'Unable to verify TwinaForms connection status.')
                 );
                 return;
             }
 
+            this.hasBlockingSetupAccessIssue = false;
             this.errorMessage = '';
             this.setupState = status.setupState || 'not_registered';
             this.connectUrl = status.connectUrl || '';
@@ -498,6 +619,11 @@ export default class NativeFormsConnect extends LightningElement {
 
             this.persistConnectState();
         } catch (error) {
+            this.tenantAuthVerified = false;
+            this.tenantAuthStatus = 'not_verified';
+            this.tenantAuthErrorMessage = '';
+            this.isAwaitingOauthReturn = false;
+            this.successMessage = '';
             this.errorMessage = this.normalizeRegistrationError(
                 new Error(`Unable to verify TwinaForms connection status.\n\n${this.formatError(error)}`)
             );

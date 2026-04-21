@@ -27,19 +27,27 @@
                         <div class="pane-header">
                             <p class="page-version">{pageVersion}</p>
                             <h2>Prefill Actions</h2>
-                            <p class="pane-copy">Define aliases by querying Salesforce records.</p>
+                            <p class="pane-copy">Define Salesforce records that can be used to prefill the form.</p>
                         </div>
 
-                        <lightning-button
-                            label="Refresh from Designer"
-                            onclick={handleRefreshFromDesigner}>
-                        </lightning-button>
+                        <div class="pane-actions">
+                            <div class="button-help-row">
+                                <button
+                                    type="button"
+                                    class="pane-action-button"
+                                    onclick={handleRefreshFromDesigner}>
+                                    Refresh from Designer
+                                </button>
+                                <lightning-helptext content={refreshFromDesignerHelpText}></lightning-helptext>
+                            </div>
 
-                        <lightning-button
-                            variant="brand"
-                            label="New Prefill Action"
-                            onclick={handleAddAction}>
-                        </lightning-button>
+                            <button
+                                type="button"
+                                class="pane-action-button pane-action-button--brand"
+                                onclick={handleAddAction}>
+                                New Prefill Action
+                            </button>
+                        </div>
 
                         <template if:true={actions.length}>
                             <div class="action-list">
@@ -59,16 +67,11 @@
                             </div>
                         </template>
 
-                        <div class="help-inline-panel">
-                            <h3>How It Works</h3>
-                            <p><strong>Salesforce Field</strong> is the field on the selected object that you want to search, such as <code>Email</code> or <code>ContactId</code>.</p>
-                            <p><strong>Value Source</strong> controls where the right side comes from:</p>
-                            <p><strong>URL Parameter</strong> uses a value from the page address, such as <code>?email=test@example.com</code>.</p>
-                            <p><strong>Form Field</strong> uses a value already on the form.</p>
-                            <p><strong>Literal Value</strong> compares against fixed text or a number.</p>
-                            <p><strong>Prefill Alias Field</strong> is a Pro feature. Choose a previous prefill alias first, then choose one of that alias's Salesforce fields, such as <code>Contact</code> + <code>Id</code>.</p>
-                            <p><strong>findOne</strong> returns one record. <strong>findMany</strong> returns multiple records and needs a <strong>Limit</strong>.</p>
-                            <p><strong>On Not Found = Ignore</strong> means the form continues without prefilling. <strong>Error</strong> means the hosted form should stop and show a failure.</p>
+                        <div class="concept-panel">
+                            <h3>What This Page Does</h3>
+                            <p>Here you define Salesforce records that can be used to prefill the form.</p>
+                            <p>You can match records by URL parameters, form fields, fixed values, or earlier aliases.</p>
+                            <p>Each prefill action creates an alias that can later be used in the form’s element properties.</p>
                         </div>
                     </section>
 
@@ -80,36 +83,64 @@
                         <template if:true={selectedAction}>
                             <div class="editor-grid">
                                 <div class="editor-grid-top">
-                                    <lightning-input
-                                        name="storeResultAs"
-                                        label="Alias / Store Result As"
-                                        value={draftAction.storeResultAs}
-                                        onchange={handleDraftChange}>
-                                    </lightning-input>
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>Result Alias</span>
+                                            <lightning-helptext content={resultAliasHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-input
+                                            name="storeResultAs"
+                                            variant="label-hidden"
+                                            label="Result Alias"
+                                            value={draftAction.storeResultAs}
+                                            onchange={handleDraftChange}>
+                                        </lightning-input>
+                                    </div>
 
-                                    <lightning-combobox
-                                        name="objectApiName"
-                                        label="Salesforce Object"
-                                        value={draftAction.objectApiName}
-                                        options={filteredObjectOptions}
-                                        onchange={handleDraftChange}>
-                                    </lightning-combobox>
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>Salesforce Object</span>
+                                            <lightning-helptext content={salesforceObjectHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-combobox
+                                            name="objectApiName"
+                                            variant="label-hidden"
+                                            label="Salesforce Object"
+                                            value={draftAction.objectApiName}
+                                            options={filteredObjectOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </div>
 
-                                    <lightning-combobox
-                                        name="commandType"
-                                        label="Command Type"
-                                        value={draftAction.commandType}
-                                        options={commandTypeOptions}
-                                        onchange={handleDraftChange}>
-                                    </lightning-combobox>
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>Prefill Mode</span>
+                                            <lightning-helptext content={prefillModeHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-combobox
+                                            name="commandType"
+                                            variant="label-hidden"
+                                            label="Prefill Mode"
+                                            value={draftAction.commandType}
+                                            options={commandTypeOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </div>
 
-                                    <lightning-combobox
-                                        name="onNotFound"
-                                        label="On Not Found"
-                                        value={draftAction.onNotFound}
-                                        options={notFoundOptions}
-                                        onchange={handleDraftChange}>
-                                    </lightning-combobox>
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>If No Record Is Found</span>
+                                            <lightning-helptext content={ifNoRecordFoundHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-combobox
+                                            name="onNotFound"
+                                            variant="label-hidden"
+                                            label="If No Record Is Found"
+                                            value={draftAction.onNotFound}
+                                            options={notFoundOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </div>
                                 </div>
 
                                 <div class="condition-builder">
@@ -119,30 +150,51 @@
                                     <template for:each={conditionRows} for:item="row" for:index="index">
                                         <div key={row.id} class="condition-row">
                                             <div class="condition-index">{row.displayIndex}</div>
-                                            <lightning-combobox
-                                                data-index={index}
-                                                name="fieldApiName"
-                                                label="Salesforce Field"
-                                                value={row.fieldApiName}
-                                                options={fieldOptions}
-                                                onchange={handleConditionChange}>
-                                            </lightning-combobox>
-                                            <lightning-combobox
-                                                data-index={index}
-                                                name="operator"
-                                                label="Operator"
-                                                value={row.operator}
-                                                options={operatorOptions}
-                                                onchange={handleConditionChange}>
-                                            </lightning-combobox>
-                                            <lightning-combobox
-                                                data-index={index}
-                                                name="valueSource"
-                                                label="Value Source"
-                                                value={row.valueSource}
-                                                options={valueSourceOptions}
-                                                onchange={handleConditionChange}>
-                                            </lightning-combobox>
+                                            <div class="field-help-stack">
+                                                <div class="field-help-label">
+                                                    <span>Salesforce Field</span>
+                                                    <lightning-helptext content={salesforceFieldHelpText}></lightning-helptext>
+                                                </div>
+                                                <lightning-combobox
+                                                    data-index={index}
+                                                    name="fieldApiName"
+                                                    variant="label-hidden"
+                                                    label="Salesforce Field"
+                                                    value={row.fieldApiName}
+                                                    options={fieldOptions}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                            <div class="field-help-stack">
+                                                <div class="field-help-label">
+                                                    <span>Operator</span>
+                                                    <lightning-helptext content={operatorHelpText}></lightning-helptext>
+                                                </div>
+                                                <lightning-combobox
+                                                    data-index={index}
+                                                    name="operator"
+                                                    variant="label-hidden"
+                                                    label="Operator"
+                                                    value={row.operator}
+                                                    options={operatorOptions}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                            <div class="field-help-stack">
+                                                <div class="field-help-label">
+                                                    <span>Value Source</span>
+                                                    <lightning-helptext content={valueSourceHelpText}></lightning-helptext>
+                                                </div>
+                                                <lightning-combobox
+                                                    data-index={index}
+                                                    name="valueSource"
+                                                    variant="label-hidden"
+                                                    label="Value Source"
+                                                    value={row.valueSource}
+                                                    options={valueSourceOptions}
+                                                    onchange={handleConditionChange}>
+                                                </lightning-combobox>
+                                            </div>
                                             <template if:true={row.isValueSourceField}>
                                                 <lightning-combobox
                                                     data-index={index}
@@ -156,22 +208,36 @@
                                             </template>
                                             <template if:false={row.isValueSourceField}>
                                                 <template if:true={row.isValueSourceAlias}>
-                                                    <lightning-combobox
-                                                        data-index={index}
-                                                        name="aliasName"
-                                                        label="Prefill Alias"
-                                                        value={row.selectedAliasName}
-                                                        options={row.aliasOptions}
-                                                        onchange={handleConditionChange}>
-                                                    </lightning-combobox>
-                                                    <lightning-combobox
-                                                        data-index={index}
-                                                        name="aliasField"
-                                                        label="Alias Field"
-                                                        value={row.selectedAliasField}
-                                                        options={row.aliasFieldOptions}
-                                                        onchange={handleConditionChange}>
-                                                    </lightning-combobox>
+                                                    <div class="field-help-stack">
+                                                        <div class="field-help-label">
+                                                            <span>Prefill Alias</span>
+                                                            <lightning-helptext content={prefillAliasHelpText}></lightning-helptext>
+                                                        </div>
+                                                        <lightning-combobox
+                                                            data-index={index}
+                                                            name="aliasName"
+                                                            variant="label-hidden"
+                                                            label="Prefill Alias"
+                                                            value={row.selectedAliasName}
+                                                            options={row.aliasOptions}
+                                                            onchange={handleConditionChange}>
+                                                        </lightning-combobox>
+                                                    </div>
+                                                    <div class="field-help-stack">
+                                                        <div class="field-help-label">
+                                                            <span>Alias Field</span>
+                                                            <lightning-helptext content={aliasFieldHelpText}></lightning-helptext>
+                                                        </div>
+                                                        <lightning-combobox
+                                                            data-index={index}
+                                                            name="aliasField"
+                                                            variant="label-hidden"
+                                                            label="Alias Field"
+                                                            value={row.selectedAliasField}
+                                                            options={row.aliasFieldOptions}
+                                                            onchange={handleConditionChange}>
+                                                        </lightning-combobox>
+                                                    </div>
                                                 </template>
                                                 <template if:false={row.isValueSourceAlias}>
                                                     <lightning-input
@@ -193,12 +259,19 @@
                                         </div>
                                     </template>
                                     <template if:true={showConditionExpression}>
-                                        <lightning-input
-                                            name="conditionExpression"
-                                            label="Condition Logic"
-                                            value={draftAction.conditionExpression}
-                                            onchange={handleConditionExpressionChange}>
-                                        </lightning-input>
+                                        <div class="field-help-stack field-help-stack--wide">
+                                            <div class="field-help-label">
+                                                <span>Condition Logic</span>
+                                                <lightning-helptext content={conditionLogicHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-input
+                                                name="conditionExpression"
+                                                variant="label-hidden"
+                                                label="Condition Logic"
+                                                value={draftAction.conditionExpression}
+                                                onchange={handleConditionExpressionChange}>
+                                            </lightning-input>
+                                        </div>
                                     </template>
                                     <template if:true={canAddCondition}>
                                         <lightning-button
@@ -210,16 +283,26 @@
 
                                 <template if:true={isFindMany}>
                                     <div class="order-row">
-                                        <lightning-combobox
-                                            name="orderByField"
-                                            label="Order By"
-                                            value={draftAction.orderByField}
-                                            options={orderByFieldOptions}
-                                            onchange={handleDraftChange}>
-                                        </lightning-combobox>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Order By</span>
+                                                <lightning-helptext content={orderByHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-combobox
+                                                name="orderByField"
+                                                variant="label-hidden"
+                                                label="Order By"
+                                                value={draftAction.orderByField}
+                                                options={orderByFieldOptions}
+                                                onchange={handleDraftChange}>
+                                            </lightning-combobox>
+                                        </div>
 
                                         <div class="sort-direction">
-                                            <span class="sort-direction__label">Sort Direction</span>
+                                            <span class="sort-direction__label">
+                                                <span>Sort Direction</span>
+                                                <lightning-helptext content={sortDirectionHelpText}></lightning-helptext>
+                                            </span>
                                             <div class="sort-direction__options">
                                                 <label class="sort-direction__option">
                                                     <input
@@ -243,32 +326,50 @@
                                         </div>
                                     </div>
 
-                                    <lightning-input
-                                        type="number"
-                                        name="limitValue"
-                                        label="Limit"
-                                        value={draftAction.limitValue}
-                                        onchange={handleDraftChange}>
-                                    </lightning-input>
+                                    <div class="field-help-stack field-help-stack--limit">
+                                        <div class="field-help-label">
+                                            <span>Limit</span>
+                                            <lightning-helptext content={limitHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-input
+                                            type="number"
+                                            name="limitValue"
+                                            variant="label-hidden"
+                                            label="Limit"
+                                            value={draftAction.limitValue}
+                                            onchange={handleDraftChange}>
+                                        </lightning-input>
+                                    </div>
                                 </template>
 
                                 <lightning-accordion allow-multiple-sections-open>
                                     <lightning-accordion-section name="advanced" label="Advanced">
-                                        <lightning-input
-                                            name="actionKey"
-                                            label="Action Key"
-                                            value={draftAction.actionKey}
-                                            read-only>
-                                        </lightning-input>
-                                        <lightning-textarea
-                                            name="configJson"
-                                            label="Config JSON"
-                                            value={draftAction.configJson}
-                                            read-only>
-                                        </lightning-textarea>
-                                        <p class="help-inline">
-                                            Queried Salesforce fields are derived from the builder field mappings for this alias.
-                                        </p>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Action Key</span>
+                                                <lightning-helptext content={actionKeyHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-input
+                                                name="actionKey"
+                                                variant="label-hidden"
+                                                label="Action Key"
+                                                value={draftAction.actionKey}
+                                                read-only>
+                                            </lightning-input>
+                                        </div>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Config JSON</span>
+                                                <lightning-helptext content={configJsonHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-textarea
+                                                name="configJson"
+                                                variant="label-hidden"
+                                                label="Config JSON"
+                                                value={draftAction.configJson}
+                                                read-only>
+                                            </lightning-textarea>
+                                        </div>
                                     </lightning-accordion-section>
                                 </lightning-accordion>
 

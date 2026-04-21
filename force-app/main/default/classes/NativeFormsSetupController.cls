@@ -200,7 +200,7 @@ public with sharing class NativeFormsSetupController {
             result.tenantAuthErrorMessage = tenantAuth.errorMessage;
         } catch (Exception e) {
             result.success = false;
-            result.errorMessage = 'TwinaForms could not verify the current connection status. Refresh and try again.';
+            result.errorMessage = buildConnectionStatusErrorMessage(null, e == null ? null : e.getMessage());
         }
 
         return result;

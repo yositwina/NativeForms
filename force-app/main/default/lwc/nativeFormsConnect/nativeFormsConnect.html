@@ -39,12 +39,13 @@
                         <h2 class="slds-text-heading_small slds-m-bottom_x-small">What To Do First</h2>
                         <p class="slds-m-bottom_x-small">An admin needs to finish the TwinaForms access setup before this page can connect the org.</p>
                         <ol class="instruction-list">
-                            <li>Open the <strong>TwinaForms Admin</strong> permission set and assign it to the admins who will manage setup.</li>
+                            <li>Open the <strong>TwinaForms User</strong> permission set and assign it to the people who will use the main TwinaForms workspace.</li>
                             <li>Inside that permission set, open <strong>External Credential Principal Access</strong>.</li>
                             <li>Enable both principals:
                                 <div class="instruction-detail">TwinaForms Bootstrap / NativeFormsBootstrapPrincipal</div>
                                 <div class="instruction-detail">TwinaForms Shared Secret / NativeFormsSharedSecret</div>
                             </li>
+                            <li>If you plan to open <strong>TwinaForms Admin</strong> for support/debug work later, enable the same two principals there too.</li>
                             <li>Return here and click <strong>Generate Secret</strong> again.</li>
                         </ol>
                     </div>
@@ -77,25 +78,15 @@
                             <li class="instruction-step">
                                 <div class="instruction-step__content">
                                     <p class="instruction-text-block">
-                                        Open the <strong>TwinaForms Admin</strong> permission set in Salesforce Setup and assign it to the admins who will manage the app.
+                                        Open the <strong>TwinaForms User</strong> permission set in Salesforce Setup and assign it to the people who will use the main TwinaForms workspace.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
                                         In that permission set, open <strong>External Credential Principal Access</strong>.
                                     </p>
-                                    <div class="instruction-toggle">
-                                        <lightning-button
-                                            variant="base"
-                                            label={step1ImageButtonLabel}
-                                            data-section="step1"
-                                            onclick={handleToggleImage}>
-                                        </lightning-button>
-                                    </div>
+                                    <p class="instruction-text-block slds-m-top_small">
+                                        If you plan to use <strong>TwinaForms Admin</strong> for support/debug access, enable the same principals there too after the main setup is working.
+                                    </p>
                                 </div>
-                                <template if:true={showStep1Image}>
-                                    <div class="instruction-step__media">
-                                        <img src={step1ImageUrl} alt="Permission set and External Credential Principal Access example" class="instruction-image" />
-                                    </div>
-                                </template>
                             </li>
                             <li class="instruction-step">
                                 <div class="instruction-step__content">
@@ -104,20 +95,7 @@
                                     </p>
                                     <div class="instruction-detail">TwinaForms Bootstrap / NativeFormsBootstrapPrincipal</div>
                                     <div class="instruction-detail">TwinaForms Shared Secret / NativeFormsSharedSecret</div>
-                                    <div class="instruction-toggle">
-                                        <lightning-button
-                                            variant="base"
-                                            label={step2ImageButtonLabel}
-                                            data-section="step2"
-                                            onclick={handleToggleImage}>
-                                        </lightning-button>
-                                    </div>
                                 </div>
-                                <template if:true={showStep2Image}>
-                                    <div class="instruction-step__media">
-                                        <img src={step2ImageUrl} alt="Enabled external credential principals example" class="instruction-image instruction-image--compact" />
-                                    </div>
-                                </template>
                             </li>
                             <li>Click <strong>Generate Secret</strong> below.</li>
                             <li>Add the generated tenant secret to <strong>Named Credentials &gt; TwinaForms &gt; NativeFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
@@ -281,6 +259,128 @@
                             </p>
                         </div>
                     </template>
+                </section>
+            </template>
+
+            <template if:true={showAccessSection}>
+                <section class="access-section slds-m-top_large">
+                    <div class="access-section__header">
+                        <div>
+                            <p class="access-section__eyebrow">User Access</p>
+                            <h3 class="access-section__title">Manage TwinaForms seats and admin access</h3>
+                        </div>
+                        <div class="access-section__pills">
+                            <span class="status-pill status-pill--neutral">TwinaForms Users {usage.activeUsersLabel}</span>
+                            <span class={adminAppStatusClass}>Admin App {adminAppStatusLabel}</span>
+                        </div>
+                    </div>
+
+                    <p class="access-section__copy">
+                        <strong>TwinaForms User</strong> counts against your plan seat limit. <strong>TwinaForms Admin</strong> is support/debug access and only opens when enabled from the TwinaForms Admin console.
+                    </p>
+
+                    <div class="access-grid">
+                        <article class="access-panel">
+                            <div class="access-panel__heading">
+                                <div>
+                                    <p class="access-panel__kicker">Customer Seats</p>
+                                    <h4>{access.userPermissionSetLabel}</h4>
+                                </div>
+                            </div>
+
+                            <div class="access-list">
+                                <template for:each={userAssignments} for:item="userItem">
+                                    <div key={userItem.userId} class="access-list__row">
+                                        <div class="access-list__copy">
+                                            <strong>{userItem.name}</strong>
+                                            <span>{userItem.email}</span>
+                                        </div>
+                                        <lightning-button
+                                            variant="neutral"
+                                            label="Remove"
+                                            data-user-id={userItem.userId}
+                                            data-access-type="user"
+                                            data-enabled="false"
+                                            onclick={handleToggleAccess}
+                                            disabled={isUpdatingAccess}>
+                                        </lightning-button>
+                                    </div>
+                                </template>
+
+                                <template if:false={hasUserAssignments}>
+                                    <div class="access-empty">No Salesforce users have TwinaForms seat access yet.</div>
+                                </template>
+                            </div>
+
+                            <div class="access-grant">
+                                <lightning-combobox
+                                    label="Add TwinaForms User"
+                                    value={selectedUserGrantId}
+                                    options={availableUserGrantOptions}
+                                    placeholder="Choose an active Salesforce user"
+                                    onchange={handleUserGrantSelection}>
+                                </lightning-combobox>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Grant Seat"
+                                    onclick={handleGrantUserAccess}
+                                    disabled={userGrantDisabled}>
+                                </lightning-button>
+                            </div>
+                        </article>
+
+                        <template if:true={adminAppOpen}>
+                            <article class="access-panel">
+                                <div class="access-panel__heading">
+                                    <div>
+                                        <p class="access-panel__kicker">Support / Debug</p>
+                                        <h4>{access.adminPermissionSetLabel}</h4>
+                                    </div>
+                                </div>
+
+                                <div class="access-list">
+                                    <template for:each={adminAssignments} for:item="userItem">
+                                        <div key={userItem.userId} class="access-list__row">
+                                            <div class="access-list__copy">
+                                                <strong>{userItem.name}</strong>
+                                                <span>{userItem.email}</span>
+                                            </div>
+                                            <lightning-button
+                                                variant="neutral"
+                                                label="Remove"
+                                                data-user-id={userItem.userId}
+                                                data-access-type="admin"
+                                                data-enabled="false"
+                                                onclick={handleToggleAccess}
+                                                disabled={isUpdatingAccess}>
+                                            </lightning-button>
+                                        </div>
+                                    </template>
+
+                                    <template if:false={hasAdminAssignments}>
+                                        <div class="access-empty">No users currently have TwinaForms Admin access.</div>
+                                    </template>
+                                </div>
+
+                                <div class="access-grant">
+                                    <lightning-combobox
+                                        label="Add TwinaForms Admin"
+                                        value={selectedAdminGrantId}
+                                        options={availableAdminGrantOptions}
+                                        placeholder="Choose an active Salesforce user"
+                                        onchange={handleAdminGrantSelection}
+                                        disabled={adminGrantComboboxDisabled}>
+                                    </lightning-combobox>
+                                    <lightning-button
+                                        variant="brand"
+                                        label="Grant Admin Access"
+                                        onclick={handleGrantAdminAccess}
+                                        disabled={adminGrantDisabled}>
+                                    </lightning-button>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
                 </section>
             </template>
         </div>

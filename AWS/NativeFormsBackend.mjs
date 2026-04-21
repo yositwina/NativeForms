@@ -1528,6 +1528,9 @@ export const handler = async (event) => {
         orgId,
         registered: !!tenantRecord,
         setupState,
+        supportFlags: {
+          enableSalesforceAdminApp: tenantRecord?.supportFlags?.enableSalesforceAdminApp === true
+        },
         plan: {
           code: planCode,
           label: selectedPlan?.label || "Trial",

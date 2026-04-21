@@ -7,7 +7,7 @@ import deleteSubmitAction from '@salesforce/apex/NativeFormsSubmitActionsControl
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
-const PAGE_VERSION = 'Submit v0.9';
+const PAGE_VERSION = 'Submit v1.1';
 
 export default class NativeFormsSubmitActions extends LightningElement {
     isLoading = true;
@@ -52,6 +52,82 @@ export default class NativeFormsSubmitActions extends LightningElement {
         return PAGE_VERSION;
     }
 
+    get refreshFromDesignerHelpText() {
+        return 'Reloads the latest version context and field mappings from TwinaForms Designer.';
+    }
+
+    get resultAliasHelpText() {
+        return 'Alias used later in the form’s element properties and related actions.';
+    }
+
+    get salesforceObjectHelpText() {
+        return 'Choose which Salesforce object this submit action should create or update.';
+    }
+
+    get submitModeHelpText() {
+        return 'Choose whether this action creates, updates, finds then updates, or saves repeat-group rows.';
+    }
+
+    get ifNoMatchFoundHelpText() {
+        return 'For find-and-update flows, choose whether to stop or create a new record.';
+    }
+
+    get recordIdSourceHelpText() {
+        return 'Use a field, hidden value, or alias expression that contains the Salesforce record Id.';
+    }
+
+    get salesforceFieldHelpText() {
+        return 'Field on the selected Salesforce object used in this match condition.';
+    }
+
+    get operatorHelpText() {
+        return 'How the Salesforce field should be compared to the incoming value.';
+    }
+
+    get valueSourceHelpText() {
+        return 'Choose where the value comes from: URL, form field, fixed value, or earlier alias.';
+    }
+
+    get resultAliasFieldHelpText() {
+        return 'Choose an earlier prefill or submit alias to read from.';
+    }
+
+    get aliasFieldHelpText() {
+        return 'Salesforce field from the selected alias result.';
+    }
+
+    get conditionLogicHelpText() {
+        return 'Use expressions like 1 AND 2, or 1 AND (2 OR 3).';
+    }
+
+    get repeatGroupHelpText() {
+        return 'Choose which records list this action should save.';
+    }
+
+    get parentRelationshipFieldHelpText() {
+        return 'Salesforce lookup field on the child object that points to the parent record.';
+    }
+
+    get relationshipValueSourceHelpText() {
+        return 'Choose where the parent record Id should come from.';
+    }
+
+    get relationshipValueHelpText() {
+        return 'Value that will be written into the parent relationship field.';
+    }
+
+    get allowDeleteHelpText() {
+        return 'Rows removed by the user can also be deleted in Salesforce.';
+    }
+
+    get actionKeyHelpText() {
+        return 'System key used internally for mappings and publish output.';
+    }
+
+    get configJsonHelpText() {
+        return 'Read-only advanced view of the saved submit definition.';
+    }
+
     notFoundOptions = [
         { label: 'Show error', value: 'error' },
         { label: 'Create new record', value: 'create' }
@@ -66,7 +142,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
             options.push({ label: 'Find and update existing record', value: 'findAndUpdate' });
         }
         if (this.enableProRepeatGroups) {
-            options.push({ label: 'Upsert repeat group', value: 'upsertMany' });
+            options.push({ label: 'Save records list', value: 'upsertMany' });
         }
         return options;
     }
@@ -236,7 +312,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
             return 'Build conditions with Salesforce fields on the left, then choose a URL parameter, form field, result alias field, or literal value on the right.';
         }
         if (this.draftAction?.commandType === 'upsertMany') {
-            return 'Use this Pro mode to save rows from one Repeat Group. Existing rows with an Id update, and rows without an Id create new records.';
+            return 'Use this Pro mode to save rows from one Records List. Existing rows with an Id update, and rows without an Id create new records.';
         }
         return 'Create adds a new record using the fields mapped from the Builder.';
     }

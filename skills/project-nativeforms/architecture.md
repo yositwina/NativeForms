@@ -8,6 +8,9 @@ Use for cross-system design, Home/admin/product changes, publish-flow work, or a
 
 ## NativeForms Rules
 - Salesforce is the design source of truth for forms, versions, elements, and actions.
+- Salesforce also owns the admin organization model for authored assets, with hierarchy: `Project -> Form -> Version`.
+- Formula Fields V1 are Salesforce-authored and browser-evaluated only: Designer preview and published HTML runtime compute them, with no AWS submit-time recheck in V1.
+- Blank formula expressions are allowed in V1 and behave as empty derived values until the admin enters an expression.
 - AWS is the execution authority for runtime registration, prefill, submit, plan/tenant data, and admin operations.
 - Publish flow is: validate in Salesforce, compile artifacts, register in AWS, publish HTML, then update Salesforce publication state.
 - Tenant identity is `orgId`; tenant trust and public form trust must stay separate.

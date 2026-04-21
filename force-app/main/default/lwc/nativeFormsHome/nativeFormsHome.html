@@ -39,87 +39,177 @@
                     </div>
                 </section>
 
-                <section class="top-grid">
-                    <article class="summary-card summary-card--accent">
-                        <div class="section-heading">
+                <section class="home-layout">
+                    <section class="section-block section-block--quickstart">
+                        <div class="section-heading section-heading--wide">
                             <div>
-                                <span class="section-kicker">Connection Status</span>
-                                <h3>{connectionCardTitle}</h3>
-                            </div>
-                        </div>
-
-                        <div class="detail-list">
-                            <div class="detail-list__row">
-                                <span>Secret key added to External Credential</span>
-                                <strong>{connection.secretKeyLabel}</strong>
-                            </div>
-                            <div class="detail-list__row">
-                                <span>Permission set access configured</span>
-                                <strong>{connection.permissionSetLabel}</strong>
+                                <span class="section-kicker">Getting Started</span>
+                                <h3>Quick Start Guide</h3>
                             </div>
                         </div>
 
                         <template if:true={connection.needsConnectAction}>
-                            <div class="helper-row">
-                                <p class="helper-copy">Finish setup on the Connect page.</p>
+                            <div class="quickstart-prereq">
+                                <div class="quickstart-prereq__body">
+                                    <strong>Finish connecting first</strong>
+                                    <span>TwinaForms needs the connection to our service before you can install demo records and publish forms. Open the Connect page and complete setup, then come back here.</span>
+                                </div>
                                 <lightning-button
-                                    variant="base"
+                                    variant="brand"
                                     label="Open Connect Page"
                                     onclick={handleOpenConnect}
                                 ></lightning-button>
                             </div>
                         </template>
-                    </article>
 
-                    <article class="summary-card">
-                        <div class="section-heading">
-                            <div>
-                                <span class="section-kicker">Current Plan</span>
-                                <h3>{plan.label}</h3>
+                        <template if:false={connection.needsConnectAction}>
+                        <p class="card-copy">Send your first prefilled form in a few minutes.</p>
+
+                        <ol class="quickstart-list">
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">1</span>
+                                <div class="quickstart-body">
+                                    <strong>Install demo records</strong>
+                                    <span>Click <em>Install Demo Records</em> in the Current Plan card on the right. It creates a <strong>General</strong> project with sample forms and seed Contacts.</span>
+                                </div>
+                            </li>
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">2</span>
+                                <div class="quickstart-body">
+                                    <strong>Open the Designer</strong>
+                                    <span>Go to the <strong>Designer</strong> tab. Pick the <strong>General</strong> project and the <strong>Contact details update demo</strong> form.</span>
+                                </div>
+                            </li>
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">3</span>
+                                <div class="quickstart-body">
+                                    <strong>Inspect Prefill &amp; Submit tabs</strong>
+                                    <span>Open the <strong>Prefill</strong> and <strong>Submit</strong> tabs. They are already wired: Prefill loads an existing Contact by email, Submit creates or updates that Contact.</span>
+                                </div>
+                            </li>
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">4</span>
+                                <div class="quickstart-body">
+                                    <strong>Publish the form</strong>
+                                    <span>Click <strong>Publish Form</strong> in the Designer top bar. Copy the resulting public URL.</span>
+                                </div>
+                            </li>
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">5</span>
+                                <div class="quickstart-body">
+                                    <strong>Prefill from a URL</strong>
+                                    <span>Append <code>?email=liam.carter@example.com</code> (a demo Contact we created) to the published URL and open it. The form loads that Contact&apos;s values prefilled.</span>
+                                </div>
+                            </li>
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">6</span>
+                                <div class="quickstart-body">
+                                    <strong>Submit to add or update</strong>
+                                    <span>Change any field and submit. The matching Contact in Salesforce is updated &mdash; or a new Contact is created if the email wasn&apos;t found.</span>
+                                </div>
+                            </li>
+                            <li class="quickstart-item">
+                                <span class="quickstart-num">7</span>
+                                <div class="quickstart-body">
+                                    <strong>Try the complex form (repeat group)</strong>
+                                    <span>Repeat steps 2&ndash;6 with the <strong>Prefill multi record demo</strong> form, which shows a <strong>repeat group</strong> for multiple child rows per submission.</span>
+                                </div>
+                            </li>
+                        </ol>
+
+                        <div class="quickstart-tips">
+                            <p class="card-copy">
+                                <strong>Form settings</strong> (theme, success message, CAPTCHA, secret code, etc.) live under the <strong>form settings icon at the top-right of the Designer canvas</strong>.
+                            </p>
+                            <p class="card-copy">
+                                <strong>Create a new form</strong> with the <strong>+ New Form</strong> button in the top-right of the Designer page.
+                            </p>
+                        </div>
+                        </template>
+                    </section>
+
+                    <aside class="home-rail">
+                        <article class="summary-card">
+                            <div class="section-heading">
+                                <div>
+                                    <span class="section-kicker">Usage &amp; Limits</span>
+                                    <h3>Current workspace usage</h3>
+                                </div>
                             </div>
-                        </div>
 
-                        <p class="card-copy">{plan.description}</p>
-
-                        <div class="detail-list">
-                            <div class="detail-list__row"><span>Forms Allowed</span><strong>{planMaxFormsLabel}</strong></div>
-                            <div class="detail-list__row"><span>Demo data installed</span><strong>{demo.installedLabel}</strong></div>
-                        </div>
-
-                        <div class="action-row">
-                            <template if:false={demo.installed}>
-                                <lightning-button
-                                    variant="neutral"
-                                    label="Install Demo Records"
-                                    onclick={handleInstall}
-                                    disabled={installDisabled}
-                                ></lightning-button>
-                            </template>
-
-                            <template if:true={showPlanUpgradeAction}>
-                                <lightning-button
-                                    variant="brand-outline"
-                                    label="Upgrade Plan"
-                                    onclick={handleOpenUpgrade}
-                                ></lightning-button>
-                            </template>
-                        </div>
-                    </article>
-
-                    <article class="summary-card">
-                        <div class="section-heading">
-                            <div>
-                                <span class="section-kicker">Usage &amp; Limits</span>
-                                <h3>Current workspace usage</h3>
+                            <div class="detail-list">
+                                <div class="detail-list__row"><span>Forms</span><strong>{usage.formsUsageLabel}</strong></div>
+                                <div class="detail-list__row"><span>Submissions This Month</span><strong>{usage.submissionsUsageLabel}</strong></div>
+                                <div class="detail-list__row"><span>Active Users</span><strong>{usage.activeUsersLabel}</strong></div>
                             </div>
-                        </div>
+                        </article>
 
-                        <div class="detail-list">
-                            <div class="detail-list__row"><span>Forms</span><strong>{usage.formsUsageLabel}</strong></div>
-                            <div class="detail-list__row"><span>Submissions This Month</span><strong>{usage.submissionsUsageLabel}</strong></div>
-                            <div class="detail-list__row"><span>Active Users</span><strong>{usage.activeUsersLabel}</strong></div>
-                        </div>
-                    </article>
+                        <article class="summary-card">
+                            <div class="section-heading">
+                                <div>
+                                    <span class="section-kicker">Current Plan</span>
+                                    <h3>{plan.label}</h3>
+                                </div>
+                            </div>
+
+                            <p class="card-copy">{plan.description}</p>
+
+                            <div class="detail-list">
+                                <div class="detail-list__row"><span>Forms Allowed</span><strong>{planMaxFormsLabel}</strong></div>
+                                <div class="detail-list__row"><span>Demo data installed</span><strong>{demo.installedLabel}</strong></div>
+                            </div>
+
+                            <div class="action-row">
+                                <template if:false={demo.installed}>
+                                    <lightning-button
+                                        variant="neutral"
+                                        label="Install Demo Records"
+                                        onclick={handleInstall}
+                                        disabled={installDisabled}
+                                    ></lightning-button>
+                                </template>
+
+                                <template if:true={showPlanUpgradeAction}>
+                                    <lightning-button
+                                        variant="brand-outline"
+                                        label="Upgrade Plan"
+                                        onclick={handleOpenUpgrade}
+                                    ></lightning-button>
+                                </template>
+                            </div>
+                        </article>
+
+                        <article class="summary-card summary-card--accent">
+                            <div class="section-heading">
+                                <div>
+                                    <span class="section-kicker">Connection Status</span>
+                                    <h3>{connectionCardTitle}</h3>
+                                </div>
+                            </div>
+
+                            <div class="detail-list">
+                                <div class="detail-list__row">
+                                    <span>Secret key added to External Credential</span>
+                                    <strong>{connection.secretKeyLabel}</strong>
+                                </div>
+                                <div class="detail-list__row">
+                                    <span>Permission set access configured</span>
+                                    <strong>{connection.permissionSetLabel}</strong>
+                                </div>
+                            </div>
+
+                            <template if:true={connection.needsConnectAction}>
+                                <div class="helper-row">
+                                    <p class="helper-copy">Finish setup on the Connect page.</p>
+                                    <lightning-button
+                                        variant="base"
+                                        label="Open Connect Page"
+                                        onclick={handleOpenConnect}
+                                    ></lightning-button>
+                                </div>
+                            </template>
+                        </article>
+                    </aside>
                 </section>
 
                 <template if:true={showUpgradeSection}>

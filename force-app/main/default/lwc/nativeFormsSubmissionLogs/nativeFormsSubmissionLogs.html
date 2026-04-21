@@ -16,35 +16,58 @@
             </template>
 
             <template if:false={isLoading}>
-                <section class="summary-grid">
-                    <article class="summary-card">
-                        <strong class="summary-value">{loadedCount}</strong>
-                        <span class="summary-label">Loaded Results</span>
-                    </article>
-                    <article class="summary-card">
-                        <strong class="summary-value summary-value--danger">{failedCount}</strong>
-                        <span class="summary-label">Failed</span>
-                    </article>
-                    <article class="summary-card">
-                        <strong class="summary-value summary-value--success">{successCount}</strong>
-                        <span class="summary-label">Success</span>
-                    </article>
-                    <article class="summary-card">
-                        <strong class="summary-value">{last24HoursCount}</strong>
-                        <span class="summary-label">Last 24h</span>
-                    </article>
-                </section>
-
-                <section class="filters-card">
-                    <div class="filters-grid">
-                        <lightning-input type="search" name="formId" label="Form Name" value={formId} onchange={handleFilterChange}></lightning-input>
-                        <lightning-combobox name="outcome" label="Outcome" value={outcome} options={outcomeOptions} onchange={handleFilterChange}></lightning-combobox>
-                        <lightning-input type="date" name="dateFrom" label="Date From" value={dateFrom} onchange={handleFilterChange}></lightning-input>
-                        <lightning-input type="date" name="dateTo" label="Date To" value={dateTo} onchange={handleFilterChange}></lightning-input>
+                <section class="logs-toolbar">
+                    <div class="logs-toolbar__field">
+                        <span class="logs-toolbar__label">Project</span>
+                        <lightning-combobox
+                            name="projectId"
+                            variant="label-hidden"
+                            label="Project"
+                            value={selectedProjectId}
+                            options={projectOptions}
+                            placeholder="Select project"
+                            onchange={handleProjectChange}>
+                        </lightning-combobox>
+                    </div>
+                    <div class="logs-toolbar__field">
+                        <span class="logs-toolbar__label">Form</span>
+                        <lightning-combobox
+                            name="formId"
+                            variant="label-hidden"
+                            label="Form"
+                            value={selectedFormId}
+                            options={formOptions}
+                            placeholder="Select form"
+                            onchange={handleFormChange}>
+                        </lightning-combobox>
                     </div>
 
-                    <div class="actions">
-                        <lightning-button variant="brand" label="Search Logs" onclick={handleSearch}></lightning-button>
+                    <span class="logs-toolbar__divider"></span>
+
+                    <div class="logs-toolbar__stats">
+                        <span class="logs-stat"><strong>{loadedCount}</strong> Loaded</span>
+                        <span class="logs-stat logs-stat--danger"><strong>{failedCount}</strong> Failed</span>
+                        <span class="logs-stat logs-stat--success"><strong>{successCount}</strong> Success</span>
+                        <span class="logs-stat"><strong>{last24HoursCount}</strong> 24h</span>
+                    </div>
+
+                    <span class="logs-toolbar__divider"></span>
+
+                    <div class="logs-toolbar__field logs-toolbar__field--compact">
+                        <span class="logs-toolbar__label">Outcome</span>
+                        <lightning-combobox name="outcome" variant="label-hidden" label="Outcome" value={outcome} options={outcomeOptions} onchange={handleFilterChange}></lightning-combobox>
+                    </div>
+                    <div class="logs-toolbar__field logs-toolbar__field--date">
+                        <span class="logs-toolbar__label">From</span>
+                        <lightning-input type="date" name="dateFrom" variant="label-hidden" label="Date From" value={dateFrom} onchange={handleFilterChange}></lightning-input>
+                    </div>
+                    <div class="logs-toolbar__field logs-toolbar__field--date">
+                        <span class="logs-toolbar__label">To</span>
+                        <lightning-input type="date" name="dateTo" variant="label-hidden" label="Date To" value={dateTo} onchange={handleFilterChange}></lightning-input>
+                    </div>
+
+                    <div class="logs-toolbar__actions">
+                        <lightning-button variant="brand" label="Search" onclick={handleSearch}></lightning-button>
                         <lightning-button label="Reset" onclick={handleReset}></lightning-button>
                     </div>
                 </section>
@@ -75,8 +98,7 @@
                                             <tr key={row.submissionId} data-id={row.submissionId} class={row.rowClass} onclick={handleSelectRow}>
                                                 <td>{row.submittedAtLabel}</td>
                                                 <td>
-                                                    <div class="cell-title">{row.formId}</div>
-                                                    <div class="cell-subtle">{row.formVersionId}</div>
+                                                    <div class="cell-title">{row.formDescription}</div>
                                                 </td>
                                                 <td><span class={row.outcomeClass}>{row.outcomeLabel}</span></td>
                                                 <td>{row.failureStageLabel}</td>
@@ -114,9 +136,11 @@
                                     <div>
                                         <span class="detail-kicker">Submission Detail</span>
                                         <h2>{selectedDetail.formHeading}</h2>
-                                        <p class="detail-meta">{selectedDetail.submissionRef}</p>
+                                        <template if:true={selectedDetail.formDescription}>
+                                            <p class="detail-meta">{selectedDetail.formDescription}</p>
+                                        </template>
+                                        <p class="detail-meta">{selectedDetail.submittedAtLabel}</p>
                                     </div>
-                                    <lightning-button-icon icon-name="utility:copy" alternative-text="Copy submission ref" title="Copy submission ref" onclick={handleCopySubmissionRef}></lightning-button-icon>
                                 </div>
 
                                 <div class="pill-row">
@@ -125,13 +149,6 @@
                                     <template if:true={selectedDetail.failureStageVisible}>
                                         <span class="detail-pill">{selectedDetail.failureStageLabel}</span>
                                     </template>
-                                </div>
-
-                                <div class="kv-card">
-                                    <div class="kv-row"><span class="kv-label">Submitted At</span><span class="kv-value">{selectedDetail.submittedAtLabel}</span></div>
-                                    <div class="kv-row"><span class="kv-label">Form Id</span><span class="kv-value">{selectedDetail.formId}</span></div>
-                                    <div class="kv-row"><span class="kv-label">Form Version</span><span class="kv-value">{selectedDetail.formVersionId}</span></div>
-                                    <div class="kv-row"><span class="kv-label">Submission Ref</span><span class="kv-value">{selectedDetail.submissionRef}</span></div>
                                 </div>
 
                                 <template if:true={selectedDetail.metadataOnlyMessage}>

@@ -107,12 +107,6 @@
     color: #31527a;
 }
 
-.top-grid {
-    display: grid;
-    gap: 0.85rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .summary-card,
 .section-block {
     padding: 1rem;
@@ -124,6 +118,124 @@
 
 .section-block--upgrade {
     background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
+}
+
+.section-block--quickstart {
+    background: linear-gradient(180deg, #fafbff 0%, #ffffff 100%);
+}
+
+.home-layout {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.95fr);
+    align-items: start;
+}
+
+.home-rail {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.quickstart-list {
+    counter-reset: quickstart;
+    display: grid;
+    gap: 0.65rem;
+    list-style: none;
+    margin: 0.25rem 0 1rem;
+    padding: 0;
+}
+
+.quickstart-item {
+    align-items: start;
+    background: #ffffff;
+    border: 1px solid #e6edf5;
+    border-radius: 0.75rem;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.quickstart-num {
+    align-items: center;
+    background: #0f6cbd;
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+    font-weight: 700;
+    height: 1.6rem;
+    justify-content: center;
+    width: 1.6rem;
+}
+
+.quickstart-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.quickstart-body strong {
+    color: #16325c;
+    font-size: 0.95rem;
+}
+
+.quickstart-body span {
+    color: #44546f;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.quickstart-body code {
+    background: #eef3f8;
+    border-radius: 0.3rem;
+    color: #16325c;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 0.82rem;
+    padding: 0.05rem 0.35rem;
+}
+
+.quickstart-tips {
+    background: #f3f6fa;
+    border-radius: 0.75rem;
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.quickstart-tips .card-copy {
+    margin: 0;
+}
+
+.quickstart-prereq {
+    align-items: center;
+    background: #fff7e6;
+    border: 1px solid #f3d48f;
+    border-radius: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    justify-content: space-between;
+    padding: 0.9rem 1rem;
+}
+
+.quickstart-prereq__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 0.2rem;
+    min-width: 220px;
+}
+
+.quickstart-prereq__body strong {
+    color: #8a5b10;
+    font-size: 0.95rem;
+}
+
+.quickstart-prereq__body span {
+    color: #5f4b1f;
+    font-size: 0.88rem;
+    line-height: 1.45;
 }
 
 .section-heading {
@@ -219,7 +331,7 @@
 }
 
 @media (max-width: 1100px) {
-    .top-grid {
+    .home-layout {
         grid-template-columns: 1fr;
     }
 }

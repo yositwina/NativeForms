@@ -5,12 +5,16 @@ import getLogDetail from '@salesforce/apex/NativeFormsSubmissionLogsController.g
 import getSubmissionLogStatus from '@salesforce/apex/NativeFormsSubmissionLogsController.getSubmissionLogStatus';
 import saveSubmissionLogKeyPair from '@salesforce/apex/NativeFormsSubmissionLogsController.saveSubmissionLogKeyPair';
 import syncSubmissionLogConfig from '@salesforce/apex/NativeFormsSubmissionLogsController.syncSubmissionLogConfig';
+import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
 
 const HIDDEN_DETAIL_KEYS = new Set([
     'captchaToken',
     'gRecaptchaResponse',
     'g-recaptcha-response'
 ]);
+
+const LS_PROJECT_KEY = 'nfLogsSelectedProjectId';
+const LS_FORM_KEY = 'nfLogsSelectedFormId';
 
 export default class NativeFormsSubmissionLogs extends LightningElement {
     isLoading = true;
@@ -22,7 +26,12 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
     selectedSubmissionId = '';
     selectedDetail = null;
 
-    formId = '';
+    projectOptions = [];
+    formOptions = [];
+    selectedProjectId = '';
+    selectedFormId = '';
+    formVersionIdSet = new Set();
+
     outcome = '';
     dateFrom = '';
     dateTo = '';
@@ -40,7 +49,70 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             this.errorMessage = this.normalizeError(error);
         }
 
+        const storedProjectId = this.readStored(LS_PROJECT_KEY);
+        const storedFormId = this.readStored(LS_FORM_KEY);
+        await this.loadWorkspace(storedProjectId, storedFormId);
         await this.loadLogs(true);
+    }
+
+    async loadWorkspace(projectId, formId) {
+        try {
+            const workspace = await getWorkspace({
+                projectId: projectId || null,
+                formId: formId || null,
+                versionId: null
+            });
+            this.projectOptions = (workspace?.projects || []).map((option) => ({
+                label: option.label,
+                value: option.value
+            }));
+            this.formOptions = (workspace?.forms || []).map((option) => ({
+                label: option.label,
+                value: option.value
+            }));
+            this.selectedProjectId = workspace?.selectedProjectId || '';
+            this.selectedFormId = workspace?.selectedFormId || '';
+            const versionIds = Array.isArray(workspace?.versions)
+                ? workspace.versions.map((version) => version.value).filter(Boolean)
+                : [];
+            this.formVersionIdSet = new Set(versionIds);
+            this.writeStored(LS_PROJECT_KEY, this.selectedProjectId);
+            this.writeStored(LS_FORM_KEY, this.selectedFormId);
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        }
+    }
+
+    async handleProjectChange(event) {
+        const nextProjectId = event.detail?.value || '';
+        await this.loadWorkspace(nextProjectId, null);
+        await this.loadLogs(true);
+    }
+
+    async handleFormChange(event) {
+        const nextFormId = event.detail?.value || '';
+        await this.loadWorkspace(this.selectedProjectId, nextFormId);
+        await this.loadLogs(true);
+    }
+
+    readStored(key) {
+        try {
+            return window.localStorage.getItem(key) || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
+    writeStored(key, value) {
+        try {
+            if (value) {
+                window.localStorage.setItem(key, value);
+            } else {
+                window.localStorage.removeItem(key);
+            }
+        } catch (error) {
+            // ignore storage failures
+        }
     }
 
     get outcomeOptions() {
@@ -80,6 +152,7 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             ...item,
             rowClass: item.submissionId === this.selectedSubmissionId ? 'log-row log-row--selected' : 'log-row',
             submittedAtLabel: this.formatDateTime(item.submittedAt),
+            formDescription: item.formDescription || item.formId || '',
             outcomeLabel: this.toTitleCase(item.outcome),
             outcomeClass: this.badgeClass(item.outcome),
             failureStageLabel: item.failureStage === 'none' ? 'None' : this.toTitleCase(item.failureStage),
@@ -98,7 +171,6 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
     }
 
     async handleReset() {
-        this.formId = '';
         this.outcome = '';
         this.dateFrom = '';
         this.dateTo = '';
@@ -154,7 +226,7 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
 
         try {
             const result = await listLogs({
-                formId: this.formId || null,
+                formId: null,
                 outcome: this.outcome || null,
                 dateFrom: this.dateFrom || null,
                 dateTo: this.dateTo || null,
@@ -166,7 +238,10 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
                 throw new Error(result?.errorMessage || 'Unable to load submission logs.');
             }
 
-            const newLogs = Array.isArray(result.logs) ? result.logs : [];
+            let newLogs = Array.isArray(result.logs) ? result.logs : [];
+            if (this.selectedFormId && this.formVersionIdSet.size > 0) {
+                newLogs = newLogs.filter((log) => this.formVersionIdSet.has(log.formVersionId));
+            }
             this.logs = resetList ? newLogs : [...this.logs, ...newLogs];
             this.nextToken = result?.nextToken || null;
 
@@ -262,10 +337,12 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             objectApiName: 'Object',
             statusCode: 'Status Code'
         });
+        const userAgent = detailPayload?.technicalContext?.userAgent;
         const technicalRows = this.buildGenericRows({
             durationMs: detailPayload?.durationMs,
             ipAddress: detailPayload?.technicalContext?.ipAddress,
-            userAgent: detailPayload?.technicalContext?.userAgent,
+            device: this.detectDevice(userAgent),
+            userAgent,
             securityMode: detailPayload?.technicalContext?.securityMode,
             planCode: detailPayload?.planCode,
             submissionId: detailPayload?.submissionId || log.submissionId,
@@ -273,6 +350,7 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
         }, {
             durationMs: 'Duration (ms)',
             ipAddress: 'IP Address',
+            device: 'Device',
             userAgent: 'User Agent',
             securityMode: 'Security Mode',
             planCode: 'Plan',
@@ -285,6 +363,7 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             formHeading: result?.formTitle || log.formId || 'Submission',
             formId: log.formId,
             formVersionId: log.formVersionId,
+            formDescription: log.formDescription || '',
             submissionRef: log.submissionRef,
             submittedAtLabel: this.formatDateTime(log.submittedAt),
             outcomeLabel: this.toTitleCase(log.outcome),
@@ -538,6 +617,20 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             return null;
         }
         return this.formatDateTime(new Date(Number(expiresAt) * 1000).toISOString());
+    }
+
+    detectDevice(userAgent) {
+        if (!userAgent || typeof userAgent !== 'string') {
+            return undefined;
+        }
+        if (/iPhone/i.test(userAgent)) return 'iPhone';
+        if (/iPad/i.test(userAgent)) return 'iPad';
+        if (/Android/i.test(userAgent)) return 'Android';
+        if (/Windows/i.test(userAgent)) return 'Windows';
+        if (/Macintosh|Mac OS X/i.test(userAgent)) return 'Mac';
+        if (/CrOS/i.test(userAgent)) return 'ChromeOS';
+        if (/Linux/i.test(userAgent)) return 'Linux';
+        return 'Other';
     }
 
     prettyKey(value) {

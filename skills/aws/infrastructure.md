@@ -10,6 +10,8 @@ Use for S3 website publishing, Lambda deployment targets, region-aware AWS chang
 - Default AWS region for this project is `eu-north-1`.
 - Primary S3 bucket for NativeForms web assets and published content is `nativeformspublish`.
 - `twinaforms.com` content is published into path-style folders inside `nativeformspublish`.
+- `admin.twinaforms.com` is currently served from the same bucket through CloudFront distribution `E3BZPH4WKETIFB` with origin path `/admin-console/dev`.
+- The correct admin console publish target is `s3://nativeformspublish/admin-console/dev/`.
 - Current upgrade page publish target is `s3://nativeformspublish/upgrade/`.
 - Published forms also use `nativeformspublish`, and the runtime public base URL in AWS is `https://forms.twinaforms.com`.
 - Pro V1 browser file uploads use presigned S3 `PUT` requests into `nativeformspublish`, so that bucket must allow CORS from `https://forms.twinaforms.com` for at least `PUT`, `GET`, and `HEAD`.
@@ -30,3 +32,4 @@ Use for S3 website publishing, Lambda deployment targets, region-aware AWS chang
 - `AWS/documentation/Starter_Launch_Remaining_Checklist.md`
 - `AWS/documentation/admin_control_app_v1_screen_structure.md`
 - `AWS/documentation/admin_control_app_v1_focused_spec.md`
+- `AWS/documentation/Technical and specs/admin_control_app_v1_api_implementation_notes.md`

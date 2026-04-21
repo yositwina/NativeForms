@@ -18,6 +18,25 @@ public with sharing class NativeFormsFormKeyService {
         }
     }
 
+    public static void ensureProjects(List<NF_Form__c> records, Boolean isInsert) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+
+        Id defaultProjectId = null;
+        for (NF_Form__c record : records) {
+            if (record == null) {
+                continue;
+            }
+            if (record.Project__c == null && isInsert == true) {
+                if (defaultProjectId == null) {
+                    defaultProjectId = NativeFormsProjectService.ensureDefaultProjectId();
+                }
+                record.Project__c = defaultProjectId;
+            }
+        }
+    }
+
     public static void assignAutoKeys(List<NF_Form__c> newRecords) {
         if (newRecords == null || newRecords.isEmpty()) {
             return;

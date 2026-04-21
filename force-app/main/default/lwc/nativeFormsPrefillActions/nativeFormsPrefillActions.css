@@ -58,25 +58,72 @@
     color: #5f6f89;
 }
 
+.pane-actions {
+    display: grid;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.button-help-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.pane-action-button {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid #c9cfd6;
+    border-radius: 0.35rem;
+    background: #ffffff;
+    color: #0f6cbd;
+    font-size: 0.95rem;
+    line-height: 1.2;
+    cursor: pointer;
+    text-align: center;
+}
+
+.pane-action-button:hover,
+.pane-action-button:focus {
+    border-color: #0f6cbd;
+    box-shadow: 0 0 0 1px rgba(15, 108, 189, 0.2);
+}
+
+.pane-action-button--brand {
+    border-color: #0176d3;
+    background: #0176d3;
+    color: #ffffff;
+}
+
+.pane-action-button--brand:hover,
+.pane-action-button--brand:focus {
+    border-color: #015fb2;
+    background: #015fb2;
+}
+
 .action-list {
     display: grid;
     gap: 0.75rem;
     margin-top: 1rem;
 }
 
-.help-inline-panel {
+.concept-panel {
     margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #d8dde6;
+    padding: 0.9rem 1rem;
+    border: 1px solid #d8dde6;
+    border-radius: 0.9rem;
+    background: linear-gradient(180deg, #f8fbfd, #eef4f8);
 }
 
-.help-inline-panel h3 {
+.concept-panel h3 {
     margin: 0 0 0.5rem;
     color: #17324d;
     font-size: 1rem;
 }
 
-.help-inline-panel p {
+.concept-panel p {
     margin: 0.3rem 0;
     color: #5f6f89;
 }
@@ -140,6 +187,31 @@
     color: #17324d;
 }
 
+.field-help-stack {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.field-help-stack--wide {
+    max-width: 24rem;
+}
+
+.field-help-stack--limit {
+    max-width: 12rem;
+}
+
+.field-help-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    color: #3e3e3c;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
 .condition-row {
     display: grid;
     gap: 0.55rem;
@@ -160,6 +232,9 @@
 }
 
 .sort-direction__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     color: #3e3e3c;
     font-size: 0.75rem;
     font-weight: 700;

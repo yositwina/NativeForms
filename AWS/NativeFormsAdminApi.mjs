@@ -996,6 +996,9 @@ function buildTenantDetail(tenant, plansByCode) {
       limits: {},
       featureFlags: {}
     },
+    supportFlags: {
+      enableSalesforceAdminApp: normalizedTenant?.supportFlags?.enableSalesforceAdminApp === true
+    },
     setupState: deriveSetupState(normalizedTenant),
     tenantSecretStatus: normalizedTenant.tenantSecretStatus || "unknown",
     oauthStatus: normalizedTenant.oauthStatus || (normalizedTenant.salesforceConnectionStatus === "connected" ? "connected" : "not_started"),
@@ -1554,6 +1557,14 @@ export const handler = async (event) => {
         trialStartedAt: normalizeOptionalDate(body.trialStartedAt) ?? tenant.trialStartedAt ?? null,
         trialEndsAt: normalizeOptionalDate(body.trialEndsAt) ?? tenant.trialEndsAt ?? null,
         supportStatus: normalizeOptionalString(body.supportStatus) || tenant.supportStatus || "normal",
+        supportFlags: {
+          ...(tenant.supportFlags || {}),
+          ...(body.supportFlags && typeof body.supportFlags === "object"
+            ? {
+                enableSalesforceAdminApp: body.supportFlags.enableSalesforceAdminApp === true
+              }
+            : {})
+        },
         internalNotes: body.internalNotes != null ? String(body.internalNotes) : (tenant.internalNotes || tenant.notes || ""),
         notes: body.internalNotes != null ? String(body.internalNotes) : (tenant.notes || tenant.internalNotes || ""),
         updatedAt: new Date().toISOString(),
