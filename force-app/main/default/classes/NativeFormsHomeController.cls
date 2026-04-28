@@ -1,10 +1,18 @@
 public with sharing class NativeFormsHomeController {
     private static final Integer TIMEOUT_MS = 120000;
     private static final String BASE_BOOTSTRAP_NC_NAME = 'NativeForms_Bootstrap';
+    private static final String BASE_HOME_TAB_API_NAME = 'NativeForms_Home';
     private static final String BASE_CONNECT_TAB_API_NAME = 'NativeForms_Connect';
     private static final String USER_PERMISSION_SET_LABEL = 'TwinaForms User';
     private static final String ADMIN_PERMISSION_SET_LABEL = 'TwinaForms Admin';
+    private static final String CREDENTIALS_PERMISSION_SET_LABEL = 'TwinaForms Credentials';
+    private static final String CREDENTIALS_PERMISSION_SET_API_NAME = 'TwinaForms_Credentials';
+    private static final String BOOTSTRAP_EXTERNAL_CREDENTIAL_NAME = 'TwinaFormsBootstrap';
+    private static final String BOOTSTRAP_EXTERNAL_CREDENTIAL_PRINCIPAL = 'TwinaFormsBootstrapPrincipal';
+    private static final String LAMBDA_EXTERNAL_CREDENTIAL_NAME = 'TwinaFormsLambdaAuth';
+    private static final String LAMBDA_EXTERNAL_CREDENTIAL_PRINCIPAL = 'TwinaFormsSharedSecret';
     private static String cachedBootstrapNc;
+    private static String cachedHomeTabApiName;
     private static String cachedConnectTabApiName;
 
     public class ConnectionSummary {
@@ -56,12 +64,15 @@ public with sharing class NativeFormsHomeController {
         @AuraEnabled public String displayLabel { get; set; }
         @AuraEnabled public Boolean hasTwinaFormsUser { get; set; }
         @AuraEnabled public Boolean hasTwinaFormsAdmin { get; set; }
+        @AuraEnabled public Boolean hasTwinaFormsServiceAccess { get; set; }
+        @AuraEnabled public Boolean missingTwinaFormsServiceAccess { get; set; }
     }
 
     public class AccessSummary {
         @AuraEnabled public Boolean adminAppOpen { get; set; }
         @AuraEnabled public String userPermissionSetLabel { get; set; }
         @AuraEnabled public String adminPermissionSetLabel { get; set; }
+        @AuraEnabled public String credentialsPermissionSetLabel { get; set; }
         @AuraEnabled public List<AccessUserItem> users { get; set; }
     }
 
@@ -77,6 +88,7 @@ public with sharing class NativeFormsHomeController {
         @AuraEnabled public Boolean success { get; set; }
         @AuraEnabled public String orgId { get; set; }
         @AuraEnabled public String errorMessage { get; set; }
+        @AuraEnabled public String homeTabApiName { get; set; }
         @AuraEnabled public String connectTabApiName { get; set; }
         @AuraEnabled public ConnectionSummary connection { get; set; }
         @AuraEnabled public PlanSummary plan { get; set; }
@@ -88,11 +100,12 @@ public with sharing class NativeFormsHomeController {
         @AuraEnabled public String upgradeUrl { get; set; }
     }
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static HomeView getHomeView() {
         HomeView view = new HomeView();
         view.success = true;
         view.orgId = currentOrgId();
+        view.homeTabApiName = homeTabApiName();
         view.connectTabApiName = connectTabApiName();
         view.connection = new ConnectionSummary();
         view.plan = new PlanSummary();
@@ -102,6 +115,7 @@ public with sharing class NativeFormsHomeController {
         view.access.adminAppOpen = false;
         view.access.userPermissionSetLabel = USER_PERMISSION_SET_LABEL;
         view.access.adminPermissionSetLabel = ADMIN_PERMISSION_SET_LABEL;
+        view.access.credentialsPermissionSetLabel = CREDENTIALS_PERMISSION_SET_LABEL;
         view.access.users = new List<AccessUserItem>();
         view.upgradeFeatures = new List<FeatureItem>();
 
@@ -132,7 +146,7 @@ public with sharing class NativeFormsHomeController {
         return view;
     }
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static HomeView getAccessManagementView() {
         Map<String, Object> homeSummary;
         String errorMessage;
@@ -183,6 +197,18 @@ public with sharing class NativeFormsHomeController {
             LIMIT 1
         ];
 
+        PermissionSet credentialsPermissionSet = permissionSetsByLabel.get(CREDENTIALS_PERMISSION_SET_LABEL);
+        List<PermissionSetAssignment> existingCredentialsAssignments = new List<PermissionSetAssignment>();
+        if (normalizedAccessType == 'user' && credentialsPermissionSet != null) {
+            existingCredentialsAssignments = [
+                SELECT Id
+                FROM PermissionSetAssignment
+                WHERE AssigneeId = :assignee.Id
+                AND PermissionSetId = :credentialsPermissionSet.Id
+                LIMIT 1
+            ];
+        }
+
         Boolean shouldEnable = enabled == true;
         Map<String, Object> homeSummary;
         if (shouldEnable) {
@@ -202,21 +228,35 @@ public with sharing class NativeFormsHomeController {
             }
         }
 
-        if (shouldEnable && existingAssignments.isEmpty()) {
+        Boolean hasTargetAssignment = !existingAssignments.isEmpty();
+        Boolean hasCredentialsAssignment = !existingCredentialsAssignments.isEmpty();
+
+        if (shouldEnable) {
+            if (normalizedAccessType == 'user' && credentialsPermissionSet == null) {
+                throw new AuraHandledException(
+                    CREDENTIALS_PERMISSION_SET_LABEL
+                    + ' is not available. Create it with API Name '
+                    + CREDENTIALS_PERMISSION_SET_API_NAME
+                    + ' and the TwinaForms External Credential Principal Access entries before granting seats.'
+                );
+            }
+
             if (normalizedAccessType == 'user') {
-                Integer maxUsers = readMaxSfUsers(homeSummary);
-                Integer activeUsersCount = countAssignedTwinaFormsUsers(permissionSetsByLabel.get(USER_PERMISSION_SET_LABEL));
-                if (maxUsers != null && activeUsersCount >= maxUsers) {
-                    throw new AuraHandledException(
-                        'This plan allows ' + String.valueOf(maxUsers)
-                        + ' TwinaForms user'
-                        + (maxUsers == 1 ? '' : 's')
-                        + '. Remove access from another user or upgrade the plan before adding a new one.'
-                    );
+                if (!hasTargetAssignment) {
+                    Integer maxUsers = readMaxSfUsers(homeSummary);
+                    Integer activeUsersCount = countAssignedTwinaFormsUsers(permissionSetsByLabel.get(USER_PERMISSION_SET_LABEL));
+                    if (maxUsers != null && activeUsersCount >= maxUsers) {
+                        throw new AuraHandledException(
+                            'This plan allows ' + String.valueOf(maxUsers)
+                            + ' TwinaForms user'
+                            + (maxUsers == 1 ? '' : 's')
+                            + '. Remove access from another user or upgrade the plan before adding a new one.'
+                        );
+                    }
                 }
             } else {
                 Boolean adminAppOpen = readAdminAppOpen(homeSummary);
-                if (adminAppOpen != true) {
+                if (!hasTargetAssignment && adminAppOpen != true) {
                     throw new AuraHandledException(
                         'TwinaForms Admin is currently closed for this tenant. Enable it from the TwinaForms Admin console before assigning access.'
                     );
@@ -224,18 +264,37 @@ public with sharing class NativeFormsHomeController {
             }
 
             try {
-                insert new PermissionSetAssignment(
-                    AssigneeId = assignee.Id,
-                    PermissionSetId = targetPermissionSet.Id
-                );
+                List<PermissionSetAssignment> assignmentsToInsert = new List<PermissionSetAssignment>();
+                if (!hasTargetAssignment) {
+                    assignmentsToInsert.add(new PermissionSetAssignment(
+                        AssigneeId = assignee.Id,
+                        PermissionSetId = targetPermissionSet.Id
+                    ));
+                }
+                if (normalizedAccessType == 'user' && !hasCredentialsAssignment) {
+                    assignmentsToInsert.add(new PermissionSetAssignment(
+                        AssigneeId = assignee.Id,
+                        PermissionSetId = credentialsPermissionSet.Id
+                    ));
+                }
+                if (!assignmentsToInsert.isEmpty()) {
+                    insert assignmentsToInsert;
+                }
             } catch (DmlException e) {
                 throw new AuraHandledException(
                     'TwinaForms could not update permission-set access. Make sure you are a Salesforce admin with permission to assign permission sets.'
                 );
             }
-        } else if (!shouldEnable && !existingAssignments.isEmpty()) {
+        } else if (!shouldEnable && (hasTargetAssignment || hasCredentialsAssignment)) {
             try {
-                delete existingAssignments;
+                List<PermissionSetAssignment> assignmentsToDelete = new List<PermissionSetAssignment>();
+                assignmentsToDelete.addAll(existingAssignments);
+                if (normalizedAccessType == 'user') {
+                    assignmentsToDelete.addAll(existingCredentialsAssignments);
+                }
+                if (!assignmentsToDelete.isEmpty()) {
+                    delete assignmentsToDelete;
+                }
             } catch (DmlException e) {
                 throw new AuraHandledException(
                     'TwinaForms could not update permission-set access. Make sure you are a Salesforce admin with permission to assign permission sets.'
@@ -250,6 +309,7 @@ public with sharing class NativeFormsHomeController {
         HomeView view = new HomeView();
         view.success = String.isBlank(errorMessage);
         view.orgId = currentOrgId();
+        view.homeTabApiName = homeTabApiName();
         view.connectTabApiName = connectTabApiName();
         view.errorMessage = errorMessage;
         view.connection = new ConnectionSummary();
@@ -260,6 +320,7 @@ public with sharing class NativeFormsHomeController {
         view.access.adminAppOpen = false;
         view.access.userPermissionSetLabel = USER_PERMISSION_SET_LABEL;
         view.access.adminPermissionSetLabel = ADMIN_PERMISSION_SET_LABEL;
+        view.access.credentialsPermissionSetLabel = CREDENTIALS_PERMISSION_SET_LABEL;
         view.access.users = new List<AccessUserItem>();
         view.upgradeFeatures = new List<FeatureItem>();
 
@@ -349,6 +410,7 @@ public with sharing class NativeFormsHomeController {
         Map<String, PermissionSet> permissionSetsByLabel = getManagedPermissionSets();
         PermissionSet userPermissionSet = permissionSetsByLabel.get(USER_PERMISSION_SET_LABEL);
         PermissionSet adminPermissionSet = permissionSetsByLabel.get(ADMIN_PERMISSION_SET_LABEL);
+        PermissionSet credentialsPermissionSet = permissionSetsByLabel.get(CREDENTIALS_PERMISSION_SET_LABEL);
 
         Set<Id> permissionSetIds = new Set<Id>();
         if (userPermissionSet != null) {
@@ -356,6 +418,9 @@ public with sharing class NativeFormsHomeController {
         }
         if (adminPermissionSet != null) {
             permissionSetIds.add(adminPermissionSet.Id);
+        }
+        if (credentialsPermissionSet != null) {
+            permissionSetIds.add(credentialsPermissionSet.Id);
         }
 
         Map<Id, Set<Id>> permissionSetIdsByUserId = new Map<Id, Set<Id>>();
@@ -386,6 +451,7 @@ public with sharing class NativeFormsHomeController {
                 : new Set<Id>();
             Boolean hasTwinaFormsUser = userPermissionSet != null && assignedPermissionSetIds.contains(userPermissionSet.Id);
             Boolean hasTwinaFormsAdmin = adminPermissionSet != null && assignedPermissionSetIds.contains(adminPermissionSet.Id);
+            Boolean hasTwinaFormsServiceAccess = credentialsPermissionSet != null && assignedPermissionSetIds.contains(credentialsPermissionSet.Id);
             if (hasTwinaFormsUser) {
                 activeUsersCount += 1;
             }
@@ -399,6 +465,8 @@ public with sharing class NativeFormsHomeController {
                 : userRecord.Name + ' (' + userRecord.Email + ')';
             item.hasTwinaFormsUser = hasTwinaFormsUser;
             item.hasTwinaFormsAdmin = hasTwinaFormsAdmin;
+            item.hasTwinaFormsServiceAccess = hasTwinaFormsServiceAccess;
+            item.missingTwinaFormsServiceAccess = hasTwinaFormsUser && !hasTwinaFormsServiceAccess;
             accessUsers.add(item);
         }
 
@@ -422,13 +490,130 @@ public with sharing class NativeFormsHomeController {
     private static Map<String, PermissionSet> getManagedPermissionSets() {
         Map<String, PermissionSet> byLabel = new Map<String, PermissionSet>();
         for (PermissionSet permissionSetRecord : [
-            SELECT Id, Label
+            SELECT Id, Label, Name
             FROM PermissionSet
-            WHERE Label IN :new Set<String>{ USER_PERMISSION_SET_LABEL, ADMIN_PERMISSION_SET_LABEL }
+            WHERE Label IN :new Set<String>{ USER_PERMISSION_SET_LABEL, ADMIN_PERMISSION_SET_LABEL, CREDENTIALS_PERMISSION_SET_LABEL }
+            OR Name = :CREDENTIALS_PERMISSION_SET_API_NAME
         ]) {
-            byLabel.put(permissionSetRecord.Label, permissionSetRecord);
+            if (permissionSetRecord.Label == USER_PERMISSION_SET_LABEL) {
+                byLabel.put(USER_PERMISSION_SET_LABEL, permissionSetRecord);
+            } else if (permissionSetRecord.Label == ADMIN_PERMISSION_SET_LABEL) {
+                byLabel.put(ADMIN_PERMISSION_SET_LABEL, permissionSetRecord);
+            } else if (
+                permissionSetRecord.Label == CREDENTIALS_PERMISSION_SET_LABEL
+                || permissionSetRecord.Name == CREDENTIALS_PERMISSION_SET_API_NAME
+            ) {
+                byLabel.put(CREDENTIALS_PERMISSION_SET_LABEL, permissionSetRecord);
+            }
+        }
+        if (!byLabel.containsKey(CREDENTIALS_PERMISSION_SET_LABEL)) {
+            PermissionSet permissionSetWithCredentialAccess = findPermissionSetWithTwinaFormsCredentialAccess();
+            if (permissionSetWithCredentialAccess != null) {
+                byLabel.put(CREDENTIALS_PERMISSION_SET_LABEL, permissionSetWithCredentialAccess);
+            }
         }
         return byLabel;
+    }
+
+    private static PermissionSet findPermissionSetWithTwinaFormsCredentialAccess() {
+        Set<Id> principalIds = getTwinaFormsExternalCredentialPrincipalIds();
+        if (principalIds.isEmpty()) {
+            return null;
+        }
+
+        Map<Id, Set<Id>> principalIdsByPermissionSetId = new Map<Id, Set<Id>>();
+        for (SetupEntityAccess accessRecord : [
+            SELECT ParentId, SetupEntityId
+            FROM SetupEntityAccess
+            WHERE SetupEntityId IN :principalIds
+        ]) {
+            if (accessRecord.ParentId == null || accessRecord.SetupEntityId == null) {
+                continue;
+            }
+            if (!principalIdsByPermissionSetId.containsKey(accessRecord.ParentId)) {
+                principalIdsByPermissionSetId.put(accessRecord.ParentId, new Set<Id>());
+            }
+            principalIdsByPermissionSetId.get(accessRecord.ParentId).add(accessRecord.SetupEntityId);
+        }
+
+        Set<Id> candidatePermissionSetIds = new Set<Id>();
+        for (Id permissionSetId : principalIdsByPermissionSetId.keySet()) {
+            if (principalIdsByPermissionSetId.get(permissionSetId).containsAll(principalIds)) {
+                candidatePermissionSetIds.add(permissionSetId);
+            }
+        }
+        if (candidatePermissionSetIds.isEmpty()) {
+            return null;
+        }
+
+        List<PermissionSet> candidates = [
+            SELECT Id, Label, Name
+            FROM PermissionSet
+            WHERE Id IN :candidatePermissionSetIds
+            ORDER BY Label ASC
+        ];
+        for (PermissionSet candidate : candidates) {
+            if (containsTwinaForms(candidate.Label) || containsTwinaForms(candidate.Name)) {
+                return candidate;
+            }
+        }
+        return candidates.isEmpty() ? null : candidates[0];
+    }
+
+    private static Set<Id> getTwinaFormsExternalCredentialPrincipalIds() {
+        Set<Id> principalIds = new Set<Id>();
+        addExternalCredentialPrincipalId(
+            principalIds,
+            BOOTSTRAP_EXTERNAL_CREDENTIAL_NAME,
+            BOOTSTRAP_EXTERNAL_CREDENTIAL_PRINCIPAL
+        );
+        addExternalCredentialPrincipalId(
+            principalIds,
+            LAMBDA_EXTERNAL_CREDENTIAL_NAME,
+            LAMBDA_EXTERNAL_CREDENTIAL_PRINCIPAL
+        );
+        return principalIds;
+    }
+
+    private static void addExternalCredentialPrincipalId(
+        Set<Id> principalIds,
+        String externalCredentialName,
+        String principalName
+    ) {
+        if (principalIds == null || String.isBlank(externalCredentialName) || String.isBlank(principalName)) {
+            return;
+        }
+
+        for (String candidateExternalCredentialName : externalCredentialNameCandidates(externalCredentialName)) {
+            try {
+                ConnectApi.ExternalCredential credential =
+                    ConnectApi.NamedCredentials.getExternalCredential(candidateExternalCredentialName);
+                if (credential == null || credential.principals == null) {
+                    continue;
+                }
+                for (ConnectApi.ExternalCredentialPrincipal principal : credential.principals) {
+                    if (principal != null && principal.principalName == principalName && String.isNotBlank(principal.id)) {
+                        principalIds.add((Id) principal.id);
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                // Keep the fallback best-effort. Exact permission-set lookup still handles the expected path.
+            }
+        }
+    }
+
+    private static List<String> externalCredentialNameCandidates(String baseName) {
+        List<String> names = new List<String>{ baseName };
+        String ns = currentNamespacePrefix();
+        if (String.isNotBlank(ns)) {
+            names.add(ns + '__' + baseName);
+        }
+        return names;
+    }
+
+    private static Boolean containsTwinaForms(String value) {
+        return String.isNotBlank(value) && value.toLowerCase().contains('twinaforms');
     }
 
     private static Integer readMaxSfUsers(Map<String, Object> payload) {
@@ -610,6 +795,18 @@ public with sharing class NativeFormsHomeController {
             ? BASE_CONNECT_TAB_API_NAME
             : ns + '__' + BASE_CONNECT_TAB_API_NAME;
         return cachedConnectTabApiName;
+    }
+
+    private static String homeTabApiName() {
+        if (cachedHomeTabApiName != null) {
+            return cachedHomeTabApiName;
+        }
+
+        String ns = currentNamespacePrefix();
+        cachedHomeTabApiName = String.isBlank(ns)
+            ? BASE_HOME_TAB_API_NAME
+            : ns + '__' + BASE_HOME_TAB_API_NAME;
+        return cachedHomeTabApiName;
     }
 
     private static String currentNamespacePrefix() {

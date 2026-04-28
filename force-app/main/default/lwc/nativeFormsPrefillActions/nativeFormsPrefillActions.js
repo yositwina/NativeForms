@@ -7,7 +7,6 @@ import deletePrefillAction from '@salesforce/apex/NativeFormsPrefillActionsContr
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
-const PAGE_VERSION = 'Prefill v1.2';
 
 export default class NativeFormsPrefillActions extends LightningElement {
     isLoading = true;
@@ -45,10 +44,6 @@ export default class NativeFormsPrefillActions extends LightningElement {
     @track draftAction = {};
     @track mappings = [];
     boundHandlePageActivation;
-
-    get pageVersion() {
-        return PAGE_VERSION;
-    }
 
     get refreshFromDesignerHelpText() {
         return 'Reloads the latest version context and field mappings from TwinaForms Designer.';

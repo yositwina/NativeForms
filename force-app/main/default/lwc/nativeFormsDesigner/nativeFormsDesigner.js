@@ -25,7 +25,6 @@ const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v20.29';
     isLoading = true;
     errorMessage = '';
     selectedProjectId;

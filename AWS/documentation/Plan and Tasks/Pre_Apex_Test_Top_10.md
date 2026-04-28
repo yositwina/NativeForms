@@ -17,7 +17,6 @@ It does **not** try to include:
 
 ## Recommended Remaining Items Before Apex Tests
 
-0. clean ver number on pages (top left)
 1. Run one full Starter manual QA pass in the current dev org
 - Cover:
   - setup / connect

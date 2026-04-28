@@ -3,10 +3,10 @@
 Current TwinaForms managed 2GP package:
 - package name: `TwinaForms`
 - package id: `0HogL0000002CUvSAM`
-- latest beta package version id: `08cgL0000008gbZQAQ`
-- latest package2 version id: `05igL0000002uR7QAI`
-- latest subscriber package version id: `04tgL000000ENMXQA4`
-- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000ENMXQA4`
+- latest beta package version id: `08cgL0000008j81QAA`
+- latest package2 version id: `05igL0000002vYTQAY`
+- latest subscriber package version id: `04tgL000000ERGTQA4`
+- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000ERGTQA4`
 
 Packaging note:
 - do not rely on `externalCredentialPrincipalAccesses` packaging inside shipped permission sets for TwinaForms install flow
@@ -18,7 +18,7 @@ Packaging note:
 - ship only one packaged Salesforce app in App Launcher, `TwinaForms`; admin/support-debug tooling must live inside that app as a gated area controlled by the AWS admin flag plus the `TwinaForms Admin` permission set
 - LWC-to-Apex save/update/register calls should use primitive parameters or JSON string payloads, not custom Apex inner-class DTO parameters
 
-Date: 2026-04-27
+Date: 2026-04-28
 
 ## Purpose
 

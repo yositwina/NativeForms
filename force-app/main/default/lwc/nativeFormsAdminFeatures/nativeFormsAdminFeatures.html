@@ -1,5 +1,5 @@
 <template>
-    <lightning-card title="TwinaForms Admin Features" icon-name="utility:settings">
+    <lightning-card title="TwinaForms Admin" icon-name="utility:settings">
         <div class="shell">
             <template if:true={errorMessage}>
                 <div class="panel-error">{errorMessage}</div>
@@ -13,87 +13,8 @@
 
             <template if:false={isLoading}>
                 <div class="admin-grid">
-                    <section class="feature-panel">
-                        <h2>Pro Feature Flags</h2>
-                        <p class="feature-version">Admin Features {adminFeaturesVersion}</p>
-                        <p class="feature-copy">Use this left section to turn Pro-only features on or off while testing in the org.</p>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProConditionLogic"
-                            label="Enable Pro Condition Logic"
-                            checked={enableProConditionLogic}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProRepeatGroups"
-                            label="Enable Pro Repeat Groups"
-                            checked={enableProRepeatGroups}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProPrefillAliasReferences"
-                            label="Enable Pro Prefill Alias References"
-                            checked={enableProPrefillAliasReferences}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProAdvancedSubmitModes"
-                            label="Enable Pro Advanced Submit Modes"
-                            checked={enableProAdvancedSubmitModes}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProFormulaFields"
-                            label="Enable Pro Formula Fields"
-                            checked={enableProFormulaFields}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProPostSubmitAutoLink"
-                            label="Enable Pro Post Submit Auto Link"
-                            checked={enableProPostSubmitAutoLink}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProSfSecretCodeAuth"
-                            label="Enable Pro Authenticate Secret Code at SF"
-                            checked={enableProSfSecretCodeAuth}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <lightning-input
-                            type="checkbox"
-                            name="enableProLoadFile"
-                            label="Enable Pro File Uploads"
-                            checked={enableProLoadFile}
-                            onchange={handleToggle}>
-                        </lightning-input>
-
-                        <div class="actions">
-                            <lightning-button
-                                variant="brand"
-                                label="Save Feature Settings"
-                                onclick={handleSave}>
-                            </lightning-button>
-                        </div>
-                    </section>
-
                     <section class="feature-panel feature-panel--admin">
                         <h2>Admin Settings</h2>
-                        <p class="feature-version">Admin Features {adminFeaturesVersion}</p>
                         <p class="feature-copy">Use this right section for org-level settings and connection testing tools.</p>
 
                         <div class="status-box">
@@ -138,14 +59,6 @@
                             placeholder="Managed in AWS only"
                             disabled>
                         </lightning-input>
-
-                        <div class="actions">
-                            <lightning-button
-                                variant="brand"
-                                label="Save Admin Settings"
-                                onclick={handleSave}>
-                            </lightning-button>
-                        </div>
 
                         <h3>Submission Logs</h3>
                         <p class="feature-copy">Submission Logs now follow the customer plan automatically. Org users do not choose the log mode or paste keys manually, and TwinaForms will try to prepare and sync the hidden crypto setup automatically.</p>

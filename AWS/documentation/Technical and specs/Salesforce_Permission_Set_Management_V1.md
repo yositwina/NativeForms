@@ -202,6 +202,21 @@ When assigning `TwinaForms User`:
 1. read `maxSfUsers` from AWS tenant data
 2. count current active `TwinaForms User` assignments locally
 3. if the limit is not null and the assignment would exceed it, block with a customer-safe error
+4. also assign the subscriber-created `TwinaForms Credentials` permission set to the same user, so the user can access the External Credential principals needed for TwinaForms AWS callouts
+
+The server-side assignment method must enforce the seat limit from a freshly fetched access summary. The UI can disable obvious over-limit actions, but Apex must not trust the UI's current count.
+
+The preferred subscriber-created permission set naming is:
+
+- Label: `TwinaForms Credentials`
+- API Name: `TwinaForms_Credentials`
+
+If that exact permission set is not found, Apex can fall back to a permission set that already includes both known TwinaForms External Credential Principal Access entries:
+
+- `TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal`
+- `TwinaFormsLambdaAuth - TwinaFormsSharedSecret`
+
+If the user already has `TwinaForms User` but is missing `TwinaForms Credentials`, granting the seat again should repair the missing service access without counting it as a new seat.
 
 Example:
 
@@ -221,6 +236,8 @@ Example:
 ## Revoking access
 
 Revoking either permission set should always be allowed.
+
+When revoking `TwinaForms User` from the Connect page, also revoke the subscriber-created `TwinaForms Credentials` permission set from that same user.
 
 ---
 
@@ -248,7 +265,7 @@ Show:
 
 Recommended actions:
 
-- grant/remove `TwinaForms User`
+- grant/remove `TwinaForms User`; this also grants/removes `TwinaForms Credentials`
 - grant/remove `TwinaForms Admin`
 
 Recommended UX:
@@ -256,6 +273,8 @@ Recommended UX:
 - normal user access is the main action
 - admin/debug access is visually secondary
 - if admin/debug access is closed, explain that it is controlled from the TwinaForms Admin console
+- if a listed user has `TwinaForms User` but not `TwinaForms Credentials`, show: `This user has a seat but is missing TwinaForms service access.`
+- after Step 2 becomes complete, reload the access summary immediately so stale browser state cannot offer invalid seat actions
 
 ---
 

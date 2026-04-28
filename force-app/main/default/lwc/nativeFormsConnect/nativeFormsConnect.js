@@ -1,17 +1,18 @@
 import { LightningElement } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
 import getSetupContext from '@salesforce/apex/NativeFormsSetupController.getSetupContext';
 import getConnectionStatus from '@salesforce/apex/NativeFormsSetupController.getConnectionStatus';
 import registerOrg from '@salesforce/apex/NativeFormsSetupController.registerOrg';
 import getAccessManagementView from '@salesforce/apex/NativeFormsHomeController.getAccessManagementView';
 import updatePermissionSetAccess from '@salesforce/apex/NativeFormsHomeController.updatePermissionSetAccess';
+import installDemoData from '@salesforce/apex/NativeFormsDemoDataController.installDemoData';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const CONNECT_STATE_KEY = 'nativeforms:connectState';
 const TENANT_SECRET_VISIBLE_MS = 5 * 60 * 1000;
 const CONNECTION_POLL_MS = 5000;
 
-export default class NativeFormsConnect extends LightningElement {
-    connectVersion = 'v2.7';
+export default class NativeFormsConnect extends NavigationMixin(LightningElement) {
     orgId = '';
     adminEmail = '';
     companyName = '';
@@ -44,6 +45,8 @@ export default class NativeFormsConnect extends LightningElement {
     tenantTestMessageVariant = '';
     accessView;
     isUpdatingAccess = false;
+    isInstallingDemo = false;
+    homeTabApiName = 'NativeForms_Home';
     selectedUserGrantId = '';
     selectedAdminGrantId = '';
 
@@ -185,7 +188,11 @@ export default class NativeFormsConnect extends LightningElement {
     }
 
     get showOauthCompleteBanner() {
-        return this.isConnected;
+        return this.tenantSetupComplete && this.isConnected;
+    }
+
+    get showDemoInstallStage() {
+        return this.tenantSetupComplete && this.isConnected;
     }
 
     get showConnectAction() {
@@ -197,7 +204,7 @@ export default class NativeFormsConnect extends LightningElement {
     }
 
     get actionDisabled() {
-        return this.isBusy || this.isInitializing;
+        return this.isBusy || this.isInitializing || this.isInstallingDemo;
     }
 
     get connectionStatusLabel() {
@@ -281,7 +288,7 @@ export default class NativeFormsConnect extends LightningElement {
     }
 
     get showAccessSection() {
-        return this.isConnected && this.accessUsers.length > 0;
+        return this.tenantSetupComplete && this.isConnected && this.accessUsers.length > 0;
     }
 
     get userAssignments() {
@@ -415,10 +422,21 @@ export default class NativeFormsConnect extends LightningElement {
             this.connectUrl = data.connectUrl || '';
             this.setupState = 'registered_pending_connection';
             this.successMessage = 'Tenant secret generated. Add it to Named Credentials, then click Test Tenant Secret.';
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Tenant secret generated',
+                message: 'Add it to Named Credentials, then click Test Tenant Secret.',
+                variant: 'success'
+            }));
             this.scheduleTenantSecretExpiry();
             this.persistConnectState();
         } catch (error) {
             this.errorMessage = this.normalizeRegistrationError(error);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Could not generate tenant secret',
+                message: this.errorMessage,
+                variant: 'error',
+                mode: 'sticky'
+            }));
         } finally {
             this.isBusy = false;
         }
@@ -492,6 +510,46 @@ export default class NativeFormsConnect extends LightningElement {
     async loadAccessSummary() {
         const result = await getAccessManagementView();
         this.accessView = result || {};
+        this.homeTabApiName = result?.homeTabApiName || this.homeTabApiName;
+    }
+
+    async handleInstallDemoRecords() {
+        this.isInstallingDemo = true;
+        this.errorMessage = '';
+        this.successMessage = '';
+
+        try {
+            const result = await installDemoData();
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Demo records installed',
+                message: result?.message || 'Demo records are ready.',
+                variant: 'success'
+            }));
+            this.navigateToHome();
+        } catch (error) {
+            this.errorMessage = this.formatError(error);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Could not install demo records',
+                message: this.errorMessage,
+                variant: 'error',
+                mode: 'sticky'
+            }));
+        } finally {
+            this.isInstallingDemo = false;
+        }
+    }
+
+    handleSkipDemoRecords() {
+        this.navigateToHome();
+    }
+
+    navigateToHome() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: {
+                apiName: this.homeTabApiName || 'NativeForms_Home'
+            }
+        });
     }
 
     async changeAccess(userId, accessType, enabled, successToastMessage) {
@@ -505,6 +563,7 @@ export default class NativeFormsConnect extends LightningElement {
         try {
             const result = await updatePermissionSetAccess({ userId, accessType, enabled });
             this.accessView = result || {};
+            this.homeTabApiName = result?.homeTabApiName || this.homeTabApiName;
             this.dispatchEvent(new ShowToastEvent({
                 title: 'User access updated',
                 message: successToastMessage,
@@ -512,6 +571,12 @@ export default class NativeFormsConnect extends LightningElement {
             }));
         } catch (error) {
             this.errorMessage = this.formatError(error);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Could not update user access',
+                message: this.errorMessage,
+                variant: 'error',
+                mode: 'sticky'
+            }));
         } finally {
             this.isUpdatingAccess = false;
         }
@@ -541,8 +606,11 @@ export default class NativeFormsConnect extends LightningElement {
             this.connectUrl = status.connectUrl || '';
             this.hasClientCredentials = status.hasClientCredentials === true;
             const tenantAuthWasAlreadyVerified = this.tenantAuthVerified === true && status.tenantAuthStatus === 'not_checked';
-            this.tenantAuthVerified = tenantAuthWasAlreadyVerified || status.tenantAuthVerified === true;
-            this.tenantAuthStatus = status.tenantAuthStatus || 'not_checked';
+            const orgIsAlreadyConnected = status.setupState === 'connected' || status.connected === true;
+            this.tenantAuthVerified = tenantAuthWasAlreadyVerified || status.tenantAuthVerified === true || orgIsAlreadyConnected;
+            this.tenantAuthStatus = this.tenantAuthVerified
+                ? 'verified'
+                : (status.tenantAuthStatus || 'not_checked');
             this.tenantAuthErrorMessage = status.tenantAuthErrorMessage || '';
 
             if (this.tenantAuthVerified) {
@@ -553,6 +621,11 @@ export default class NativeFormsConnect extends LightningElement {
                 this.isAwaitingOauthReturn = false;
                 this.stopConnectionPolling();
                 this.successMessage = 'TwinaForms is fully connected.';
+                try {
+                    await this.loadAccessSummary();
+                } catch (accessError) {
+                    this.errorMessage = this.formatError(accessError);
+                }
             } else if (this.isAwaitingOauthReturn && !this.isPendingConnection) {
                 this.isAwaitingOauthReturn = false;
                 this.stopConnectionPolling();

@@ -26,17 +26,17 @@ That connection should:
 
 ## User-facing setup flow
 1. Install package
-2. Assign `TwinaForms User` / `TwinaForms Admin` permission sets as needed
-3. Create a subscriber-owned permission set:
+2. Create a subscriber-owned permission set:
    - Label: `TwinaForms Credentials`
-   - API Name: `TwinaFormsCredentials`
-4. In `TwinaForms Credentials`, open `External Credential Principal Access` and enable:
+   - API Name: `TwinaForms_Credentials`
+3. In `TwinaForms Credentials`, open `External Credential Principal Access` and enable:
    - `TwinaFormsBootstrapPrincipal`
    - `TwinaFormsSharedSecret`
-5. Assign `TwinaForms Credentials` to the same users who need TwinaForms access
-6. Register org with AWS
-7. Click `Connect Salesforce`
-8. Approve access
+4. Register org with AWS
+5. Click `Connect Salesforce`
+6. Approve access
+7. Use the Connect page `Grant Seat` action to assign normal users. Connect assigns both `TwinaForms User` and `TwinaForms Credentials` for the selected user.
+8. Assign `TwinaForms Admin` only for support/debug access when the tenant admin flag allows it.
 9. NativeForms stores the Salesforce connection for that org
 10. Publish forms
 

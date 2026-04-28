@@ -629,10 +629,6 @@
         <visibility>Visible</visibility>
     </tabSettings>
     <tabSettings>
-        <tab>NativeForms_Guided_Setup</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
-    <tabSettings>
         <tab>NF_Project__c</tab>
         <visibility>None</visibility>
     </tabSettings>

@@ -7,7 +7,6 @@ import deleteSubmitAction from '@salesforce/apex/NativeFormsSubmitActionsControl
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
-const PAGE_VERSION = 'Submit v1.1';
 
 export default class NativeFormsSubmitActions extends LightningElement {
     isLoading = true;
@@ -47,10 +46,6 @@ export default class NativeFormsSubmitActions extends LightningElement {
     @track draftAction = {};
     @track mappings = [];
     boundHandlePageActivation;
-
-    get pageVersion() {
-        return PAGE_VERSION;
-    }
 
     get refreshFromDesignerHelpText() {
         return 'Reloads the latest version context and field mappings from TwinaForms Designer.';

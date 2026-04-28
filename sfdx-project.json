@@ -1,8 +1,8 @@
 {
   "packageDirectories": [
     {
-      "versionName": "ver 0.1",
-      "versionNumber": "0.1.0.NEXT",
+      "versionName": "ver 0.2",
+      "versionNumber": "0.2.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "TwinaForms",
@@ -22,6 +22,10 @@
     "TwinaForms@0.1.0-5": "04tgL000000ELarQAG",
     "TwinaForms@0.1.0-6": "04tgL000000ELm9QAG",
     "TwinaForms@0.1.0-7": "04tgL000000ELuDQAW",
-    "TwinaForms@0.1.0-8": "04tgL000000ENMXQA4"
+    "TwinaForms@0.1.0-8": "04tgL000000ENMXQA4",
+    "TwinaForms@0.1.0-9": "04tgL000000ENj7QAG",
+    "TwinaForms@0.1.0-10": "04tgL000000EOLpQAO",
+    "TwinaForms@0.1.0-11": "04tgL000000EPTBQA4",
+    "TwinaForms@0.1.0-12": "04tgL000000ERGTQA4"
   }
 }

@@ -22,8 +22,8 @@ Use for S3 website publishing, Lambda deployment targets, region-aware AWS chang
 - Repo also contains the public runtime Lambdas `NativeForms-PrefillForm` and `NativeForms-SubmitForm`; do not change those without explicit user approval.
 - Known public web domains in this project include `twinaforms.com`, `admin.twinaforms.com`, and `forms.twinaforms.com`.
 - CloudFront distribution IDs and internal distribution names are not yet verified in-repo because the current IAM user cannot list CloudFront distributions.
-- On this workstation, the confirmed AWS CLI profile for Codex deploy work is `codex-nativeforms`.
-- The local AWS CLI config also contains a `nativeforms-codex` profile, but `codex-nativeforms` is the confirmed working profile used for Lambda deploys in this repo.
+- On this workstation, the confirmed AWS CLI profile for Codex AWS work is `nativeforms-codex`.
+- Avoid the default AWS credentials when they resolve to `evhomelinkUser`; use `nativeforms-codex` for TwinaForms AWS reads, deploys, and tenant test resets.
 
 ## Escalate When
 - A publish target is unclear between bucket root and prefix path.

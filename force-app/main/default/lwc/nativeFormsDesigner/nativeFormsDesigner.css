@@ -187,13 +187,6 @@
     margin-bottom: 0.8rem;
 }
 
-.designer-version {
-    margin: 0 0 0.35rem;
-    font-size: 0.76rem;
-    font-weight: 700;
-    color: #0f6cbd;
-}
-
 .pane-header h2 {
     margin: 0;
     font-size: 1.08rem;
@@ -355,13 +348,6 @@
     color: var(--nf-theme-hint-color, #5f6f89);
     font-size: calc(var(--nf-theme-main-size, 14.4px) * 0.9);
     font-family: var(--nf-theme-main-font, Inter, Arial, sans-serif);
-}
-
-.designer-form-description {
-    margin: 0 0 0.55rem;
-    font-size: 0.8rem;
-    color: #5f6f89;
-    line-height: 1.4;
 }
 
 .designer-new-form-modal {

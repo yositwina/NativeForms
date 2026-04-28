@@ -1,6 +1,5 @@
 import { LightningElement } from 'lwc';
 import getFeatureSettings from '@salesforce/apex/NativeFormsAdminController.getFeatureSettings';
-import saveFeatureSettings from '@salesforce/apex/NativeFormsAdminController.saveFeatureSettings';
 import getSubmissionLogStatus from '@salesforce/apex/NativeFormsSubmissionLogsController.getSubmissionLogStatus';
 import saveSubmissionLogKeyPair from '@salesforce/apex/NativeFormsSubmissionLogsController.saveSubmissionLogKeyPair';
 import syncSubmissionLogConfig from '@salesforce/apex/NativeFormsSubmissionLogsController.syncSubmissionLogConfig';
@@ -9,20 +8,11 @@ import disconnectOrg from '@salesforce/apex/NativeFormsSetupController.disconnec
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 export default class NativeFormsAdminFeatures extends LightningElement {
-    adminFeaturesVersion = 'v0.8';
     isLoading = true;
     isDisconnecting = false;
     isPreparingSubmissionLogs = false;
     isSyncingSubmissionLogs = false;
     errorMessage = '';
-    enableProConditionLogic = false;
-    enableProRepeatGroups = false;
-    enableProPrefillAliasReferences = false;
-    enableProAdvancedSubmitModes = false;
-    enableProFormulaFields = false;
-    enableProPostSubmitAutoLink = false;
-    enableProSfSecretCodeAuth = false;
-    enableProLoadFile = false;
     captchaSiteKey = '';
     captchaSecretKey = '';
     submissionLogPlanCode = '';
@@ -62,14 +52,6 @@ export default class NativeFormsAdminFeatures extends LightningElement {
 
     async loadSettings() {
         const settings = await getFeatureSettings();
-        this.enableProConditionLogic = !!settings?.enableProConditionLogic;
-        this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;
-        this.enableProPrefillAliasReferences = !!settings?.enableProPrefillAliasReferences;
-        this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
-        this.enableProFormulaFields = !!settings?.enableProFormulaFields;
-        this.enableProPostSubmitAutoLink = !!settings?.enableProPostSubmitAutoLink;
-        this.enableProSfSecretCodeAuth = !!settings?.enableProSfSecretCodeAuth;
-        this.enableProLoadFile = !!settings?.enableProLoadFile;
         this.captchaSiteKey = settings?.captchaSiteKey || '';
         this.captchaSecretKey = settings?.captchaSecretKey || '';
     }
@@ -179,77 +161,6 @@ export default class NativeFormsAdminFeatures extends LightningElement {
         }
 
         return 'This org is entitled to detailed submission logs, but the hidden keypair has not been prepared and synced yet. Use the repair actions below to finish setup.';
-    }
-
-    handleToggle(event) {
-        const fieldName = event.target.name;
-        if (fieldName === 'enableProRepeatGroups') {
-            this.enableProRepeatGroups = event.target.checked;
-            return;
-        }
-        if (fieldName === 'enableProPrefillAliasReferences') {
-            this.enableProPrefillAliasReferences = event.target.checked;
-            return;
-        }
-        if (fieldName === 'enableProAdvancedSubmitModes') {
-            this.enableProAdvancedSubmitModes = event.target.checked;
-            return;
-        }
-        if (fieldName === 'enableProFormulaFields') {
-            this.enableProFormulaFields = event.target.checked;
-            return;
-        }
-        if (fieldName === 'enableProPostSubmitAutoLink') {
-            this.enableProPostSubmitAutoLink = event.target.checked;
-            return;
-        }
-        if (fieldName === 'enableProSfSecretCodeAuth') {
-            this.enableProSfSecretCodeAuth = event.target.checked;
-            return;
-        }
-        if (fieldName === 'enableProLoadFile') {
-            this.enableProLoadFile = event.target.checked;
-            return;
-        }
-        this.enableProConditionLogic = event.target.checked;
-    }
-
-    async handleSave() {
-        this.isLoading = true;
-        this.errorMessage = '';
-        try {
-            const settings = await saveFeatureSettings({
-                inputJson: JSON.stringify({
-                    enableProConditionLogic: this.enableProConditionLogic,
-                    enableProRepeatGroups: this.enableProRepeatGroups,
-                    enableProPrefillAliasReferences: this.enableProPrefillAliasReferences,
-                    enableProAdvancedSubmitModes: this.enableProAdvancedSubmitModes,
-                    enableProFormulaFields: this.enableProFormulaFields,
-                    enableProPostSubmitAutoLink: this.enableProPostSubmitAutoLink,
-                    enableProSfSecretCodeAuth: this.enableProSfSecretCodeAuth,
-                    enableProLoadFile: this.enableProLoadFile
-                })
-            });
-            this.enableProConditionLogic = !!settings?.enableProConditionLogic;
-            this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;
-            this.enableProPrefillAliasReferences = !!settings?.enableProPrefillAliasReferences;
-            this.enableProAdvancedSubmitModes = !!settings?.enableProAdvancedSubmitModes;
-            this.enableProFormulaFields = !!settings?.enableProFormulaFields;
-            this.enableProPostSubmitAutoLink = !!settings?.enableProPostSubmitAutoLink;
-            this.enableProSfSecretCodeAuth = !!settings?.enableProSfSecretCodeAuth;
-            this.enableProLoadFile = !!settings?.enableProLoadFile;
-            this.captchaSiteKey = settings?.captchaSiteKey || '';
-            this.captchaSecretKey = settings?.captchaSecretKey || '';
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Settings saved',
-                message: 'TwinaForms feature flags were updated.',
-                variant: 'success'
-            }));
-        } catch (error) {
-            this.errorMessage = this.normalizeError(error);
-        } finally {
-            this.isLoading = false;
-        }
     }
 
     async handlePrepareSubmissionLogs() {

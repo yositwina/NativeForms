@@ -5,8 +5,6 @@
                 Connect this Salesforce org to TwinaForms so AWS can publish forms and run prefill and submit securely.
             </p>
 
-            <p class="connect-version">Page Version {connectVersion}</p>
-
             <template if:true={showConnectionStatusSection}>
                 <div class="status-panel slds-m-bottom_medium">
                     <p class="status-panel__title">Connection Status</p>
@@ -15,20 +13,6 @@
                     <p class="status-panel__line"><strong>Tenant Secret Auth:</strong> {tenantSecretAuthLabel}</p>
                     <p class="status-panel__line"><strong>Setup State:</strong> {setupState}</p>
                     <p class="status-panel__line"><strong>Org Id:</strong> {orgId}</p>
-                </div>
-            </template>
-
-            <template if:true={errorMessage}>
-                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
-                    <span class="slds-assistive-text">error</span>
-                    <h2>{errorMessage}</h2>
-                </div>
-            </template>
-
-            <template if:true={successMessage}>
-                <div class="slds-notify slds-notify_alert slds-alert_success slds-m-bottom_medium" role="alert">
-                    <span class="slds-assistive-text">success</span>
-                    <h2>{successMessage}</h2>
                 </div>
             </template>
 
@@ -58,10 +42,10 @@
                             <li class="instruction-step">
                                 <div class="instruction-step__content">
                                     <p class="instruction-text-block">
-                                        Open the <strong>TwinaForms User</strong> permission set in Salesforce Setup and assign it to the people who will use the main TwinaForms workspace.
+                                        Create the service-access permission set that lets TwinaForms call AWS from this org.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
-                                        Create a new permission set with <strong>Label = TwinaForms Credentials</strong> and <strong>API Name = TwinaFormsCredentials</strong>.
+                                        Create a new permission set with <strong>Label = TwinaForms Credentials</strong> and <strong>API Name = TwinaForms_Credentials</strong>.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
                                         Open <strong>TwinaForms Credentials</strong>, then open <strong>External Credential Principal Access</strong>.
@@ -76,12 +60,16 @@
                                     <div class="instruction-detail">TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal</div>
                                     <div class="instruction-detail">TwinaFormsLambdaAuth - TwinaFormsSharedSecret</div>
                                     <p class="instruction-text-block slds-m-top_small">
-                                        Assign <strong>TwinaForms Credentials</strong> to the same users who need TwinaForms access.
+                                        Assign <strong>TwinaForms Credentials</strong> to the setup admin opening this page. After Step 2, use <strong>Grant Seat</strong> below to add TwinaForms users.
                                     </p>
                                 </div>
                             </li>
                             <li>Click <strong>Generate Secret</strong> below.</li>
-                            <li>Add the generated tenant secret to <strong>Named Credentials &gt; TwinaForms &gt; TwinaFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
+                            <li>
+                                Open <strong>Named Credentials &gt; TwinaForms &gt; TwinaFormsSharedSecret</strong>.
+                                Edit <strong>TwinaFormsSharedSecret</strong> with the right-arrow action, then click <strong>Add</strong>.
+                                Set <strong>Name</strong> to <strong>secret</strong> and set <strong>Value</strong> to the generated tenant secret code.
+                            </li>
                             <li>Click <strong>Test Tenant Secret</strong> to verify the setup.</li>
                         </ol>
                     </div>
@@ -197,6 +185,38 @@
                 </section>
             </template>
 
+            <template if:true={showDemoInstallStage}>
+                <section class="setup-stage slds-m-bottom_large">
+                    <div class="setup-stage__header">
+                        <div>
+                            <p class="setup-stage__eyebrow">Step 3</p>
+                            <h2 class="setup-stage__title">Install demo records</h2>
+                        </div>
+                    </div>
+
+                    <div class="instruction-box slds-m-top_medium">
+                        <p class="instruction-title"><strong>Start with a sample workspace</strong></p>
+                        <p class="instruction-text-block">
+                            Add a General project, sample forms, and seed Contacts so you can explore TwinaForms right away.
+                        </p>
+                    </div>
+
+                    <div class="stage-actions slds-m-top_medium">
+                        <lightning-button
+                            variant="brand"
+                            label="Install Demo Records"
+                            onclick={handleInstallDemoRecords}
+                            disabled={actionDisabled}>
+                        </lightning-button>
+                        <lightning-button
+                            label="Skip for Now"
+                            onclick={handleSkipDemoRecords}
+                            disabled={actionDisabled}>
+                        </lightning-button>
+                    </div>
+                </section>
+            </template>
+
             <template if:true={showAccessSection}>
                 <section class="access-section slds-m-top_large">
                     <div class="access-section__header">
@@ -211,7 +231,8 @@
                     </div>
 
                     <p class="access-section__copy">
-                        <strong>TwinaForms User</strong> counts against your plan seat limit. <strong>TwinaForms Admin</strong> is support/debug access and only opens when enabled from the TwinaForms Admin console.
+                        <strong>Grant Seat</strong> assigns both the TwinaForms user seat and the TwinaForms service access needed for secure AWS callouts.
+                        <strong>TwinaForms Admin</strong> is support/debug access and only opens when enabled from the TwinaForms Admin console.
                     </p>
 
                     <div class="access-grid">
@@ -229,6 +250,11 @@
                                         <div class="access-list__copy">
                                             <strong>{userItem.name}</strong>
                                             <span>{userItem.email}</span>
+                                            <template if:true={userItem.missingTwinaFormsServiceAccess}>
+                                                <span class="access-list__warning">
+                                                    This user has a seat but is missing TwinaForms service access.
+                                                </span>
+                                            </template>
                                         </div>
                                         <lightning-button
                                             variant="neutral"
