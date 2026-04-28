@@ -9,15 +9,18 @@
                 <p class="instruction-title">Before You Connect</p>
                 <ol class="instruction-list">
                     <li>Open the <strong>TwinaForms User</strong> permission set and assign it to the people who will use the main TwinaForms workspace.</li>
-                    <li>Inside that permission set, open <strong>External Credential Principal Access</strong> and enable both principals:
-                        <div class="instruction-detail">`TwinaForms Bootstrap / NativeFormsBootstrapPrincipal`</div>
-                        <div class="instruction-detail">`TwinaForms Shared Secret / NativeFormsSharedSecret`</div>
+                    <li>Create a new permission set:
+                        <div class="instruction-detail">Label: <strong>TwinaForms Credentials</strong></div>
+                        <div class="instruction-detail">API Name: <strong>TwinaFormsCredentials</strong></div>
                     </li>
-                    <li>If you plan to use <strong>TwinaForms Admin</strong> for support/debug access, enable the same two principals there too.</li>
-                    <li>Open <strong>External Client App Manager</strong>, open <strong>NativForms</strong>, go to <strong>Auth Settings</strong>, click <strong>Consumer Key and Secret</strong>, and copy both values.</li>
-                    <li>Paste the client id and client secret below, then click <strong>Connect TwinaForms</strong>.</li>
+                    <li>Inside <strong>TwinaForms Credentials</strong>, open <strong>External Credential Principal Access</strong> and enable both principals:
+                        <div class="instruction-detail">`TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal`</div>
+                        <div class="instruction-detail">`TwinaFormsLambdaAuth - TwinaFormsSharedSecret`</div>
+                    </li>
+                    <li>Assign <strong>TwinaForms Credentials</strong> to the same users who need TwinaForms access.</li>
+                    <li>Click <strong>Connect TwinaForms</strong> to generate the tenant code and open Salesforce authorization.</li>
                     <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>TwinaForms</strong>, then open its <strong>External Credential</strong>.</li>
-                    <li>In that screen, find the <strong>Principal</strong> section and edit <strong>NativeFormsSharedSecret</strong>.</li>
+                    <li>In that screen, find the <strong>Principal</strong> section and edit <strong>TwinaFormsSharedSecret</strong>.</li>
                     <li>Add an authentication parameter:
                         <div class="instruction-detail">Name: `secret`</div>
                         <div class="instruction-detail">Value: the tenant code shown on this screen and sent by email</div>
@@ -51,24 +54,6 @@
                     ></lightning-input>
                 </div>
 
-                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
-                    <lightning-input
-                        label="Salesforce Client Id"
-                        value={salesforceClientId}
-                        onchange={handleChange}
-                        data-field="salesforceClientId"
-                    ></lightning-input>
-                </div>
-
-                <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
-                    <lightning-input
-                        type="password"
-                        label="Salesforce Client Secret"
-                        value={salesforceClientSecret}
-                        onchange={handleChange}
-                        data-field="salesforceClientSecret"
-                    ></lightning-input>
-                </div>
             </div>
 
             <div class="slds-m-top_medium">
@@ -85,7 +70,7 @@
                     <p class="success-title">TwinaForms Tenant Code Created</p>
                     <p class="success-text">{successMessage}</p>
                     <p class="success-step">After the tenant secret is generated and emailed, open Named Credentials, open TwinaForms, then open its External Credential.</p>
-                    <p class="success-step">In that screen, find the Principal section and edit NativeFormsSharedSecret.</p>
+                    <p class="success-step">In that screen, find the Principal section and edit TwinaFormsSharedSecret.</p>
                     <p class="success-step">Add an authentication parameter:</p>
                     <div class="instruction-detail">Name: `secret`</div>
                     <div class="instruction-detail">Value: the tenant code shown on this screen and sent by email</div>

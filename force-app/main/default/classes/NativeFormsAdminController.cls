@@ -30,27 +30,35 @@ public with sharing class NativeFormsAdminController {
     }
 
     @AuraEnabled
-    public static FeatureSettings saveFeatureSettings(FeatureSettings inputValue) {
+    public static FeatureSettings saveFeatureSettings(String inputJson) {
+        FeatureSettings inputValue = parseFeatureSettings(inputJson);
         NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
         if (config == null) {
             config = new NativeForms_Config__c(
                 SetupOwnerId = UserInfo.getOrganizationId()
             );
         }
-        config.Enable_Pro_Condition_Logic__c = inputValue != null && inputValue.enableProConditionLogic;
-        config.Enable_Pro_Repeat_Groups__c = inputValue != null && inputValue.enableProRepeatGroups;
-        config.Enable_Pro_Prefill_Alias_References__c = inputValue != null && inputValue.enableProPrefillAliasReferences;
-        config.Enable_Pro_Advanced_Submit_Modes__c = inputValue != null && inputValue.enableProAdvancedSubmitModes;
-        config.Enable_Pro_Formula_Fields__c = inputValue != null && inputValue.enableProFormulaFields;
-        config.Enable_Pro_Post_Submit_Auto_Link__c = inputValue != null && inputValue.enableProPostSubmitAutoLink;
-        config.Enable_Pro_SF_Secret_Code_Auth__c = inputValue != null && inputValue.enableProSfSecretCodeAuth;
-        config.Enable_Pro_Load_File__c = inputValue != null && inputValue.enableProLoadFile;
+        config.Enable_Pro_Condition_Logic__c = inputValue != null && inputValue.enableProConditionLogic == true;
+        config.Enable_Pro_Repeat_Groups__c = inputValue != null && inputValue.enableProRepeatGroups == true;
+        config.Enable_Pro_Prefill_Alias_References__c = inputValue != null && inputValue.enableProPrefillAliasReferences == true;
+        config.Enable_Pro_Advanced_Submit_Modes__c = inputValue != null && inputValue.enableProAdvancedSubmitModes == true;
+        config.Enable_Pro_Formula_Fields__c = inputValue != null && inputValue.enableProFormulaFields == true;
+        config.Enable_Pro_Post_Submit_Auto_Link__c = inputValue != null && inputValue.enableProPostSubmitAutoLink == true;
+        config.Enable_Pro_SF_Secret_Code_Auth__c = inputValue != null && inputValue.enableProSfSecretCodeAuth == true;
+        config.Enable_Pro_Load_File__c = inputValue != null && inputValue.enableProLoadFile == true;
         if (config.Id == null) {
             insert config;
         } else {
             update config;
         }
         return getFeatureSettings();
+    }
+
+    private static FeatureSettings parseFeatureSettings(String inputJson) {
+        if (String.isBlank(inputJson)) {
+            return new FeatureSettings();
+        }
+        return (FeatureSettings) JSON.deserialize(inputJson, FeatureSettings.class);
     }
 
     private static String normalizeText(String value) {

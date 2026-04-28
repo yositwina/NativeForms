@@ -7,8 +7,6 @@
     <isTokenExchangeFlowEnabled>false</isTokenExchangeFlowEnabled>
     <label>NativForms_oauthPlcy</label>
     <permittedUsersPolicyType>AllSelfAuthorized</permittedUsersPolicyType>
-    <refreshTokenPolicyType>SpecificLifetime</refreshTokenPolicyType>
-    <refreshTokenValidityPeriod>365</refreshTokenValidityPeriod>
-    <refreshTokenValidityUnit>Days</refreshTokenValidityUnit>
+    <refreshTokenPolicyType>Infinite</refreshTokenPolicyType>
     <requiredSessionLevel>STANDARD</requiredSessionLevel>
 </ExtlClntAppOauthConfigurablePolicies>

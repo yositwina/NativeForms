@@ -84,6 +84,12 @@
                     </div>
 
                     <div class="designer-topbar__right">
+                        <template if:true={showFormLimitWarning}>
+                            <div class="designer-topbar__result designer-topbar__result--error designer-form-limit-warning">
+                                <span>{formLimitUsageLabel}: {formLimitMessage}</span>
+                                <a href={upgradeUrl} target="_blank" rel="noopener">Upgrade plan</a>
+                            </div>
+                        </template>
                         <lightning-button
                             variant="brand-outline"
                             label="+ New Form"
@@ -837,6 +843,7 @@
                                         <lightning-input
                                             label="Default Value"
                                             value={editorDefaultValue}
+                                            placeholder={editorPlaceholder}
                                             onblur={handleEditorDefaultValueCommit}>
                                         </lightning-input>
                                     </template>
@@ -869,6 +876,21 @@
                                         onchange={handleEditorDateGmtOffsetChange}>
                                     </lightning-combobox>
                                     <p class="selection-hint">{selectedDateFormatHelpText}</p>
+                                </template>
+
+                                <template if:true={selectedElementIsTime}>
+                                    <div class="selection-label-row">
+                                        <p class="field-inline-label">Time Format</p>
+                                        <lightning-helptext content={timeFormatHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-combobox
+                                        variant="label-hidden"
+                                        label="Time Format"
+                                        value={editorTimeFormat}
+                                        options={timeFormatOptions}
+                                        onchange={handleEditorTimeFormatChange}>
+                                    </lightning-combobox>
+                                    <p class="selection-hint">{selectedTimeFormatHelpText}</p>
                                 </template>
 
                                 <p class="property-inline-text">
@@ -1500,6 +1522,36 @@
                             </div>
 
                             <div class="selection-card">
+                                <p class="selection-label">Advanced</p>
+                                <div class="selection-label-row">
+                                    <p class="field-inline-label">Custom JavaScript</p>
+                                    <lightning-helptext content={customJsHelpText}></lightning-helptext>
+                                </div>
+                                <p class="selection-hint selection-hint--compact">{customJsStatusText}</p>
+                                <div class="custom-js-settings">
+                                    <a
+                                        class="selection-inline-link"
+                                        href={customJsHelpUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer">
+                                        Learn Custom JavaScript
+                                    </a>
+                                    <template if:true={enableProCustomJs}>
+                                        <lightning-button
+                                            variant="neutral"
+                                            label={customJsButtonLabel}
+                                            onclick={handleOpenCustomJsModal}>
+                                        </lightning-button>
+                                    </template>
+                                    <template if:false={enableProCustomJs}>
+                                        <p class="selection-hint selection-hint--compact">
+                                            Available on Pro plans. Enable it in your AWS plan entitlements first.
+                                        </p>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="selection-card">
                                 <p class="selection-label">Security</p>
 
                                 <lightning-input
@@ -1639,6 +1691,20 @@
                                 </template>
                             </div>
 
+                            <div class="selection-card selection-card--danger">
+                                <p class="selection-label">Danger Zone</p>
+                                <p class="selection-hint selection-hint--compact">
+                                    Delete this form from Designer and disable its published links. Submission logs are kept according to your plan retention settings.
+                                </p>
+                                <div class="selection-actions">
+                                    <lightning-button
+                                        variant="destructive"
+                                        label="Delete Form"
+                                        onclick={handleOpenDeleteFormModal}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+
                         </template>
                     </section>
                 </div>
@@ -1657,9 +1723,17 @@
                                 <h2 id="new-form-modal-heading" class="slds-modal__title slds-hyphenate">Create New Form</h2>
                             </header>
                             <div class="slds-modal__content slds-p-around_medium">
+                                <template if:true={showFormLimitWarning}>
+                                    <div class="designer-limit-alert">
+                                        <p><strong>{formLimitUsageLabel}</strong></p>
+                                        <p>{formLimitMessage}</p>
+                                        <a href={upgradeUrl} target="_blank" rel="noopener">Upgrade plan</a>
+                                    </div>
+                                </template>
                                 <lightning-textarea
                                     label="Form Name"
                                     value={newFormDescription}
+                                    disabled={formLimitReached}
                                     onchange={handleNewFormDescriptionChange}
                                     max-length="255">
                                 </lightning-textarea>
@@ -1667,6 +1741,7 @@
                                     label="Project"
                                     value={newFormProjectId}
                                     options={newFormProjectOptions}
+                                    disabled={formLimitReached}
                                     onchange={handleNewFormProjectChange}>
                                 </lightning-combobox>
                                 <template if:true={showNewProjectNameInput}>
@@ -1679,6 +1754,7 @@
                                         variant="label-hidden"
                                         label="Project Name"
                                         value={newFormProjectName}
+                                        disabled={formLimitReached}
                                         onchange={handleNewProjectNameChange}
                                         max-length="80">
                                     </lightning-input>
@@ -1729,6 +1805,85 @@
                                     label="Save"
                                     class="slds-m-left_small"
                                     onclick={handleSaveDisplayTextModal}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showCustomJsModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="custom-js-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-custom-js-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="custom-js-modal-heading" class="slds-modal__title slds-hyphenate">Edit Custom JavaScript</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Custom JavaScript</p>
+                                    <lightning-helptext content={customJsHelpText}></lightning-helptext>
+                                    <a
+                                        class="selection-inline-link"
+                                        href={customJsHelpUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer">
+                                        Learn Custom JavaScript
+                                    </a>
+                                </div>
+                                <textarea
+                                    class="slds-textarea designer-custom-js-textarea"
+                                    rows="5"
+                                    oninput={handleModalCustomJsChange}
+                                    spellcheck="false"></textarea>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    onclick={handleCloseCustomJsModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Save"
+                                    class="slds-m-left_small"
+                                    onclick={handleSaveCustomJsModal}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showDeleteFormModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="delete-form-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-delete-form-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="delete-form-modal-heading" class="slds-modal__title slds-hyphenate">Delete this form permanently?</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <div class="designer-limit-alert">
+                                    <p>{deleteFormWarningText}</p>
+                                </div>
+                                <lightning-input
+                                    type="text"
+                                    label={deleteFormConfirmationHelpText}
+                                    value={deleteFormConfirmText}
+                                    onchange={handleDeleteFormConfirmTextChange}>
+                                </lightning-input>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    disabled={isDeletingForm}
+                                    onclick={handleCloseDeleteFormModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="destructive"
+                                    label="Delete Form"
+                                    class="slds-m-left_small"
+                                    disabled={deleteFormDisabled}
+                                    onclick={handleDeleteForm}>
                                 </lightning-button>
                             </footer>
                         </div>

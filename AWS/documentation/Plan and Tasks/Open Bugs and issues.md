@@ -1,113 +1,76 @@
-# Bug Tracker
+# Open Bugs
 
-## Open
-- [ ] BUG-001 Add hints
-  - Status: Open
+## Current
+- [x] BUG-001 Package install app visibility
+  - Severity: High
+  - Area: Salesforce packaging / app visibility
+  - Repro: Install the package in a clean Developer Edition org, then open App Launcher.
+  - Actual: Both `TwinaForms` and `TwinaForms Admin` are visible as separate apps.
+  - Expected: Only `TwinaForms` should be visible to normal installed users by default.
+  - Resolution: Solved in source by removing the separate packaged `TwinaForms Admin` app and moving admin/support-debug tooling into the main `TwinaForms` app as a gated area.
+  - Notes: `NativeForms_Admin_Features` now lives inside the main app, `TwinaForms User` hides that tab, and `TwinaForms Admin` keeps the gated admin/debug access path.
+
+- [ ] BUG-002 Home page connect link opens missing page
+  - Severity: High
+  - Area: Salesforce Home page navigation
+  - Repro: On the Home page, press the button/link that should open the Connect page.
+  - Actual: Salesforce opens a modal saying `Page doesn't exist` and `Enter a valid URL and try again`.
+  - Expected: The Connect page should open correctly from Home.
+  - Notes: Do not solve yet. Logged from first beta package QA.
+
+- [x] BUG-005 Admin tabs/objects still searchable from App Launcher
   - Severity: Medium
-  - Area: SF user pages 
-  - File: 
-  - Description: Add hints how to use the system.
-  - Actual: Partial
-  - Notes: keep simple
+  - Area: Salesforce packaging / app visibility
+  - Repro: Install the package in a clean org, open the 9-dot App Launcher, and search for TwinaForms admin-related items.
+  - Actual: The separate `TwinaForms Admin` app is gone, but admin tabs/objects/items from the old admin surface can still be found from the App Launcher.
+  - Expected: Admin-only items should not be discoverable by normal installed users from the App Launcher.
+  - Resolution: Solved in source by removing `NativeForms_Admin_Features` from the packaged `TwinaForms` app navigation and removing the admin tab setting from `TwinaForms User`.
+  - Notes: Retest in the next package version with a normal installed user. Admin/debug access remains in the separate `TwinaForms Admin` permission set for support scenarios.
 
-- [X] BUG-002 error messgae on fail submit form
-  - Status: Solved
+- [x] BUG-003 Connect page still shows red setup warning text
+  - Severity: Medium
+  - Area: Salesforce Connect page / packaging QA
+  - Repro: Open the Connect page manually in the packaged install org.
+  - Actual: The page shows a red warning banner and a `What To Do First` section with manual principal-access instructions.
+  - Expected: Remove this red warning text and remove the `What To Do First` section text.
+  - Resolution: Solved in source by removing the duplicate red setup-warning banner from `nativeFormsConnect`.
+  - Notes: The normal Step 1 setup instructions remain on the page; only the extra red warning block was removed.
+
+- [x] BUG-004 Packaged install missing external credential access/setup
   - Severity: High
-  - Area: Submit-lambda
-  - File: lambda/submit/index.mjs
-  - Description:  Error fils shoud be clear , we need to define set of error messages i.e Authenication not set up, subscription end, faile to deploy to sf fields not matched.  we need to discuss this feature
-  - Example : Query failed. Status: 400. Body: [{"message":"\nContact WHERE Email = liam.carter@example.com ORDER BY CreatedDate\n ^\nERROR at Row:1:Column:54\nunexpected token: '@'","errorCode":"MALFORMED_QUERY"}]
-  - Example : Token refresh failed. Status: 400. Body: {"error":"invalid_client_id","error_description":"client identifier invalid"} Reference: NF-20260414125612-9583FB
-  - Example : update command 'submitAction1' requires id or fields.Id Reference: NF-20260414133051-08BF01
-  - Example : Update failed. Status: 404. Body: [{"errorCode":"NOT_FOUND","message":"Provided external ID field does not exist or is not accessible: 1222222"}] Reference: NF-20260415130212-970924
-  - Expected friendly message : We could not match the submitted record in Salesforce. Please check the form mapping or contact support.
-  - Example : Update failed. Status: 400. Body: [{"message":"Cannot deserialize instance of date from VALUE_STRING value or request may be missing a required field at [line:1, column:16]","errorCode":"JSON_PARSER_ERROR"}] Reference: NF-20260415130755-3EE40D
-  - Expected friendly message : One of the date values in this form is not in a valid format. Please review the date field and try again.
-  - Actual:
-    - Published runtime now shows customer-safe primary error messages instead of leading with raw backend or Salesforce text.
-    - Submit failures are bucketed into clearer product-facing messages, with technical detail treated as secondary troubleshooting information.
-  
-- [X] BUG-003 NF themes Object fiels deiplays
-  - Status: Solved
+  - Area: Salesforce packaging / external credentials
+  - Resolution: Solved by changing install/setup instructions.
+  - Notes: Packaged External Credentials and principals install, but the manual assignment surface is the subscriber-created permission set, not the packaged TwinaForms permission sets. Connect/setup instructions now tell the customer to create `TwinaForms Credentials` (`TwinaFormsCredentials`), add the two principals there, and assign that permission set to the same users who need TwinaForms access.
+
+- [ ] BUG-006 Connect page shows User Access too early
+  - Severity: Medium
+  - Area: Salesforce Connect page / setup flow
+  - Repro: Open the Connect page before Step 1 and Step 2 are both complete and green.
+  - Actual: The `User Access` section is shown before the connection/setup flow is fully complete.
+  - Expected: Show `User Access` only after Step 1 and Step 2 are both completed successfully.
+  - Notes: Do not solve yet. Logged during beta package QA.
+
+- [x] BUG-007 Connect page refresh checks tenant secret credential too early
   - Severity: High
-  - Area: nativeForms Admin app
-  - File:
-  - Description: on NF Theme object plesae add on page layot to show al lfields, currently no field is shown
-  - Actual: 
+  - Area: Salesforce Connect page / packaging QA
+  - Repro: Install the package in a clean org, complete the External Credential Principal Access setup, then refresh the Connect page before tenant secret verification is complete.
+  - Actual: The page shows a red error such as `TwinaForms could not connect yet because the required permission-set access is not fully enabled.` and Salesforce may surface an internal server error ID.
+  - Expected: Page-load status checks should use the bootstrap/status path only. The tenant-secret Named Credential should be probed only when the user clicks `Test Tenant Secret`.
+  - Resolution: Solved in source by adding an explicit `verifyTenantAuthNow` flag to `NativeFormsSetupController.getConnectionStatus`, using `false` for page load/Home/Admin status checks and `true` only for the Connect page `Test Tenant Secret` action.
 
-[ ] BUG-004 Publish failed
-- Severity: High
-- Description: when external credential are not set correctly by user on Permission set he get teh below error insteasd of a simple mssage youe external credentail are not set correctly (and instructions what to do) 
-System.CalloutException: We couldn't access the credential(s). You might not have the required permissions, or the external credential "NativeFormsLambdaAuth" might not exist. @ Class.NativeFormsAwsClient.presignHtml: line 48, column 1
+- [ ] BUG-008 Connect page does not pre-check current user permission-set setup
+  - Severity: Medium
+  - Area: Salesforce Connect page / setup flow
+  - Repro: Install the package, create `TwinaForms Credentials`, add the required External Credential Principal Access, but assign it to a different user than the one currently opening Connect.
+  - Actual: Connect shows a generic setup-access error and does not clearly tell the current user that they are missing the required permission-set assignment.
+  - Expected: On Connect page load, check whether the current user has the required `TwinaForms User` and subscriber-created `TwinaForms Credentials` assignments, then show a clear customer-safe message if not.
+  - Notes: Do not solve yet. Logged during Beta 4 package QA after a wrong-user assignment caused the initial refresh error.
 
-
-[X] BUG-005 Pudblish Link
-- Severity: High
-- Type: feature
-- Description: On Designer Page Once a Form is publishes,If this version is selected teh link to teh form should appear (near teh wording "This published version is read-only. Publish creates a new draft copy for continued editing."
-
-[X] Bug 006 NativeForm Connect Page
-- Status: Solved
-- Actual:
-  - Updated connect-page wording and layout text.
-  - Tenant secret is shown in the UI for 5 minutes only.
-  - After 5 minutes the page stops showing the code and tells the user to use the admin email inbox.
-- text cahnges below, keep bold part bold as today
-Finish NativeForms Setup  --> You need to finish NativeForms Setup ,please gollow below instructions (in bold)
-
-Open the
-NativeForms Admin
-permission set in Salesforce Setup and assign it to the admins who will manage the app.
- --> 
-Open the NativeForms Admin 
-permission set in Salesforce Setup and assign it to the admins who will manage the app.
-In that permission set, open External Credential Principal Access
-
-Open
-External Client App Manager
-
-and choose the
-NativeForms
-
-app. Go to the
-Settings
-
-tab, then under
-OAuth Settings
-
-click the button to view the
-Consumer Key
-
-and
-Consumer Secret 
--->
-Open  External Client App Manager
-
-and choose the NativeForms
-
-app. Go to the Settings
-
-tab, then under OAuth Settings
-
-click the button to view the Consumer Key
-and
-Consumer Secret
-
-- Tenant Secret Code
-
-oUo_ZuXUW3jIUQgQ-jehIo5oyXhLiQfa7sXmLdT-TQY
-plese delete the code after 5 minutes and nevert show it again 9add text that explain this), teh code is in teh email box of admin
-
-- [X] BUG-007 Repeat group new contact/new case relation missing
-  - Status: Solved
+- [x] BUG-009 Managed package LWC-to-Apex DTO binding fails before Apex logs
   - Severity: High
-  - Area: Submit lambda / repeat group submit
-  - File: `AWS/NativeForms-SubmitForm.mjs`
-  - Description: When a repeat-group form is submitted with no existing Contact and no existing Cases, and the user enters new contact details and adds one new Case row, the submit succeeds but the created Case is not related to the newly created Contact.
-  - Repro:
-  - Open the demo repeat-group form with no matching prefill data.
-  - Enter new contact details.
-  - Add one new case row with Subject and Priority.
-  - Submit the form.
-  - Actual: Solved in the demo repeat-group flow after the submit mapping was updated to use the created Contact id when present.
-  - Expected: If submit creates a new Contact in the same flow, new Case rows in the repeat group should be created with `ContactId` pointing to that created Contact.
+  - Area: Salesforce packaging / LWC-to-Apex contract
+  - Repro: Install Beta 4, complete permission-set principal access correctly, open Connect, then press `Generate Secret`.
+  - Actual: Salesforce returns `An internal server error has occurred` with error code `-583189392`; DevTools shows the Aura action calling `NativeFormsSetupController.registerOrg` with a custom DTO-shaped `requestBody`, but no Apex debug log is produced.
+  - Expected: The action should reach Apex and either register the org or return a customer-safe handled error.
+  - Resolution: Solved in source by changing package-visible LWC save/update/register request bodies from custom Apex DTO parameters to JSON string parameters that Apex deserializes inside the method body.
+  - Notes: Same hardening was applied to Connect registration/client-credential save, Admin feature save, Theme save, Builder element update, Prefill action save, and Submit action save.

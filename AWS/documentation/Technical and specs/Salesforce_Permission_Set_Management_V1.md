@@ -7,7 +7,7 @@ Last updated: 2026-04-21
 Define the V1 model for:
 
 - Salesforce user access to the customer-facing `TwinaForms` app
-- a separate support/debug access path for the `TwinaForms Admin` app
+- a gated support/debug access path inside the main `TwinaForms` app
 - seat limits driven from AWS tenant data
 - package-safe permission-set structure before Apex test work and packaging
 
@@ -53,11 +53,11 @@ V1 rule:
 Reason:
 
 - the user seat limit is for the real customer-facing TwinaForms workspace
-- the Admin app is a support/debug path, not a normal customer seat
+- the admin/debug area is a support/debug path, not a normal customer seat
 
-### 4. TwinaForms Admin app is controlled by a tenant support flag
+### 4. TwinaForms Admin access is controlled by a tenant support flag
 
-The Admin app should not be open by default.
+The admin/debug area should not be open by default.
 
 V1 rule:
 
@@ -110,21 +110,20 @@ Should include:
 
 Should not include:
 
-- `NativeForms_Admin` app visibility
-- raw object tabs used only for debug/admin support
-- `NativeForms_Admin_Features`
+- admin/debug-only tabs or object access
+- visible access to `NativeForms_Admin_Features`
 
 ## TwinaForms Admin
 
 Purpose:
 
-- grants access to the separate `TwinaForms Admin` app
+- grants access to the gated admin/debug area inside the main `TwinaForms` app
 - used only for support/debug or advanced internal admin scenarios
 - not counted against `maxSfUsers`
 
 Should include:
 
-- `NativeForms_Admin` app visibility
+- `NativeForms` app visibility
 - admin/debug object tabs
 - `NativeForms_Admin_Features`
 - any admin/setup classes and object permissions required by that app
@@ -256,7 +255,7 @@ Recommended UX:
 
 - normal user access is the main action
 - admin/debug access is visually secondary
-- if Admin app is closed, explain that it is controlled from the TwinaForms Admin console
+- if admin/debug access is closed, explain that it is controlled from the TwinaForms Admin console
 
 ---
 
@@ -277,9 +276,16 @@ The current packaged setup should be refactored so ordinary use works with:
 
 only.
 
-### 3. Admin app stays separate
+### 3. Admin/debug tooling stays inside the main app
 
-The `TwinaForms Admin` app should remain packaged, but access should be intentionally separate.
+Do not ship a separate `TwinaForms Admin` app in App Launcher.
+
+Instead:
+
+- ship only the main `TwinaForms` app
+- keep `NativeForms_Admin_Features` inside that app
+- expose the admin/debug area only to users with `TwinaForms Admin`
+- keep grant/removal of `TwinaForms Admin` controlled by the AWS support flag
 
 ### 4. Setup docs must be updated
 
@@ -303,7 +309,7 @@ Included:
 - split packaged permission sets
 - local Salesforce seat counting
 - enforcement against AWS `maxSfUsers`
-- tenant support flag for Admin app open/closed
+- tenant support flag for admin/debug access open/closed
 - admin-console toggle for that support flag
 - Connect-page user access management in Salesforce
 
@@ -321,7 +327,7 @@ Not included:
 V1 should be implemented with this simple model:
 
 - `TwinaForms User` = standard seat, counted against AWS limit
-- `TwinaForms Admin` = support/debug access, controlled by tenant support flag
+- `TwinaForms Admin` = support/debug access inside the main app, controlled by tenant support flag
 - AWS owns the seat limit and the Admin-open flag
 - Salesforce owns the real assignment count and local enforcement
 

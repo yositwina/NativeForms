@@ -59,7 +59,7 @@ export default class NativeFormsHome extends NavigationMixin(LightningElement) {
         this[NavigationMixin.Navigate]({
             type: 'standard__navItemPage',
             attributes: {
-                apiName: 'NativeForms_Connect'
+                apiName: this.connectTabApiName
             }
         });
     }
@@ -91,6 +91,10 @@ export default class NativeFormsHome extends NavigationMixin(LightningElement) {
 
     get connection() {
         return this.homeView?.connection || {};
+    }
+
+    get connectTabApiName() {
+        return this.homeView?.connectTabApiName || 'NativeForms_Connect';
     }
 
     get plan() {

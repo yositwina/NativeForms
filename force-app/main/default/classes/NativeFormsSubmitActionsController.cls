@@ -308,7 +308,8 @@ public with sharing class NativeFormsSubmitActionsController {
     }
 
     @AuraEnabled
-    public static SubmitActionRecord saveSubmitAction(SubmitActionInput inputValue) {
+    public static SubmitActionRecord saveSubmitAction(String inputJson) {
+        SubmitActionInput inputValue = parseSubmitActionInput(inputJson);
         if (inputValue == null) {
             throw new AuraHandledException('Action data is required.');
         }
@@ -538,6 +539,13 @@ public with sharing class NativeFormsSubmitActionsController {
 
     private static List<Object> listValue(Object value) {
         return value instanceof List<Object> ? (List<Object>) value : new List<Object>();
+    }
+
+    private static SubmitActionInput parseSubmitActionInput(String inputJson) {
+        if (String.isBlank(inputJson)) {
+            return null;
+        }
+        return (SubmitActionInput) JSON.deserialize(inputJson, SubmitActionInput.class);
     }
 
     private static String buildActionKey(String objectApiName, String commandType) {

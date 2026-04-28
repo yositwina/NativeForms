@@ -1,7 +1,9 @@
 ﻿import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
 import updateFormSettings from '@salesforce/apex/NativeFormsDesignerController.updateFormSettings';
+import updateVersionCustomJs from '@salesforce/apex/NativeFormsDesignerController.updateVersionCustomJs';
 import createFormWithDraftVersion from '@salesforce/apex/NativeFormsDesignerController.createFormWithDraftVersion';
+import deleteDesignerForm from '@salesforce/apex/NativeFormsDesignerController.deleteForm';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPicklistFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistFieldOptions';
 import getPicklistValueOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistValueOptions';
@@ -23,7 +25,7 @@ const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
 
 export default class NativeFormsDesigner extends LightningElement {
-    designerVersion = 'v20.20';
+    designerVersion = 'v20.29';
     isLoading = true;
     errorMessage = '';
     selectedProjectId;
@@ -67,6 +69,7 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedVersionSubmitConditionalValue = '';
     selectedVersionSubmitConditionalConditions = [];
     selectedVersionSubmitConditionalExpression = '';
+    selectedVersionCustomJs = '';
     draftSubmitSuccessMessage = 'Your form was submitted successfully.';
     draftSubmitLabel = 'Submit';
     draftRtlEnabled = false;
@@ -92,6 +95,7 @@ export default class NativeFormsDesigner extends LightningElement {
     draftSubmitConditionalValue = '';
     draftSubmitConditionalConditions = [];
     draftSubmitConditionalExpression = '';
+    draftCustomJs = '';
     selectedPublishedUrl = '';
     selectedTheme = null;
     draggedElementId = null;
@@ -101,10 +105,14 @@ export default class NativeFormsDesigner extends LightningElement {
     publishResult = null;
     showNewFormModal = false;
     showDisplayTextModal = false;
+    showCustomJsModal = false;
+    showDeleteFormModal = false;
     newFormDescription = '';
     newFormProjectId = '';
     newFormProjectName = '';
     isCreatingForm = false;
+    deleteFormConfirmText = '';
+    isDeletingForm = false;
 
     @track projectOptions = [];
     @track formOptions = [];
@@ -122,6 +130,12 @@ export default class NativeFormsDesigner extends LightningElement {
     enableProFormulaFields = false;
     enableProPostSubmitAutoLink = false;
     enableProSfSecretCodeAuth = false;
+    enableProCustomJs = false;
+    currentFormCount = 0;
+    maxForms = null;
+    formLimitReached = false;
+    formLimitMessage = '';
+    upgradeUrl = 'https://twinaforms.com/upgrade?source=salesforce-designer';
     selectedPostSubmitFormToken = '';
     selectedFormulaFieldToken = '';
     postSubmitUrlSelectionStart = 0;
@@ -165,6 +179,7 @@ export default class NativeFormsDesigner extends LightningElement {
     editorMaxValue = '';
     editorDateDisplayFormat = 'us';
     editorDateGmtOffset = '+00:00';
+    editorTimeFormat = '24h';
     editorPastYears = '';
     editorPastMonths = '';
     editorFutureYears = '';
@@ -185,11 +200,13 @@ export default class NativeFormsDesigner extends LightningElement {
     editorFormulaPreviewValue = '';
     editorFormulaError = '';
     modalDisplayText = '';
+    modalCustomJs = '';
 
     inputFieldOptions = [
         { label: 'Text', value: 'text' },
         { label: 'Number', value: 'number' },
         { label: 'Date', value: 'date' },
+        { label: 'Time', value: 'time' },
         { label: 'Email', value: 'email' },
         { label: 'Phone', value: 'tel' },
         { label: 'Picklist', value: 'select' },
@@ -259,6 +276,11 @@ export default class NativeFormsDesigner extends LightningElement {
     dateDisplayFormatOptions = [
         { label: 'US (MM/DD/YYYY)', value: 'us' },
         { label: 'EU (DD/MM/YYYY)', value: 'eu' }
+    ];
+
+    timeFormatOptions = [
+        { label: '24-hour (19:00)', value: '24h' },
+        { label: '12-hour (8:00 PM)', value: '12h' }
     ];
 
     dateGmtOffsetOptions = [
@@ -443,9 +465,20 @@ export default class NativeFormsDesigner extends LightningElement {
         const projectSelection = String(this.newFormProjectId || '').trim();
         const requiresNewProjectName = projectSelection === '__new__';
         return this.isCreatingForm
+            || this.formLimitReached
             || !String(this.newFormDescription || '').trim()
             || (!projectSelection && !requiresNewProjectName)
             || (requiresNewProjectName && !String(this.newFormProjectName || '').trim());
+    }
+
+    get showFormLimitWarning() {
+        return this.formLimitReached && !!this.formLimitMessage;
+    }
+
+    get formLimitUsageLabel() {
+        return this.maxForms == null
+            ? `${this.currentFormCount || 0} forms`
+            : `${this.currentFormCount || 0} / ${this.maxForms} forms`;
     }
 
     get showNewProjectNameInput() {
@@ -537,28 +570,28 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsLabelPosition() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDefaultValue() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType)
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType)
             && !this.editorUseFormula;
     }
 
     get selectedElementSupportsPlaceholder() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsBoldLabel() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsRequired() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsFieldBehavior() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'group'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'group'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDisplayFieldBehavior() {
@@ -628,7 +661,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsSalesforceMapping() {
-        return ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
     }
 
     get selectedRepeatGroupParent() {
@@ -700,6 +733,51 @@ export default class NativeFormsDesigner extends LightningElement {
         return 'https://twinaforms.com/help/formulas';
     }
 
+    get customJsHelpUrl() {
+        return 'https://twinaforms.com/help/custom-javascript';
+    }
+
+    get customJsHelpText() {
+        return [
+            'Run supported TwinaForms custom JavaScript in the published form runtime.',
+            'Use TwinaForms.getValue(...), TwinaForms.setValue(...), and TwinaForms.on(...).',
+            'This is a Pro feature and only runs on published forms for versions with saved code.'
+        ].join('\n');
+    }
+
+    get customJsStatusText() {
+        return this.draftCustomJs && this.draftCustomJs.trim()
+            ? 'Configured on this form version.'
+            : 'No custom JavaScript is configured on this form version.';
+    }
+
+    get customJsButtonLabel() {
+        return this.draftCustomJs && this.draftCustomJs.trim()
+            ? 'Edit Custom JavaScript'
+            : 'Add Custom JavaScript';
+    }
+
+    get deleteFormConfirmationValue() {
+        return this.selectedFormName || this.selectedFormKey || '';
+    }
+
+    get deleteFormConfirmationHelpText() {
+        const expectedValue = this.deleteFormConfirmationValue;
+        return expectedValue
+            ? `Type "${expectedValue}" to confirm.`
+            : 'Type the form name or form key to confirm.';
+    }
+
+    get deleteFormDisabled() {
+        return this.isDeletingForm
+            || !this.selectedFormId
+            || !String(this.deleteFormConfirmText || '').trim();
+    }
+
+    get deleteFormWarningText() {
+        return 'This permanently deletes the form from Designer, including versions, fields, Prefill actions, and Submit actions. Published links will stop working. Existing submission logs are kept according to your plan retention settings. This cannot be undone.';
+    }
+
     get formulaFieldTokenOptions() {
         return [{ label: 'Insert field', value: '' }].concat(
             (this.elements || [])
@@ -707,7 +785,7 @@ export default class NativeFormsDesigner extends LightningElement {
                     if (!item?.fieldKey || item.id === this.selectedElementId) {
                         return false;
                     }
-                    if (!['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'hidden'].includes(item.elementType)) {
+                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'hidden'].includes(item.elementType)) {
                         return false;
                     }
                     if (item.parentElementId && this.isElementInsideRepeatGroup(item)) {
@@ -747,6 +825,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get dateTimezoneHelpText() {
         return 'Use this only if you need the date to be interpreted with a specific GMT offset.';
+    }
+
+    get timeFormatHelpText() {
+        return 'Choose how users enter the time. TwinaForms stores and submits the value as HH:mm.';
     }
 
     get repeatSourceAliasHelpText() {
@@ -831,10 +913,75 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorElementType === 'date';
     }
 
+    get selectedElementIsTime() {
+        return this.editorElementType === 'time';
+    }
+
     get selectedDateFormatHelpText() {
         return this.editorDateDisplayFormat === 'eu'
             ? 'Users will enter dates as DD/MM/YYYY.'
             : 'Users will enter dates as MM/DD/YYYY.';
+    }
+
+    get selectedTimeFormatHelpText() {
+        return this.editorTimeFormat === '12h'
+            ? 'Users enter time like 8:00 PM. TwinaForms submits it as HH:mm.'
+            : 'Users enter time from 00:00 to 23:59.';
+    }
+
+    timePlaceholderForFormat(format) {
+        return format === '12h' ? '8:00 PM' : '19:00';
+    }
+
+    parseTimeValue(value, format = '24h') {
+        const raw = String(value || '').trim();
+        if (!raw) {
+            return null;
+        }
+        let match;
+        if (format === '12h') {
+            match = raw.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+            if (!match) {
+                return null;
+            }
+            let hours = Number(match[1]);
+            const minutes = Number(match[2]);
+            if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+                return null;
+            }
+            const meridiem = match[3].toUpperCase();
+            if (meridiem === 'AM' && hours === 12) {
+                hours = 0;
+            } else if (meridiem === 'PM' && hours < 12) {
+                hours += 12;
+            }
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+        match = raw.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) {
+            return null;
+        }
+        const hours = Number(match[1]);
+        const minutes = Number(match[2]);
+        if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+            return null;
+        }
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+
+    formatTimeValue(value, format = '24h') {
+        const normalized = this.parseTimeValue(value, '24h') || this.parseTimeValue(value, '12h');
+        if (!normalized) {
+            return value || '';
+        }
+        if (format !== '12h') {
+            return normalized;
+        }
+        const [hourText, minuteText] = normalized.split(':');
+        const hour24 = Number(hourText);
+        const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+        const hour12 = hour24 % 12 || 12;
+        return `${hour12}:${minuteText} ${meridiem}`;
     }
 
     get selectedElementSupportsTextValidation() {
@@ -1068,7 +1215,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.elements
                 .filter((item) =>
                     item.fieldKey &&
-                    ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
+                    ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
                 )
                 .map((item) => ({
                     label: `${item.label} (${item.fieldKey})`,
@@ -1097,7 +1244,7 @@ export default class NativeFormsDesigner extends LightningElement {
             .filter((item) =>
                 item.id !== this.selectedElementId &&
                 item.fieldKey &&
-                ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
+                ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
             )
             .map((item) => ({
                 label: `${item.label} (${item.fieldKey})`,
@@ -1369,6 +1516,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 workspace.selectedVersionSubmitConditionalExpression || '',
                 this.selectedVersionSubmitConditionalConditions.length
             );
+            this.selectedVersionCustomJs = workspace.selectedVersionCustomJs || '';
             this.draftSubmitSuccessMessage = this.selectedVersionSubmitSuccessMessage;
             this.draftLanguageCode = this.selectedVersionLanguageCode;
             this.draftSubmitLabel = this.selectedVersionSubmitLabel;
@@ -1395,6 +1543,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.draftSubmitConditionalValue = this.selectedVersionSubmitConditionalValue;
             this.draftSubmitConditionalConditions = [...this.selectedVersionSubmitConditionalConditions];
             this.draftSubmitConditionalExpression = this.selectedVersionSubmitConditionalExpression;
+            this.draftCustomJs = this.selectedVersionCustomJs;
             this.ensureDraftSubmitConditionRow();
             this.selectedPublishedUrl = workspace.selectedPublishedUrl || '';
             this.prefillAliasDetails = workspace.prefillAliases || [];
@@ -1405,6 +1554,12 @@ export default class NativeFormsDesigner extends LightningElement {
             this.enableProFormulaFields = !!workspace.enableProFormulaFields;
             this.enableProPostSubmitAutoLink = !!workspace.enableProPostSubmitAutoLink;
             this.enableProSfSecretCodeAuth = !!workspace.enableProSfSecretCodeAuth;
+            this.enableProCustomJs = !!workspace.enableProCustomJs;
+            this.currentFormCount = workspace.currentFormCount || 0;
+            this.maxForms = workspace.maxForms === null || workspace.maxForms === undefined ? null : Number(workspace.maxForms);
+            this.formLimitReached = workspace.formLimitReached === true;
+            this.formLimitMessage = workspace.formLimitMessage || '';
+            this.upgradeUrl = workspace.upgradeUrl || 'https://twinaforms.com/upgrade?source=salesforce-designer';
             if (this.selectedProjectId) {
                 this.storeSelectedProject(this.selectedProjectId);
             } else {
@@ -1614,6 +1769,7 @@ export default class NativeFormsDesigner extends LightningElement {
             isTextarea: effectiveType === 'textarea',
             isNumber: effectiveType === 'number',
             isDate: effectiveType === 'date',
+            isTime: effectiveType === 'time',
             isEmail: effectiveType === 'email',
             isPhone: effectiveType === 'tel',
             isUrl: effectiveType === 'url',
@@ -1768,7 +1924,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     supportsRequiredMarker(item) {
         const effectiveType = item?.elementType === 'hidden' ? 'text' : item?.elementType;
-        if (!['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(effectiveType)) {
+        if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(effectiveType)) {
             return false;
         }
         const config = this.parseConfig(item?.configJson);
@@ -1799,6 +1955,9 @@ export default class NativeFormsDesigner extends LightningElement {
         if (this.isLegacySeedDefaultValue(item, config.defaultValue)) {
             return '';
         }
+        if (item.elementType === 'time') {
+            return this.formatTimeValue(config.defaultValue || '', config.timeFormat === '12h' ? '12h' : '24h');
+        }
         return config.defaultValue || '';
     }
 
@@ -1809,6 +1968,9 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         if (item.elementType === 'date') {
             return config.placeholder || (config.dateDisplayFormat === 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy');
+        }
+        if (item.elementType === 'time') {
+            return config.placeholder || this.timePlaceholderForFormat(config.timeFormat === '12h' ? '12h' : '24h');
         }
         if (config.placeholder) {
             return config.placeholder;
@@ -1865,6 +2027,9 @@ export default class NativeFormsDesigner extends LightningElement {
         if (effectiveType === 'date') {
             return 'text';
         }
+        if (effectiveType === 'time') {
+            return 'text';
+        }
         return ['text', 'number', 'date', 'email', 'tel', 'url'].includes(effectiveType) ? effectiveType : 'text';
     }
 
@@ -1885,7 +2050,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     previewInputDirection(item) {
-        return ['number', 'date', 'email', 'tel', 'url'].includes(item?.elementType) ? 'ltr' : null;
+        return ['number', 'date', 'time', 'email', 'tel', 'url'].includes(item?.elementType) ? 'ltr' : null;
     }
 
     isFormulaField(item) {
@@ -2089,9 +2254,40 @@ export default class NativeFormsDesigner extends LightningElement {
         this.showDisplayTextModal = true;
     }
 
+    handleOpenCustomJsModal() {
+        if (!this.enableProCustomJs) {
+            this.showToast('Upgrade required', 'Custom JavaScript is available on Pro plans only.', 'warning');
+            return;
+        }
+        this.modalCustomJs = this.selectedVersionCustomJs || this.draftCustomJs || '';
+        this.showCustomJsModal = true;
+    }
+
     handleCloseDisplayTextModal() {
         this.showDisplayTextModal = false;
         this.modalDisplayText = '';
+    }
+
+    handleCloseCustomJsModal() {
+        this.showCustomJsModal = false;
+        this.modalCustomJs = '';
+    }
+
+    handleOpenDeleteFormModal() {
+        this.deleteFormConfirmText = '';
+        this.showDeleteFormModal = true;
+    }
+
+    handleCloseDeleteFormModal() {
+        if (this.isDeletingForm) {
+            return;
+        }
+        this.showDeleteFormModal = false;
+        this.deleteFormConfirmText = '';
+    }
+
+    handleDeleteFormConfirmTextChange(event) {
+        this.deleteFormConfirmText = event.detail.value || '';
     }
 
     handleCloseNewFormModal() {
@@ -2154,6 +2350,37 @@ export default class NativeFormsDesigner extends LightningElement {
         }
     }
 
+    async handleDeleteForm() {
+        if (this.deleteFormDisabled) {
+            return;
+        }
+
+        const projectId = this.selectedProjectId;
+        const formName = this.selectedFormName || 'The form';
+        this.isDeletingForm = true;
+        this.errorMessage = '';
+        try {
+            await deleteDesignerForm({
+                formId: this.selectedFormId,
+                confirmationText: this.deleteFormConfirmText
+            });
+            this.showDeleteFormModal = false;
+            this.deleteFormConfirmText = '';
+            this.selectedFormId = null;
+            this.selectedVersionId = null;
+            this.selectedElementId = null;
+            this.publishResult = null;
+            this.clearStoredForm();
+            this.clearStoredVersion();
+            await this.loadWorkspace(projectId, null, null);
+            this.showToast('Form deleted', `${formName} was deleted and published links were disabled.`, 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isDeletingForm = false;
+        }
+    }
+
     async saveFormSettings(nextValues, successMessage, options = {}) {
         if (!this.selectedFormId) {
             return;
@@ -2198,6 +2425,7 @@ export default class NativeFormsDesigner extends LightningElement {
         };
         this.isLoading = true;
         this.errorMessage = '';
+        let saved = false;
         try {
             await updateFormSettings({
                 formId: this.selectedFormId,
@@ -2233,6 +2461,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 submitConditionalConditionsJson: mergedValues.submitConditionalConditionsJson || '[]',
                 submitConditionalExpression: mergedValues.submitConditionalExpression || ''
             });
+            saved = true;
             this.selectedFormName = (mergedValues.formName || '').trim();
             this.selectedFormDescription = this.selectedFormName;
             this.draftFormName = this.selectedFormName;
@@ -2310,6 +2539,7 @@ export default class NativeFormsDesigner extends LightningElement {
         } finally {
             this.isLoading = false;
         }
+        return saved;
     }
 
     async handleThemeChange(event) {
@@ -2906,7 +3136,9 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     handleEditorDefaultValueCommit(event) {
-        this.editorDefaultValue = event.target.value;
+        this.editorDefaultValue = this.selectedElementIsTime
+            ? this.formatTimeValue(event.target.value, this.editorTimeFormat)
+            : event.target.value;
         this.applyEditorDraft(false);
         this.flushEditorDraftSave();
     }
@@ -2932,11 +3164,51 @@ export default class NativeFormsDesigner extends LightningElement {
         this.modalDisplayText = event.detail.value;
     }
 
+    handleModalCustomJsChange(event) {
+        this.modalCustomJs = event.detail?.value ?? event.target.value ?? '';
+    }
+
     handleSaveDisplayTextModal() {
         this.editorDisplayText = this.modalDisplayText || '<p>Display text</p>';
         this.applyEditorDraft(false);
         this.flushEditorDraftSave();
         this.handleCloseDisplayTextModal();
+    }
+
+    async handleSaveCustomJsModal() {
+        if (!this.selectedFormId || !this.selectedVersionId) {
+            return;
+        }
+        const customJsInput = this.template.querySelector('.designer-custom-js-textarea');
+        const latestCustomJs = customJsInput ? (customJsInput.value || '') : (this.modalCustomJs || '');
+        this.modalCustomJs = latestCustomJs;
+        this.isLoading = true;
+        this.errorMessage = '';
+        try {
+            await updateVersionCustomJs({
+                formId: this.selectedFormId,
+                versionId: this.selectedVersionId,
+                customJs: latestCustomJs
+            });
+            this.selectedVersionCustomJs = latestCustomJs;
+            this.draftCustomJs = this.selectedVersionCustomJs;
+            this.handleCloseCustomJsModal();
+            this.showToast('Custom JavaScript saved', 'Custom JavaScript updated.', 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    renderedCallback() {
+        if (!this.showCustomJsModal) {
+            return;
+        }
+        const customJsInput = this.template.querySelector('.designer-custom-js-textarea');
+        if (customJsInput && customJsInput.value !== this.modalCustomJs) {
+            customJsInput.value = this.modalCustomJs || '';
+        }
     }
 
     handleEditorImageUrlCommit(event) {
@@ -3156,6 +3428,20 @@ export default class NativeFormsDesigner extends LightningElement {
     handleEditorDateDisplayFormatChange(event) {
         this.editorDateDisplayFormat = event.detail.value || 'us';
         this.applyEditorDraft();
+    }
+
+    handleEditorTimeFormatChange(event) {
+        const nextFormat = event.detail.value === '12h' ? '12h' : '24h';
+        const normalized = this.parseTimeValue(this.editorDefaultValue, this.editorTimeFormat) || this.parseTimeValue(this.editorDefaultValue, nextFormat);
+        this.editorTimeFormat = nextFormat;
+        if (!this.editorPlaceholder || ['HH:mm', '19:00', '8:00 PM'].includes(this.editorPlaceholder)) {
+            this.editorPlaceholder = this.timePlaceholderForFormat(nextFormat);
+        }
+        if (normalized) {
+            this.editorDefaultValue = this.formatTimeValue(normalized, nextFormat);
+        }
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorDateGmtOffsetChange(event) {
@@ -3510,6 +3796,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorMaxValue = '';
             this.editorDateDisplayFormat = 'us';
             this.editorDateGmtOffset = '+00:00';
+            this.editorTimeFormat = '24h';
             this.editorPastYears = '';
             this.editorPastMonths = '';
             this.editorFutureYears = '';
@@ -3545,7 +3832,11 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorLabel = selected.label || '';
         this.editorElementType = selected.elementType === 'hidden' ? 'text' : (selected.elementType || 'text');
         this.editorLabelPosition = config.labelPosition === 'inline' ? 'above' : (config.labelPosition || 'above');
-        this.editorDefaultValue = config.defaultValue || '';
+        const loadedTimeFormat = config.timeFormat === '12h' ? '12h' : '24h';
+        this.editorTimeFormat = loadedTimeFormat;
+        this.editorDefaultValue = selected.elementType === 'time'
+            ? this.formatTimeValue(config.defaultValue || '', loadedTimeFormat)
+            : (config.defaultValue || '');
         this.editorPlaceholder = config.placeholder || '';
         this.editorDisplayText = config.html || config.text || '';
         this.editorImageUrl = config.imageUrl || '';
@@ -3621,7 +3912,9 @@ export default class NativeFormsDesigner extends LightningElement {
         }
 
         if (this.selectedElementSupportsDefaultValue) {
-            nextConfig.defaultValue = this.editorDefaultValue || '';
+            nextConfig.defaultValue = this.selectedElementIsTime
+                ? (this.parseTimeValue(this.editorDefaultValue, this.editorTimeFormat) || this.editorDefaultValue || '')
+                : (this.editorDefaultValue || '');
             delete nextConfig.placeholder;
             if (this.editorElementType === 'checkbox') {
                 nextConfig.checked = ['true', '1', 'yes', 'checked'].includes(String(this.editorDefaultValue || '').toLowerCase());
@@ -3631,7 +3924,9 @@ export default class NativeFormsDesigner extends LightningElement {
         }
 
         if (this.selectedElementSupportsPlaceholder) {
-            nextConfig.placeholder = this.editorPlaceholder || '';
+            nextConfig.placeholder = this.selectedElementIsTime
+                ? (this.editorPlaceholder || this.timePlaceholderForFormat(this.editorTimeFormat))
+                : (this.editorPlaceholder || '');
         } else {
             delete nextConfig.placeholder;
         }
@@ -3767,6 +4062,12 @@ export default class NativeFormsDesigner extends LightningElement {
             delete nextConfig.futureMonths;
         }
 
+        if (this.selectedElementIsTime) {
+            nextConfig.timeFormat = this.editorTimeFormat === '12h' ? '12h' : '24h';
+        } else {
+            delete nextConfig.timeFormat;
+        }
+
         if (this.selectedElementSupportsTextValidation) {
             nextConfig.textRule = this.editorTextRule || 'none';
         } else {
@@ -3851,6 +4152,7 @@ export default class NativeFormsDesigner extends LightningElement {
         this.errorMessage = '';
         this.updateFormulaPreview();
         this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
     }
 
     handleEditorFormulaExpressionInput(event) {
@@ -3930,7 +4232,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 return item;
             }
 
-            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup', 'fileUpload'].includes(this.editorElementType)
+            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup', 'fileUpload'].includes(this.editorElementType)
                 ? (item.fieldKey || this.generatedFieldKey(this.editorElementType))
                 : null;
 
@@ -3986,13 +4288,13 @@ export default class NativeFormsDesigner extends LightningElement {
         try {
             const selected = this.selectedElement;
             await updateElement({
-                inputValue: {
+                inputJson: JSON.stringify({
                     id: selected.id,
                     label: selected.label,
                     fieldKey: selected.fieldKey,
                     configJson: selected.configJson,
                     elementType: selected.elementType
-                }
+                })
             });
             if (showToast) {
                 this.showToast('Saved', 'Visual settings updated.', 'success');
@@ -4085,13 +4387,13 @@ export default class NativeFormsDesigner extends LightningElement {
 
         try {
             await updateElement({
-                inputValue: {
+                inputJson: JSON.stringify({
                     id: updatedParent.id,
                     label: updatedParent.label,
                     fieldKey: updatedParent.fieldKey,
                     configJson: updatedParent.configJson,
                     elementType: updatedParent.elementType
-                }
+                })
             });
         } catch (error) {
             this.errorMessage = this.normalizeError(error);

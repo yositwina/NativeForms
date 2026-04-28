@@ -96,4 +96,20 @@ public with sharing class NativeFormsAwsClient {
 
         return (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
     }
+
+    public static Map<String, Object> unpublishForm(Map<String, Object> requestBody) {
+        HttpRequest request = new HttpRequest();
+        request.setMethod('POST');
+        request.setEndpoint('callout:' + namedCredentialName() + '/forms/unpublish');
+        request.setHeader('Content-Type', 'application/json');
+        request.setTimeout(TIMEOUT_MS);
+        request.setBody(JSON.serialize(requestBody));
+
+        HttpResponse response = new Http().send(request);
+        if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+            throw new CalloutException('Unpublish API error: ' + response.getStatusCode() + ' ' + response.getStatus() + ' ' + response.getBody());
+        }
+
+        return (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
+    }
 }

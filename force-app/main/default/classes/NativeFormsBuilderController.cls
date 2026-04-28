@@ -206,7 +206,7 @@ public with sharing class NativeFormsBuilderController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Element type is required.');
         }
-        if (!new Set<String>{ 'text', 'input', 'textarea', 'select', 'checkbox', 'radio', 'hidden' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'input', 'textarea', 'time', 'select', 'checkbox', 'radio', 'hidden' }.contains(elementType)) {
             throw new AuraHandledException('Only basic input elements are supported in this builder version.');
         }
 
@@ -261,7 +261,8 @@ public with sharing class NativeFormsBuilderController {
     }
 
     @AuraEnabled
-    public static ElementRecord updateElement(ElementUpsertInput inputValue) {
+    public static ElementRecord updateElement(String inputJson) {
+        ElementUpsertInput inputValue = parseElementUpsertInput(inputJson);
         if (inputValue == null || inputValue.id == null) {
             throw new AuraHandledException('Element id is required.');
         }
@@ -448,6 +449,7 @@ public with sharing class NativeFormsBuilderController {
             'text' => 'Text Field',
             'input' => 'Input Field',
             'textarea' => 'Long Text',
+            'time' => 'Time',
             'select' => 'Select Option',
             'checkbox' => 'Checkbox',
             'radio' => 'Radio Group',
@@ -469,6 +471,7 @@ public with sharing class NativeFormsBuilderController {
         String seed = elementType == 'input' ? 'field' : elementType;
         if (seed == 'select') seed = 'picklist';
         if (seed == 'tel') seed = 'phone';
+        if (seed == 'time') seed = 'time';
         Integer safeIndex = elementIndex == null || elementIndex <= 0 ? 1 : elementIndex;
         return seed + String.valueOf(safeIndex);
     }
@@ -485,6 +488,11 @@ public with sharing class NativeFormsBuilderController {
         }
         if (elementType == 'textarea' || elementType == 'text' || elementType == 'input') {
             config.put('placeholder', 'Enter a value');
+        }
+        if (elementType == 'time') {
+            config.put('defaultValue', '');
+            config.put('placeholder', '19:00');
+            config.put('timeFormat', '24h');
         }
         if (elementType == 'text' || elementType == 'number') {
             config.put('isFormula', false);
@@ -569,6 +577,13 @@ public with sharing class NativeFormsBuilderController {
             return (Boolean) value;
         }
         return String.valueOf(value).toLowerCase() == 'true';
+    }
+
+    private static ElementUpsertInput parseElementUpsertInput(String inputJson) {
+        if (String.isBlank(inputJson)) {
+            return null;
+        }
+        return (ElementUpsertInput) JSON.deserialize(inputJson, ElementUpsertInput.class);
     }
 
     private static List<SelectOption> getReadableFieldOptions(String objectApiName) {

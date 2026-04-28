@@ -5,6 +5,7 @@ Static landing pages for the Help section on `https://twinaforms.com/help/...`.
 ## Pages
 
 - `formulas.html` — served at `https://twinaforms.com/help/formulas`.
+- `custom-javascript.html` — served at `https://twinaforms.com/help/custom-javascript`.
 
 ## Styling
 
@@ -19,7 +20,7 @@ All help pages share `styles.css`, which extends the visual language used on the
 
 ## Data source
 
-These pages are fully static. No backend calls &mdash; just HTML + CSS + web fonts.
+These pages are fully static. No backend calls — just HTML + CSS + web fonts.
 
 ## Content ownership
 

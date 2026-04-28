@@ -109,12 +109,16 @@ const CAPTCHA_SECRET_KEY = String(process.env.CAPTCHA_SECRET_KEY || "").trim();
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "nativeformspublish";
 const SALESFORCE_API_VERSION = "v60.0";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
+const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
+const SALESFORCE_OAUTH_CLIENT_ID = process.env.SALESFORCE_OAUTH_CLIENT_ID || "";
+const SALESFORCE_OAUTH_CLIENT_SECRET = process.env.SALESFORCE_OAUTH_CLIENT_SECRET || "";
 const SUBMISSION_LOG_SCHEMA_VERSION = "v2";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
 const s3Client = new S3Client({});
 const salesforceDescribeCache = new Map();
+let cachedSalesforceOAuthClientCredentials = null;
 
 function jsonResponse(statusCode, payload) {
   return {
@@ -171,6 +175,31 @@ async function getSecret(secretName) {
 
 function getSalesforceConnectionSecretName(orgId) {
   return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${orgId}`;
+}
+
+async function getSalesforceOAuthClientCredentials() {
+  if (cachedSalesforceOAuthClientCredentials) {
+    return cachedSalesforceOAuthClientCredentials;
+  }
+
+  let clientId = String(SALESFORCE_OAUTH_CLIENT_ID || "").trim();
+  let clientSecret = String(SALESFORCE_OAUTH_CLIENT_SECRET || "").trim();
+
+  if ((!clientId || !clientSecret) && SALESFORCE_OAUTH_CLIENT_SECRET_NAME) {
+    const secretValue = await getSecret(SALESFORCE_OAUTH_CLIENT_SECRET_NAME);
+    clientId = clientId || String(secretValue?.client_id || secretValue?.clientId || "").trim();
+    clientSecret = clientSecret || String(secretValue?.client_secret || secretValue?.clientSecret || "").trim();
+  }
+
+  if (!clientId || !clientSecret) {
+    throw buildFailureError("TwinaForms Salesforce OAuth client credentials are not configured in AWS.", 500, "system");
+  }
+
+  cachedSalesforceOAuthClientCredentials = {
+    clientId,
+    clientSecret
+  };
+  return cachedSalesforceOAuthClientCredentials;
 }
 
 function hashToken(token) {
@@ -769,10 +798,11 @@ function validateSubmitCommandAgainstPolicy(command, formSecurity) {
 }
 
 async function refreshAccessToken(secret, loginUrl) {
+  const oauthClient = await getSalesforceOAuthClientCredentials();
   const tokenBody = querystring.stringify({
     grant_type: "refresh_token",
-    client_id: secret.client_id,
-    client_secret: secret.client_secret,
+    client_id: oauthClient.clientId,
+    client_secret: oauthClient.clientSecret,
     refresh_token: secret.refresh_token
   });
 
@@ -804,7 +834,7 @@ async function refreshAccessToken(secret, loginUrl) {
 }
 
 function assertSecret(secret) {
-  if (!secret.client_id || !secret.client_secret || !secret.refresh_token || !secret.instance_url) {
+  if (!secret.refresh_token || !secret.instance_url) {
     throw new Error("Secret is missing required fields");
   }
 }
@@ -984,12 +1014,12 @@ async function callSalesforceApex(instanceUrl, accessToken, path, payload) {
   return data;
 }
 
-function buildSecretVerificationSigningSecret(secret) {
-  return String(secret?.client_secret || "");
+function buildSecretVerificationSigningSecret(secret, tenantRecord) {
+  return String(secret?.secretVerificationSigningSecret || tenantRecord?.secret || "");
 }
 
-function createSecretVerificationToken(formSecurity, email, sessionId, secret) {
-  const signingSecret = buildSecretVerificationSigningSecret(secret);
+function createSecretVerificationToken(formSecurity, email, sessionId, secret, tenantRecord) {
+  const signingSecret = buildSecretVerificationSigningSecret(secret, tenantRecord);
   if (!signingSecret) {
     throw buildFailureError("Secret verification signing secret is missing", 500, "system");
   }
@@ -1015,8 +1045,8 @@ function createSecretVerificationToken(formSecurity, email, sessionId, secret) {
   return `${encodedPayload}.${signature}`;
 }
 
-function verifySecretVerificationToken(formSecurity, token, sessionId, secret, email) {
-  const signingSecret = buildSecretVerificationSigningSecret(secret);
+function verifySecretVerificationToken(formSecurity, token, sessionId, secret, tenantRecord, email) {
+  const signingSecret = buildSecretVerificationSigningSecret(secret, tenantRecord);
   if (!signingSecret) {
     return false;
   }
@@ -2022,7 +2052,8 @@ export const handler = async (event) => {
           formSecurity,
           normalizedEmail,
           sessionId,
-          secret
+          secret,
+          tenantRecord
         );
 
         return jsonResponse(200, {
@@ -2064,7 +2095,7 @@ export const handler = async (event) => {
         inputPayload?.input?.secretVerificationToken ||
         inputPayload?.secretVerificationToken ||
         "";
-      if (!verifySecretVerificationToken(formSecurity, verificationToken, sessionId, secret, verifiedEmail)) {
+      if (!verifySecretVerificationToken(formSecurity, verificationToken, sessionId, secret, tenantRecord, verifiedEmail)) {
         throw buildFailureError(
           secretCodeConfig.invalidMessage || "Verify the secret code before continuing.",
           403,

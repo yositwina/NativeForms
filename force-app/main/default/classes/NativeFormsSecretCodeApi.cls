@@ -3,6 +3,9 @@ global with sharing class NativeFormsSecretCodeApi {
     private static final Integer DEFAULT_EXPIRY_MINUTES = 10;
     private static final Integer DEFAULT_MAX_ATTEMPTS = 5;
     private static final String TEMPLATE_DEVELOPER_NAME = 'NativeForms_Secret_Code_Default';
+    @TestVisible private static String forcedEmailFailureMessageForTest;
+
+    private class SecretCodeHandledException extends Exception {}
 
     global class RequestPayload {
         public String action;
@@ -43,6 +46,11 @@ global with sharing class NativeFormsSecretCodeApi {
             }
 
             throw buildHandledException('Unsupported action: ' + payload.action, 400);
+        } catch (SecretCodeHandledException expected) {
+            RestContext.response.statusCode = RestContext.response.statusCode == 0
+                ? 500
+                : RestContext.response.statusCode;
+            return errorResponse(expected.getMessage());
         } catch (Exception unexpected) {
             RestContext.response.statusCode = RestContext.response.statusCode == 0
                 ? 500
@@ -194,6 +202,10 @@ global with sharing class NativeFormsSecretCodeApi {
     }
 
     private static void sendSecretCodeEmail(Contact target) {
+        if (Test.isRunningTest() && String.isNotBlank(forcedEmailFailureMessageForTest)) {
+            throw buildHandledException(forcedEmailFailureMessageForTest, 500);
+        }
+
         EmailTemplate templateRow = [
             SELECT Id
             FROM EmailTemplate
@@ -258,8 +270,8 @@ global with sharing class NativeFormsSecretCodeApi {
         return String.valueOf(value).toLowerCase() == 'true';
     }
 
-    private static AuraHandledException buildHandledException(String message, Integer statusCode) {
+    private static SecretCodeHandledException buildHandledException(String message, Integer statusCode) {
         RestContext.response.statusCode = statusCode;
-        return new AuraHandledException(message);
+        return new SecretCodeHandledException(message);
     }
 }

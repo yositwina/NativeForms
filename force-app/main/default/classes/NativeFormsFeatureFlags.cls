@@ -30,4 +30,8 @@ public with sharing class NativeFormsFeatureFlags {
     public static Boolean isProLoadFileEnabled() {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProLoadFile');
     }
+
+    public static Boolean isProCustomJsEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProCustomJs');
+    }
 }

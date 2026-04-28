@@ -387,7 +387,12 @@ public with sharing class NativeFormsPublisher {
             insert clonedActions;
         }
 
-        return draftVersion;
+        return [
+            SELECT Id, Name, Form__c, Form_Id__c, Version_Number__c, Version_Status__c, Publish_Status__c, Publish_Token__c
+            FROM NF_Form_Version__c
+            WHERE Id = :draftVersion.Id
+            LIMIT 1
+        ];
     }
 
     private static Integer getNextVersionNumber(Id formId) {
@@ -1668,6 +1673,9 @@ public with sharing class NativeFormsPublisher {
         publishedUiSettings.put('submitLabel', submitLabel);
         publishedUiSettings.put('submitSuccessMessage', submitSuccessMessage);
         publishedUiSettings.put('postSubmitButtonLabel', postSubmitButtonLabel);
+        String publishedCustomJs = NativeFormsFeatureFlags.isProCustomJsEnabled()
+            ? versionRecord.Custom_JS__c
+            : null;
         html += '<script>window.NativeFormsConfig=' + JSON.serialize(new Map<String, Object>{
             'versionId' => (String) versionRecord.Id,
             'formId' => formId,
@@ -1690,6 +1698,9 @@ public with sharing class NativeFormsPublisher {
         html += 'const resultEl=document.querySelector("[data-nativeforms-result]");';
         html += 'const statusEl=document.querySelector("[data-nativeforms-status]");';
         html += 'if(!form||!config.submitUrl||!runtimeEl||!resultEl){return;}';
+        html += 'const twinaFormsHandlers={};';
+        html += 'const manualVisibilityState={};';
+        html += 'function emitTwinaFormsEvent(name,detail){const payload=detail&&typeof detail==="object"?detail:{};const handlers=(twinaFormsHandlers[name]||[]).slice();handlers.forEach(function(handler){try{handler(payload);}catch(error){console.error("TwinaForms event handler error",name,error);}});try{window.dispatchEvent(new CustomEvent("twinaforms:"+name,{detail:payload}));}catch(error){}}';
         html += 'const runtimeText=(config.runtimeText&&typeof config.runtimeText==="object")?config.runtimeText:{};';
         html += 'function t(key,fallback){const value=runtimeText[key];return typeof value==="string"&&value!==""?value:fallback;}';
         html += 'function interpolate(template,replacements){let output=String(template==null?"":template);const values=replacements||{};Object.keys(values).forEach(function(key){output=output.replace(new RegExp("\\\\{"+key+"\\\\}","g"),String(values[key]));});return output;}';
@@ -1708,7 +1719,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function createFormulaParser(){if(!(window.exprEval&&window.exprEval.Parser)){return null;}const parser=new window.exprEval.Parser({operators:{add:true,subtract:true,multiply:true,divide:true,remainder:false,power:false,factorial:false,comparison:true,logical:true,conditional:true,concatenate:false,assignment:false,array:false,fndef:false,in:false},allowMemberAccess:false});parser.unaryOps={"-":function(value){return-Number(value);},"+":Number,not:function(value){return!value;}};parser.binaryOps={"+":function(left,right){return Number(left)+Number(right);},"-":function(left,right){return Number(left)-Number(right);},"*":function(left,right){return Number(left)*Number(right);},"/":function(left,right){return Number(left)/Number(right);},"==":function(left,right){return formulaNormalizeComparable(left)===formulaNormalizeComparable(right);},"!=":function(left,right){return formulaNormalizeComparable(left)!==formulaNormalizeComparable(right);},">":function(left,right){return left>right;},"<":function(left,right){return left<right;},">=":function(left,right){return left>=right;},"<=":function(left,right){return left<=right;},and:function(left,right){return Boolean(left&&right);},or:function(left,right){return Boolean(left||right);}};parser.ternaryOps={"?":function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;}};parser.functions={CONCAT:function(){return Array.prototype.slice.call(arguments).map(formulaToText).join("");},IF:function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;},COALESCE:function(){for(let index=0;index<arguments.length;index+=1){if(!formulaIsBlank(arguments[index])){return arguments[index];}}return null;},ISBLANK:function(value){return formulaIsBlank(value);},VALUE:function(value){return formulaToNumber(value);},TEXT:function(value){return formulaToText(value);},ROUND:function(value,digits){const numericValue=formulaToNumber(value);const numericDigits=Number.isFinite(Number(digits))?Number(digits):0;if(numericValue===null){return null;}const factor=Math.pow(10,numericDigits);return Math.round(numericValue*factor)/factor;},ABS:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.abs(numericValue);},MIN:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.min.apply(Math,values):null;},MAX:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.max.apply(Math,values):null;},TODAY:function(){return formulaIsoLocalDate(new Date());},NOW:function(){return formulaIsoLocalDateTime(new Date());},YEAR:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getFullYear():null;},MONTH:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getMonth()+1:null;},DAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDate():null;}};parser.consts={true:true,false:false};return parser;}';
         html += 'const formulaParser=createFormulaParser();';
         html += 'function formulaFieldKeySet(){return new Set(formulaFieldControls().map(function(control){return String(control.name||control.dataset.formulaFieldKey||"");}).filter(function(value){return !!value;}));}';
-        html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}return first.value||"";}';
+        html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
         html += 'function normalizeFormulaResult(targetType,value){if(targetType==="number"){return formulaToNumber(value);}if(value===null||value===undefined){return "";}return String(value);}';
         html += 'function evaluateFormulaControl(control){if(!control||!formulaParser){return;}const expression=normalizeFormulaExpression(control.dataset.formulaExpression||"");if(!expression){control.value="";return;}const variableMap={};let normalizedExpression=expression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=readRuntimeFieldValue(fieldKey);});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const normalizedValue=normalizeFormulaResult(control.dataset.formulaType||"text",rawValue);control.value=normalizedValue===null||normalizedValue===undefined?"":String(normalizedValue);}catch(error){control.value="";}}';
         html += 'function evaluateAllFormulaFields(){formulaFieldControls().forEach(function(control){evaluateFormulaControl(control);});}';
@@ -1744,7 +1755,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function setSecretVerificationSectionVisible(visible){if(secretVerifyEl){secretVerifyEl.hidden=!visible;secretVerifyEl.style.display=visible?"":"none";}}';
         html += 'function readSecretVerificationEmail(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-email]"):null;return input?String(input.value||"").trim().toLowerCase():"";}';
         html += 'function readSecretVerificationCode(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-code]"):null;return input?String(input.value||"").trim():"";}';
-        html += 'async function runPrefillWithParams(params){if(!config.prefillUrl||!params||Object.keys(params).length===0){return;}const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Prefill failed");}applyPrefillPayload(data);}';
+        html += 'async function runPrefillWithParams(params){if(!config.prefillUrl||!params||Object.keys(params).length===0){return;}emitTwinaFormsEvent("prefill:before",{params:params});const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){const errorMessage=(data.error&&data.error.message)||data.error||"Prefill failed";emitTwinaFormsEvent("prefill:error",{params:params,message:errorMessage,response:data});throw new Error(errorMessage);}applyPrefillPayload(data);emitTwinaFormsEvent("prefill:after",{params:params,payload:data});}';
         html += 'async function sendSecretCodeRequest(action,payload){const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,formId:config.formId,publishToken:config.publishToken,publishedVersionId:config.versionId},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Secret code request failed");}return data;}';
         html += 'function clearPostSubmitRedirect(){if(postSubmitRedirectTimer){window.clearTimeout(postSubmitRedirectTimer);postSubmitRedirectTimer=null;}if(postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}activePostSubmitRedirectUrl="";}';
         html += 'function clearResult(){if(!resultEl){return;}clearPostSubmitRedirect();resultEl.hidden=true;resultEl.innerHTML="";form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}';
@@ -1763,15 +1774,20 @@ public with sharing class NativeFormsPublisher {
         html += 'function formatParsedDate(parsed,format){if(!parsed){return "";}const day=String(parsed.day).padStart(2,"0");const month=String(parsed.month).padStart(2,"0");const year=String(parsed.year).padStart(4,"0");return format==="eu"?day+"/"+month+"/"+year:month+"/"+day+"/"+year;}';
         html += 'function formatDateForField(value,field){const format=field&&field.dataset&&field.dataset.dateFormat?field.dataset.dateFormat:"us";const parsed=parseDateValue(value,format)||parseDateValue(value,"us")||parseDateValue(value,"eu");return parsed?formatParsedDate(parsed,format):value==null?"":String(value);}';
         html += 'function validateDateField(el,showMessage){if(!el||el.dataset.nativeformsDate!=="true"){return true;}const format=el.dataset.dateFormat||"us";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseDateValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("dateInvalid","Please enter a valid date in {format} format."),{format:dateFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}const minDate=el.dataset.effectiveMinDate||"";const maxDate=el.dataset.effectiveMaxDate||"";if(minDate&&parsed.iso<minDate){el.setCustomValidity(interpolate(t("dateMin","Please enter a date on or after {date}."),{date:formatDateForField(minDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}if(maxDate&&parsed.iso>maxDate){el.setCustomValidity(interpolate(t("dateMax","Please enter a date on or before {date}."),{date:formatDateForField(maxDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
+        html += 'function timeFormatHint(format){return format==="12h"?"h:mm AM/PM":"HH:mm";}';
+        html += 'function parseTimeValue(value,format){const raw=String(value||"").trim();if(!raw){return null;}let match;if(format==="12h"){match=raw.match(/^(\\d{1,2}):(\\d{2})\\s*([AaPp][Mm])$/);if(!match){return null;}let hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<1||hours>12||minutes<0||minutes>59){return null;}const meridiem=match[3].toUpperCase();if(meridiem==="AM"&&hours===12){hours=0;}else if(meridiem==="PM"&&hours<12){hours+=12;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}match=raw.match(/^(\\d{1,2}):(\\d{2})$/);if(!match){return null;}const hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<0||hours>23||minutes<0||minutes>59){return null;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}';
+        html += 'function formatTimeForField(value,field){const format=field&&field.dataset&&field.dataset.timeFormat?field.dataset.timeFormat:"24h";const parsed=parseTimeValue(value,"24h")||parseTimeValue(value,"12h");if(!parsed){return value==null?"":String(value);}if(format!=="12h"){return parsed;}const parts=parsed.split(":");const hour24=Number(parts[0]);const meridiem=hour24>=12?"PM":"AM";const hour12=hour24%12||12;return String(hour12)+":"+parts[1]+" "+meridiem;}';
+        html += 'function validateTimeField(el,showMessage){if(!el||el.dataset.nativeformsTime!=="true"){return true;}const format=el.dataset.timeFormat||"24h";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseTimeValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("timeInvalid","Please enter a valid time in {format} format."),{format:timeFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
         html += 'function evaluateSingleCondition(condition){if(!condition||!condition.fieldKey||!condition.operator){return true;}const actual=readFieldValue(condition.fieldKey);const compare=condition.value||"";if(condition.operator==="equals"){return String(actual)===compare;}if(condition.operator==="notEquals"){return String(actual)!==compare;}if(condition.operator==="isTrue"){return actual===true||String(actual).toLowerCase()==="true";}if(condition.operator==="isFalse"){return actual===false||String(actual).toLowerCase()==="false"||String(actual)==="";}if(condition.operator==="isBlank"){return String(actual)==="";}if(condition.operator==="isNotBlank"){return String(actual)!=="";}return true;}';
         html += 'function evaluateConditionExpression(results,expression){if(!results.length){return true;}if(results.length===1){return results[0];}const normalized=((expression||"").trim()||results.map(function(_,index){return String(index+1);}).join(" AND ")).replace(/\\(/g," ( ").replace(/\\)/g," ) ").replace(/\\s+/g," ").trim();const tokens=normalized?normalized.split(" "):[];const values=[];const operators=[];function applyOperator(){if(values.length<2||!operators.length){return;}const operator=operators.pop();const right=values.pop();const left=values.pop();values.push(operator==="AND"?(left&&right):(left||right));}function precedence(operator){return operator==="AND"?2:1;}for(let index=0;index<tokens.length;index+=1){const token=tokens[index];if(!token){continue;}if(token==="("){operators.push(token);continue;}if(token===")"){while(operators.length&&operators[operators.length-1]!=="("){applyOperator();}if(operators.length&&operators[operators.length-1]==="("){operators.pop();}continue;}if(token==="AND"||token==="OR"){while(operators.length&&operators[operators.length-1]!=="("&&precedence(operators[operators.length-1])>=precedence(token)){applyOperator();}operators.push(token);continue;}if(/^\\d+$/.test(token)){const refIndex=Number(token)-1;values.push(refIndex>=0&&refIndex<results.length?results[refIndex]:false);}}while(operators.length){applyOperator();}return values.length?!!values[0]:false;}';
         html += 'function evaluateElementConditions(el){let conditions=[];try{conditions=JSON.parse(el.dataset.conditions||"[]")||[];}catch(error){conditions=[];}if(!conditions.length&&el.dataset.conditionSource){conditions=[{fieldKey:el.dataset.conditionSource,operator:el.dataset.conditionOperator,value:el.dataset.conditionValue||""}];}if(!conditions.length){return true;}const results=conditions.map(function(condition){return evaluateSingleCondition(condition);});return evaluateConditionExpression(results,el.dataset.conditionExpression||"");}';
-        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function readAllFieldValues(){const values={};form.querySelectorAll("[name]").forEach(function(control){const fieldKey=String(control.name||"");if(!fieldKey||Object.prototype.hasOwnProperty.call(values,fieldKey)){return;}values[fieldKey]=readRuntimeFieldValue(fieldKey);});return values;}';
         html += 'const repeatDeleteState={};';
         html += 'let lastPrefillPayload=null;';
-        html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}return first.value||"";}';
-        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}field.value=value==null?"":value;}';
+        html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
+        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}if(field.dataset.nativeformsTime==="true"){field.value=formatTimeForField(value,field);validateTimeField(field,false);return;}field.value=value==null?"":value;}';
         html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:"";if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
         html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);});}';
         html += 'function clearRepeatGroups(){form.querySelectorAll("[data-repeat-rows]").forEach(function(host){host.innerHTML="";});Object.keys(repeatDeleteState).forEach(function(key){repeatDeleteState[key]=[];});}';
@@ -1784,23 +1800,31 @@ public with sharing class NativeFormsPublisher {
         html += 'async function runPrefill(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}await runPrefillWithParams(params);}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("[data-nativeforms-date=\'true\']").forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
-        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
-        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}const events=el.dataset.nativeformsDate==="true"?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
+        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}if(el.dataset.nativeformsTime==="true"){const valid=validateTimeField(el,true);if(valid&&el.value){el.value=formatTimeForField(el.value,el);}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
+        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}const events=(el.dataset.nativeformsDate==="true"||el.dataset.nativeformsTime==="true")?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
         html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!validateDateField(el,true)){return{success:false,message:el.validationMessage||t("dateReview","Please review the date fields and try again."),values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
-        html += 'function evaluateConditions(){form.querySelectorAll("[data-conditions],[data-condition-source]").forEach(function(el){el.style.display=evaluateElementConditions(el)?"":"none";});}';
+        html += 'function collectNormalizedTimeValues(){const values={};const timeFields=form.querySelectorAll("[data-nativeforms-time=\'true\']");for(let index=0;index<timeFields.length;index+=1){const el=timeFields[index];if(!validateTimeField(el,true)){return{success:false,message:el.validationMessage||t("timeReview","Please review the time fields and try again."),values:{}};}const parsed=parseTimeValue(el.value||"",el.dataset.timeFormat||"24h");if(parsed&&el.name){values[el.name]=parsed;el.value=formatTimeForField(parsed,el);}}return{success:true,message:"",values:values};}';
+        html += 'function setElementVisibilityState(elementId,visible){const key=String(elementId||"");if(!key){return;}manualVisibilityState[key]=visible!==false;evaluateConditions();}';
+        html += 'function evaluateConditions(){form.querySelectorAll("[data-conditions],[data-condition-source],[data-element-id]").forEach(function(el){const elementId=String(el.dataset.elementId||"");const conditionVisible=evaluateElementConditions(el);const manualVisible=elementId&&Object.prototype.hasOwnProperty.call(manualVisibilityState,elementId)?manualVisibilityState[elementId]:true;const visible=conditionVisible&&manualVisible;el.hidden=!visible;el.style.display=visible?"":"none";});}';
+        html += 'const twinaFormsApi={getValue:function(fieldKey){return readRuntimeFieldValue(String(fieldKey||""));},setValue:function(fieldKey,value){const safeFieldKey=String(fieldKey||"");setFieldValue(safeFieldKey,value);handleRuntimeStateChange();emitTwinaFormsEvent("change",{fieldKey:safeFieldKey,value:readRuntimeFieldValue(safeFieldKey),source:"api"});},getAll:function(){return readAllFieldValues();},showElement:function(elementId){setElementVisibilityState(elementId,true);},hideElement:function(elementId){setElementVisibilityState(elementId,false);},on:function(eventName,handler){const name=String(eventName||"");if(!name||typeof handler!=="function"){return function(){};}twinaFormsHandlers[name]=twinaFormsHandlers[name]||[];twinaFormsHandlers[name].push(handler);return function(){twinaFormsApi.off(name,handler);};},off:function(eventName,handler){const name=String(eventName||"");const handlers=twinaFormsHandlers[name]||[];if(typeof handler!=="function"){delete twinaFormsHandlers[name];return;}twinaFormsHandlers[name]=handlers.filter(function(candidate){return candidate!==handler;});}};';
+        html += 'window.TwinaForms=twinaFormsApi;window.NativeForms=window.TwinaForms;';
+        html += 'function runGuardedCustomJs(){const customJsSource="' + escapeJsString(publishedCustomJs) + '";if(!String(customJsSource||"").trim()){return;}try{const runner=new Function("TwinaForms",customJsSource);runner(window.TwinaForms);}catch(error){console.error("TwinaForms custom JavaScript error",error);emitTwinaFormsEvent("customjs:error",{message:error&&error.message?error.message:"Custom JavaScript failed",source:"customjs"});}}';
         html += 'applyDateConstraints();';
         html += 'wireLiveValidation();';
         html += 'fileUploadControls().forEach(function(control){renderFileUploadState(control);control.addEventListener("change",function(){uploadSelectedFiles(control).catch(function(error){setStatus("error",error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again."));});});});';
         html += 'form.addEventListener("click",function(event){const clearButton=event.target.closest("[data-file-upload-clear]");if(!clearButton){return;}event.preventDefault();clearFileUploadField(clearButton.getAttribute("data-file-upload-clear"));});';
-        html += 'function handleRuntimeStateChange(){evaluateAllFormulaFields();evaluateConditions();}';
+        html += 'runGuardedCustomJs();';
+        html += 'emitTwinaFormsEvent("form:init",{versionId:config.versionId,formId:config.formId});';
+        html += 'function handleRuntimeStateChange(event){evaluateAllFormulaFields();evaluateConditions();const fieldKey=event&&event.target&&event.target.name?String(event.target.name):"";if(fieldKey){emitTwinaFormsEvent("change",{fieldKey:fieldKey,value:readRuntimeFieldValue(fieldKey),source:"user"});}}';
         html += 'form.addEventListener("input",handleRuntimeStateChange);';
         html += 'form.addEventListener("change",handleRuntimeStateChange);';
         html += 'evaluateAllFormulaFields();';
         html += 'evaluateConditions();';
         html += 'setSecretGatedState(!secretCodeEnabled);';
         html += 'setSecretCodeStepVisible(false);';
+        html += 'emitTwinaFormsEvent("form:ready",{versionId:config.versionId,formId:config.formId});';
         html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const data=await sendSecretCodeRequest("verifyCode",{email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId});if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);runPrefillWithParams({email:secretVerifiedEmail}).catch(function(){setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
-        html += 'runPrefill().catch(function(){setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});';
+        html += 'runPrefill().catch(function(error){emitTwinaFormsEvent("prefill:error",{message:error&&error.message?error.message:t("prefillLoadFailed","We could not load prefill data for this form.")});setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
         html += 'if(secretCodeEnabled&&!secretVerificationApproved){setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
@@ -1808,24 +1832,22 @@ public with sharing class NativeFormsPublisher {
         html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){setStatus("error",uploadValidation.message||t("fileUploadReview","Please review the uploaded files and try again."));return;}';
         html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error",t("captchaRequired","Please complete the CAPTCHA."));return;}';
         html += 'setSubmitting(true);';
-        html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
+        html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const normalizedTimes=collectNormalizedTimeValues();if(!normalizedTimes.success){setStatus("error",normalizedTimes.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
         html += 'form.querySelectorAll("input[type=\'checkbox\'][name]").forEach(function(el){input[el.name]=!!el.checked;});';
         html += 'Object.keys(normalizedDates.values).forEach(function(key){input[key]=normalizedDates.values[key];});';
+        html += 'Object.keys(normalizedTimes.values).forEach(function(key){input[key]=normalizedTimes.values[key];});';
         html += 'const uploadedFieldKeys=Object.keys(uploadedFilesByField).filter(function(key){return Array.isArray(uploadedFilesByField[key])&&uploadedFilesByField[key].length;});if(uploadedFieldKeys.length){input.fileUploads={};uploadedFieldKeys.forEach(function(key){input.fileUploads[key]=uploadedFilesByField[key];});input.fileUploadSessionId=fileUploadSessionId;}';
         html += 'if(secretCodeEnabled){input.secretVerificationToken=secretVerificationToken;input.secretVerificationSessionId=secretVerificationSessionId;input.secretVerificationEmail=secretVerifiedEmail;}';
         html += 'if(captchaEnabled){input.captchaToken=getCaptchaToken();}';
         html += 'input.repeatGroups=collectRepeatGroups();';
-        html += 'const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input,prefillSnapshot:lastPrefillPayload})});';
+        html += 'emitTwinaFormsEvent("submit:before",{input:input,prefillSnapshot:lastPrefillPayload});const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input,prefillSnapshot:lastPrefillPayload})});';
         html += 'const data=await response.json();';
-        html += 'if(!response.ok||data.success===false){renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
+        html += 'if(!response.ok||data.success===false){emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
         html += 'const resolvedPostSubmitUrl=postSubmitAutoLinkEnabled?resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload):"";';
-        html += 'form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
-        html += '}catch(error){renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
+        html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
+        html += '}catch(error){emitTwinaFormsEvent("submit:error",{error:{message:error&&error.message?error.message:"Submit failed"}});renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
         html += '});';
         html += '})();</script>';
-        if (String.isNotBlank(versionRecord.Custom_JS__c)) {
-            html += '<script>' + versionRecord.Custom_JS__c + '</script>';
-        }
         html += '</body></html>';
         return html;
     }
@@ -2114,6 +2136,16 @@ public with sharing class NativeFormsPublisher {
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
+        if (typeValue == 'time') {
+            String timeFormat = normalizedTimeFormat(config);
+            String displayValue = formatTimeDefaultValue(defaultValue, timeFormat);
+            String timePlaceholder = String.isNotBlank(placeholder) ? placeholder : timePlaceholder(timeFormat);
+            String timeValueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
+            String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String controlHtml = '<input class="nf-control--ltr" type="text" id="' + safeName + '" name="' + safeName + '" inputmode="text" autocomplete="off" data-nativeforms-time="true" data-time-format="' + escapeHtml(timeFormat) + '"' + lockOnPrefillAttr + ' placeholder="' + escapeHtml(timePlaceholder) + '"' + timeValueAttr + requiredAttr + '>';
+            return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
+
         if (typeValue == 'fileUpload') {
             String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String acceptAttr = fileAcceptAttr(config);
@@ -2237,6 +2269,16 @@ public with sharing class NativeFormsPublisher {
             return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
+        if (typeValue == 'time') {
+            String timeFormat = normalizedTimeFormat(config);
+            String displayValue = formatTimeDefaultValue(stringValue(config.get('defaultValue')), timeFormat);
+            String timePlaceholder = String.isNotBlank(placeholder) ? placeholder : timePlaceholder(timeFormat);
+            String valueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
+            String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String controlHtml = '<input class="nf-control--ltr" type="text" id="' + baseId + '" inputmode="text" autocomplete="off" data-nativeforms-time="true" data-time-format="' + escapeHtml(timeFormat) + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + ' placeholder="' + escapeHtml(timePlaceholder) + '"' + valueAttr + requiredAttr + '>';
+            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
+
         if (typeValue == 'fileUpload') {
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String acceptAttr = fileAcceptAttr(config);
@@ -2274,7 +2316,7 @@ public with sharing class NativeFormsPublisher {
     }
 
     private static Boolean isLtrInputType(String typeValue) {
-        return typeValue == 'number' || typeValue == 'email' || typeValue == 'tel' || typeValue == 'url' || typeValue == 'date';
+        return typeValue == 'number' || typeValue == 'email' || typeValue == 'tel' || typeValue == 'url' || typeValue == 'date' || typeValue == 'time';
     }
 
     private static String lockOnPrefillDataAttr(Map<String, Object> config) {
@@ -2786,6 +2828,14 @@ public with sharing class NativeFormsPublisher {
         return normalizedDateDisplayFormat(config) == 'eu' ? 'dd/mm/yyyy' : 'mm/dd/yyyy';
     }
 
+    private static String normalizedTimeFormat(Map<String, Object> config) {
+        return stringValue(config.get('timeFormat')) == '12h' ? '12h' : '24h';
+    }
+
+    private static String timePlaceholder(String timeFormat) {
+        return timeFormat == '12h' ? '8:00 PM' : '19:00';
+    }
+
     private static Boolean isLegacySeedDefaultValue(String typeValue, String defaultValue) {
         String trimmedValue = String.isBlank(defaultValue) ? '' : defaultValue.trim();
         if (String.isBlank(trimmedValue)) {
@@ -2805,6 +2855,9 @@ public with sharing class NativeFormsPublisher {
     private static String localizedPlaceholderForType(String typeValue, String languageCode, Map<String, Object> config) {
         if (typeValue == 'date') {
             return datePlaceholder(config);
+        }
+        if (typeValue == 'time') {
+            return timePlaceholder(normalizedTimeFormat(config));
         }
         Map<String, String> placeholderKeys = new Map<String, String>{
             'text' => 'placeholderText',
@@ -2848,6 +2901,28 @@ public with sharing class NativeFormsPublisher {
         return trimmed;
     }
 
+    private static String formatTimeDefaultValue(String value, String timeFormat) {
+        if (String.isBlank(value)) {
+            return '';
+        }
+        String trimmed = value.trim();
+        if (!Pattern.matches('^\\d{1,2}:\\d{2}$', trimmed)) {
+            return trimmed;
+        }
+        List<String> parts = trimmed.split(':');
+        Integer hours = Integer.valueOf(parts[0]);
+        Integer minutes = Integer.valueOf(parts[1]);
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+            return trimmed;
+        }
+        if (timeFormat != '12h') {
+            return String.valueOf(hours).leftPad(2, '0') + ':' + String.valueOf(minutes).leftPad(2, '0');
+        }
+        String meridiem = hours >= 12 ? 'PM' : 'AM';
+        Integer hour12 = hours == 0 ? 12 : (hours > 12 ? hours - 12 : hours);
+        return String.valueOf(hour12) + ':' + String.valueOf(minutes).leftPad(2, '0') + ' ' + meridiem;
+    }
+
     private static String normalizeInputType(String typeValue) {
         Set<String> allowed = new Set<String>{ 'text', 'email', 'number', 'date', 'datetime-local', 'tel', 'url', 'hidden' };
         return allowed.contains(typeValue) ? typeValue : 'text';
@@ -2885,6 +2960,9 @@ public with sharing class NativeFormsPublisher {
         return value
             .replace('\\', '\\\\')
             .replace('"', '\\"')
+            .replace('<', '\\u003C')
+            .replace('>', '\\u003E')
+            .replace('&', '\\u0026')
             .replace('\r', '\\r')
             .replace('\n', '\\n');
     }

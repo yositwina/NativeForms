@@ -102,6 +102,11 @@
     color: #7f1d1d;
 }
 
+.designer-form-limit-warning {
+    max-width: 34rem;
+    white-space: normal;
+}
+
 .designer-topbar__inline-label {
     flex: 0 0 auto;
     color: #17324d;
@@ -367,11 +372,43 @@
     max-width: 52rem;
 }
 
+.designer-custom-js-modal {
+    max-width: 64rem;
+}
+
+.designer-delete-form-modal {
+    max-width: 38rem;
+}
+
 .designer-new-form-help {
     margin: 0.85rem 0 0;
     color: #5f6f89;
     font-size: 0.82rem;
     line-height: 1.45;
+}
+
+.designer-limit-alert {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid #f5c2c7;
+    border-radius: 0.85rem;
+    background: #fde7e9;
+    color: #7f1d1d;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.designer-limit-alert p {
+    margin: 0;
+}
+
+.designer-limit-alert a {
+    width: max-content;
+    color: #7f1d1d;
+    font-weight: 700;
+    text-decoration: underline;
 }
 
 .designer-canvas {
@@ -1025,6 +1062,20 @@
     gap: 0.7rem;
     margin-top: 0.45rem;
     margin-left: 0.4rem;
+}
+
+.custom-js-settings {
+    display: grid;
+    gap: 0.65rem;
+    margin-left: 0.4rem;
+    margin-top: 0.35rem;
+}
+
+.designer-custom-js-textarea {
+    min-height: 24rem;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
 }
 
 .secret-code-settings__hint {

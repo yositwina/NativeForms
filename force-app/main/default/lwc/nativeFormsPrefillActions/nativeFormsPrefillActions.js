@@ -549,7 +549,7 @@ export default class NativeFormsPrefillActions extends LightningElement {
             }
             const configJson = this.buildConfigJson();
             await savePrefillAction({
-                inputValue: {
+                inputJson: JSON.stringify({
                     id: this.draftAction.id,
                     versionId: this.selectedVersionId,
                     actionKey: this.draftAction.actionKey,
@@ -557,7 +557,7 @@ export default class NativeFormsPrefillActions extends LightningElement {
                     objectApiName: this.draftAction.objectApiName,
                     storeResultAs: this.draftAction.storeResultAs,
                     configJson
-                }
+                })
             });
             await this.loadWorkspace(this.selectedVersionId);
             this.showToast('Prefill action saved', 'The query definition was updated.', 'success');

@@ -31,6 +31,10 @@ const FEATURE_FLAG_METADATA = {
     label: "File Uploads",
     description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
+  enableProCustomJs: {
+    label: "Custom JavaScript",
+    description: "Run supported TwinaForms custom JavaScript in published forms for advanced behavior."
+  },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
     description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."

@@ -9,14 +9,17 @@
                 <p class="instruction-title">Action Required To Use TwinaForms</p>
                 <ol class="instruction-list">
                     <li>Open the <strong>TwinaForms User</strong> permission set and assign it to the people who will use the main TwinaForms workspace.</li>
-                    <li>In that permission set, open <strong>External Credential Principal Access</strong> and enable both principals:
-                        <div class="instruction-detail">`TwinaForms Bootstrap / NativeFormsBootstrapPrincipal`</div>
-                        <div class="instruction-detail">`TwinaForms Shared Secret / NativeFormsSharedSecret`</div>
+                    <li>Create a new permission set:
+                        <div class="instruction-detail">Label: <strong>TwinaForms Credentials</strong></div>
+                        <div class="instruction-detail">API Name: <strong>TwinaFormsCredentials</strong></div>
                     </li>
-                    <li>If you plan to use <strong>TwinaForms Admin</strong> for support/debug access, enable the same two principals there too.</li>
-                    <li>Open <strong>External Client App Manager</strong>, open <strong>NativForms</strong>, then copy the <strong>Consumer Key</strong> and <strong>Consumer Secret</strong> from the app settings.</li>
-                    <li>Enter the admin email plus the Salesforce client id and secret below, then click <strong>Connect TwinaForms</strong>.</li>
-                    <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>TwinaForms</strong>, then open its external credential principal <strong>NativeFormsSharedSecret</strong>.</li>
+                    <li>In <strong>TwinaForms Credentials</strong>, open <strong>External Credential Principal Access</strong> and enable both principals:
+                        <div class="instruction-detail">`TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal`</div>
+                        <div class="instruction-detail">`TwinaFormsLambdaAuth - TwinaFormsSharedSecret`</div>
+                    </li>
+                    <li>Assign <strong>TwinaForms Credentials</strong> to the same users who need TwinaForms access.</li>
+                    <li>Enter the admin email, then click <strong>Connect TwinaForms</strong>.</li>
+                    <li>After the tenant secret is generated and emailed, open <strong>Named Credentials</strong>, open <strong>TwinaForms</strong>, then open its external credential principal <strong>TwinaFormsSharedSecret</strong>.</li>
                     <li>Add or edit the authentication parameter named <strong>secret</strong> and paste the tenant secret value there.</li>
                 </ol>
             </div>
@@ -63,25 +66,6 @@
 
                 <div class="slds-col slds-size_1-of-1">
                     <lightning-input label="Admin Email" value={adminEmail} onchange={handleChange} data-field="adminEmail"></lightning-input>
-                </div>
-
-                <div class="slds-col slds-size_1-of-1">
-                    <lightning-input
-                        label="Salesforce Client Id"
-                        value={salesforceClientId}
-                        onchange={handleChange}
-                        data-field="salesforceClientId"
-                    ></lightning-input>
-                </div>
-
-                <div class="slds-col slds-size_1-of-1">
-                    <lightning-input
-                        type="password"
-                        label="Salesforce Client Secret"
-                        value={salesforceClientSecret}
-                        onchange={handleChange}
-                        data-field="salesforceClientSecret"
-                    ></lightning-input>
                 </div>
 
                 <div class="slds-col slds-size_1-of-1">

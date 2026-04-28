@@ -21,8 +21,12 @@ Use for Home, Connect, setup flows, demo data, thank-you behavior, upgrade frami
 - The primary create flow should stay lightweight: admins create projects inline from `+ New Form`, and the Designer should filter forms by the selected project.
 - Seeded system projects should include `General` for active forms and an empty `Archive` project for later cleanup/organization.
 - Formula Fields are a Pro feature. In V1, only `text` and `number` fields can be formula targets, the target field is system-controlled, and any customer-visible runtime formula copy must stay multilingual-safe.
+- Custom JavaScript should be treated as an advanced Pro feature. If it is exposed in product UI, it must use plan gating, strong warning copy, a `Learn Custom JavaScript` help link, and a documented TwinaForms runtime API instead of relying on unsupported DOM hacks as the official contract.
 - `Radio Group` should be treated as a Salesforce-backed picklist presentation, not as a separate free-text option list. `Picklist` and `Radio Group` should use the same Salesforce value source, with only the UI presentation differing.
+- `Time` is a simple input field that stores/submits `HH:mm` values. V1 should not use native browser time inputs because locale can force unwanted AM/PM display. Use a TwinaForms-controlled text input with `Time Format`: `24-hour (19:00)` or `12-hour (8:00 PM)`. In 12-hour mode, convert display input to `HH:mm` before submit. Do not add AWS Time normalization or GMT conversion.
 - the technical element type remains `repeatGroup`, but customer-facing Builder / setup UI should label it as `Records List`
+- `effectiveLimits.maxForms` is enforced in Salesforce Designer against local `NF_Form__c` count. When the limit is reached, block new form creation with a clear upgrade link; if AWS entitlements cannot load, allow creation rather than blocking customers because of temporary connectivity issues.
+- Deleting a form is a destructive `Form Settings > Danger Zone` action. It should delete the Salesforce Designer form definition, disable the AWS public runtime first, keep historical submission logs under normal retention, and block delete if runtime disable fails for a published form.
 
 ## Escalate When
 - A screen feels internal, technical, or debug-oriented instead of customer-ready.

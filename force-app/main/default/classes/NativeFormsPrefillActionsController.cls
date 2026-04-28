@@ -259,7 +259,8 @@ public with sharing class NativeFormsPrefillActionsController {
     }
 
     @AuraEnabled
-    public static PrefillActionRecord savePrefillAction(PrefillActionInput inputValue) {
+    public static PrefillActionRecord savePrefillAction(String inputJson) {
+        PrefillActionInput inputValue = parsePrefillActionInput(inputJson);
         if (inputValue == null) {
             throw new AuraHandledException('Action data is required.');
         }
@@ -468,6 +469,13 @@ public with sharing class NativeFormsPrefillActionsController {
 
     private static List<Object> listValue(Object value) {
         return value instanceof List<Object> ? (List<Object>) value : new List<Object>();
+    }
+
+    private static PrefillActionInput parsePrefillActionInput(String inputJson) {
+        if (String.isBlank(inputJson)) {
+            return null;
+        }
+        return (PrefillActionInput) JSON.deserialize(inputJson, PrefillActionInput.class);
     }
 
     private static String buildActionKey(String aliasValue, String objectApiName) {

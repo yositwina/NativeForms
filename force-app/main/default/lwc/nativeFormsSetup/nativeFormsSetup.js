@@ -7,8 +7,6 @@ export default class NativeFormsSetup extends LightningElement {
     adminEmail = '';
     companyName = '';
     loginBaseUrl = '';
-    salesforceClientId = '';
-    salesforceClientSecret = '';
     subscriptionState = 'trial';
     subscriptionStartDate = '';
     subscriptionEndDate = '';
@@ -99,8 +97,6 @@ export default class NativeFormsSetup extends LightningElement {
             adminEmail: this.adminEmail,
             companyName: this.companyName,
             loginBaseUrl: this.loginBaseUrl,
-            salesforceClientId: this.salesforceClientId,
-            salesforceClientSecret: this.salesforceClientSecret,
             subscriptionState: this.subscriptionState,
             subscriptionStartDate: this.subscriptionStartDate || null,
             subscriptionEndDate: this.subscriptionEndDate || null,
@@ -116,7 +112,9 @@ export default class NativeFormsSetup extends LightningElement {
 
         try {
             const payload = this.buildRegistrationPayload();
-            const data = await registerOrg({ requestBody: payload });
+            const data = await registerOrg({
+                requestJson: JSON.stringify(payload)
+            });
             this.rawResponse = data?.rawResponse || '';
 
             if (!data?.success) {

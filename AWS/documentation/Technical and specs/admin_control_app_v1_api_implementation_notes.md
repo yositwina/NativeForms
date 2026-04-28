@@ -6,12 +6,71 @@ Initial Lambda scaffold created:
 
 - `AWS/NativeFormsAdminApi.mjs`
 
+Runtime/publish lifecycle routes are implemented in:
+
+- `AWS/NativeFormsBackend.mjs`
+
 ## Implemented routes in the scaffold
 
 - `GET /admin/overview`
 - `GET /admin/plans`
 - `GET /admin/tenants`
 - `GET /admin/tenants/{orgId}`
+
+## Implemented NativeFormsBackend runtime/admin routes
+
+### `POST /forms/register`
+
+Registers or updates the published form runtime security record in `NativeFormsFormSecurity`.
+
+Used by Salesforce publish after the HTML has been uploaded.
+
+Important fields:
+
+- `orgId`
+- `formId`
+- `publishedVersionId`
+- `publishToken`
+- `status`
+- `securityMode`
+- `generatedHtmlRef`
+- `publicUrl`
+- `prefillPolicy`
+- `submitPolicy`
+- `prefillDefinition`
+- `submitDefinition`
+
+### `POST /forms/unpublish`
+
+Disables public runtime access for a form before Salesforce deletes the Designer form definition.
+
+Request body:
+
+```json
+{
+  "orgId": "00Dxxxxxxxxxxxx",
+  "formId": "nf-00Dxxxxxxxxxxxx-a0123456789ABC"
+}
+```
+
+Authentication:
+
+- Uses the same tenant bearer-token auth as publish/register.
+- The form security record must belong to the same normalized `orgId`.
+
+Behavior:
+
+- If the `NativeFormsFormSecurity` record exists, set `status` to `unpublished`.
+- Set `unpublishedAt` if it was not already set.
+- Update `updatedAt`.
+- If `generatedHtmlRef` can be resolved to a key in `nativeformspublish`, replace that hosted form HTML with a small “form no longer available” page.
+- If the form security record is already missing, return success with `found: false`; the Salesforce delete flow can continue because no live AWS runtime was found.
+- Do not delete submission logs. Logs remain governed by plan retention.
+
+Salesforce delete rule:
+
+- Salesforce should call `/forms/unpublish` before deleting a published form.
+- If this call fails for a published form, Salesforce should block the delete so a live public form is not orphaned.
 
 ## Current behavior
 

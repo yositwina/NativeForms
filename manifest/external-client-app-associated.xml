@@ -5,7 +5,7 @@
         <name>ExternalClientApplication</name>
     </types>
     <types>
-        <members>NativFormsWebServer</members>
+        <members>NativForms_oauth</members>
         <name>ExtlClntAppOauthSettings</name>
     </types>
     <version>61.0</version>

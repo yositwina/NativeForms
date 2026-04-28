@@ -139,9 +139,13 @@ const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormS
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const SALESFORCE_API_VERSION = "v60.0";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
+const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
+const SALESFORCE_OAUTH_CLIENT_ID = process.env.SALESFORCE_OAUTH_CLIENT_ID || "";
+const SALESFORCE_OAUTH_CLIENT_SECRET = process.env.SALESFORCE_OAUTH_CLIENT_SECRET || "";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
+let cachedSalesforceOAuthClientCredentials = null;
 
 function jsonResponse(statusCode, payload) {
   return {
@@ -198,6 +202,31 @@ async function getSecret(secretName) {
 
 function getSalesforceConnectionSecretName(orgId) {
   return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${orgId}`;
+}
+
+async function getSalesforceOAuthClientCredentials() {
+  if (cachedSalesforceOAuthClientCredentials) {
+    return cachedSalesforceOAuthClientCredentials;
+  }
+
+  let clientId = String(SALESFORCE_OAUTH_CLIENT_ID || "").trim();
+  let clientSecret = String(SALESFORCE_OAUTH_CLIENT_SECRET || "").trim();
+
+  if ((!clientId || !clientSecret) && SALESFORCE_OAUTH_CLIENT_SECRET_NAME) {
+    const secretValue = await getSecret(SALESFORCE_OAUTH_CLIENT_SECRET_NAME);
+    clientId = clientId || String(secretValue?.client_id || secretValue?.clientId || "").trim();
+    clientSecret = clientSecret || String(secretValue?.client_secret || secretValue?.clientSecret || "").trim();
+  }
+
+  if (!clientId || !clientSecret) {
+    throw new Error("TwinaForms Salesforce OAuth client credentials are not configured in AWS.");
+  }
+
+  cachedSalesforceOAuthClientCredentials = {
+    clientId,
+    clientSecret
+  };
+  return cachedSalesforceOAuthClientCredentials;
 }
 
 function hashToken(token) {
@@ -340,16 +369,17 @@ function validatePrefillCommandAgainstPolicy(command, formSecurity) {
 }
 
 function assertSecret(secret) {
-  if (!secret.client_id || !secret.client_secret || !secret.refresh_token || !secret.instance_url) {
+  if (!secret.refresh_token || !secret.instance_url) {
     throw new Error("Secret is missing required fields");
   }
 }
 
 async function refreshAccessToken(secret, loginUrl) {
+  const oauthClient = await getSalesforceOAuthClientCredentials();
   const tokenBody = querystring.stringify({
     grant_type: "refresh_token",
-    client_id: secret.client_id,
-    client_secret: secret.client_secret,
+    client_id: oauthClient.clientId,
+    client_secret: oauthClient.clientSecret,
     refresh_token: secret.refresh_token
   });
 

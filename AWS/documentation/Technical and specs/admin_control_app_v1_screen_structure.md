@@ -341,7 +341,7 @@ Show:
 
 - tenant secret generated?
 - tenant secret verified?
-- client credentials saved?
+- central OAuth client configured?
 - OAuth connected?
 
 ### Recent connection errors

@@ -56,6 +56,10 @@ const FEATURE_FLAG_METADATA = {
     label: "File Uploads",
     description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
+  enableProCustomJs: {
+    label: "Custom JavaScript",
+    description: "Run supported TwinaForms custom JavaScript in published forms for advanced behavior."
+  },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
     description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."
@@ -86,6 +90,7 @@ const DEFAULT_PLANS = [
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
       enableProLoadFile: false,
+      enableProCustomJs: false,
       enableDetailedSubmissionLogs: false
     }
   },
@@ -112,6 +117,7 @@ const DEFAULT_PLANS = [
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
       enableProLoadFile: true,
+      enableProCustomJs: true,
       enableDetailedSubmissionLogs: true
     }
   },
@@ -138,6 +144,7 @@ const DEFAULT_PLANS = [
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
       enableProLoadFile: false,
+      enableProCustomJs: false,
       enableDetailedSubmissionLogs: true
     }
   },
@@ -164,6 +171,7 @@ const DEFAULT_PLANS = [
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
       enableProLoadFile: true,
+      enableProCustomJs: true,
       enableDetailedSubmissionLogs: true
     }
   }

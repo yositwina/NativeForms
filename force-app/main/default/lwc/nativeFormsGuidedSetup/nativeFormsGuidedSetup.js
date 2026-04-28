@@ -7,8 +7,6 @@ export default class NativeFormsGuidedSetup extends LightningElement {
     adminEmail = '';
     companyName = '';
     loginBaseUrl = '';
-    salesforceClientId = '';
-    salesforceClientSecret = '';
 
     tenantSecret = '';
     connectUrl = '';
@@ -80,8 +78,6 @@ export default class NativeFormsGuidedSetup extends LightningElement {
             adminEmail: this.adminEmail,
             companyName: this.companyName,
             loginBaseUrl: this.loginBaseUrl,
-            salesforceClientId: this.salesforceClientId,
-            salesforceClientSecret: this.salesforceClientSecret,
             subscriptionState: 'active',
             subscriptionStartDate: this.subscriptionStartDate,
             subscriptionEndDate: this.subscriptionEndDate,
@@ -96,7 +92,9 @@ export default class NativeFormsGuidedSetup extends LightningElement {
         this.isBusy = true;
 
         try {
-            const result = await registerOrg({ requestBody: this.buildRegistrationPayload() });
+            const result = await registerOrg({
+                requestJson: JSON.stringify(this.buildRegistrationPayload())
+            });
 
             if (!result?.success) {
                 throw new Error(result?.errorMessage || 'TwinaForms registration failed.');

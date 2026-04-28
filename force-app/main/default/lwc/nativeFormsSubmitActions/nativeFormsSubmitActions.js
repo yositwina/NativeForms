@@ -665,7 +665,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
             }
             const configJson = this.buildConfigJson();
             await saveSubmitAction({
-                inputValue: {
+                inputJson: JSON.stringify({
                     id: this.draftAction.id,
                     versionId: this.selectedVersionId,
                     actionKey: this.draftAction.actionKey,
@@ -673,7 +673,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
                     objectApiName: this.draftAction.objectApiName,
                     storeResultAs: this.draftAction.storeResultAs,
                     configJson
-                }
+                })
             });
             await this.loadWorkspace(this.selectedVersionId);
             this.showToast('Submit action saved', 'The submit action was updated.', 'success');

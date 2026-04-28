@@ -161,7 +161,15 @@ public with sharing class NativeFormsSubmissionLogsController {
             update keyRecord;
         }
 
-        return getSubmissionLogStatus();
+        SubmissionLogStatus result = new SubmissionLogStatus();
+        result.success = true;
+        result.orgId = currentOrgId();
+        result.keyVersion = keyRecord.Key_Version__c;
+        result.hasPublicKey = !String.isBlank(keyRecord.Public_Key__c);
+        result.hasPrivateKey = !String.isBlank(keyRecord.Private_Key__c);
+        result.publicKeySyncedAt = null;
+        result.errorMessage = null;
+        return result;
     }
 
     @AuraEnabled

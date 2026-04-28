@@ -1,9 +1,11 @@
 public with sharing class NativeFormsHomeController {
     private static final Integer TIMEOUT_MS = 120000;
     private static final String BASE_BOOTSTRAP_NC_NAME = 'NativeForms_Bootstrap';
+    private static final String BASE_CONNECT_TAB_API_NAME = 'NativeForms_Connect';
     private static final String USER_PERMISSION_SET_LABEL = 'TwinaForms User';
     private static final String ADMIN_PERMISSION_SET_LABEL = 'TwinaForms Admin';
     private static String cachedBootstrapNc;
+    private static String cachedConnectTabApiName;
 
     public class ConnectionSummary {
         @AuraEnabled public Boolean ready { get; set; }
@@ -75,6 +77,7 @@ public with sharing class NativeFormsHomeController {
         @AuraEnabled public Boolean success { get; set; }
         @AuraEnabled public String orgId { get; set; }
         @AuraEnabled public String errorMessage { get; set; }
+        @AuraEnabled public String connectTabApiName { get; set; }
         @AuraEnabled public ConnectionSummary connection { get; set; }
         @AuraEnabled public PlanSummary plan { get; set; }
         @AuraEnabled public UsageSummary usage { get; set; }
@@ -90,6 +93,7 @@ public with sharing class NativeFormsHomeController {
         HomeView view = new HomeView();
         view.success = true;
         view.orgId = currentOrgId();
+        view.connectTabApiName = connectTabApiName();
         view.connection = new ConnectionSummary();
         view.plan = new PlanSummary();
         view.usage = new UsageSummary();
@@ -103,7 +107,7 @@ public with sharing class NativeFormsHomeController {
 
         try {
             NativeFormsSetupController.ConnectionStatus connectionStatus =
-                NativeFormsSetupController.getConnectionStatus(view.orgId);
+                NativeFormsSetupController.getConnectionStatus(view.orgId, false);
             view.connection = buildConnectionSummary(connectionStatus);
         } catch (Exception e) {
             view.success = false;
@@ -246,6 +250,7 @@ public with sharing class NativeFormsHomeController {
         HomeView view = new HomeView();
         view.success = String.isBlank(errorMessage);
         view.orgId = currentOrgId();
+        view.connectTabApiName = connectTabApiName();
         view.errorMessage = errorMessage;
         view.connection = new ConnectionSummary();
         view.plan = new PlanSummary();
@@ -305,7 +310,7 @@ public with sharing class NativeFormsHomeController {
 
         if (payload.containsKey('usage') && payload.get('usage') instanceof Map<String, Object>) {
             Map<String, Object> usageMap = (Map<String, Object>) payload.get('usage');
-            view.usage.activeFormsCount = integerValue(usageMap, 'activeFormsCount');
+            view.usage.activeFormsCount = localFormCount();
             view.usage.maxForms = integerValue(usageMap, 'maxForms');
             view.usage.formsUsageLabel = buildUsageLabel(view.usage.activeFormsCount, view.usage.maxForms);
             view.usage.submissionsMonth = integerValue(usageMap, 'submissionsMonth');
@@ -330,6 +335,10 @@ public with sharing class NativeFormsHomeController {
             Map<String, Object> supportFlags = (Map<String, Object>) payload.get('supportFlags');
             view.access.adminAppOpen = booleanValue(supportFlags, 'enableSalesforceAdminApp');
         }
+    }
+
+    private static Integer localFormCount() {
+        return [SELECT COUNT() FROM NF_Form__c];
     }
 
     private static void applyLocalAccessSummary(HomeView view) {
@@ -438,11 +447,12 @@ public with sharing class NativeFormsHomeController {
 
     private static ConnectionSummary buildConnectionSummary(NativeFormsSetupController.ConnectionStatus source) {
         ConnectionSummary summary = new ConnectionSummary();
-        summary.secretKeyConfigured = source != null && source.tenantAuthVerified;
+        Boolean connected = source != null && source.connected == true;
+        summary.secretKeyConfigured = connected || (source != null && source.tenantAuthVerified == true);
         summary.secretKeyLabel = summary.secretKeyConfigured ? 'Yes' : 'No';
         summary.permissionSetConfigured = source != null && source.success;
         summary.permissionSetLabel = summary.permissionSetConfigured ? 'Yes' : 'No';
-        summary.ready = summary.secretKeyConfigured && summary.permissionSetConfigured;
+        summary.ready = connected;
         summary.needsConnectAction = !summary.ready;
         return summary;
     }
@@ -581,14 +591,30 @@ public with sharing class NativeFormsHomeController {
             return cachedBootstrapNc;
         }
 
-        String fullName = NativeFormsHomeController.class.getName();
-        Integer dot = fullName.indexOf('.');
-        String ns = dot > 0 ? fullName.substring(0, dot) : null;
+        String ns = currentNamespacePrefix();
 
         cachedBootstrapNc = String.isBlank(ns)
             ? BASE_BOOTSTRAP_NC_NAME
             : ns + '__' + BASE_BOOTSTRAP_NC_NAME;
 
         return cachedBootstrapNc;
+    }
+
+    private static String connectTabApiName() {
+        if (cachedConnectTabApiName != null) {
+            return cachedConnectTabApiName;
+        }
+
+        String ns = currentNamespacePrefix();
+        cachedConnectTabApiName = String.isBlank(ns)
+            ? BASE_CONNECT_TAB_API_NAME
+            : ns + '__' + BASE_CONNECT_TAB_API_NAME;
+        return cachedConnectTabApiName;
+    }
+
+    private static String currentNamespacePrefix() {
+        String fullName = NativeFormsHomeController.class.getName();
+        Integer dot = fullName.indexOf('.');
+        return dot > 0 ? fullName.substring(0, dot) : null;
     }
 }

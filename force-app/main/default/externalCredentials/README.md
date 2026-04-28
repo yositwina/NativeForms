@@ -1,13 +1,13 @@
-# NativeForms External Credentials
+# TwinaForms External Credentials
 
-NativeForms uses the same deployable metadata pattern proven in FormCase:
+TwinaForms uses deployable External Credential metadata for AWS callouts:
 
-- `NativeFormsBootstrap`
-  - label: `NativeForms Bootstrap`
-  - named principal: `NativeFormsBootstrapPrincipal`
+- `TwinaFormsBootstrap`
+  - label: `TwinaForms Bootstrap`
+  - named principal: `TwinaFormsBootstrapPrincipal`
   - auth variant: `NoAuthentication`
-- `NativeFormsLambdaAuth`
-  - label: `NativeFormsLambdaAuth`
-  - named principal: `NativeFormsSharedSecret`
+- `TwinaFormsLambdaAuth`
+  - label: `TwinaForms Shared Secret`
+  - named principal: `TwinaFormsSharedSecret`
 
 These API names are referenced by the packaged named credential metadata.

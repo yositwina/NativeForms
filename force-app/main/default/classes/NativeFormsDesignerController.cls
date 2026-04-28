@@ -1,4 +1,6 @@
 public with sharing class NativeFormsDesignerController {
+    private static final Integer MAX_INTEGER_VALUE = 2147483647;
+
     public class SelectOption {
         @AuraEnabled public String label { get; set; }
         @AuraEnabled public String value { get; set; }
@@ -138,6 +140,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedVersionSubmitConditionalValue { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalConditionsJson { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalExpression { get; set; }
+        @AuraEnabled public String selectedVersionCustomJs { get; set; }
         @AuraEnabled public String selectedPublishedUrl { get; set; }
         @AuraEnabled public List<SelectOption> projects { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
@@ -153,6 +156,12 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
         @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
+        @AuraEnabled public Boolean enableProCustomJs { get; set; }
+        @AuraEnabled public Integer currentFormCount { get; set; }
+        @AuraEnabled public Integer maxForms { get; set; }
+        @AuraEnabled public Boolean formLimitReached { get; set; }
+        @AuraEnabled public String formLimitMessage { get; set; }
+        @AuraEnabled public String upgradeUrl { get; set; }
     }
 
     public class NewFormResult {
@@ -174,6 +183,79 @@ public with sharing class NativeFormsDesignerController {
             LIMIT 1
         ];
         return matchingProjects.isEmpty() ? defaultProjectId : matchingProjects[0].Id;
+    }
+
+    private class FormLimitState {
+        Integer currentFormCount;
+        Integer maxForms;
+        Boolean limitReached;
+        String message;
+        String upgradeUrl;
+    }
+
+    private static FormLimitState buildFormLimitState() {
+        FormLimitState state = new FormLimitState();
+        state.currentFormCount = [SELECT COUNT() FROM NF_Form__c];
+        state.maxForms = null;
+        state.limitReached = false;
+        state.message = null;
+        state.upgradeUrl = buildUpgradeUrl(null);
+
+        NativeFormsTenantEntitlements.EntitlementSnapshot snapshot = NativeFormsTenantEntitlements.getCurrentOrgEntitlements();
+        if (snapshot == null || snapshot.loadedSuccessfully != true) {
+            return state;
+        }
+
+        state.maxForms = integerLimitValue(snapshot.effectiveLimits, 'maxForms');
+        state.upgradeUrl = buildUpgradeUrl(snapshot.planCode);
+        if (state.maxForms != null && state.currentFormCount >= state.maxForms) {
+            state.limitReached = true;
+            state.message = formLimitReachedMessage();
+        }
+        return state;
+    }
+
+    private static void enforceFormCreationLimit() {
+        FormLimitState state = buildFormLimitState();
+        if (state.limitReached == true) {
+            throw new AuraHandledException(state.message);
+        }
+    }
+
+    private static String formLimitReachedMessage() {
+        return 'You have reached your plan limit for forms. Upgrade your plan or remove an existing form before creating a new one.';
+    }
+
+    private static String buildUpgradeUrl(String planCode) {
+        String normalizedPlan = String.isBlank(planCode) ? 'trial' : planCode.trim().toLowerCase();
+        return 'https://twinaforms.com/upgrade?source=salesforce-designer&plan='
+            + EncodingUtil.urlEncode(normalizedPlan, 'UTF-8');
+    }
+
+    private static Integer integerLimitValue(Map<String, Object> source, String key) {
+        if (source == null || String.isBlank(key) || !source.containsKey(key) || source.get(key) == null) {
+            return null;
+        }
+        Object rawValue = source.get(key);
+        if (rawValue instanceof Integer) {
+            return (Integer) rawValue;
+        }
+        if (rawValue instanceof Long) {
+            Long longValue = (Long) rawValue;
+            return longValue > MAX_INTEGER_VALUE ? MAX_INTEGER_VALUE : Integer.valueOf(String.valueOf(longValue));
+        }
+        if (rawValue instanceof Decimal) {
+            return ((Decimal) rawValue).intValue();
+        }
+        String textValue = String.valueOf(rawValue).trim();
+        if (String.isBlank(textValue) || textValue.toLowerCase() == 'null' || textValue.toLowerCase() == 'unlimited') {
+            return null;
+        }
+        try {
+            return Decimal.valueOf(textValue).intValue();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @AuraEnabled(cacheable=true)
@@ -285,6 +367,13 @@ public with sharing class NativeFormsDesignerController {
         workspace.enableProFormulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         workspace.enableProPostSubmitAutoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
         workspace.enableProSfSecretCodeAuth = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
+        workspace.enableProCustomJs = NativeFormsFeatureFlags.isProCustomJsEnabled();
+        FormLimitState formLimitState = buildFormLimitState();
+        workspace.currentFormCount = formLimitState.currentFormCount;
+        workspace.maxForms = formLimitState.maxForms;
+        workspace.formLimitReached = formLimitState.limitReached;
+        workspace.formLimitMessage = formLimitState.message;
+        workspace.upgradeUrl = formLimitState.upgradeUrl;
 
         Id effectiveProjectId = normalizeProjectSelection(projectId);
         workspace.captchaKeysConfigured = NativeFormsPublisher.hasSharedCaptchaSiteKey();
@@ -379,7 +468,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         List<NF_Form_Version__c> versionRecords = [
-            SELECT Id, Name, Version_Number__c, Version_Status__c, Publish_Status__c, LastModifiedDate, UI_Settings_JSON__c
+            SELECT Id, Name, Version_Number__c, Version_Status__c, Publish_Status__c, LastModifiedDate, UI_Settings_JSON__c, Custom_JS__c
             FROM NF_Form_Version__c
             WHERE Form__c = :effectiveFormId
             ORDER BY LastModifiedDate DESC
@@ -502,6 +591,7 @@ public with sharing class NativeFormsDesignerController {
             stringValue(versionUiSettings.get('submitConditionalExpression')),
             submitConditionalConditions.size()
         );
+        workspace.selectedVersionCustomJs = stringValue(selectedVersion.Custom_JS__c);
         List<NF_Form_Publication__c> publicationRows = [
             SELECT Generated_HTML_Ref__c
             FROM NF_Form_Publication__c
@@ -671,11 +761,38 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
+    public static void updateVersionCustomJs(Id formId, Id versionId, String customJs) {
+        if (formId == null) {
+            throw new AuraHandledException('Form id is required.');
+        }
+        if (versionId == null) {
+            throw new AuraHandledException('Form version is required.');
+        }
+        if (String.isNotBlank(customJs) && !NativeFormsFeatureFlags.isProCustomJsEnabled()) {
+            throw new AuraHandledException('Custom JavaScript is available on Pro plans only. Enable it in your AWS plan entitlements first.');
+        }
+
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c, Custom_JS__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            LIMIT 1
+        ];
+        if (versionRecord.Form__c != formId) {
+            throw new AuraHandledException('Selected version does not belong to the selected form.');
+        }
+
+        versionRecord.Custom_JS__c = String.isBlank(customJs) ? null : customJs;
+        update versionRecord;
+    }
+
+    @AuraEnabled
     public static NewFormResult createFormWithDraftVersion(String description, Id projectId, String newProjectName, Id themeId) {
         String normalizedDescription = String.isBlank(description) ? null : description.trim();
         if (String.isBlank(normalizedDescription)) {
             throw new AuraHandledException('Description is required.');
         }
+        enforceFormCreationLimit();
         Id effectiveProjectId = NativeFormsProjectService.resolveProjectId(projectId, newProjectName);
 
         NF_Form__c formRecord = new NF_Form__c(
@@ -708,6 +825,87 @@ public with sharing class NativeFormsDesignerController {
         result.versionId = versionRecord.Id;
         result.formName = normalizedDescription;
         return result;
+    }
+
+    @AuraEnabled
+    public static void deleteForm(Id formId, String confirmationText) {
+        if (formId == null) {
+            throw new AuraHandledException('Form id is required.');
+        }
+
+        NF_Form__c formRecord = [
+            SELECT Id, Description__c, NF_Key__c
+            FROM NF_Form__c
+            WHERE Id = :formId
+            LIMIT 1
+        ];
+
+        if (!matchesDeleteFormConfirmation(confirmationText, formRecord.Description__c, formRecord.NF_Key__c)) {
+            throw new AuraHandledException('Type the form name or form key to confirm delete.');
+        }
+
+        List<NF_Form_Publication__c> publicationRows = [
+            SELECT Id, Published_Form_Id__c, Publication_Status__c
+            FROM NF_Form_Publication__c
+            WHERE Form__c = :formId
+        ];
+        Set<String> runtimeFormIds = new Set<String>();
+        for (NF_Form_Publication__c publicationRow : publicationRows) {
+            if (publicationRow.Publication_Status__c == 'Success' && String.isNotBlank(publicationRow.Published_Form_Id__c)) {
+                runtimeFormIds.add(publicationRow.Published_Form_Id__c);
+            }
+        }
+
+        for (NF_Form_Version__c versionRecord : [
+            SELECT Id, Form_Id__c, Publish_Status__c
+            FROM NF_Form_Version__c
+            WHERE Form__c = :formId
+              AND Form_Id__c != null
+              AND Publish_Status__c = 'Published'
+        ]) {
+            runtimeFormIds.add(versionRecord.Form_Id__c);
+        }
+
+        if (!runtimeFormIds.isEmpty()) {
+            unpublishRuntimeForms(runtimeFormIds);
+        }
+
+        if (!publicationRows.isEmpty()) {
+            delete publicationRows;
+        }
+        delete formRecord;
+    }
+
+    private static Boolean matchesDeleteFormConfirmation(String confirmationText, String formName, String formKey) {
+        String normalizedConfirmation = normalizeDeleteConfirmation(confirmationText);
+        if (String.isBlank(normalizedConfirmation)) {
+            return false;
+        }
+
+        return normalizedConfirmation == normalizeDeleteConfirmation(formName)
+            || normalizedConfirmation == normalizeDeleteConfirmation(formKey);
+    }
+
+    private static String normalizeDeleteConfirmation(String value) {
+        return String.isBlank(value) ? null : value.trim().toLowerCase();
+    }
+
+    private static void unpublishRuntimeForms(Set<String> runtimeFormIds) {
+        String orgId = UserInfo.getOrganizationId().substring(0, 15);
+        for (String runtimeFormId : runtimeFormIds) {
+            try {
+                Map<String, Object> response = NativeFormsAwsClient.unpublishForm(new Map<String, Object>{
+                    'orgId' => orgId,
+                    'formId' => runtimeFormId
+                });
+                Boolean success = response != null && Boolean.valueOf(String.valueOf(response.get('success')));
+                if (!success) {
+                    throw new CalloutException('Unpublish API did not return success.');
+                }
+            } catch (Exception error) {
+                throw new AuraHandledException('TwinaForms could not disable the published link for this form. The form was not deleted. Try again or contact support. Details: ' + error.getMessage());
+            }
+        }
     }
 
     @AuraEnabled
@@ -745,7 +943,7 @@ public with sharing class NativeFormsDesignerController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Choose an element type first.');
         }
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
@@ -989,7 +1187,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form_Element__c elementRecord = [
-            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
             LIMIT 1
@@ -1027,7 +1225,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form_Element__c elementRecord = [
-            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
             LIMIT 1
@@ -1133,6 +1331,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'textarea') return 'Textarea';
         if (elementType == 'number') return 'Number';
         if (elementType == 'date') return 'Date';
+        if (elementType == 'time') return 'Time';
         if (elementType == 'email') return 'Email';
         if (elementType == 'tel') return 'Phone';
         if (elementType == 'url') return 'URL';
@@ -1142,7 +1341,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'repeatGroup' }.contains(elementType)) {
             return null;
         }
         String prefix = 'field';
@@ -1150,6 +1349,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'textarea') prefix = 'textarea';
         if (elementType == 'number') prefix = 'number';
         if (elementType == 'date') prefix = 'date';
+        if (elementType == 'time') prefix = 'time';
         if (elementType == 'email') prefix = 'email';
         if (elementType == 'tel') prefix = 'phone';
         if (elementType == 'url') prefix = 'url';
@@ -1196,6 +1396,14 @@ public with sharing class NativeFormsDesignerController {
             config.put('fieldBehavior', 'editable');
             config.put('dateDisplayFormat', 'us');
             config.put('dateGmtOffset', '+00:00');
+            config.put('required', false);
+        }
+        if (elementType == 'time') {
+            config.put('defaultValue', '');
+            config.put('placeholder', '19:00');
+            config.put('timeFormat', '24h');
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
             config.put('required', false);
         }
         if (elementType == 'email') {

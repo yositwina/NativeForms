@@ -47,11 +47,26 @@ Supported element types in the current runtime:
 - select
 - checkbox
 - radio
+- time
 - image
 - section
 - columns
 - hidden
 - repeatGroup
+
+### Time Field V1
+`time` is a simple input field for time-of-day values.
+
+- Time fields are rendered as TwinaForms-controlled text inputs, not native browser time inputs.
+- This avoids browser/OS locale surprises such as showing AM/PM to users who expect 24-hour time.
+- Field setting: `Time Format`.
+  - `24-hour (19:00)` accepts `00:00` through `23:59`.
+  - `12-hour (8:00 PM)` accepts `1:00 AM` through `12:59 PM`, with optional leading zero.
+- The value submitted to AWS/Salesforce remains the plain `HH:mm` string.
+- In 12-hour mode, TwinaForms converts the display value to `HH:mm` before submit.
+- AWS submit does not normalize Time fields or add GMT/UTC suffixes in V1.
+- The field can be mapped directly to Salesforce Time or Text fields when the customer expects `HH:mm`.
+- Custom JavaScript and formulas read the field as a text value, for example `TwinaForms.getValue("time1")`.
 
 Planned/documented but not yet implemented in this runtime sample:
 - link

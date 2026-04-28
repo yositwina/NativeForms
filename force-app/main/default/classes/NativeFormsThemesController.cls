@@ -159,7 +159,8 @@ public with sharing class NativeFormsThemesController {
     }
 
     @AuraEnabled
-    public static ThemeRecord saveTheme(ThemeRecord inputValue) {
+    public static ThemeRecord saveTheme(String inputJson) {
+        ThemeRecord inputValue = parseThemeRecord(inputJson);
         if (inputValue == null) {
             throw new AuraHandledException('Theme values are required.');
         }
@@ -312,6 +313,13 @@ public with sharing class NativeFormsThemesController {
 
     private static String blankToDefault(String value, String fallbackValue) {
         return String.isBlank(value) ? fallbackValue : value;
+    }
+
+    private static ThemeRecord parseThemeRecord(String inputJson) {
+        if (String.isBlank(inputJson)) {
+            return null;
+        }
+        return (ThemeRecord) JSON.deserialize(inputJson, ThemeRecord.class);
     }
 
     private static void ensureStarterSampleThemes() {

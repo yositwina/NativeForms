@@ -219,17 +219,20 @@ This separation is required.
 
 ## Per-org Salesforce connection
 The Salesforce API connection used by prefill and submit must also be tenant-specific.
+The OAuth client app credential is not tenant-specific: AWS uses the TwinaForms-owned packaged External Client App client id/secret from central AWS configuration or Secrets Manager.
 
 Recommended prototype storage:
 - tenant metadata in DynamoDB
+- one central OAuth client secret such as `TwinaForms/SalesforceOAuthClient`
 - one Secrets Manager entry per org:
   - `NativeForms/SalesforceConnection/<orgId>`
 
 Connection flow:
 1. tenant registers in AWS
 2. admin completes AWS `/connect?orgId=<orgId>`
-3. callback stores the org-specific refresh token and instance URL under that org id
-4. prefill/submit resolve `orgId` from the form and load that org's Salesforce connection
+3. callback uses the central TwinaForms OAuth client credentials to exchange the authorization code
+4. callback stores the org-specific refresh token and instance URL under that org id
+5. prefill/submit resolve `orgId` from the form, load that org's Salesforce connection, and refresh with the central OAuth client credentials
 
 This replaces the older single shared backend Salesforce secret model.
 

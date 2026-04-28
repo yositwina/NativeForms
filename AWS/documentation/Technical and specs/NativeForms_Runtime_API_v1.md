@@ -1,27 +1,33 @@
-# NativeForms Runtime API - V1
+# TwinaForms Runtime API - V1
 
 ## Purpose
-Define the public browser-side runtime contract exposed by a published NativeForms HTML artifact.
+Define the public browser-side runtime contract exposed by a published TwinaForms HTML artifact.
 
 This API is an HTML/runtime concern only. It does not change the Lambda payload contracts.
 
 ## Global API
-Published forms expose a global object:
+Published forms expose an official global object:
 
 ```js
-window.NativeForms
+window.TwinaForms
+```
+
+V1 compatibility alias:
+
+```js
+window.NativeForms === window.TwinaForms
 ```
 
 Supported methods:
 
 ```js
-NativeForms.getValue(key)
-NativeForms.setValue(key, value)
-NativeForms.getAll()
-NativeForms.showElement(id)
-NativeForms.hideElement(id)
-NativeForms.on(eventName, handler)
-NativeForms.off(eventName, handler)
+TwinaForms.getValue(key)
+TwinaForms.setValue(key, value)
+TwinaForms.getAll()
+TwinaForms.showElement(id)
+TwinaForms.hideElement(id)
+TwinaForms.on(eventName, handler)
+TwinaForms.off(eventName, handler)
 ```
 
 ## Method Behavior
@@ -30,36 +36,36 @@ NativeForms.off(eventName, handler)
 Returns the current value for a top-level input key.
 
 ```js
-const email = NativeForms.getValue("email");
+const email = TwinaForms.getValue("email");
 ```
 
 ### setValue
 Sets a top-level input value, refreshes the UI, and emits a `change` event.
 
 ```js
-NativeForms.setValue("subject", "Updated by custom JS");
+TwinaForms.setValue("subject", "Updated by custom JS");
 ```
 
 ### getAll
 Returns the full current input object, including repeat groups and deleted repeat-row tracking.
 
 ```js
-const input = NativeForms.getAll();
+const input = TwinaForms.getAll();
 ```
 
 ### showElement / hideElement
 Manually shows or hides an element by `FORM_DEF.elements[].id`.
 
 ```js
-NativeForms.hideElement("existingCases");
-NativeForms.showElement("existingCases");
+TwinaForms.hideElement("existingCases");
+TwinaForms.showElement("existingCases");
 ```
 
 ### on / off
 Registers or removes a runtime event listener.
 
 ```js
-const unsubscribe = NativeForms.on("submit:after", (detail) => {
+const unsubscribe = TwinaForms.on("submit:after", (detail) => {
   console.log(detail.response);
 });
 
@@ -69,7 +75,7 @@ unsubscribe();
 ## Runtime Events
 Events are emitted in two forms:
 
-1. Through `NativeForms.on(eventName, handler)`
+1. Through `TwinaForms.on(eventName, handler)`
 2. As browser events on `window` with the prefix:
    - `nativeforms:<eventName>`
 
@@ -130,3 +136,4 @@ Emitted for validation failures, submit failures, or submit exceptions.
 - This API is intentionally small and stable.
 - `showElement` and `hideElement` are UI-only and do not change Lambda payloads.
 - Conditional visibility rules defined in `FORM_DEF` still apply independently.
+- Customer-facing docs and examples should use `TwinaForms`, not `NativeForms`.

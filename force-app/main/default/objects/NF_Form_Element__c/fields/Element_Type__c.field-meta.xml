@@ -17,6 +17,7 @@
             <value><fullName>textarea</fullName><default>false</default><label>Textarea</label></value>
             <value><fullName>number</fullName><default>false</default><label>Number</label></value>
             <value><fullName>date</fullName><default>false</default><label>Date</label></value>
+            <value><fullName>time</fullName><default>false</default><label>Time</label></value>
             <value><fullName>email</fullName><default>false</default><label>Email</label></value>
             <value><fullName>tel</fullName><default>false</default><label>Phone</label></value>
             <value><fullName>url</fullName><default>false</default><label>URL</label></value>

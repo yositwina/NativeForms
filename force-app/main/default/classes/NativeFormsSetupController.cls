@@ -18,8 +18,6 @@ public with sharing class NativeFormsSetupController {
         @AuraEnabled public String adminEmail { get; set; }
         @AuraEnabled public String companyName { get; set; }
         @AuraEnabled public String loginBaseUrl { get; set; }
-        @AuraEnabled public String salesforceClientId { get; set; }
-        @AuraEnabled public String salesforceClientSecret { get; set; }
         @AuraEnabled public String subscriptionState { get; set; }
         @AuraEnabled public String subscriptionStartDate { get; set; }
         @AuraEnabled public String subscriptionEndDate { get; set; }
@@ -35,8 +33,6 @@ public with sharing class NativeFormsSetupController {
         @AuraEnabled public String adminEmail { get; set; }
         @AuraEnabled public String companyName { get; set; }
         @AuraEnabled public String loginBaseUrl { get; set; }
-        @AuraEnabled public String salesforceClientId { get; set; }
-        @AuraEnabled public String salesforceClientSecret { get; set; }
     }
 
     public class RegistrationResult {
@@ -88,10 +84,11 @@ public with sharing class NativeFormsSetupController {
     }
 
     @AuraEnabled
-    public static RegistrationResult registerOrg(RegistrationRequest requestBody) {
+    public static RegistrationResult registerOrg(String requestJson) {
         RegistrationResult result = new RegistrationResult();
 
         try {
+            RegistrationRequest requestBody = parseRegistrationRequest(requestJson);
             HttpRequest request = new HttpRequest();
             request.setMethod('POST');
             request.setEndpoint('callout:' + bootstrapNamedCredentialName() + '/tenant/register');
@@ -125,10 +122,11 @@ public with sharing class NativeFormsSetupController {
     }
 
     @AuraEnabled
-    public static RegistrationResult saveClientCredentials(ClientCredentialsRequest requestBody) {
+    public static RegistrationResult saveClientCredentials(String requestJson) {
         RegistrationResult result = new RegistrationResult();
 
         try {
+            ClientCredentialsRequest requestBody = parseClientCredentialsRequest(requestJson);
             HttpRequest request = new HttpRequest();
             request.setMethod('POST');
             request.setEndpoint('callout:' + bootstrapNamedCredentialName() + '/tenant/register');
@@ -161,7 +159,7 @@ public with sharing class NativeFormsSetupController {
     }
 
     @AuraEnabled
-    public static ConnectionStatus getConnectionStatus(String orgId) {
+    public static ConnectionStatus getConnectionStatus(String orgId, Boolean verifyTenantAuthNow) {
         ConnectionStatus result = new ConnectionStatus();
 
         try {
@@ -194,10 +192,17 @@ public with sharing class NativeFormsSetupController {
                 ? null
                 : buildConnectionStatusErrorMessage(null, String.valueOf(responseBody.get('error')));
 
-            TenantAuthStatus tenantAuth = verifyTenantAuth(effectiveOrgId);
-            result.tenantAuthVerified = tenantAuth.verified;
-            result.tenantAuthStatus = tenantAuth.status;
-            result.tenantAuthErrorMessage = tenantAuth.errorMessage;
+            Boolean shouldVerifyTenantAuth = verifyTenantAuthNow == true && result.registered == true;
+            if (shouldVerifyTenantAuth) {
+                TenantAuthStatus tenantAuth = verifyTenantAuth(effectiveOrgId);
+                result.tenantAuthVerified = tenantAuth.verified;
+                result.tenantAuthStatus = tenantAuth.status;
+                result.tenantAuthErrorMessage = tenantAuth.errorMessage;
+            } else {
+                result.tenantAuthVerified = false;
+                result.tenantAuthStatus = 'not_checked';
+                result.tenantAuthErrorMessage = null;
+            }
         } catch (Exception e) {
             result.success = false;
             result.errorMessage = buildConnectionStatusErrorMessage(null, e == null ? null : e.getMessage());
@@ -249,6 +254,20 @@ public with sharing class NativeFormsSetupController {
         public Boolean verified { get; set; }
         public String status { get; set; }
         public String errorMessage { get; set; }
+    }
+
+    private static RegistrationRequest parseRegistrationRequest(String requestJson) {
+        if (String.isBlank(requestJson)) {
+            return new RegistrationRequest();
+        }
+        return (RegistrationRequest) JSON.deserialize(requestJson, RegistrationRequest.class);
+    }
+
+    private static ClientCredentialsRequest parseClientCredentialsRequest(String requestJson) {
+        if (String.isBlank(requestJson)) {
+            return new ClientCredentialsRequest();
+        }
+        return (ClientCredentialsRequest) JSON.deserialize(requestJson, ClientCredentialsRequest.class);
     }
 
     private static TenantAuthStatus verifyTenantAuth(String orgId) {
@@ -312,17 +331,17 @@ public with sharing class NativeFormsSetupController {
 
     private static String buildSaveClientCredentialsErrorMessage(Integer statusCode, String rawBody) {
         if (isPermissionSetAccessIssue(statusCode, rawBody)) {
-            return 'TwinaForms could not save the Salesforce client credentials yet because setup access is not complete. Check permission-set access and try again.';
+            return 'TwinaForms could not prepare Salesforce authorization yet because setup access is not complete. Check permission-set access and try again.';
         }
-        return 'TwinaForms could not save the Salesforce client credentials. Check the values and try again.';
+        return 'TwinaForms could not prepare Salesforce authorization. Refresh and try again.';
     }
 
     private static String buildSaveClientCredentialsExceptionMessage(Exception e) {
         String message = e == null ? '' : String.valueOf(e.getMessage());
         if (isPermissionSetAccessIssue(null, message)) {
-            return 'TwinaForms could not save the Salesforce client credentials yet because setup access is not complete. Check permission-set access and try again.';
+            return 'TwinaForms could not prepare Salesforce authorization yet because setup access is not complete. Check permission-set access and try again.';
         }
-        return 'TwinaForms could not save the Salesforce client credentials. Check the values and try again.';
+        return 'TwinaForms could not prepare Salesforce authorization. Refresh and try again.';
     }
 
     private static String buildConnectionStatusErrorMessage(Integer statusCode, String rawBody) {

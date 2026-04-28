@@ -32,26 +32,6 @@
                 </div>
             </template>
 
-            <template if:true={showPrincipalAccessHelp}>
-                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium" role="alert">
-                    <span class="slds-assistive-text">error</span>
-                    <div>
-                        <h2 class="slds-text-heading_small slds-m-bottom_x-small">What To Do First</h2>
-                        <p class="slds-m-bottom_x-small">An admin needs to finish the TwinaForms access setup before this page can connect the org.</p>
-                        <ol class="instruction-list">
-                            <li>Open the <strong>TwinaForms User</strong> permission set and assign it to the people who will use the main TwinaForms workspace.</li>
-                            <li>Inside that permission set, open <strong>External Credential Principal Access</strong>.</li>
-                            <li>Enable both principals:
-                                <div class="instruction-detail">TwinaForms Bootstrap / NativeFormsBootstrapPrincipal</div>
-                                <div class="instruction-detail">TwinaForms Shared Secret / NativeFormsSharedSecret</div>
-                            </li>
-                            <li>If you plan to open <strong>TwinaForms Admin</strong> for support/debug work later, enable the same two principals there too.</li>
-                            <li>Return here and click <strong>Generate Secret</strong> again.</li>
-                        </ol>
-                    </div>
-                </div>
-            </template>
-
             <template if:true={isInitializing}>
                 <lightning-spinner alternative-text="Loading setup context" size="small"></lightning-spinner>
             </template>
@@ -81,10 +61,10 @@
                                         Open the <strong>TwinaForms User</strong> permission set in Salesforce Setup and assign it to the people who will use the main TwinaForms workspace.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
-                                        In that permission set, open <strong>External Credential Principal Access</strong>.
+                                        Create a new permission set with <strong>Label = TwinaForms Credentials</strong> and <strong>API Name = TwinaFormsCredentials</strong>.
                                     </p>
                                     <p class="instruction-text-block slds-m-top_small">
-                                        If you plan to use <strong>TwinaForms Admin</strong> for support/debug access, enable the same principals there too after the main setup is working.
+                                        Open <strong>TwinaForms Credentials</strong>, then open <strong>External Credential Principal Access</strong>.
                                     </p>
                                 </div>
                             </li>
@@ -93,12 +73,15 @@
                                     <p class="instruction-text-block">
                                         Move these two principals from left to right, then click <strong>Save</strong>.
                                     </p>
-                                    <div class="instruction-detail">TwinaForms Bootstrap / NativeFormsBootstrapPrincipal</div>
-                                    <div class="instruction-detail">TwinaForms Shared Secret / NativeFormsSharedSecret</div>
+                                    <div class="instruction-detail">TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal</div>
+                                    <div class="instruction-detail">TwinaFormsLambdaAuth - TwinaFormsSharedSecret</div>
+                                    <p class="instruction-text-block slds-m-top_small">
+                                        Assign <strong>TwinaForms Credentials</strong> to the same users who need TwinaForms access.
+                                    </p>
                                 </div>
                             </li>
                             <li>Click <strong>Generate Secret</strong> below.</li>
-                            <li>Add the generated tenant secret to <strong>Named Credentials &gt; TwinaForms &gt; NativeFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
+                            <li>Add the generated tenant secret to <strong>Named Credentials &gt; TwinaForms &gt; TwinaFormsSharedSecret</strong> as the authentication parameter named <strong>secret</strong>.</li>
                             <li>Click <strong>Test Tenant Secret</strong> to verify the setup.</li>
                         </ol>
                     </div>
@@ -158,7 +141,7 @@
             <template if:true={showOauthCompleteBanner}>
                 <div class="stage-complete slds-m-bottom_medium">
                     <p class="stage-complete__title">Step 2 Complete</p>
-                    <p class="stage-complete__text">Salesforce client credentials and OAuth connection are active.</p>
+                    <p class="stage-complete__text">Salesforce OAuth connection is active.</p>
                 </div>
             </template>
 
@@ -167,67 +150,19 @@
                     <div class="setup-stage__header">
                         <div>
                             <p class="setup-stage__eyebrow">Step 2</p>
-                            <h2 class="setup-stage__title">Save the Salesforce client key and secret</h2>
+                            <h2 class="setup-stage__title">Connect Salesforce</h2>
                         </div>
                     </div>
 
                     <div class="instruction-box slds-m-top_medium">
-                        <p class="instruction-title"><strong>OAuth setup</strong></p>
-                        <ol class="instruction-list">
-                            <li class="instruction-step">
-                                <div class="instruction-step__content">
-                                    <p class="instruction-text-block">
-                                        Open <strong>External Client App Manager</strong>.
-                                    </p>
-                                    <p class="instruction-text-block slds-m-top_small">
-                                        Choose the <strong>TwinaForms</strong> app.
-                                    </p>
-                                    <p class="instruction-text-block slds-m-top_small">
-                                        Go to the <strong>Settings</strong> tab, then under <strong>OAuth Settings</strong> click the button to view the <strong>Consumer Key</strong> and <strong>Consumer Secret</strong>.
-                                    </p>
-                                    <div class="instruction-toggle">
-                                        <lightning-button
-                                            variant="base"
-                                            label={step3ImageButtonLabel}
-                                            data-section="step3"
-                                            onclick={handleToggleImage}>
-                                        </lightning-button>
-                                    </div>
-                                </div>
-                                <template if:true={showStep3Image}>
-                                    <div class="instruction-step__media">
-                                        <img src={step3ImageUrl} alt="External Client App Manager and OAuth settings example" class="instruction-image" />
-                                    </div>
-                                </template>
-                            </li>
-                            <li>Paste those values below.</li>
-                            <li>Click <strong>Connect TwinaForms</strong>.</li>
-                            <li>Finish authentication in the new Salesforce window. This page will keep checking automatically, and you can also click <strong>Refresh Connection Status</strong>.</li>
-                        </ol>
+                        <p class="instruction-title"><strong>Authorize TwinaForms</strong></p>
+                        <p class="instruction-text-block">
+                            Click <strong>Connect TwinaForms</strong> and approve access in the Salesforce window that opens.
+                        </p>
+                        <p class="instruction-text-block slds-m-top_small">
+                            After approval, return here. This page will refresh the connection status automatically.
+                        </p>
                     </div>
-
-                    <template if:true={showOauthCredentialsForm}>
-                        <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium">
-                            <div class="slds-col slds-size_1-of-1">
-                                <lightning-input
-                                    label="Salesforce Client Id"
-                                    value={salesforceClientId}
-                                    onchange={handleChange}
-                                    data-field="salesforceClientId">
-                                </lightning-input>
-                            </div>
-
-                            <div class="slds-col slds-size_1-of-1">
-                                <lightning-input
-                                    type="password"
-                                    label="Salesforce Client Secret"
-                                    value={salesforceClientSecret}
-                                    onchange={handleChange}
-                                    data-field="salesforceClientSecret">
-                                </lightning-input>
-                            </div>
-                        </div>
-                    </template>
 
                     <div class="stage-actions slds-m-top_medium">
                         <template if:true={showConnectAction}>
@@ -255,7 +190,7 @@
                                 TwinaForms opened the Salesforce authentication page in a new tab or window.
                             </p>
                             <p class="awaiting-auth-box__text">
-                                After you finish authentication there, this page will keep checking automatically. You can also click <strong>Refresh Connection Status</strong>.
+                                After you finish authentication there, this page will refresh the connection status automatically.
                             </p>
                         </div>
                     </template>

@@ -24,6 +24,7 @@ $items = @(
         enableProPostSubmitAutoLink = @{ BOOL = $false }
         enableProSfSecretCodeAuth = @{ BOOL = $false }
         enableProLoadFile = @{ BOOL = $false }
+        enableProCustomJs = @{ BOOL = $false }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }
@@ -53,6 +54,7 @@ $items = @(
         enableProPostSubmitAutoLink = @{ BOOL = $true }
         enableProSfSecretCodeAuth = @{ BOOL = $true }
         enableProLoadFile = @{ BOOL = $true }
+        enableProCustomJs = @{ BOOL = $true }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }
@@ -82,6 +84,7 @@ $items = @(
         enableProPostSubmitAutoLink = @{ BOOL = $false }
         enableProSfSecretCodeAuth = @{ BOOL = $false }
         enableProLoadFile = @{ BOOL = $false }
+        enableProCustomJs = @{ BOOL = $false }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }
@@ -111,6 +114,7 @@ $items = @(
         enableProPostSubmitAutoLink = @{ BOOL = $true }
         enableProSfSecretCodeAuth = @{ BOOL = $true }
         enableProLoadFile = @{ BOOL = $true }
+        enableProCustomJs = @{ BOOL = $true }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }

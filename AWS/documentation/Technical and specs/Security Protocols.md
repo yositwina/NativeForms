@@ -222,5 +222,10 @@ For this prototype, the server-side registry is stored in AWS DynamoDB using:
 - `NativeFormsFormSecurity`
 - one item per form in a table such as `NativeFormsFormSecurity`
 
-Salesforce connection credentials are stored per org in AWS Secrets Manager using names such as:
+Salesforce connection tokens are stored per org in AWS Secrets Manager using names such as:
 - `NativeForms/SalesforceConnection/<orgId>`
+
+The packaged External Client App OAuth client id/secret is TwinaForms-owned and configured centrally in AWS, preferably in a secret such as:
+- `TwinaForms/SalesforceOAuthClient`
+
+Per-org connection secrets hold refresh token and instance metadata only; they do not hold subscriber-entered OAuth client credentials.

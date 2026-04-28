@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom JavaScript - TwinaForms Help</title>
+  <meta name="description" content="How to use Custom JavaScript in TwinaForms. Supported TwinaForms runtime API, setup steps, and copy-paste examples.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/help/styles.css?v=20260421-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Using Custom JavaScript in TwinaForms.</h1>
+      <p class="hero-copy">Custom JavaScript lets you add browser-side automation to a published TwinaForms form. Use it for advanced field syncing, light custom behavior, and interaction patterns that go beyond the standard builder settings.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#where">Where to add it</a>
+        <a href="#api">Supported API</a>
+        <a href="#pattern">Basic pattern</a>
+        <a href="#multiple">Multiple functions</a>
+        <a href="#examples">Examples</a>
+        <a href="#example-gmt-sf">GMT with Salesforce</a>
+        <a href="#practices">Good practices</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+      <div class="layout__main">
+        <section class="section" id="where">
+          <h2>Where to add it</h2>
+          <p>In TwinaForms Designer:</p>
+          <ol>
+            <li>Open the form.</li>
+            <li>Open <strong>Form Settings</strong>.</li>
+            <li>Open <strong>Advanced</strong>.</li>
+            <li>Click <strong>Edit Custom JavaScript</strong>.</li>
+            <li>Paste your code and save.</li>
+            <li>Republish the form.</li>
+          </ol>
+          <div class="callout">
+            <strong>Important:</strong> Custom JavaScript runs in the browser, not in Salesforce or AWS. Use only trusted code.
+          </div>
+        </section>
+
+        <section class="section" id="pattern">
+          <h2>Basic pattern</h2>
+          <p>Most scripts use the same simple structure:</p>
+          <pre class="code-block">(function (TwinaForms) {
+  function syncSomething() {
+    const source = TwinaForms.getValue("text5") || "";
+    TwinaForms.setValue("text6", source);
+  }
+
+  TwinaForms.on("change", function () {
+    syncSomething();
+  });
+
+  syncSomething();
+})(TwinaForms);</pre>
+          <p>That gives you two important behaviors:</p>
+          <ul>
+            <li>the script reacts when the user changes a field</li>
+            <li>the form also starts in the correct state on first load</li>
+          </ul>
+        </section>
+
+        <section class="section" id="multiple">
+          <h2>Writing several functions</h2>
+          <p>A form can have as many Custom JavaScript functions as you need. Two patterns work well &mdash; pick whichever fits the code you are writing.</p>
+
+          <h3>Pattern A &mdash; one IIFE, multiple helpers</h3>
+          <p>Use this when your functions share helpers or need to run together on the same event.</p>
+          <pre class="code-block">(function (TwinaForms) {
+  function updatePhoneCode()  { /* ... */ }
+  function updateFullName()   { /* ... */ }
+  function updateSfDatetime() { /* ... */ }
+
+  function syncAll() {
+    updatePhoneCode();
+    updateFullName();
+    updateSfDatetime();
+  }
+
+  TwinaForms.on("change", syncAll);
+  syncAll(); // initial state
+})(TwinaForms);</pre>
+
+          <h3>Pattern B &mdash; separate IIFEs per concern</h3>
+          <p>Use this when the concerns are unrelated. Each block is self-contained, so you can copy, paste, or remove one without breaking the others.</p>
+          <pre class="code-block">// Block 1: phone code sync
+(function (TwinaForms) {
+  function updatePhoneCode() { /* ... */ }
+  TwinaForms.on("change", updatePhoneCode);
+  updatePhoneCode();
+})(TwinaForms);
+
+// Block 2: GMT-to-SF datetime
+(function (TwinaForms) {
+  function updateSfDatetime() { /* ... */ }
+  TwinaForms.on("change", updateSfDatetime);
+  updateSfDatetime();
+})(TwinaForms);</pre>
+
+          <div class="callout">
+            <strong>Trade-off:</strong> Pattern B is easier to manage when features come and go &mdash; delete a block, the rest keep working. Pattern A is tighter when helpers are shared (for example a common <span class="inline">pad()</span>, <span class="inline">formatDate()</span>, or <span class="inline">getCountry()</span>). If two IIFEs both listen to <span class="inline">change</span>, both run on every change &mdash; usually fine, but keep an eye on performance if one of them is expensive.
+          </div>
+        </section>
+
+        <section class="section" id="examples">
+          <h2>Examples</h2>
+          <p class="lead">These examples use internal field IDs like <span class="inline">text5</span>, <span class="inline">text6</span>, and <span class="inline">checkbox11</span>. Use the actual field IDs from your form.</p>
+
+          <div class="example-block">
+            <p class="example-title">Build full name from two fields</p>
+            <p class="example-subtitle">Assume <span class="inline">text1</span> is first name, <span class="inline">text2</span> is last name, and <span class="inline">text3</span> is full name.</p>
+            <pre class="code-block">(function (TwinaForms) {
+  function updateFullName() {
+    const first = (TwinaForms.getValue("text1") || "").trim();
+    const last = (TwinaForms.getValue("text2") || "").trim();
+    const fullName = [first, last].filter(Boolean).join(" ");
+    TwinaForms.setValue("text3", fullName);
+  }
+
+  TwinaForms.on("change", function () {
+    updateFullName();
+  });
+
+  updateFullName();
+})(TwinaForms);</pre>
+          </div>
+
+          <div class="example-block">
+            <p class="example-title">Set a greeting based on country</p>
+            <p class="example-subtitle">Assume <span class="inline">text5</span> is country and <span class="inline">text7</span> is greeting.</p>
+            <pre class="code-block">(function (TwinaForms) {
+  function updateGreeting() {
+    const country = TwinaForms.getValue("text5") || "";
+
+    if (country === "Israel") {
+      TwinaForms.setValue("text7", "Shalom");
+      return;
+    }
+
+    if (country === "Spain") {
+      TwinaForms.setValue("text7", "Hola");
+      return;
+    }
+
+    TwinaForms.setValue("text7", "Hello");
+  }
+
+  TwinaForms.on("change", function () {
+    updateGreeting();
+  });
+
+  updateGreeting();
+})(TwinaForms);</pre>
+          </div>
+
+          <div class="example-block">
+            <p class="example-title">Country to phone country code</p>
+            <p class="example-subtitle">Assume <span class="inline">text5</span> is the country field and <span class="inline">text6</span> is the phone code field.</p>
+            <pre class="code-block">(function (TwinaForms) {
+  const phoneCodes = {
+    "Israel": "+972",
+    "United States": "+1",
+    "Canada": "+1",
+    "United Kingdom": "+44",
+    "Germany": "+49",
+    "France": "+33",
+    "Spain": "+34",
+    "Italy": "+39"
+  };
+
+  function updatePhoneCode() {
+    const country = TwinaForms.getValue("text5") || "";
+    TwinaForms.setValue("text6", phoneCodes[country] || "");
+  }
+
+  TwinaForms.on("change", function () {
+    updatePhoneCode();
+  });
+
+  updatePhoneCode();
+})(TwinaForms);</pre>
+          </div>
+
+          <div class="example-block">
+            <p class="example-title">Show a section only when a checkbox is checked</p>
+            <p class="example-subtitle">Assume <span class="inline">checkbox11</span> controls a section whose element id is <span class="inline">sectionPromo</span>.</p>
+            <pre class="code-block">(function (TwinaForms) {
+  function syncSection() {
+    const checked = TwinaForms.getValue("checkbox11") === true;
+    if (checked) {
+      TwinaForms.showElement("sectionPromo");
+    } else {
+      TwinaForms.hideElement("sectionPromo");
+    }
+  }
+
+  TwinaForms.on("change", function () {
+    syncSection();
+  });
+
+  syncSection();
+})(TwinaForms);</pre>
+          </div>
+
+          <div class="example-block" id="example-gmt-sf">
+            <p class="example-title">GMT with Salesforce &mdash; write an SF Datetime value</p>
+            <p class="example-subtitle">Detects the submitter's current timezone (including Daylight Saving automatically), combines it with a Date field and a Time field, and writes an ISO&#8239;8601 string like <span class="inline">2026-04-23T14:30:00+03:00</span> into a hidden Text field. Map that hidden field to a Salesforce <strong>Datetime</strong> column on the Submit action. SF stores it in UTC and renders in each user's locale.</p>
+            <p class="example-subtitle">Assume <span class="inline">date1</span> is the date the user picks, <span class="inline">time1</span> is a TwinaForms Time field (<span class="inline">HH:mm</span>), and <span class="inline">text5</span> is the hidden Text field submitted to SF.</p>
+            <pre class="code-block">(function (TwinaForms) {
+  function pad(n) {
+    return String(n || 0).padStart(2, "0");
+  }
+
+  function offsetPart() {
+    var minutes = -new Date().getTimezoneOffset();
+    var sign = minutes &gt;= 0 ? "+" : "-";
+    var m = Math.abs(minutes);
+    return sign + pad(Math.floor(m / 60)) + ":" + pad(m % 60);
+  }
+
+  function datePart() {
+    var val = TwinaForms.getValue("date1");
+    if (val) return String(val);
+
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function timePart() {
+    var val = TwinaForms.getValue("time1");
+    if (val) {
+      var p = String(val).split(":");
+      return pad(p[0]) + ":" + pad(p[1]) + ":" + pad(p[2]);
+    }
+
+    var d = new Date();
+    return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
+
+  function updateSfDatetime() {
+    var iso = datePart() + "T" + timePart() + offsetPart();
+    TwinaForms.setValue("text5", iso);
+  }
+
+  TwinaForms.on("input", updateSfDatetime);
+  TwinaForms.on("change", updateSfDatetime);
+
+  updateSfDatetime();
+})(TwinaForms);</pre>
+            <p class="example-subtitle"><strong>Notes:</strong></p>
+            <ul>
+              <li>Half-hour timezones (India <span class="inline">+05:30</span>, Iran <span class="inline">+03:30</span>, Newfoundland <span class="inline">-03:30</span>) render correctly.</li>
+              <li>Privacy-hardened browsers (Tor, Firefox with <span class="inline">privacy.resistFingerprinting</span>) always report UTC. The script still produces valid ISO; it just records <span class="inline">+00:00</span> for those users.</li>
+              <li>The Time field returns <span class="inline">HH:mm</span>. The script adds seconds as <span class="inline">:00</span> when needed.</li>
+              <li>If the Time field is empty, the script uses the current browser time on page load or field change.</li>
+              <li>To store midnight instead of the current time when the Time field is empty, replace the last three lines of <span class="inline">timePart()</span> with <span class="inline">return "00:00:00";</span>.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section" id="practices">
+          <h2>Good practices</h2>
+          <ul>
+            <li>Keep scripts short and focused.</li>
+            <li>Prefer <span class="inline">TwinaForms.getValue()</span> and <span class="inline">TwinaForms.setValue()</span> over direct DOM selectors.</li>
+            <li>Republish after saving new code.</li>
+            <li>Test with realistic form values.</li>
+          </ul>
+
+          <h3>Avoid</h3>
+          <ul>
+            <li>very large scripts</li>
+            <li>code that depends heavily on the page HTML structure</li>
+            <li>untrusted copied code</li>
+          </ul>
+
+          <div class="callout">
+            <strong>Support note:</strong> TwinaForms officially supports the <span class="inline">TwinaForms</span> runtime API. TwinaForms does not automatically include third-party libraries such as <span class="inline">jQuery</span>, so prefer the built-in API and plain JavaScript unless you explicitly control that dependency. Direct DOM scripting may work, but it is less stable and may break more easily if the published HTML structure changes in future versions.
+          </div>
+        </section>
+      </div>
+
+      <aside class="layout__aside">
+        <section class="section layout__aside-section" id="api">
+          <h2>Supported API</h2>
+          <p class="lead">Use the TwinaForms runtime API when possible.</p>
+
+          <div class="fn-grid">
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.getValue(key)</span>
+              <p class="fn-desc">Read the current value of a field by its internal ID.</p>
+            </div>
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.setValue(key, value)</span>
+              <p class="fn-desc">Write a value into a field by its internal ID.</p>
+            </div>
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.getAll()</span>
+              <p class="fn-desc">Read the current values of all fields.</p>
+            </div>
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.showElement(id)</span>
+              <p class="fn-desc">Show an element by its element id.</p>
+            </div>
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.hideElement(id)</span>
+              <p class="fn-desc">Hide an element by its element id.</p>
+            </div>
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.on(eventName, handler)</span>
+              <p class="fn-desc">Listen for supported form lifecycle and change events.</p>
+            </div>
+            <div class="fn-card">
+              <span class="fn-name">TwinaForms.off(eventName, handler)</span>
+              <p class="fn-desc">Remove a previously attached event handler.</p>
+            </div>
+          </div>
+
+          <h3>Supported events</h3>
+          <div class="pill-row">
+            <span class="pill">form:init</span>
+            <span class="pill">form:ready</span>
+            <span class="pill">change</span>
+            <span class="pill">prefill:before</span>
+            <span class="pill">prefill:after</span>
+            <span class="pill">prefill:error</span>
+            <span class="pill">submit:before</span>
+            <span class="pill">submit:after</span>
+            <span class="pill">submit:error</span>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>

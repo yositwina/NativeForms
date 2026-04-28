@@ -1,13 +1,41 @@
 # Pro Features For Later
 
-## Purpose
+# Purpose
 Capture Pro feature work that is intentionally out of scope for the current Pro V1 file-upload design.
 
 This keeps the current `Pro features for started.md` focused on the first shippable version.
 
+
+## Other Pro Enhancements To Keep Separate
+
+The following stay outside the current File Uploads V1 scope:
+
++ Major
+- File upload - See below
+- export logs to CSV
+- Signature add on as an item to forms = saved with detailed and served as an electornic signature / or create pdf with signatured
+- Form Journey (see below plus , two column page, on eleft forms name, on right attibutesm , each arrtibute can call to new form. If so its automatically created on cavs with arrow
+-JS CSS / Style)
+- GMT for time Fields auto identify user submit location and GMT summer winter
+-DB country city world wide probably on dynamodb 
+
++ Minor 
+- richer submission filters
+- chained logic based on prior prefill or submit outcomes
+- more advanced post-submit navigation options (part of journey)
+- more advanced verification and secure access flows (part of Hourney)
+- broader admin and commercial control tooling
+
 ---
 
-## File Uploads - Later Scope
+## Rule
+
+Do not quietly pull these items into Pro V1 implementation.
+
+If one of them becomes necessary, it should be re-evaluated as a deliberate scope expansion rather than an accidental addition.
+
+
+# File Uploads - Later Scope
 
 These are explicitly deferred beyond Pro V1:
 
@@ -27,26 +55,94 @@ These are explicitly deferred beyond Pro V1:
 - non-Salesforce final file storage as a product option
 
 ---
+ 
+# Journey Builder – UX Summary (Agreed Design)
+Core Concept
+A Journey is a simple, ordered sequence of forms that guide a user through a process.
+•	No diagrams
+•	No flow builder
+•	No technical setup
+👉 Just define what happens next after each form
 
-## Other Pro Enhancements To Keep Separate
+Page Structure (reuse existing builder)
+Left Panel
+•	List of available forms
+•	Action: “Add to Journey”
 
-The following stay outside the current File Uploads V1 scope:
+Center Canvas (Journey Steps)
+•	Displays forms as vertical step cards
+•	Each form = one step
+•	Steps are:
+o	Ordered top → bottom
+o	Reorderable via drag & drop
+Example:
+[ Form A ]
+[ Form B ]
+[ Form C ]
+👉 No free positioning
+👉 No arrows or connections
 
-+ Major
-- export logs to CSV
-- Signature add on as an item to forms = saved with detailed and served as an electornic signature / or create pdf with signatured
-- Form Journey, two column page, on eleft forms name, on right attibutesm , each arrtibute can call to new form. If so its automatically created on cavs with arrow
-+ Minor 
-- richer submission filters
-- chained logic based on prior prefill or submit outcomes
-- more advanced post-submit navigation options (part of journey)
-- more advanced verification and secure access flows (part of Hourney)
-- broader admin and commercial control tooling
+Right Panel (Step Configuration)
+When selecting a step, user configures:
 
----
+1. Next Step Behavior
+Default:
+•	“Go to next step”
+Optional:
+•	Override next step:
+o	Select another form
 
-## Rule
+2. Conditional Routing (Optional)
+User can define simple rules:
+Example:
+•	If Country = Israel → go to Form C
+•	Else → go to Form D
+Structure:
+•	Field
+•	Condition
+•	Value
+•	Target form
+👉 Conditions are defined inside the step
+👉 No separate “decision elements”
 
-Do not quietly pull these items into Pro V1 implementation.
+3. Data Passing (Prefill)
+Label:
+“Prefill next form” / “Pass data forward”
+Default:
+•	Automatic mapping of matching fields
+Optional:
+•	Editable field mapping:
+o	Source field → Target field
 
-If one of them becomes necessary, it should be re-evaluated as a deliberate scope expansion rather than an accidental addition.
+UX Principles
+•	Linear by default (works immediately)
+•	Logic is optional (progressive complexity)
+•	No technical language (no input/output, no flows)
+•	No visual flow diagrams
+•	All behavior configured per step (right panel)
+
+User Mental Model
+1.	Add forms
+2.	Arrange order
+3.	Click a step → define what happens next
+👉 That’s the entire experience
+
+Positioning
+This is NOT like Salesforce Flow Builder
+It is:
+A simple way to build connected form journeys
+
+What this enables
+•	Multi-step processes
+•	Smart routing between forms
+•	Seamless user experience with prefilled data
+•	Powerful behavior without complexity
+
+Final Guiding Rule
+If it feels like building a “flow” → it’s too complex
+If it feels like defining “next steps” → it’s correct
+
+If you want, next step I can turn this into:
+•	a Codex-ready spec (tasks + components)
+•	or a very concrete right-panel field list so implementation is fast and clean
+•	

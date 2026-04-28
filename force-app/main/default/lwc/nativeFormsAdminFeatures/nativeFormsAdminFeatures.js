@@ -75,7 +75,10 @@ export default class NativeFormsAdminFeatures extends LightningElement {
     }
 
     async loadConnectionStatus() {
-        const status = await getConnectionStatus({ orgId: null });
+        const status = await getConnectionStatus({
+            orgId: null,
+            verifyTenantAuthNow: false
+        });
         if (status?.success !== true) {
             throw new Error(status?.errorMessage || 'Unable to load TwinaForms connection status.');
         }
@@ -216,7 +219,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
         this.errorMessage = '';
         try {
             const settings = await saveFeatureSettings({
-                inputValue: {
+                inputJson: JSON.stringify({
                     enableProConditionLogic: this.enableProConditionLogic,
                     enableProRepeatGroups: this.enableProRepeatGroups,
                     enableProPrefillAliasReferences: this.enableProPrefillAliasReferences,
@@ -225,7 +228,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
                     enableProPostSubmitAutoLink: this.enableProPostSubmitAutoLink,
                     enableProSfSecretCodeAuth: this.enableProSfSecretCodeAuth,
                     enableProLoadFile: this.enableProLoadFile
-                }
+                })
             });
             this.enableProConditionLogic = !!settings?.enableProConditionLogic;
             this.enableProRepeatGroups = !!settings?.enableProRepeatGroups;

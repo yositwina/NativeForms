@@ -279,7 +279,7 @@ export default class NativeFormsThemes extends LightningElement {
         }
         this.isLoading = true;
         try {
-            const saved = await saveTheme({ inputValue: this.draft });
+            const saved = await saveTheme({ inputJson: JSON.stringify(this.draft) });
             this.selectedThemeId = saved.id;
             await this.loadWorkspace(saved.id);
             this.showToast('Theme saved', 'Theme settings were updated.', 'success');

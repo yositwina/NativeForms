@@ -305,13 +305,13 @@ export default class NativeFormsBuilder extends LightningElement {
         try {
             const configJson = this.buildConfigJson();
             await updateElement({
-                inputValue: {
+                inputJson: JSON.stringify({
                     id: this.draftElement.id,
                     label: this.draftElement.label,
                     fieldKey: this.draftElement.fieldKey,
                     configJson,
                     elementType: this.draftElement.elementType
-                }
+                })
             });
             await this.loadWorkspace(this.selectedVersionId);
             const refreshed = this.elements.find((item) => item.id === this.selectedElementId);

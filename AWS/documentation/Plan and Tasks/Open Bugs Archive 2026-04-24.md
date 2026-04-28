@@ -1,0 +1,120 @@
+# Open Bugs Archive 2026-04-24
+
+Archived from the previous running tracker so the team can start a shorter current list without losing history.
+
+# Bug Tracker
+- delete form (done)
+- fomrula uncjec does nto work (done)
+
+
+## Open
+- [ ] BUG-001 Add hints
+  - Status: Open
+  - Severity: Medium
+  - Area: SF user pages 
+  - File: 
+  - Description: Add hints how to use the system.
+  - Actual: Partial
+  - Notes: keep simple
+
+- [X] BUG-002 error messgae on fail submit form
+  - Status: Solved
+  - Severity: High
+  - Area: Submit-lambda
+  - File: lambda/submit/index.mjs
+  - Description:  Error fils shoud be clear , we need to define set of error messages i.e Authenication not set up, subscription end, faile to deploy to sf fields not matched.  we need to discuss this feature
+  - Example : Query failed. Status: 400. Body: [{"message":"\nContact WHERE Email = liam.carter@example.com ORDER BY CreatedDate\n ^\nERROR at Row:1:Column:54\nunexpected token: '@'","errorCode":"MALFORMED_QUERY"}]
+  - Example : Token refresh failed. Status: 400. Body: {"error":"invalid_client_id","error_description":"client identifier invalid"} Reference: NF-20260414125612-9583FB
+  - Example : update command 'submitAction1' requires id or fields.Id Reference: NF-20260414133051-08BF01
+  - Example : Update failed. Status: 404. Body: [{"errorCode":"NOT_FOUND","message":"Provided external ID field does not exist or is not accessible: 1222222"}] Reference: NF-20260415130212-970924
+  - Expected friendly message : We could not match the submitted record in Salesforce. Please check the form mapping or contact support.
+  - Example : Update failed. Status: 400. Body: [{"message":"Cannot deserialize instance of date from VALUE_STRING value or request may be missing a required field at [line:1, column:16]","errorCode":"JSON_PARSER_ERROR"}] Reference: NF-20260415130755-3EE40D
+  - Expected friendly message : One of the date values in this form is not in a valid format. Please review the date field and try again.
+  - Actual:
+    - Published runtime now shows customer-safe primary error messages instead of leading with raw backend or Salesforce text.
+    - Submit failures are bucketed into clearer product-facing messages, with technical detail treated as secondary troubleshooting information.
+  
+- [X] BUG-003 NF themes Object fiels deiplays
+  - Status: Solved
+  - Severity: High
+  - Area: nativeForms Admin app
+  - File:
+  - Description: on NF Theme object plesae add on page layot to show al lfields, currently no field is shown
+  - Actual: 
+
+[ ] BUG-004 Publish failed
+- Severity: High
+- Description: when external credential are not set correctly by user on Permission set he get teh below error insteasd of a simple mssage youe external credentail are not set correctly (and instructions what to do) 
+System.CalloutException: We couldn't access the credential(s). You might not have the required permissions, or the external credential "NativeFormsLambdaAuth" might not exist. @ Class.NativeFormsAwsClient.presignHtml: line 48, column 1
+
+
+[X] BUG-005 Pudblish Link
+- Severity: High
+- Type: feature
+- Description: On Designer Page Once a Form is publishes,If this version is selected teh link to teh form should appear (near teh wording "This published version is read-only. Publish creates a new draft copy for continued editing."
+
+[X] Bug 006 NativeForm Connect Page
+- Status: Solved
+- Actual:
+  - Updated connect-page wording and layout text.
+  - Tenant secret is shown in the UI for 5 minutes only.
+  - After 5 minutes the page stops showing the code and tells the user to use the admin email inbox.
+- text cahnges below, keep bold part bold as today
+Finish NativeForms Setup  --> You need to finish NativeForms Setup ,please gollow below instructions (in bold)
+
+Open the
+NativeForms Admin
+permission set in Salesforce Setup and assign it to the admins who will manage the app.
+ --> 
+Open the NativeForms Admin 
+permission set in Salesforce Setup and assign it to the admins who will manage the app.
+In that permission set, open External Credential Principal Access
+
+Open
+External Client App Manager
+
+and choose the
+NativeForms
+
+app. Go to the
+Settings
+
+tab, then under
+OAuth Settings
+
+click the button to view the
+Consumer Key
+
+and
+Consumer Secret 
+-->
+Open  External Client App Manager
+
+and choose the NativeForms
+
+app. Go to the Settings
+
+tab, then under OAuth Settings
+
+click the button to view the Consumer Key
+and
+Consumer Secret
+
+- Tenant Secret Code
+
+oUo_ZuXUW3jIUQgQ-jehIo5oyXhLiQfa7sXmLdT-TQY
+plese delete the code after 5 minutes and nevert show it again 9add text that explain this), teh code is in teh email box of admin
+
+- [X] BUG-007 Repeat group new contact/new case relation missing
+  - Status: Solved
+  - Severity: High
+  - Area: Submit lambda / repeat group submit
+  - File: `AWS/NativeForms-SubmitForm.mjs`
+  - Description: When a repeat-group form is submitted with no existing Contact and no existing Cases, and the user enters new contact details and adds one new Case row, the submit succeeds but the created Case is not related to the newly created Contact.
+  - Repro:
+  - Open the demo repeat-group form with no matching prefill data.
+  - Enter new contact details.
+  - Add one new case row with Subject and Priority.
+  - Submit the form.
+  - Actual: Solved in the demo repeat-group flow after the submit mapping was updated to use the created Contact id when present.
+  - Expected: If submit creates a new Contact in the same flow, new Case rows in the repeat group should be created with `ContactId` pointing to that created Contact.

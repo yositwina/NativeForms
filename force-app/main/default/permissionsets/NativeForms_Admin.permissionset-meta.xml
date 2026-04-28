@@ -1,26 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Support and debug access for the separate TwinaForms Admin app and raw package objects.</description>
+    <description>Support and debug access for the gated admin area inside the main TwinaForms app and raw package objects.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>TwinaForms Admin</label>
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>NativeFormsBootstrap-NativeFormsBootstrapPrincipal</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>NativeFormsLambdaAuth-NativeFormsSharedSecret</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
-
     <applicationVisibilities>
         <application>NativeForms</application>
         <visible>true</visible>
     </applicationVisibilities>
-    <applicationVisibilities>
-        <application>NativeForms_Admin</application>
-        <visible>true</visible>
-    </applicationVisibilities>
-
     <classAccesses>
         <apexClass>NativeFormsAdminController</apexClass>
         <enabled>true</enabled>
@@ -648,30 +634,30 @@
     </tabSettings>
     <tabSettings>
         <tab>NF_Project__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
     <tabSettings>
         <tab>NF_Form__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
     <tabSettings>
         <tab>NF_Form_Version__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
     <tabSettings>
         <tab>NF_Form_Element__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
     <tabSettings>
         <tab>NF_Form_Action__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
     <tabSettings>
         <tab>NF_Form_Publication__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
     <tabSettings>
         <tab>NF_Theme__c</tab>
-        <visibility>Visible</visibility>
+        <visibility>None</visibility>
     </tabSettings>
 </PermissionSet>

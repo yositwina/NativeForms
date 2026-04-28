@@ -562,24 +562,55 @@ Example:
 
 ---
 
-## 15. Usage Enforcement - Later
+## 15. Usage Enforcement
 
-Do not build full enforcement first.
+Plan limits are managed in AWS and enforced at the platform edge that owns the action.
 
-But this model should support it later.
+### Form creation enforcement
 
-### Examples of future enforcement
+`effectiveLimits.maxForms` is enforced in Salesforce when an admin creates a form from Designer.
 
-- stop new form creation if `activeFormsCount >= effectiveLimits.maxForms`
+- `maxForms = null` means unlimited.
+- The Salesforce enforcement count is the number of local `NF_Form__c` records in the org.
+- The check runs before inserting a new `NF_Form__c`.
+- The Designer should warn and link to upgrade when the org is at the limit.
+- Apex must still enforce the limit because client-side state can be stale.
+- If AWS entitlements cannot be loaded, Salesforce should allow form creation rather than blocking customers because of a temporary service/connectivity issue.
+
+Customer-facing limit message:
+
+`You have reached your plan limit for forms. Upgrade your plan or remove an existing form before creating a new one.`
+
+### Other enforcement examples
+
 - stop form submission if `submissionsMonth >= effectiveLimits.maxSubmissionsPerMonth`
 - hide or block Pro features if `effectiveFeatureFlags.<flag> = false`
 
 ### Important design note
 
-The admin app should **manage** limits first.
-Runtime lambdas and UI should **enforce** limits later.
+AWS/Admin Console can report published/runtime form usage separately, but Salesforce Designer creation enforcement uses local `NF_Form__c` count because draft forms also consume customer workspace capacity.
 
-This phased approach is much safer.
+### Form delete / unpublish behavior
+
+Deleting a form from Designer is a destructive workspace action and should also disable the public runtime for that form.
+
+- The action is initiated from `Form Settings > Danger Zone`.
+- The admin must confirm by typing the form name or form key.
+- Salesforce deletes the Designer form definition:
+  - `NF_Form__c`
+  - child versions
+  - child elements
+  - child Prefill/Submit actions
+  - related publish records
+- AWS disables public runtime access:
+  - the form security record is marked `unpublished`
+  - if the generated HTML key is known, the hosted page is replaced with a small unavailable page
+- Historical submission logs are not deleted. They remain governed by the existing plan retention policy.
+- If AWS runtime disable fails for a published form, Salesforce should block the delete so a live public form is not orphaned.
+
+Customer-facing delete warning:
+
+`This permanently deletes the form from Designer, including versions, fields, Prefill actions, and Submit actions. Published links will stop working. Existing submission logs are kept according to your plan retention settings. This cannot be undone.`
 
 ---
 

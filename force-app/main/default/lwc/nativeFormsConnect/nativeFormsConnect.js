@@ -2,17 +2,13 @@ import { LightningElement } from 'lwc';
 import getSetupContext from '@salesforce/apex/NativeFormsSetupController.getSetupContext';
 import getConnectionStatus from '@salesforce/apex/NativeFormsSetupController.getConnectionStatus';
 import registerOrg from '@salesforce/apex/NativeFormsSetupController.registerOrg';
-import saveClientCredentials from '@salesforce/apex/NativeFormsSetupController.saveClientCredentials';
 import getAccessManagementView from '@salesforce/apex/NativeFormsHomeController.getAccessManagementView';
 import updatePermissionSetAccess from '@salesforce/apex/NativeFormsHomeController.updatePermissionSetAccess';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import step3Image from '@salesforce/resourceUrl/nativeFormsConnectStep3';
 
 const CONNECT_STATE_KEY = 'nativeforms:connectState';
 const TENANT_SECRET_VISIBLE_MS = 5 * 60 * 1000;
 const CONNECTION_POLL_MS = 5000;
-const STEP1_PLACEHOLDER_CLIENT_ID = 'nativeforms-step1-placeholder-client-id';
-const STEP1_PLACEHOLDER_CLIENT_SECRET = 'nativeforms-step1-placeholder-client-secret';
 
 export default class NativeFormsConnect extends LightningElement {
     connectVersion = 'v2.7';
@@ -20,8 +16,6 @@ export default class NativeFormsConnect extends LightningElement {
     adminEmail = '';
     companyName = '';
     loginBaseUrl = '';
-    salesforceClientId = '';
-    salesforceClientSecret = '';
     subscriptionState = 'trial';
     subscriptionStartDate = '';
     subscriptionEndDate = '';
@@ -37,7 +31,6 @@ export default class NativeFormsConnect extends LightningElement {
     successMessage = '';
     isBusy = false;
     isInitializing = true;
-    showPrincipalAccessHelp = false;
     hasBlockingSetupAccessIssue = false;
     tenantAuthVerified = false;
     tenantAuthStatus = 'not_checked';
@@ -53,9 +46,6 @@ export default class NativeFormsConnect extends LightningElement {
     isUpdatingAccess = false;
     selectedUserGrantId = '';
     selectedAdminGrantId = '';
-    expandedImageSections = {
-        step3: false
-    };
 
     connectedCallback() {
         const today = new Date();
@@ -83,7 +73,7 @@ export default class NativeFormsConnect extends LightningElement {
             this.state = context.state || '';
             this.city = context.city || '';
             this.restoreConnectState(this.orgId);
-            await this.loadConnectionStatus();
+            await this.loadConnectionStatus(false);
             await this.loadAccessSummary();
         } catch (error) {
             this.errorMessage = `Unable to load org setup details.\n\n${this.formatError(error)}`;
@@ -129,7 +119,6 @@ export default class NativeFormsConnect extends LightningElement {
             normalized.includes('permission-set access') ||
             normalized.includes('permission set access');
 
-        this.showPrincipalAccessHelp = isPrincipalAccessIssue;
         this.hasBlockingSetupAccessIssue = isPrincipalAccessIssue;
 
         if (isPrincipalAccessIssue) {
@@ -137,10 +126,6 @@ export default class NativeFormsConnect extends LightningElement {
         }
 
         return rawMessage;
-    }
-
-    get step3ImageUrl() {
-        return step3Image;
     }
 
     get hasTenantSecret() {
@@ -201,10 +186,6 @@ export default class NativeFormsConnect extends LightningElement {
 
     get showOauthCompleteBanner() {
         return this.isConnected;
-    }
-
-    get showOauthCredentialsForm() {
-        return this.showOauthStage && !this.isAwaitingOauthReturn;
     }
 
     get showConnectAction() {
@@ -300,7 +281,7 @@ export default class NativeFormsConnect extends LightningElement {
     }
 
     get showAccessSection() {
-        return this.accessUsers.length > 0;
+        return this.isConnected && this.accessUsers.length > 0;
     }
 
     get userAssignments() {
@@ -395,34 +376,12 @@ export default class NativeFormsConnect extends LightningElement {
         await this.changeAccess(userId, accessType, enabled, successToastMessage);
     }
 
-    handleToggleImage(event) {
-        const section = event.target.dataset.section;
-        if (!section) {
-            return;
-        }
-
-        this.expandedImageSections = {
-            ...this.expandedImageSections,
-            [section]: !this.expandedImageSections[section]
-        };
-    }
-
-    get showStep3Image() {
-        return this.expandedImageSections.step3;
-    }
-
-    get step3ImageButtonLabel() {
-        return this.showStep3Image ? 'Hide example image' : 'Show example image';
-    }
-
     buildRegistrationPayload() {
         return {
             orgId: this.orgId,
             adminEmail: this.adminEmail,
             companyName: this.companyName,
             loginBaseUrl: this.loginBaseUrl,
-            salesforceClientId: this.salesforceClientId || STEP1_PLACEHOLDER_CLIENT_ID,
-            salesforceClientSecret: this.salesforceClientSecret || STEP1_PLACEHOLDER_CLIENT_SECRET,
             subscriptionState: this.subscriptionState,
             subscriptionStartDate: this.subscriptionStartDate || null,
             subscriptionEndDate: this.subscriptionEndDate || null,
@@ -434,28 +393,18 @@ export default class NativeFormsConnect extends LightningElement {
         };
     }
 
-    buildClientCredentialsPayload() {
-        return {
-            orgId: this.orgId,
-            adminEmail: this.adminEmail,
-            companyName: this.companyName,
-            loginBaseUrl: this.loginBaseUrl,
-            salesforceClientId: this.salesforceClientId,
-            salesforceClientSecret: this.salesforceClientSecret
-        };
-    }
-
     async handleGenerateSecret() {
         this.errorMessage = '';
         this.successMessage = '';
         this.tenantTestMessage = '';
         this.tenantTestMessageVariant = '';
-        this.showPrincipalAccessHelp = false;
         this.hasBlockingSetupAccessIssue = false;
         this.isBusy = true;
 
         try {
-            const data = await registerOrg({ requestBody: this.buildRegistrationPayload() });
+            const data = await registerOrg({
+                requestJson: JSON.stringify(this.buildRegistrationPayload())
+            });
 
             if (!data?.success) {
                 throw new Error(data?.errorMessage || 'TwinaForms registration failed.');
@@ -483,7 +432,7 @@ export default class NativeFormsConnect extends LightningElement {
         this.tenantTestMessageVariant = '';
 
         try {
-            await this.loadConnectionStatus();
+            await this.loadConnectionStatus(true);
 
             if (this.tenantSetupComplete) {
                 this.tenantTestMessage = 'Tenant secret verified. You can continue to Step 2.';
@@ -500,27 +449,17 @@ export default class NativeFormsConnect extends LightningElement {
     async handleConnect() {
         this.errorMessage = '';
         this.successMessage = '';
-        this.showPrincipalAccessHelp = false;
         this.hasBlockingSetupAccessIssue = false;
         this.isBusy = true;
         const oauthWindow = window.open('', '_blank');
 
         try {
-            const data = await saveClientCredentials({ requestBody: this.buildClientCredentialsPayload() });
-
-            if (!data?.success) {
-                throw new Error(data?.errorMessage || 'TwinaForms could not save the Salesforce client credentials.');
-            }
-
-            this.connectUrl = data.connectUrl || '';
-            this.hasClientCredentials = true;
-
             if (!this.connectUrl) {
                 throw new Error('TwinaForms could not generate a Salesforce connection URL.');
             }
 
             this.isAwaitingOauthReturn = true;
-            this.successMessage = 'Salesforce client credentials saved. Finish authentication in the Salesforce window, then return here.';
+            this.successMessage = 'Finish authentication in the Salesforce window, then return here.';
             this.persistConnectState();
             this.startConnectionPolling();
             if (oauthWindow) {
@@ -543,7 +482,7 @@ export default class NativeFormsConnect extends LightningElement {
         this.errorMessage = '';
 
         try {
-            await this.loadConnectionStatus();
+            await this.loadConnectionStatus(false);
             await this.loadAccessSummary();
         } finally {
             this.isBusy = false;
@@ -578,9 +517,12 @@ export default class NativeFormsConnect extends LightningElement {
         }
     }
 
-    async loadConnectionStatus() {
+    async loadConnectionStatus(verifyTenantAuth = false) {
         try {
-            const status = await getConnectionStatus({ orgId: this.orgId });
+            const status = await getConnectionStatus({
+                orgId: this.orgId,
+                verifyTenantAuthNow: verifyTenantAuth
+            });
             if (status?.success !== true) {
                 this.tenantAuthVerified = false;
                 this.tenantAuthStatus = 'not_verified';
@@ -598,7 +540,8 @@ export default class NativeFormsConnect extends LightningElement {
             this.setupState = status.setupState || 'not_registered';
             this.connectUrl = status.connectUrl || '';
             this.hasClientCredentials = status.hasClientCredentials === true;
-            this.tenantAuthVerified = status.tenantAuthVerified === true;
+            const tenantAuthWasAlreadyVerified = this.tenantAuthVerified === true && status.tenantAuthStatus === 'not_checked';
+            this.tenantAuthVerified = tenantAuthWasAlreadyVerified || status.tenantAuthVerified === true;
             this.tenantAuthStatus = status.tenantAuthStatus || 'not_checked';
             this.tenantAuthErrorMessage = status.tenantAuthErrorMessage || '';
 

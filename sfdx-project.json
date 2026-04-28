@@ -1,12 +1,27 @@
 {
   "packageDirectories": [
     {
+      "versionName": "ver 0.1",
+      "versionNumber": "0.1.0.NEXT",
       "path": "force-app",
-      "default": true
+      "default": true,
+      "package": "TwinaForms",
+      "versionDescription": ""
     }
   ],
-  "name": "NativeForms",
-  "namespace": "",
+  "name": "twinaforms",
+  "namespace": "twinaforms",
   "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "64.0"
+  "sourceApiVersion": "64.0",
+  "packageAliases": {
+    "TwinaForms": "0HogL0000002CUvSAM",
+    "TwinaForms@0.1.0-1": "04tgL000000EDF7QAO",
+    "TwinaForms@0.1.0-2": "04tgL000000EDILQA4",
+    "TwinaForms@0.1.0-3": "04tgL000000EF8rQAG",
+    "TwinaForms@0.1.0-4": "04tgL000000ELHVQA4",
+    "TwinaForms@0.1.0-5": "04tgL000000ELarQAG",
+    "TwinaForms@0.1.0-6": "04tgL000000ELm9QAG",
+    "TwinaForms@0.1.0-7": "04tgL000000ELuDQAW",
+    "TwinaForms@0.1.0-8": "04tgL000000ENMXQA4"
+  }
 }

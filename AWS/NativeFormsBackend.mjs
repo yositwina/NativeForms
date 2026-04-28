@@ -26,6 +26,9 @@ const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
+const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
+const SALESFORCE_OAUTH_CLIENT_ID = process.env.SALESFORCE_OAUTH_CLIENT_ID || "";
+const SALESFORCE_OAUTH_CLIENT_SECRET = process.env.SALESFORCE_OAUTH_CLIENT_SECRET || "";
 const SES_FROM = process.env.SES_FROM || "";
 const DEV_MODE = String(process.env.DEV_MODE || "").toLowerCase() === "true";
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "";
@@ -64,11 +67,17 @@ const FEATURE_FLAG_METADATA = {
     label: "File Uploads",
     description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
+  enableProCustomJs: {
+    label: "Custom JavaScript",
+    description: "Run supported TwinaForms custom JavaScript in published forms for advanced behavior."
+  },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
     description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."
   }
 };
+
+let cachedSalesforceOAuthClientCredentials = null;
 
 const DEFAULT_PLANS = [
   {
@@ -91,7 +100,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
-      enableProLoadFile: false
+      enableProLoadFile: false,
+      enableProCustomJs: false
     }
   },
   {
@@ -114,7 +124,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
-      enableProLoadFile: true
+      enableProLoadFile: true,
+      enableProCustomJs: true
     }
   },
   {
@@ -137,7 +148,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
-      enableProLoadFile: false
+      enableProLoadFile: false,
+      enableProCustomJs: false
     }
   },
   {
@@ -160,7 +172,8 @@ const DEFAULT_PLANS = [
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
-      enableProLoadFile: true
+      enableProLoadFile: true,
+      enableProCustomJs: true
     }
   }
 ];
@@ -212,6 +225,50 @@ async function getSalesforceConnection(secretName) {
 
 function getSalesforceConnectionSecretName(orgId) {
   return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${normalizeOrgId(orgId)}`;
+}
+
+function stripLegacySalesforceClientCredentials(connectionRecord) {
+  if (!connectionRecord || typeof connectionRecord !== "object") {
+    return {};
+  }
+
+  const { client_id, client_secret, ...safeConnectionRecord } = connectionRecord;
+  return safeConnectionRecord;
+}
+
+async function getSalesforceOAuthClientCredentials() {
+  if (cachedSalesforceOAuthClientCredentials) {
+    return cachedSalesforceOAuthClientCredentials;
+  }
+
+  let clientId = String(SALESFORCE_OAUTH_CLIENT_ID || "").trim();
+  let clientSecret = String(SALESFORCE_OAUTH_CLIENT_SECRET || "").trim();
+
+  if ((!clientId || !clientSecret) && SALESFORCE_OAUTH_CLIENT_SECRET_NAME) {
+    const secretValue = await getSalesforceConnection(SALESFORCE_OAUTH_CLIENT_SECRET_NAME);
+    clientId = clientId || String(secretValue?.client_id || secretValue?.clientId || "").trim();
+    clientSecret = clientSecret || String(secretValue?.client_secret || secretValue?.clientSecret || "").trim();
+  }
+
+  if (!clientId || !clientSecret) {
+    throw new Error("TwinaForms Salesforce OAuth client credentials are not configured in AWS.");
+  }
+
+  cachedSalesforceOAuthClientCredentials = {
+    clientId,
+    clientSecret
+  };
+  return cachedSalesforceOAuthClientCredentials;
+}
+
+async function hasSalesforceOAuthClientCredentials() {
+  try {
+    await getSalesforceOAuthClientCredentials();
+    return true;
+  } catch (error) {
+    console.warn("Salesforce OAuth client credentials are not configured:", error.message);
+    return false;
+  }
 }
 
 function jsonResponse(statusCode, payload) {
@@ -672,7 +729,8 @@ function hasAdvancedProFeatures(featureFlags) {
     "enableProFormulaFields",
     "enableProPostSubmitAutoLink",
     "enableProSfSecretCodeAuth",
-    "enableProLoadFile"
+    "enableProLoadFile",
+    "enableProCustomJs"
   ].some((key) => featureFlags?.[key] === true);
 }
 
@@ -1237,8 +1295,6 @@ function validateClientCredentialsPayload(payload) {
   if (!payload?.adminEmail) throw new Error("Missing required field: adminEmail");
   if (!payload?.companyName) throw new Error("Missing required field: companyName");
   if (!payload?.loginBaseUrl) throw new Error("Missing required field: loginBaseUrl");
-  if (!payload?.salesforceClientId) throw new Error("Missing required field: salesforceClientId");
-  if (!payload?.salesforceClientSecret) throw new Error("Missing required field: salesforceClientSecret");
 }
 
 function validateFormSecurityPayload(payload) {
@@ -1285,6 +1341,12 @@ function validatePublishPresignPayload(payload) {
   if (!payload?.fileName) throw new Error("Missing required field: fileName");
 }
 
+function validateFormUnpublishPayload(payload) {
+  if (!payload?.orgId) throw new Error("Missing required field: orgId");
+  if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
+  if (!payload?.formId) throw new Error("Missing required field: formId");
+}
+
 function validateUploadInitPayload(payload) {
   if (!payload?.formId) throw new Error("Missing required field: formId");
   if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
@@ -1303,10 +1365,6 @@ function buildTenantSetupState(tenantRecord, connectionRecord) {
   const isConnected = tenantRecord.salesforceConnectionStatus === "connected" && hasRefreshToken && hasInstanceUrl;
 
   return isConnected ? "connected" : "registered_pending_connection";
-}
-
-function hasStoredClientCredentials(connectionRecord) {
-  return !!connectionRecord?.client_id && !!connectionRecord?.client_secret;
 }
 
 function sanitizeKeyPart(value) {
@@ -1335,6 +1393,67 @@ function buildPublishKey(companySlug, formSlug) {
   const safeCompanySlug = slugifyPublicSegment(companySlug, "company");
   const safeFormSlug = slugifyPublicSegment(formSlug, "form");
   return `${safeCompanySlug}/${safeFormSlug}`;
+}
+
+function extractPublishedKey(generatedHtmlRef) {
+  const rawValue = String(generatedHtmlRef || "").trim();
+  if (!rawValue) return null;
+
+  if (PUBLIC_BASE_URL && rawValue.startsWith(`${PUBLIC_BASE_URL}/`)) {
+    return decodeURIComponent(rawValue.substring(PUBLIC_BASE_URL.length + 1));
+  }
+
+  if (/^https?:\/\//i.test(rawValue)) {
+    try {
+      return decodeURIComponent(new URL(rawValue).pathname.replace(/^\/+/, ""));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  return rawValue.replace(/^\/+/, "");
+}
+
+function buildUnavailableFormHtml() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Form unavailable</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f7fbff; color: #10233f; }
+    main { min-height: 100vh; display: grid; place-items: center; padding: 2rem; }
+    section { max-width: 32rem; border: 1px solid #d8e5f4; border-radius: 1rem; background: #fff; padding: 2rem; box-shadow: 0 18px 60px rgba(16, 35, 63, 0.08); }
+    h1 { margin: 0 0 0.75rem; font-size: 1.5rem; }
+    p { margin: 0; line-height: 1.5; color: #526582; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>This form is no longer available</h1>
+      <p>The TwinaForms form you opened has been unpublished or deleted by the form owner.</p>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+async function replacePublishedFormWithUnavailablePage(generatedHtmlRef) {
+  const key = extractPublishedKey(generatedHtmlRef);
+  if (!PUBLISH_BUCKET || !key) {
+    return false;
+  }
+
+  await s3Client.send(new PutObjectCommand({
+    Bucket: PUBLISH_BUCKET,
+    Key: key,
+    ContentType: "text/html; charset=utf-8",
+    Body: buildUnavailableFormHtml()
+  }));
+
+  return true;
 }
 
 async function ensureTenantCompanySlug(orgId, tenantRecord) {
@@ -1419,20 +1538,21 @@ export const handler = async (event) => {
       };
     }
 
-    const tenantConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
-    const clientId = tenantConnection?.client_id;
     const redirectUri = process.env.SF_REDIRECT_URI;
     const loginUrl = tenantRecord.loginBaseUrl;
+    let clientId;
 
-    if (!clientId) {
+    try {
+      ({ clientId } = await getSalesforceOAuthClientCredentials());
+    } catch (error) {
       return {
-        statusCode: 400,
+        statusCode: 500,
         headers: { "Content-Type": "text/html" },
         body: `
           <html>
             <body style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Missing Salesforce Client Id</h2>
-              <p>Register the tenant with salesforceClientId and salesforceClientSecret before connecting.</p>
+              <h2>TwinaForms OAuth Client Is Not Configured</h2>
+              <p>${error.message}</p>
             </body>
           </html>
         `
@@ -1468,6 +1588,7 @@ export const handler = async (event) => {
       const tenantRecord = await getTenantRecord(orgId);
       const connectionRecord = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
       const setupState = buildTenantSetupState(tenantRecord, connectionRecord);
+      const oauthClientConfigured = await hasSalesforceOAuthClientCredentials();
 
       return jsonResponse(200, {
         success: true,
@@ -1476,7 +1597,8 @@ export const handler = async (event) => {
         setupState,
         connectUrl: tenantRecord && baseUrl ? `${baseUrl}/connect?orgId=${encodeURIComponent(orgId)}` : null,
         tenant: sanitizeTenantRecord(tenantRecord),
-        hasClientCredentials: hasStoredClientCredentials(connectionRecord),
+        hasClientCredentials: oauthClientConfigured,
+        oauthClientConfigured,
         hasRefreshToken: !!connectionRecord?.refresh_token,
         hasInstanceUrl: !!connectionRecord?.instance_url
       });
@@ -1647,7 +1769,7 @@ export const handler = async (event) => {
       const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
       if (existingConnection) {
         await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
-          ...existingConnection,
+          ...stripLegacySalesforceClientCredentials(existingConnection),
           orgId,
           loginBaseUrl: existingConnection.loginBaseUrl || tenantRecord.loginBaseUrl || null,
           refresh_token: null,
@@ -1754,18 +1876,20 @@ export const handler = async (event) => {
     const redirectUri = process.env.SF_REDIRECT_URI;
     const loginUrl = tenantRecord.loginBaseUrl;
     const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
-    const clientId = existingConnection?.client_id;
-    const clientSecret = existingConnection?.client_secret;
+    let clientId;
+    let clientSecret;
 
-    if (!clientId || !clientSecret) {
+    try {
+      ({ clientId, clientSecret } = await getSalesforceOAuthClientCredentials());
+    } catch (error) {
       return {
-        statusCode: 200,
+        statusCode: 500,
         headers: { "Content-Type": "text/html" },
         body: `
           <html>
             <body style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Missing Salesforce Client Credentials</h2>
-              <p>Tenant ${orgId} does not have a stored Salesforce client id and secret yet.</p>
+              <h2>TwinaForms OAuth Client Is Not Configured</h2>
+              <p>${error.message}</p>
             </body>
           </html>
         `
@@ -1810,11 +1934,11 @@ export const handler = async (event) => {
 
       const secretName = getSalesforceConnectionSecretName(orgId);
       const saveResult = await saveSalesforceConnection(secretName, {
-        ...(existingConnection || {}),
+        ...stripLegacySalesforceClientCredentials(existingConnection),
         orgId,
         loginBaseUrl: loginUrl,
-        client_id: clientId,
-        client_secret: clientSecret,
+        oauth_client_source: "twinaforms-global",
+        oauth_client_id_last4: clientId.slice(-4),
         refresh_token: tokenData.refresh_token || existingConnection?.refresh_token || null,
         instance_url: tokenData.instance_url || null,
         id_url: tokenData.id || null,
@@ -1926,17 +2050,11 @@ export const handler = async (event) => {
       };
 
       await saveItem(TENANT_TABLE, tenantRecord);
-      if (payload.salesforceClientId && payload.salesforceClientSecret) {
+      if (existingConnection?.client_id || existingConnection?.client_secret) {
         await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
-          ...(existingConnection || {}),
+          ...stripLegacySalesforceClientCredentials(existingConnection),
           orgId,
           loginBaseUrl: payload.loginBaseUrl,
-          client_id: payload.salesforceClientId,
-          client_secret: payload.salesforceClientSecret,
-          refresh_token: existingConnection?.refresh_token || null,
-          instance_url: existingConnection?.instance_url || null,
-          id_url: existingConnection?.id_url || null,
-          token_issued_at: existingConnection?.token_issued_at || null,
           updated_at: now
         });
       }
@@ -1991,11 +2109,9 @@ export const handler = async (event) => {
       const now = new Date().toISOString();
       const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
       await saveSalesforceConnection(getSalesforceConnectionSecretName(orgId), {
-        ...(existingConnection || {}),
+        ...stripLegacySalesforceClientCredentials(existingConnection),
         orgId,
         loginBaseUrl: payload.loginBaseUrl,
-        client_id: payload.salesforceClientId,
-        client_secret: payload.salesforceClientSecret,
         refresh_token: existingConnection?.refresh_token || null,
         instance_url: existingConnection?.instance_url || null,
         id_url: existingConnection?.id_url || null,
@@ -2067,6 +2183,57 @@ export const handler = async (event) => {
         tableName: FORM_SECURITY_TABLE,
         created: !existing,
         updated: !!existing,
+        record: sanitizeFormSecurityRecord(record)
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/forms/unpublish" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateFormUnpublishPayload(payload);
+      const orgId = normalizeOrgId(payload.orgId);
+      await requireTenantAuth(event?.headers, orgId);
+
+      const existing = await getFormSecurityRecord(payload.formId);
+      if (!existing) {
+        return jsonResponse(200, {
+          success: true,
+          found: false,
+          unpublished: false,
+          replacedHtml: false
+        });
+      }
+
+      if (normalizeOrgId(existing.orgId) !== orgId) {
+        const error = new Error("Form does not belong to this tenant.");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      const now = new Date().toISOString();
+      const replacedHtml = await replacePublishedFormWithUnavailablePage(existing.generatedHtmlRef);
+      const record = {
+        ...existing,
+        status: "unpublished",
+        unpublishedAt: existing.unpublishedAt || now,
+        updatedAt: now
+      };
+      await saveItem(FORM_SECURITY_TABLE, record);
+
+      return jsonResponse(200, {
+        success: true,
+        found: true,
+        unpublished: true,
+        replacedHtml,
         record: sanitizeFormSecurityRecord(record)
       });
     } catch (e) {
