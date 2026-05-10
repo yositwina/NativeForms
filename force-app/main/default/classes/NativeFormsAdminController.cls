@@ -47,9 +47,9 @@ public with sharing class NativeFormsAdminController {
         config.Enable_Pro_SF_Secret_Code_Auth__c = inputValue != null && inputValue.enableProSfSecretCodeAuth == true;
         config.Enable_Pro_Load_File__c = inputValue != null && inputValue.enableProLoadFile == true;
         if (config.Id == null) {
-            insert config;
+            insert as user config;
         } else {
-            update config;
+            update as user config;
         }
         return getFeatureSettings();
     }

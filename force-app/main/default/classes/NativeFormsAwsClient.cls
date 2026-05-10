@@ -1,7 +1,6 @@
 public with sharing class NativeFormsAwsClient {
     private static final Integer TIMEOUT_MS = 120000;
-    private static final String BASE_NC_NAME = 'NativeForms';
-    private static String cachedNc;
+    private static final String BACKEND_BASE_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws';
 
     public class PresignRequest {
         public String orgId;
@@ -24,35 +23,28 @@ public with sharing class NativeFormsAwsClient {
         public String error;
     }
 
-    @TestVisible
-    public static String namedCredentialName() {
-        if (cachedNc != null) {
-            return cachedNc;
-        }
-
-        String fullName = NativeFormsSetupController.class.getName();
-        Integer dot = fullName.indexOf('.');
-        String ns = dot > 0 ? fullName.substring(0, dot) : null;
-
-        cachedNc = String.isBlank(ns)
-            ? BASE_NC_NAME
-            : ns + '__' + BASE_NC_NAME;
-
-        return cachedNc;
+    public static String backendBaseUrl() {
+        return BACKEND_BASE_URL;
     }
 
-    @TestVisible
-    static void resetNamedCredentialCache() {
-        cachedNc = null;
+    public static String backendEndpoint(String path) {
+        String normalizedPath = String.isBlank(path) ? '/' : path.trim();
+        if (!normalizedPath.startsWith('/')) {
+            normalizedPath = '/' + normalizedPath;
+        }
+        return BACKEND_BASE_URL + normalizedPath;
     }
 
     public static PresignResponse presignHtml(PresignRequest requestBody) {
+        String path = '/forms/publish/presign';
+        String body = JSON.serialize(requestBody);
         HttpRequest request = new HttpRequest();
         request.setMethod('POST');
-        request.setEndpoint('callout:' + namedCredentialName() + '/forms/publish/presign');
+        request.setEndpoint(backendEndpoint(path));
         request.setHeader('Content-Type', 'application/json');
+        applyBootstrapV2Signature(request, 'POST', path, body);
         request.setTimeout(TIMEOUT_MS);
-        request.setBody(JSON.serialize(requestBody));
+        request.setBody(body);
 
         HttpResponse response = new Http().send(request);
         if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
@@ -82,12 +74,15 @@ public with sharing class NativeFormsAwsClient {
     }
 
     public static Map<String, Object> registerForm(Map<String, Object> requestBody) {
+        String path = '/forms/register';
+        String body = JSON.serialize(requestBody);
         HttpRequest request = new HttpRequest();
         request.setMethod('POST');
-        request.setEndpoint('callout:' + namedCredentialName() + '/forms/register');
+        request.setEndpoint(backendEndpoint(path));
         request.setHeader('Content-Type', 'application/json');
+        applyBootstrapV2Signature(request, 'POST', path, body);
         request.setTimeout(TIMEOUT_MS);
-        request.setBody(JSON.serialize(requestBody));
+        request.setBody(body);
 
         HttpResponse response = new Http().send(request);
         if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
@@ -98,12 +93,15 @@ public with sharing class NativeFormsAwsClient {
     }
 
     public static Map<String, Object> unpublishForm(Map<String, Object> requestBody) {
+        String path = '/forms/unpublish';
+        String body = JSON.serialize(requestBody);
         HttpRequest request = new HttpRequest();
         request.setMethod('POST');
-        request.setEndpoint('callout:' + namedCredentialName() + '/forms/unpublish');
+        request.setEndpoint(backendEndpoint(path));
         request.setHeader('Content-Type', 'application/json');
+        applyBootstrapV2Signature(request, 'POST', path, body);
         request.setTimeout(TIMEOUT_MS);
-        request.setBody(JSON.serialize(requestBody));
+        request.setBody(body);
 
         HttpResponse response = new Http().send(request);
         if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
@@ -111,5 +109,12 @@ public with sharing class NativeFormsAwsClient {
         }
 
         return (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
+    }
+
+    public static void applyBootstrapV2Signature(HttpRequest request, String method, String path, String body) {
+        Map<String, String> headers = NativeFormsBootstrapV2Signer.buildSignedHeaders(method, path, body);
+        for (String headerName : headers.keySet()) {
+            request.setHeader(headerName, headers.get(headerName));
+        }
     }
 }

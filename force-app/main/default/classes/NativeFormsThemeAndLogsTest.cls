@@ -4,50 +4,44 @@ private class NativeFormsThemeAndLogsTest {
 
     @TestSetup
     static void setupLogFixtures() {
-        NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Submission Form', null, SUBMISSION_FORM_KEY);
-        NF_Form_Version__c versionRecord = NativeFormsTestDataFactory.createVersion(
-            formRecord.Id,
-            1,
-            'Published',
-            'Published',
-            NativeFormsTestConfigFactory.basicUiSettingsJson()
-        );
-        NativeFormsTestDataFactory.createElement(
-            versionRecord.Id,
-            'text',
-            'Email Address',
-            'email1',
-            1,
-            10,
-            NativeFormsTestConfigFactory.textFieldConfigJson(),
-            null
-        );
-        NativeFormsTestDataFactory.createElement(
-            versionRecord.Id,
-            'repeatGroup',
-            'Case List',
-            'records1',
-            2,
-            20,
-            NativeFormsTestConfigFactory.repeatGroupConfigJson(),
-            null
-        );
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Submission Form', null, SUBMISSION_FORM_KEY);
+            NF_Form_Version__c versionRecord = NativeFormsTestDataFactory.createVersion(
+                formRecord.Id,
+                1,
+                'Published',
+                'Published',
+                NativeFormsTestConfigFactory.basicUiSettingsJson()
+            );
+            NativeFormsTestDataFactory.createElement(
+                versionRecord.Id,
+                'text',
+                'Email Address',
+                'email1',
+                1,
+                10,
+                NativeFormsTestConfigFactory.textFieldConfigJson(),
+                null
+            );
+            NativeFormsTestDataFactory.createElement(
+                versionRecord.Id,
+                'repeatGroup',
+                'Case List',
+                'records1',
+                2,
+                20,
+                NativeFormsTestConfigFactory.repeatGroupConfigJson(),
+                null
+            );
 
-        insert new NF_Submission_Log_Key__c(
-            Name = UserInfo.getOrganizationId().substring(0, 15),
-            Public_Key__c = base64Value('setup-public-key'),
-            Private_Key__c = base64Value('setup-private-key'),
-            Key_Version__c = 'v2'
-        );
-
-        Blob key = Crypto.generateAesKey(256);
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        if (config == null) {
-            config = new NativeForms_Config__c(SetupOwnerId = UserInfo.getOrganizationId());
-            insert config;
+            NativeFormsSubmissionLogsController.saveSubmissionLogKeyPair(
+                base64Value('setup-public-key'),
+                base64Value('setup-private-key'),
+                'v2'
+            );
+            NativeFormsBootstrapV2Signer.getOrCreateSigningSecretB64();
         }
-        config.Submission_Log_Key__c = EncodingUtil.base64Encode(key);
-        upsert config;
     }
 
     private static String base64Value(String value) {
@@ -110,6 +104,7 @@ private class NativeFormsThemeAndLogsTest {
 
     @IsTest
     static void themesWorkspaceCrudAndEnsureSamplesWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsThemesController.ThemeWorkspace emptyWorkspace =
             NativeFormsThemesController.getWorkspace(null);
         System.assertEquals(0, emptyWorkspace.themes.size());
@@ -185,10 +180,12 @@ private class NativeFormsThemeAndLogsTest {
 
         NativeFormsThemesController.deleteTheme(cloneTheme.id);
         System.assertEquals(0, [SELECT COUNT() FROM NF_Theme__c WHERE Id = :cloneTheme.id]);
+        }
     }
 
     @IsTest
     static void themesUploadAndValidationGuardsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Theme__c themeRecord = NativeFormsTestDataFactory.createTheme('Logo Theme');
 
         try {
@@ -238,10 +235,12 @@ private class NativeFormsThemeAndLogsTest {
         ];
         System.assertEquals(uploadResult.previewUrl, persistedTheme.Logo_URL__c);
         System.assertEquals(String.valueOf(uploadResult.contentDocumentId), persistedTheme.Logo_Content_Document_Id__c);
+        }
     }
 
     @IsTest
     static void submissionLogStatusAndSaveKeyPairWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Test.setMock(
             HttpCalloutMock.class,
             new NativeFormsAwsMockFactory.RoutingMock()
@@ -276,18 +275,21 @@ private class NativeFormsThemeAndLogsTest {
         System.assertEquals('v2', savedStatus.keyVersion);
 
         NF_Submission_Log_Key__c savedKeyRecord = [
-            SELECT Public_Key__c, Private_Key__c, Key_Version__c
+            SELECT Public_Key__c, Sealed_Log_Data__c, Key_Version__c
             FROM NF_Submission_Log_Key__c
             WHERE Name = :UserInfo.getOrganizationId().substring(0, 15)
             LIMIT 1
         ];
         System.assertEquals(base64Value('public-key'), savedKeyRecord.Public_Key__c);
-        System.assertEquals(base64Value('private-key'), savedKeyRecord.Private_Key__c);
+        System.assertNotEquals(base64Value('private-key'), savedKeyRecord.Sealed_Log_Data__c);
+        System.assert(String.isNotBlank(savedKeyRecord.Sealed_Log_Data__c));
         System.assertEquals('v2', savedKeyRecord.Key_Version__c);
+        }
     }
 
     @IsTest
     static void submissionLogSyncAndStatusFailureFlowsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Test.setMock(
             HttpCalloutMock.class,
             new NativeFormsAwsMockFactory.RoutingMock()
@@ -303,10 +305,12 @@ private class NativeFormsThemeAndLogsTest {
         System.assertEquals(UserInfo.getOrganizationId().substring(0, 15), syncResult.orgId);
         System.assertEquals('encrypted_detail', syncResult.effectiveDetailMode);
         System.assertEquals(true, syncResult.publicKeyConfigured);
+        }
     }
 
     @IsTest
     static void submissionLogStatusFailureFlowsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Test.setMock(
             HttpCalloutMock.class,
             new NativeFormsAwsMockFactory.RoutingMock()
@@ -332,10 +336,12 @@ private class NativeFormsThemeAndLogsTest {
         System.assertEquals('Status unavailable', failedStatus.errorMessage);
         System.assertEquals(false, failedSync.success);
         System.assertEquals('Sync unavailable', failedSync.errorMessage);
+        }
     }
 
     @IsTest
     static void submissionLogListAndDetailHydrationWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form__c formRecord = getSubmissionForm();
         NF_Form_Version__c versionRecord = getSubmissionVersion(formRecord.Id);
 
@@ -417,10 +423,12 @@ private class NativeFormsThemeAndLogsTest {
         System.assertNotEquals(null, detailResult.clientEncryptedDetailJson);
         System.assertEquals(base64Value('setup-private-key'), detailResult.privateKeyPkcs8B64);
         System.assertEquals(null, detailResult.detailAccessMessage);
+        }
     }
 
     @IsTest
     static void submissionLogListAndDetailFailuresReturnMessages() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         String submissionId = 'sub-001';
 
         Test.setMock(
@@ -448,38 +456,22 @@ private class NativeFormsThemeAndLogsTest {
         System.assertEquals('List unavailable', failedList.errorMessage);
         System.assertEquals(false, failedDetail.success);
         System.assertEquals('Detail unavailable', failedDetail.errorMessage);
+        }
     }
 
     @IsTest
-    static void submissionLogDecryptAndMissingKeyGuardsWork() {
+    static void submissionLogMissingIdGuardWorks() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsSubmissionLogsController.LogDetailResult missingIdResult =
             NativeFormsSubmissionLogsController.getLogDetail(null);
         System.assertEquals(false, missingIdResult.success);
         System.assert(String.isNotBlank(missingIdResult.errorMessage));
-
-        try {
-            NativeFormsSubmissionLogsController.decryptEncryptedDetail(null, null);
-            System.assert(false, 'Missing key config should be blocked.');
-        } catch (AuraHandledException e) {
-            assertAuraHandled(e, null);
         }
-
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        Blob key = EncodingUtil.base64Decode(config.Submission_Log_Key__c);
-        Blob iv = Blob.valueOf('1234567890123456');
-        Blob plaintext = Blob.valueOf('{"ok":true}');
-        Blob ciphertext = Crypto.encrypt('AES256', key, iv, plaintext);
-
-        String decrypted =
-            NativeFormsSubmissionLogsController.decryptEncryptedDetail(
-                EncodingUtil.base64Encode(ciphertext),
-                EncodingUtil.base64Encode(iv)
-            );
-        System.assertEquals('{"ok":true}', decrypted);
     }
 
     @IsTest
     static void submissionLogThrowingMocksReturnFailureMessages() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Test.setMock(
             HttpCalloutMock.class,
             new NativeFormsAwsMockFactory.ThrowingMock('Submission logs down')
@@ -494,5 +486,6 @@ private class NativeFormsThemeAndLogsTest {
         System.assert(String.isNotBlank(throwingList.errorMessage));
         System.assertEquals(false, throwingStatus.success);
         System.assert(String.isNotBlank(throwingStatus.errorMessage));
+        }
     }
 }

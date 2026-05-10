@@ -77,8 +77,7 @@ global with sharing class NativeFormsSecretCodeApi {
         target.NativeForms_Secret_Code_Expires_At__c = expiresAt;
         target.NativeForms_Secret_Code_Attempts__c = 0;
         target.NativeForms_Secret_Code_Verified_At__c = null;
-        update target;
-
+        update as user target;
         sendSecretCodeEmail(target);
 
         response.emailSent = true;
@@ -114,7 +113,7 @@ global with sharing class NativeFormsSecretCodeApi {
 
         if (String.isBlank(normalized.code) || target.NativeForms_Secret_Code__c != normalized.code) {
             target.NativeForms_Secret_Code_Attempts__c = attempts + 1;
-            update target;
+            update as user target;
             if ((attempts + 1) >= normalized.maxAttempts) {
                 response.lockedOut = true;
                 response.message = 'Too many attempts. Request a new code and try again.';
@@ -123,8 +122,7 @@ global with sharing class NativeFormsSecretCodeApi {
         }
 
         target.NativeForms_Secret_Code_Verified_At__c = System.now();
-        update target;
-
+        update as user target;
         response.approved = true;
         response.verificationRequired = false;
         response.message = 'Code verified successfully.';
@@ -167,7 +165,7 @@ global with sharing class NativeFormsSecretCodeApi {
             SELECT Id, UI_Settings_JSON__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (String.isBlank(versionRecord.UI_Settings_JSON__c)) {
             return new Map<String, Object>();
@@ -195,7 +193,7 @@ global with sharing class NativeFormsSecretCodeApi {
                    NativeForms_Secret_Code_Verified_At__c
             FROM Contact
             WHERE Email = :email
-            ORDER BY LastModifiedDate DESC
+            WITH USER_MODE ORDER BY LastModifiedDate DESC
             LIMIT 2
         ];
         return rows.size() == 1 ? rows[0] : null;
@@ -210,7 +208,7 @@ global with sharing class NativeFormsSecretCodeApi {
             SELECT Id
             FROM EmailTemplate
             WHERE DeveloperName = :TEMPLATE_DEVELOPER_NAME
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();

@@ -92,6 +92,12 @@
                         </template>
                         <lightning-button
                             variant="brand-outline"
+                            label="Clone Form"
+                            onclick={handleOpenCloneFormModal}
+                            disabled={cloneFormDisabled}>
+                        </lightning-button>
+                        <lightning-button
+                            variant="brand-outline"
                             label="+ New Form"
                             onclick={handleOpenNewFormModal}>
                         </lightning-button>
@@ -102,7 +108,7 @@
                 <div class="designer-layout">
                     <section class="pane pane-left">
                         <div class="pane-header">
-                            <h2>Add Building Blocks</h2>
+                            <h2>Building Blocks</h2>
                         </div>
 
                         <div class="add-block">
@@ -110,7 +116,10 @@
                             <div class="builder-list" role="list">
                                 <template for:each={availableInputFieldOptions} for:item="option">
                                     <div key={option.value} class="builder-list__row" role="listitem">
-                                        <span class="builder-list__label">{option.label}</span>
+                                        <span class="builder-list__label">
+                                            <lightning-icon icon-name={option.iconName} size="x-small" alternative-text=""></lightning-icon>
+                                            <span>{option.label}</span>
+                                        </span>
                                         <button
                                             type="button"
                                             class="builder-list__action"
@@ -142,6 +151,31 @@
                                 </template>
                             </div>
                         </div>
+
+                        <template if:true={showSurveyFieldOptions}>
+                            <div class="add-block">
+                                <h3>Survey Fields</h3>
+                                <div class="builder-list" role="list">
+                                    <template for:each={availableSurveyFieldOptions} for:item="option">
+                                        <div key={option.key} class="builder-list__row" role="listitem">
+                                            <span class="builder-list__label">
+                                                <lightning-icon icon-name={option.iconName} size="x-small" alternative-text=""></lightning-icon>
+                                                <span>{option.label}</span>
+                                            </span>
+                                            <button
+                                                type="button"
+                                                class="builder-list__action"
+                                                data-type={option.value}
+                                                data-preset={option.preset}
+                                                disabled={isSelectedVersionReadOnly}
+                                                onclick={handleQuickAddField}>
+                                                Add
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                     </section>
 
                     <section class="pane pane-center">
@@ -286,6 +320,35 @@
                                                                                     </template>
                                                                                 </div>
                                                                             </template>
+                                                                            <template lwc:elseif={child.isRanking}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <ol class="preview-ranking-list">
+                                                                                        <template for:each={child.previewRankingOptions} for:item="option">
+                                                                                            <li key={option.key}>
+                                                                                                <span class="preview-ranking-list__rank">{option.rank}</span>
+                                                                                                <span>{option.label}</span>
+                                                                                                <span class="preview-ranking-list__actions">
+                                                                                                    <button type="button" disabled={option.isFirst}>Up</button>
+                                                                                                    <button type="button" disabled={option.isLast}>Down</button>
+                                                                                                </span>
+                                                                                            </li>
+                                                                                        </template>
+                                                                                    </ol>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isSignature}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-signature">
+                                                                                        <span>Signature</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
                                                                             <template lwc:elseif={child.isSelect}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
@@ -310,7 +373,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <div class="preview-radio-group">
+                                                                                    <div class={child.previewRadioGroupClass}>
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <label key={option.value} class="preview-radio-option">
                                                                                                 <input type="radio" checked={option.checked} disabled />
@@ -443,6 +506,16 @@
                                                                                     </template>
                                                                                 </div>
                                                                             </template>
+                                                                            <template lwc:elseif={child.isSignature}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-signature">
+                                                                                        <span>Signature</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
                                                                             <template lwc:elseif={child.isSelect}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
@@ -460,7 +533,7 @@
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.displayLabel}</label>
                                                                                     </template>
-                                                                                    <div class="preview-radio-group">
+                                                                                    <div class={child.previewRadioGroupClass}>
                                                                                         <template for:each={child.previewOptions} for:item="option">
                                                                                             <label key={option.value} class="preview-radio-option">
                                                                                                 <input type="radio" checked={option.checked} disabled />
@@ -545,6 +618,37 @@
                                             </div>
                                         </template>
 
+                                        <template lwc:elseif={row.item.isRanking}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
+                                                </template>
+                                                <ol class="preview-ranking-list">
+                                                    <template for:each={row.item.previewRankingOptions} for:item="option">
+                                                        <li key={option.key}>
+                                                            <span class="preview-ranking-list__rank">{option.rank}</span>
+                                                            <span>{option.label}</span>
+                                                            <span class="preview-ranking-list__actions">
+                                                                <button type="button" disabled={option.isFirst}>Up</button>
+                                                                <button type="button" disabled={option.isLast}>Down</button>
+                                                            </span>
+                                                        </li>
+                                                    </template>
+                                                </ol>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isSignature}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
+                                                </template>
+                                                <div class="preview-signature">
+                                                    <span>Signature</span>
+                                                </div>
+                                            </div>
+                                        </template>
+
                                         <template lwc:elseif={row.item.isSubmitButton}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <button type="button" class="preview-button" disabled>{row.item.previewButtonLabel}</button>
@@ -576,7 +680,7 @@
                                                 <template if:true={row.item.showLabel}>
                                                     <label class={row.item.labelClass}>{row.item.displayLabel}</label>
                                                 </template>
-                                                <div class="preview-radio-group">
+                                                <div class={row.item.previewRadioGroupClass}>
                                                     <template for:each={row.item.previewOptions} for:item="option">
                                                         <label key={option.value} class="preview-radio-option">
                                                             <input type="radio" checked={option.checked} disabled />
@@ -1203,6 +1307,47 @@
                                     </lightning-combobox>
                                 </template>
 
+                                <template if:true={selectedElementSupportsSurveyChoices}>
+                                    <div class="selection-label-row">
+                                        <p class="field-inline-label">{surveyChoicesTitle}</p>
+                                        <lightning-helptext content={surveyChoicesHelpText}></lightning-helptext>
+                                    </div>
+                                    <p class="survey-choice-editor__hint">
+                                        Choice text is shown on the form. Saved value is what TwinaForms stores and sends to Salesforce.
+                                    </p>
+                                    <div class="survey-choice-editor">
+                                        <template for:each={editorSurveyOptions} for:item="option">
+                                            <div key={option.rowKey} class="survey-choice-editor__row">
+                                                <div class="survey-choice-editor__rank">{option.displayIndex}</div>
+                                                <lightning-input
+                                                    class="survey-choice-editor__label"
+                                                    label="Choice text"
+                                                    data-index={option.index}
+                                                    data-field="label"
+                                                    value={option.label}
+                                                    onchange={handleEditorSurveyOptionChange}
+                                                    onblur={flushEditorDraftSave}>
+                                                </lightning-input>
+                                                <lightning-input
+                                                    class="survey-choice-editor__value"
+                                                    label="Saved value"
+                                                    data-index={option.index}
+                                                    data-field="value"
+                                                    value={option.value}
+                                                    onchange={handleEditorSurveyOptionChange}
+                                                    onblur={flushEditorDraftSave}>
+                                                </lightning-input>
+                                                <div class="survey-choice-editor__actions">
+                                                    <button type="button" data-index={option.index} data-direction="up" disabled={option.isFirst} onclick={handleMoveEditorSurveyOption}>Up</button>
+                                                    <button type="button" data-index={option.index} data-direction="down" disabled={option.isLast} onclick={handleMoveEditorSurveyOption}>Down</button>
+                                                    <button type="button" data-index={option.index} disabled={cannotDeleteSurveyChoice} onclick={handleDeleteEditorSurveyOption}>Delete</button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <button type="button" class="survey-choice-editor__add" onclick={handleAddEditorSurveyOption}>Add Choice</button>
+                                    </div>
+                                </template>
+
                                 <template if:true={selectedElementIsDisplayText}>
                                     <div class="selection-actions">
                                         <lightning-button
@@ -1265,6 +1410,25 @@
                                         min="1"
                                         value={editorMaxFileSizeMb}
                                         onblur={handleEditorMaxFileSizeCommit}>
+                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Target Submit Action"
+                                        value={editorTargetSubmitActionKey}
+                                        options={fileUploadTargetActionOptions}
+                                        onchange={handleEditorTargetSubmitActionChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsSignature}>
+                                    <lightning-input
+                                        label="Help Text"
+                                        value={editorHelpText}
+                                        onblur={handleEditorHelpTextCommit}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        label="Clear Button Label"
+                                        value={editorClearButtonLabel}
+                                        onblur={handleEditorClearButtonLabelCommit}>
                                     </lightning-input>
                                     <lightning-combobox
                                         label="Target Submit Action"
@@ -1512,6 +1676,67 @@
                                             </div>
                                         </div>
                                     </template>
+                                </template>
+                            </div>
+
+                            <div class="selection-card">
+                                <div class="selection-label-row">
+                                    <p class="field-inline-label">Submission PDF</p>
+                                    <lightning-helptext content="Generate a readable PDF copy of the submitted response. V1 includes fields, display text, and images in the published form order."></lightning-helptext>
+                                </div>
+
+                                <template if:true={enableProSubmissionPdf}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        variant="label-hidden"
+                                        label="Generate Submission PDF"
+                                        checked={draftSubmissionPdfEnabled}
+                                        onchange={handleSubmissionPdfEnabledChange}
+                                        onblur={handleSubmissionPdfSettingsCommit}>
+                                    </lightning-input>
+
+                                    <template if:true={draftSubmissionPdfEnabled}>
+                                        <lightning-input
+                                            type="text"
+                                            label="PDF Title"
+                                            value={draftSubmissionPdfTitle}
+                                            max-length="120"
+                                            oninput={handleSubmissionPdfTitleInput}
+                                            onblur={handleSubmissionPdfSettingsCommit}>
+                                        </lightning-input>
+
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Include empty fields"
+                                            checked={draftSubmissionPdfIncludeEmptyFields}
+                                            onchange={handleSubmissionPdfIncludeEmptyFieldsChange}
+                                            onblur={handleSubmissionPdfSettingsCommit}>
+                                        </lightning-input>
+
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Attach PDF to Salesforce record"
+                                            checked={draftSubmissionPdfAttachToRecord}
+                                            onchange={handleSubmissionPdfAttachToRecordChange}
+                                            onblur={handleSubmissionPdfSettingsCommit}>
+                                        </lightning-input>
+
+                                        <template if:true={draftSubmissionPdfAttachToRecord}>
+                                            <lightning-combobox
+                                                label="Attach to Submit Action"
+                                                value={draftSubmissionPdfTargetSubmitActionKey}
+                                                options={submissionPdfTargetActionOptions}
+                                                onchange={handleSubmissionPdfTargetActionChange}
+                                                onblur={handleSubmissionPdfSettingsCommit}>
+                                            </lightning-combobox>
+                                        </template>
+                                    </template>
+                                </template>
+
+                                <template if:false={enableProSubmissionPdf}>
+                                    <p class="selection-hint selection-hint--compact">
+                                        Available on Pro plans. Enable it in your AWS plan entitlements first.
+                                    </p>
                                 </template>
                             </div>
 
@@ -1775,6 +2000,71 @@
                     <div class="slds-backdrop slds-backdrop_open"></div>
                 </template>
 
+                <template if:true={showCloneFormModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="clone-form-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-new-form-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="clone-form-modal-heading" class="slds-modal__title slds-hyphenate">Clone Form</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <template if:true={showFormLimitWarning}>
+                                    <div class="designer-limit-alert">
+                                        <p><strong>{formLimitUsageLabel}</strong></p>
+                                        <p>{formLimitMessage}</p>
+                                        <a href={upgradeUrl} target="_blank" rel="noopener">Upgrade plan</a>
+                                    </div>
+                                </template>
+                                <lightning-textarea
+                                    label="Form Name"
+                                    value={cloneFormDescription}
+                                    disabled={formLimitReached}
+                                    onchange={handleCloneFormDescriptionChange}
+                                    max-length="255">
+                                </lightning-textarea>
+                                <lightning-combobox
+                                    label="Project"
+                                    value={cloneFormProjectId}
+                                    options={cloneFormProjectOptions}
+                                    disabled={formLimitReached}
+                                    onchange={handleCloneFormProjectChange}>
+                                </lightning-combobox>
+                                <template if:true={showCloneProjectNameInput}>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <p class="field-inline-label">Project Name</p>
+                                        <lightning-helptext content={projectNameHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-input
+                                        type="text"
+                                        variant="label-hidden"
+                                        label="Project Name"
+                                        value={cloneFormProjectName}
+                                        disabled={formLimitReached}
+                                        onchange={handleCloneProjectNameChange}
+                                        max-length="80">
+                                    </lightning-input>
+                                </template>
+                                <p class="designer-new-form-help">Creates a new draft form from the currently selected form version.</p>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    disabled={isCloningForm}
+                                    onclick={handleCloseCloneFormModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Clone Form"
+                                    class="slds-m-left_small"
+                                    disabled={cloneFormCreateDisabled}
+                                    onclick={handleCloneForm}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
                 <template if:true={showDisplayTextModal}>
                     <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="display-text-modal-heading" class="slds-modal slds-fade-in-open">
                         <div class="slds-modal__container designer-display-text-modal">
@@ -1825,7 +2115,7 @@
                                     </a>
                                 </div>
                                 <textarea
-                                    class="slds-textarea designer-custom-js-textarea"
+                                    class={customJsFallbackClass}
                                     rows="5"
                                     oninput={handleModalCustomJsChange}
                                     spellcheck="false"></textarea>

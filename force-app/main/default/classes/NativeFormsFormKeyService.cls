@@ -48,7 +48,7 @@ public with sharing class NativeFormsFormKeyService {
         for (NF_Form__c record : [
             SELECT NF_Key__c
             FROM NF_Form__c
-            WHERE NF_Key__c LIKE 'form%'
+            WHERE NF_Key__c LIKE 'form%' WITH USER_MODE
         ]) {
             maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(record.NF_Key__c));
         }

@@ -1,5 +1,11 @@
 @IsTest
 private class NativeFormsDesignerBuilderTest {
+    @TestSetup
+    static void setupPermissions() {
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+        NativeFormsBootstrapV2Signer.getOrCreateSigningSecretB64();
+    }
+
     private static NativeFormsTenantEntitlements.EntitlementSnapshot buildEntitlementsSnapshot(
         Boolean enableRepeatGroups,
         Boolean enableLoadFile,
@@ -25,6 +31,9 @@ private class NativeFormsDesignerBuilderTest {
             'enableProSfSecretCodeAuth' => enableSecretCode == true,
             'enableProPrefillAliasReferences' => enablePrefillAliasReferences == true,
             'enableProAdvancedSubmitModes' => enableAdvancedSubmitModes == true,
+            'enableProElectronicSignature' => enableLoadFile == true,
+            'enableProSubmissionPdf' => enableLoadFile == true,
+            'enableProSurveyFields' => enableLoadFile == true,
             'enableProCustomJs' => enableCustomJs == true
         };
         snapshot.effectiveLimits = new Map<String, Object>{
@@ -99,6 +108,7 @@ private class NativeFormsDesignerBuilderTest {
 
     @IsTest
     static void designerMetadataMethodsReturnExpectedOptions() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         List<NativeFormsDesignerController.SelectOption> objectOptions = NativeFormsDesignerController.getObjectOptions();
@@ -110,10 +120,12 @@ private class NativeFormsDesignerBuilderTest {
         System.assert(containsDesignerOptionValue(picklistFieldOptions, 'Origin'));
         System.assert(picklistValueOptions.size() > 0);
         System.assertEquals(0, NativeFormsDesignerController.getPicklistValueOptions('Case', null).size());
+        }
     }
 
     @IsTest
     static void designerCreateWorkspaceAndFormSettingsBehaveAsExpected() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         try {
@@ -132,7 +144,7 @@ private class NativeFormsDesignerBuilderTest {
         );
 
         NF_Form__c createdForm = [
-            SELECT Id, Description__c, Theme__c, Project__c, Project__r.Name, Current_Draft_Version__c, Current_Published_Version__c
+            SELECT Id, Description__c, NF_Key__c, Theme__c, Project__c, Project__r.Name, Current_Draft_Version__c, Current_Published_Version__c
             FROM NF_Form__c
             WHERE Id = :createResult.formId
         ];
@@ -207,6 +219,45 @@ private class NativeFormsDesignerBuilderTest {
         System.assert(String.isNotBlank(workspace.upgradeUrl));
         System.assertEquals(themeRecord.Id, workspace.selectedTheme.id);
 
+        NativeFormsDesignerController.NewFormResult cloneResult = NativeFormsDesignerController.cloneFormWithDraftVersion(
+            createResult.formId,
+            publishedVersion.Id,
+            '  Intake Demo Copy  ',
+            createResult.projectId,
+            null
+        );
+        NF_Form__c clonedForm = [
+            SELECT Id, Description__c, NF_Key__c, Project__c, Theme__c, Current_Draft_Version__c, Current_Published_Version__c
+            FROM NF_Form__c
+            WHERE Id = :cloneResult.formId
+        ];
+        NF_Form_Version__c clonedVersion = [
+            SELECT Id, Form__c, Version_Number__c, Version_Status__c, Publish_Status__c, Security_Mode__c, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :cloneResult.versionId
+        ];
+        System.assertEquals('Intake Demo Copy', clonedForm.Description__c);
+        System.assertEquals(createResult.projectId, clonedForm.Project__c);
+        System.assertEquals(themeRecord.Id, clonedForm.Theme__c);
+        System.assertEquals(cloneResult.versionId, clonedForm.Current_Draft_Version__c);
+        System.assertEquals(null, clonedForm.Current_Published_Version__c);
+        System.assertNotEquals(createdForm.NF_Key__c, clonedForm.NF_Key__c);
+        System.assertEquals(clonedForm.Id, clonedVersion.Form__c);
+        System.assertEquals(1, clonedVersion.Version_Number__c);
+        System.assertEquals('Draft', clonedVersion.Version_Status__c);
+        System.assertEquals('Never Published', clonedVersion.Publish_Status__c);
+        System.assertEquals(publishedVersion.Security_Mode__c, clonedVersion.Security_Mode__c);
+        System.assertEquals(1, [
+            SELECT COUNT()
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :cloneResult.versionId
+        ]);
+        System.assertEquals(2, [
+            SELECT COUNT()
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :cloneResult.versionId
+        ]);
+
         List<Object> conditionalConditions = new List<Object>{
             new Map<String, Object>{
                 'fieldKey' => 'email1',
@@ -247,6 +298,15 @@ private class NativeFormsDesignerBuilderTest {
             'person@example.com',
             JSON.serialize(conditionalConditions),
             ''
+        );
+        NativeFormsDesignerController.updateVersionSubmissionPdfSettings(
+            createResult.formId,
+            createResult.versionId,
+            true,
+            true,
+            'submit1',
+            'Submitted Response',
+            true
         );
         NativeFormsDesignerController.updateVersionCustomJs(
             createResult.formId,
@@ -292,10 +352,12 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals(true, updatedWorkspace.selectedVersionSubmitConditionalEnabled);
         System.assertEquals('email1', updatedWorkspace.selectedVersionSubmitConditionalFieldKey);
         System.assertEquals('window.TwinaForms.setValue("text6","+972");', updatedWorkspace.selectedVersionCustomJs);
+        }
     }
 
     @IsTest
     static void designerCreateFormEnforcesPlanLimit() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         NativeFormsDesignerController.NewFormResult firstResult = NativeFormsDesignerController.createFormWithDraftVersion(
@@ -326,10 +388,12 @@ private class NativeFormsDesignerBuilderTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        }
     }
 
     @IsTest
     static void designerDeleteUnpublishedFormRemovesDesignerRecords() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Delete Draft Form');
@@ -369,10 +433,12 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals(0, [SELECT COUNT() FROM NF_Form_Element__c WHERE Form_Version__c = :versionRecord.Id]);
         System.assertEquals(0, [SELECT COUNT() FROM NF_Form_Action__c WHERE Form_Version__c = :versionRecord.Id]);
         System.assertEquals(0, [SELECT COUNT() FROM NF_Form_Publication__c WHERE Form__c = :formRecord.Id]);
+        }
     }
 
     @IsTest
     static void designerDeletePublishedFormUnpublishesRuntimeFirst() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Delete Published Form', null, 'delete-published-form');
@@ -407,10 +473,12 @@ private class NativeFormsDesignerBuilderTest {
 
         System.assertEquals(0, [SELECT COUNT() FROM NF_Form__c WHERE Id = :formRecord.Id]);
         System.assertEquals(0, [SELECT COUNT() FROM NF_Form_Publication__c WHERE Form__c = :formRecord.Id]);
+        }
     }
 
     @IsTest
     static void designerDeletePublishedFormBlocksWhenUnpublishFails() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Blocked Delete Form');
@@ -450,10 +518,12 @@ private class NativeFormsDesignerBuilderTest {
 
         System.assertEquals(1, [SELECT COUNT() FROM NF_Form__c WHERE Id = :formRecord.Id]);
         System.assertEquals(1, [SELECT COUNT() FROM NF_Form_Publication__c WHERE Form__c = :formRecord.Id]);
+        }
     }
 
     @IsTest
     static void designerElementPlacementUploadAndDeleteBehaviorsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Designer Element Test');
@@ -520,10 +590,12 @@ private class NativeFormsDesignerBuilderTest {
             1,
             [SELECT count() FROM NF_Form_Element__c WHERE Id = :emailRecord.id]
         );
+        }
     }
 
     @IsTest
     static void designerPlanAndContainerGuardsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setFeatureFlags(false, false, true);
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Designer Guard Test');
@@ -542,16 +614,29 @@ private class NativeFormsDesignerBuilderTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        try {
+            NativeFormsDesignerController.addElement(versionRecord.Id, 'signature');
+            System.assert(false, 'Signature fields should be blocked when the feature is disabled.');
+        } catch (AuraHandledException e) {
+            assertAuraHandled(e);
+        }
 
         setFeatureFlags(true, true, true);
         NativeFormsDesignerController.ElementRecord repeatGroupRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'repeatGroup');
         NativeFormsDesignerController.ElementRecord fileUploadRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'fileUpload');
+        NativeFormsDesignerController.ElementRecord signatureRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'signature');
         NativeFormsDesignerController.ElementRecord sectionRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'section');
         NativeFormsDesignerController.ElementRecord groupRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'group');
 
         try {
             NativeFormsDesignerController.placeElementInSection(fileUploadRecord.id, repeatGroupRecord.id, 1);
             System.assert(false, 'File uploads inside records lists should be rejected.');
+        } catch (AuraHandledException e) {
+            assertAuraHandled(e);
+        }
+        try {
+            NativeFormsDesignerController.placeElementInSection(signatureRecord.id, repeatGroupRecord.id, 1);
+            System.assert(false, 'Signature fields inside records lists should be rejected.');
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
@@ -569,10 +654,12 @@ private class NativeFormsDesignerBuilderTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        }
     }
 
     @IsTest
     static void builderWorkspaceCrudAndMoveBehaviorsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Builder Workspace Test');
@@ -662,10 +749,12 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals(true, jsonMap(persistedUpdatedElement.Config_JSON__c).get('checked'));
         System.assertEquals(10, Integer.valueOf(String.valueOf(movedCheckbox.Order__c)));
         System.assertEquals(0, [SELECT count() FROM NF_Form_Element__c WHERE Id = :textRecord.Id]);
+        }
     }
 
     @IsTest
     static void builderValidationGuardsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Builder Guard Test');
         NF_Form_Version__c draftVersion = NativeFormsTestDataFactory.createDraftVersion(formRecord.Id);
         NF_Form_Version__c publishedVersion = NativeFormsTestDataFactory.createVersion(
@@ -778,6 +867,17 @@ private class NativeFormsDesignerBuilderTest {
             assertAuraHandled(e);
         }
 
+        NativeFormsBuilderController.ElementUpsertInput signatureWithoutTarget = new NativeFormsBuilderController.ElementUpsertInput();
+        signatureWithoutTarget.id = checkboxRecord.Id;
+        signatureWithoutTarget.label = 'Signature';
+        signatureWithoutTarget.fieldKey = 'signature1';
+        signatureWithoutTarget.elementType = 'signature';
+        signatureWithoutTarget.configJson = NativeFormsTestConfigFactory.signatureConfigJson(null);
+        NativeFormsBuilderController.ElementRecord savedSignature = NativeFormsBuilderController.updateElement(JSON.serialize(signatureWithoutTarget));
+
+        System.assertEquals('signature', savedSignature.elementType);
+        System.assertEquals('Signature', savedSignature.label);
+
         NativeFormsBuilderController.ElementUpsertInput fileUploadWithoutTarget = new NativeFormsBuilderController.ElementUpsertInput();
         fileUploadWithoutTarget.id = checkboxRecord.Id;
         fileUploadWithoutTarget.label = 'Upload';
@@ -814,5 +914,6 @@ private class NativeFormsDesignerBuilderTest {
 
         System.assertEquals('fileUpload', savedFileUpload.elementType);
         System.assertEquals('Upload Field', savedFileUpload.label);
+        }
     }
 }

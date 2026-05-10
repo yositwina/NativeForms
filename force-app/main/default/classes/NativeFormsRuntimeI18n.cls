@@ -62,6 +62,11 @@ public with sharing class NativeFormsRuntimeI18n {
             'secretCodeEnterEmailAndCodeFirst' => 'Enter your email and code first.',
             'secretCodeSendFailed' => 'We could not send the code right now.',
             'secretCodeVerifyFailed' => 'We could not verify the code right now.',
+            'prefillLoadingTitle' => 'Loading your saved details...',
+            'prefillLoadingMessage' => 'Please wait while we prepare your form.',
+            'prefillNoData' => 'No saved details found. You can continue with a blank form.',
+            'prefillLoadFailedContinue' => 'We could not load saved details. You can still complete the form manually.',
+            'prefillTimeout' => 'Loading saved details took too long.',
             'prefillLoadFailed' => 'We could not load prefill data for this form.',
             'dateInvalid' => 'Please enter a valid date in {format} format.',
             'dateMin' => 'Please enter a date on or after {date}.',
@@ -88,7 +93,11 @@ public with sharing class NativeFormsRuntimeI18n {
             'fileUploadsConfigMissing' => 'File Uploads are not configured for this published form.',
             'fileAllowedTypes' => 'Allowed: {types}',
             'fileMaxSize' => 'Max size: {size} MB',
-            'fileMultipleAllowed' => 'Multiple files allowed'
+            'fileMultipleAllowed' => 'Multiple files allowed',
+            'signatureClear' => 'Clear',
+            'signatureRequired' => 'Please sign before submitting.',
+            'signatureReview' => 'Please review the signature fields and try again.',
+            'signatureRepeatUnsupported' => 'Signature is not supported inside repeated records.'
         };
     }
 
@@ -137,6 +146,10 @@ public with sharing class NativeFormsRuntimeI18n {
             'fileUploadFailed' => 'לא הצלחנו להעלות את הקובץ. נסו שוב.',
             'fileUploadReview' => 'יש לבדוק את הקבצים שהועלו ולנסות שוב.',
             'fileUploadsConfigMissing' => 'העלאת קבצים אינה מוגדרת עבור טופס שפורסם זה.',
+            'signatureClear' => 'נקה',
+            'signatureRequired' => 'יש לחתום לפני השליחה.',
+            'signatureReview' => 'יש לבדוק את שדות החתימה ולנסות שוב.',
+            'signatureRepeatUnsupported' => 'חתימה אינה נתמכת בתוך רשומות חוזרות.',
             'fileAllowedTypes' => 'סוגים מותרים: {types}',
             'fileMaxSize' => 'גודל מקסימלי: {size} MB',
             'fileMultipleAllowed' => 'מותר להעלות כמה קבצים'
@@ -188,6 +201,10 @@ public with sharing class NativeFormsRuntimeI18n {
             'fileUploadFailed' => 'No pudimos subir este archivo. Inténtalo de nuevo.',
             'fileUploadReview' => 'Revisa los archivos subidos e inténtalo de nuevo.',
             'fileUploadsConfigMissing' => 'La carga de archivos no está configurada para este formulario publicado.',
+            'signatureClear' => 'Borrar',
+            'signatureRequired' => 'Firma antes de enviar.',
+            'signatureReview' => 'Revisa los campos de firma e inténtalo de nuevo.',
+            'signatureRepeatUnsupported' => 'La firma no es compatible dentro de registros repetidos.',
             'fileAllowedTypes' => 'Permitidos: {types}',
             'fileMaxSize' => 'Tamaño máximo: {size} MB',
             'fileMultipleAllowed' => 'Se permiten varios archivos'

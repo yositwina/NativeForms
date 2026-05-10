@@ -312,3 +312,81 @@
         margin-bottom: 0;
     }
 }
+
+.theme-shell {
+    --tf-blue: #1B96FF;
+    --tf-panel-header: #F3F8FF;
+    --tf-border: #D6E2F0;
+    --tf-text: #0f2e54;
+    --tf-muted: #5f6f89;
+    font-family: Inter, "Salesforce Sans", Arial, sans-serif;
+    color: var(--tf-text);
+}
+
+.theme-layout {
+    gap: 1rem;
+    grid-template-columns: minmax(16rem, 19.5rem) minmax(0, 1fr) minmax(20rem, 23rem);
+}
+
+.pane {
+    border-color: var(--tf-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 26px rgba(15, 35, 65, 0.06);
+}
+
+.pane-header {
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    background: linear-gradient(90deg, var(--tf-panel-header), #e8f4ff);
+}
+
+.pane-header h2 {
+    color: #0f4c8a;
+    font-size: 0.86rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.pane-copy {
+    color: var(--tf-muted);
+}
+
+.left-actions lightning-button,
+.editor-actions lightning-button {
+    --slds-c-button-radius-border: 0.45rem;
+    --slds-c-button-brand-color-background: var(--tf-blue);
+    --slds-c-button-brand-color-border: var(--tf-blue);
+    --slds-c-button-brand-color-background-hover: #0f7fe5;
+    --slds-c-button-brand-color-border-hover: #0f7fe5;
+}
+
+.theme-list__item,
+.editor-section,
+.preview-page,
+.preview-form,
+.preview-section {
+    border-color: var(--tf-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 8px 18px rgba(15, 35, 65, 0.04);
+}
+
+.theme-list__item {
+    background: #ffffff;
+    color: var(--tf-text);
+}
+
+.theme-list__item--selected {
+    border-color: var(--tf-blue);
+    background: #f3f8ff;
+    box-shadow: 0 0 0 2px rgba(27, 150, 255, 0.18), 0 10px 24px rgba(15, 108, 189, 0.12);
+}
+
+.editor-section {
+    background: #ffffff;
+}
+
+.editor-section h3 {
+    color: var(--tf-text);
+    font-size: 0.9rem;
+}

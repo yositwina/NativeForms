@@ -140,6 +140,11 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedVersionSubmitConditionalValue { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalConditionsJson { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalExpression { get; set; }
+        @AuraEnabled public Boolean selectedVersionSubmissionPdfEnabled { get; set; }
+        @AuraEnabled public Boolean selectedVersionSubmissionPdfAttachToRecord { get; set; }
+        @AuraEnabled public String selectedVersionSubmissionPdfTargetSubmitActionKey { get; set; }
+        @AuraEnabled public String selectedVersionSubmissionPdfTitle { get; set; }
+        @AuraEnabled public Boolean selectedVersionSubmissionPdfIncludeEmptyFields { get; set; }
         @AuraEnabled public String selectedVersionCustomJs { get; set; }
         @AuraEnabled public String selectedPublishedUrl { get; set; }
         @AuraEnabled public List<SelectOption> projects { get; set; }
@@ -153,6 +158,9 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean enableProConditionLogic { get; set; }
         @AuraEnabled public Boolean enableProRepeatGroups { get; set; }
         @AuraEnabled public Boolean enableProLoadFile { get; set; }
+        @AuraEnabled public Boolean enableProElectronicSignature { get; set; }
+        @AuraEnabled public Boolean enableProSubmissionPdf { get; set; }
+        @AuraEnabled public Boolean enableProSurveyFields { get; set; }
         @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
         @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
@@ -180,7 +188,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id
             FROM NF_Project__c
             WHERE Id = :requestedProjectId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         return matchingProjects.isEmpty() ? defaultProjectId : matchingProjects[0].Id;
     }
@@ -195,7 +203,7 @@ public with sharing class NativeFormsDesignerController {
 
     private static FormLimitState buildFormLimitState() {
         FormLimitState state = new FormLimitState();
-        state.currentFormCount = [SELECT COUNT() FROM NF_Form__c];
+        state.currentFormCount = [SELECT COUNT() FROM NF_Form__c WITH USER_MODE];
         state.maxForms = null;
         state.limitReached = false;
         state.message = null;
@@ -364,6 +372,9 @@ public with sharing class NativeFormsDesignerController {
         workspace.enableProConditionLogic = NativeFormsFeatureFlags.isProConditionLogicEnabled();
         workspace.enableProRepeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
         workspace.enableProLoadFile = NativeFormsFeatureFlags.isProLoadFileEnabled();
+        workspace.enableProElectronicSignature = NativeFormsFeatureFlags.isProElectronicSignatureEnabled();
+        workspace.enableProSubmissionPdf = NativeFormsFeatureFlags.isProSubmissionPdfEnabled();
+        workspace.enableProSurveyFields = NativeFormsFeatureFlags.isProSurveyFieldsEnabled();
         workspace.enableProFormulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         workspace.enableProPostSubmitAutoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
         workspace.enableProSfSecretCodeAuth = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
@@ -381,7 +392,7 @@ public with sharing class NativeFormsDesignerController {
         List<NF_Project__c> projectRecords = [
             SELECT Id, Name
             FROM NF_Project__c
-            ORDER BY Name ASC
+            WITH USER_MODE ORDER BY Name ASC
             LIMIT 500
         ];
         Map<Id, NF_Project__c> projectsById = new Map<Id, NF_Project__c>(projectRecords);
@@ -405,7 +416,7 @@ public with sharing class NativeFormsDesignerController {
                    Enable_Captcha__c, Project__c, Project__r.Name
             FROM NF_Form__c
             WHERE Project__c = :effectiveProjectId
-            ORDER BY Name ASC
+            WITH USER_MODE ORDER BY Name ASC
             LIMIT 200
         ];
 
@@ -443,7 +454,7 @@ public with sharing class NativeFormsDesignerController {
         for (NF_Theme__c themeRecord : [
             SELECT Id, Name
             FROM NF_Theme__c
-            ORDER BY Name ASC
+            WITH USER_MODE ORDER BY Name ASC
             LIMIT 200
         ]) {
             SelectOption option = new SelectOption();
@@ -463,7 +474,7 @@ public with sharing class NativeFormsDesignerController {
                        Button_Font__c, Button_Font_Size_Px__c, Button_Text_Color__c, Button_Background_Color__c
                 FROM NF_Theme__c
                 WHERE Id = :selectedForm.Theme__c
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ]);
         }
 
@@ -471,7 +482,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Name, Version_Number__c, Version_Status__c, Publish_Status__c, LastModifiedDate, UI_Settings_JSON__c, Custom_JS__c
             FROM NF_Form_Version__c
             WHERE Form__c = :effectiveFormId
-            ORDER BY LastModifiedDate DESC
+            WITH USER_MODE ORDER BY LastModifiedDate DESC
             LIMIT 200
         ];
 
@@ -591,6 +602,17 @@ public with sharing class NativeFormsDesignerController {
             stringValue(versionUiSettings.get('submitConditionalExpression')),
             submitConditionalConditions.size()
         );
+        workspace.selectedVersionSubmissionPdfEnabled = booleanValue(versionUiSettings.get('submissionPdfEnabled'));
+        workspace.selectedVersionSubmissionPdfAttachToRecord = versionUiSettings.containsKey('submissionPdfAttachToRecord')
+            ? booleanValue(versionUiSettings.get('submissionPdfAttachToRecord'))
+            : true;
+        workspace.selectedVersionSubmissionPdfTargetSubmitActionKey = stringValue(versionUiSettings.get('submissionPdfTargetSubmitActionKey'));
+        workspace.selectedVersionSubmissionPdfTitle = defaultSubmissionPdfTitle(
+            stringValue(versionUiSettings.get('submissionPdfTitle'))
+        );
+        workspace.selectedVersionSubmissionPdfIncludeEmptyFields = versionUiSettings.containsKey('submissionPdfIncludeEmptyFields')
+            ? booleanValue(versionUiSettings.get('submissionPdfIncludeEmptyFields'))
+            : true;
         workspace.selectedVersionCustomJs = stringValue(selectedVersion.Custom_JS__c);
         List<NF_Form_Publication__c> publicationRows = [
             SELECT Generated_HTML_Ref__c
@@ -598,7 +620,7 @@ public with sharing class NativeFormsDesignerController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Publication_Status__c = 'Success'
               AND Generated_HTML_Ref__c != null
-            ORDER BY Published_At__c DESC, CreatedDate DESC
+            WITH USER_MODE ORDER BY Published_At__c DESC, CreatedDate DESC
             LIMIT 1
         ];
         workspace.selectedPublishedUrl = publicationRows.isEmpty() ? null : publicationRows[0].Generated_HTML_Ref__c;
@@ -607,7 +629,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :effectiveVersionId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             workspace.elements.add(toElementRecord(elementRecord));
         }
@@ -618,7 +640,7 @@ public with sharing class NativeFormsDesignerController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Prefill'
               AND Store_Result_As__c != null
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             PrefillAliasDetail detail = new PrefillAliasDetail();
             detail.alias = actionRecord.Store_Result_As__c;
@@ -635,7 +657,7 @@ public with sharing class NativeFormsDesignerController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Submit'
               AND Command_Key__c != null
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             SubmitActionDetail detail = new SubmitActionDetail();
             detail.displayNumber = submitActionNumber;
@@ -698,20 +720,28 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Theme__c, Enable_Captcha__c, Description__c, Project__c
             FROM NF_Form__c
             WHERE Id = :formId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         formRecord.Description__c = normalizedFormName;
         formRecord.Project__c = projectId == null ? NativeFormsProjectService.ensureDefaultProjectId() : projectId;
         formRecord.Theme__c = themeId;
         formRecord.Enable_Captcha__c = enableCaptcha == true;
 
-        List<SObject> recordsToUpdate = new List<SObject>{ formRecord };
+        List<SObject> recordsToUpdate = new List<SObject>{
+            new NF_Form__c(
+                Id = formRecord.Id,
+                Description__c = formRecord.Description__c,
+                Project__c = formRecord.Project__c,
+                Theme__c = formRecord.Theme__c,
+                Enable_Captcha__c = formRecord.Enable_Captcha__c
+            )
+        };
         if (versionId != null) {
             NF_Form_Version__c versionRecord = [
                 SELECT Id, Form__c, UI_Settings_JSON__c
                 FROM NF_Form_Version__c
                 WHERE Id = :versionId
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ];
             if (versionRecord.Form__c != formId) {
                 throw new AuraHandledException('Selected version does not belong to the selected form.');
@@ -754,10 +784,58 @@ public with sharing class NativeFormsDesignerController {
                 defaultConditionalExpression(submitConditionalExpression, normalizedConditions.size())
             );
             versionRecord.UI_Settings_JSON__c = JSON.serializePretty(uiSettings);
-            recordsToUpdate.add(versionRecord);
+            recordsToUpdate.add(new NF_Form_Version__c(
+                Id = versionRecord.Id,
+                UI_Settings_JSON__c = versionRecord.UI_Settings_JSON__c
+            ));
         }
 
-        update recordsToUpdate;
+        update as user recordsToUpdate;
+    }
+
+    @AuraEnabled
+    public static void updateVersionSubmissionPdfSettings(
+        Id formId,
+        Id versionId,
+        Boolean enabled,
+        Boolean attachToRecord,
+        String targetSubmitActionKey,
+        String title,
+        Boolean includeEmptyFields
+    ) {
+        if (formId == null) {
+            throw new AuraHandledException('Form id is required.');
+        }
+        if (versionId == null) {
+            throw new AuraHandledException('Form version is required.');
+        }
+        Boolean normalizedEnabled = enabled == true;
+        if (normalizedEnabled && !NativeFormsFeatureFlags.isProSubmissionPdfEnabled()) {
+            throw new AuraHandledException('Submission PDF is available on Pro plans only. Enable it in your AWS plan entitlements first.');
+        }
+
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            WITH USER_MODE LIMIT 1
+        ];
+        if (versionRecord.Form__c != formId) {
+            throw new AuraHandledException('Selected version does not belong to the selected form.');
+        }
+
+        Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        uiSettings.put('submissionPdfEnabled', normalizedEnabled);
+        uiSettings.put('submissionPdfAttachToRecord', attachToRecord != false);
+        uiSettings.put('submissionPdfTargetSubmitActionKey', stringValue(targetSubmitActionKey));
+        uiSettings.put('submissionPdfTitle', defaultSubmissionPdfTitle(title));
+        uiSettings.put('submissionPdfIncludeEmptyFields', includeEmptyFields != false);
+        versionRecord.UI_Settings_JSON__c = JSON.serializePretty(uiSettings);
+
+        update as user new NF_Form_Version__c(
+            Id = versionRecord.Id,
+            UI_Settings_JSON__c = versionRecord.UI_Settings_JSON__c
+        );
     }
 
     @AuraEnabled
@@ -776,14 +854,17 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Form__c, Custom_JS__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (versionRecord.Form__c != formId) {
             throw new AuraHandledException('Selected version does not belong to the selected form.');
         }
 
         versionRecord.Custom_JS__c = String.isBlank(customJs) ? null : customJs;
-        update versionRecord;
+        update as user new NF_Form_Version__c(
+            Id = versionRecord.Id,
+            Custom_JS__c = versionRecord.Custom_JS__c
+        );
     }
 
     @AuraEnabled
@@ -801,8 +882,7 @@ public with sharing class NativeFormsDesignerController {
             Project__c = effectiveProjectId,
             Theme__c = themeId
         );
-        insert formRecord;
-
+        insert as user formRecord;
         NF_Form_Version__c versionRecord = new NF_Form_Version__c(
             Form__c = formRecord.Id,
             Version_Number__c = 1,
@@ -814,15 +894,138 @@ public with sharing class NativeFormsDesignerController {
             ),
             Prefill_Params_JSON__c = '[{"key":"email","label":"Email","required":true}]'
         );
-        insert versionRecord;
-
+        insert as user versionRecord;
         formRecord.Current_Draft_Version__c = versionRecord.Id;
-        update formRecord;
-
+        update as user formRecord;
         NewFormResult result = new NewFormResult();
         result.projectId = effectiveProjectId;
         result.formId = formRecord.Id;
         result.versionId = versionRecord.Id;
+        result.formName = normalizedDescription;
+        return result;
+    }
+
+    @AuraEnabled
+    public static NewFormResult cloneFormWithDraftVersion(
+        Id sourceFormId,
+        Id sourceVersionId,
+        String description,
+        Id projectId,
+        String newProjectName
+    ) {
+        if (sourceFormId == null) {
+            throw new AuraHandledException('Select a form to clone first.');
+        }
+        if (sourceVersionId == null) {
+            throw new AuraHandledException('Select a form version to clone first.');
+        }
+        String normalizedDescription = String.isBlank(description) ? null : description.trim();
+        if (String.isBlank(normalizedDescription)) {
+            throw new AuraHandledException('Form name is required.');
+        }
+        enforceFormCreationLimit();
+        Id effectiveProjectId = NativeFormsProjectService.resolveProjectId(projectId, newProjectName);
+
+        NF_Form__c sourceForm = [
+            SELECT Id, Theme__c, Enable_Captcha__c
+            FROM NF_Form__c
+            WHERE Id = :sourceFormId
+            WITH USER_MODE LIMIT 1
+        ];
+        NF_Form_Version__c sourceVersion = [
+            SELECT Id,
+                   Form__c,
+                   Security_Mode__c,
+                   Rate_Limit_Profile__c,
+                   Custom_CSS__c,
+                   Custom_JS__c,
+                   Theme_JSON__c,
+                   UI_Settings_JSON__c,
+                   Prefill_Params_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :sourceVersionId
+            WITH USER_MODE LIMIT 1
+        ];
+        if (sourceVersion.Form__c != sourceForm.Id) {
+            throw new AuraHandledException('Selected version does not belong to the selected form.');
+        }
+
+        NF_Form__c clonedForm = new NF_Form__c(
+            Description__c = normalizedDescription,
+            Status__c = 'Draft',
+            Project__c = effectiveProjectId,
+            Theme__c = sourceForm.Theme__c,
+            Enable_Captcha__c = sourceForm.Enable_Captcha__c
+        );
+        insert as user clonedForm;
+
+        NF_Form_Version__c clonedVersion = new NF_Form_Version__c(
+            Form__c = clonedForm.Id,
+            Version_Number__c = 1,
+            Version_Status__c = 'Draft',
+            Publish_Status__c = 'Never Published',
+            Security_Mode__c = sourceVersion.Security_Mode__c,
+            Rate_Limit_Profile__c = sourceVersion.Rate_Limit_Profile__c,
+            Custom_CSS__c = sourceVersion.Custom_CSS__c,
+            Custom_JS__c = sourceVersion.Custom_JS__c,
+            Theme_JSON__c = sourceVersion.Theme_JSON__c,
+            UI_Settings_JSON__c = sourceVersion.UI_Settings_JSON__c,
+            Prefill_Params_JSON__c = sourceVersion.Prefill_Params_JSON__c
+        );
+        insert as user clonedVersion;
+
+        List<NF_Form_Element__c> clonedElements = new List<NF_Form_Element__c>();
+        for (NF_Form_Element__c sourceElement : [
+            SELECT Element_Id__c,
+                   Element_Type__c,
+                   Field_Key__c,
+                   Element_Index__c,
+                   Label__c,
+                   Config_JSON__c,
+                   Parent_Element_Id__c,
+                   Order__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :sourceVersion.Id
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            NF_Form_Element__c clonedElement = sourceElement.clone(false, true, false, false);
+            clonedElement.Form_Version__c = clonedVersion.Id;
+            clonedElements.add(clonedElement);
+        }
+        if (!clonedElements.isEmpty()) {
+            insert as user clonedElements;
+        }
+
+        List<NF_Form_Action__c> clonedActions = new List<NF_Form_Action__c>();
+        for (NF_Form_Action__c sourceAction : [
+            SELECT Action_Scope__c,
+                   Command_Key__c,
+                   Command_Type__c,
+                   Object_Api_Name__c,
+                   Store_Result_As__c,
+                   Config_JSON__c,
+                   Order__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :sourceVersion.Id
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            NF_Form_Action__c clonedAction = sourceAction.clone(false, true, false, false);
+            clonedAction.Form_Version__c = clonedVersion.Id;
+            clonedActions.add(clonedAction);
+        }
+        if (!clonedActions.isEmpty()) {
+            insert as user clonedActions;
+        }
+
+        update as user new NF_Form__c(
+            Id = clonedForm.Id,
+            Current_Draft_Version__c = clonedVersion.Id
+        );
+
+        NewFormResult result = new NewFormResult();
+        result.projectId = effectiveProjectId;
+        result.formId = clonedForm.Id;
+        result.versionId = clonedVersion.Id;
         result.formName = normalizedDescription;
         return result;
     }
@@ -837,7 +1040,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Description__c, NF_Key__c
             FROM NF_Form__c
             WHERE Id = :formId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         if (!matchesDeleteFormConfirmation(confirmationText, formRecord.Description__c, formRecord.NF_Key__c)) {
@@ -847,7 +1050,7 @@ public with sharing class NativeFormsDesignerController {
         List<NF_Form_Publication__c> publicationRows = [
             SELECT Id, Published_Form_Id__c, Publication_Status__c
             FROM NF_Form_Publication__c
-            WHERE Form__c = :formId
+            WHERE Form__c = :formId WITH USER_MODE
         ];
         Set<String> runtimeFormIds = new Set<String>();
         for (NF_Form_Publication__c publicationRow : publicationRows) {
@@ -861,7 +1064,7 @@ public with sharing class NativeFormsDesignerController {
             FROM NF_Form_Version__c
             WHERE Form__c = :formId
               AND Form_Id__c != null
-              AND Publish_Status__c = 'Published'
+              AND Publish_Status__c = 'Published' WITH USER_MODE
         ]) {
             runtimeFormIds.add(versionRecord.Form_Id__c);
         }
@@ -871,9 +1074,9 @@ public with sharing class NativeFormsDesignerController {
         }
 
         if (!publicationRows.isEmpty()) {
-            delete publicationRows;
+            delete as user publicationRows;
         }
-        delete formRecord;
+        delete as user formRecord;
     }
 
     private static Boolean matchesDeleteFormConfirmation(String confirmationText, String formName, String formKey) {
@@ -919,7 +1122,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Element_Id__c, Element_Type__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         List<NF_Form_Element__c> recordsToDelete = new List<NF_Form_Element__c>();
@@ -927,15 +1130,19 @@ public with sharing class NativeFormsDesignerController {
             recordsToDelete.addAll([
                 SELECT Id
                 FROM NF_Form_Element__c
-                WHERE Parent_Element_Id__c = :elementRecord.Element_Id__c
+                WHERE Parent_Element_Id__c = :elementRecord.Element_Id__c WITH USER_MODE
             ]);
         }
         recordsToDelete.add(elementRecord);
-        delete recordsToDelete;
+        delete as user recordsToDelete;
+    }
+
+    public static ElementRecord addElement(Id versionId, String elementType) {
+        return addElement(versionId, elementType, null);
     }
 
     @AuraEnabled
-    public static ElementRecord addElement(Id versionId, String elementType) {
+    public static ElementRecord addElement(Id versionId, String elementType, String elementPreset) {
         if (versionId == null) {
             throw new AuraHandledException('Choose a form version first.');
         }
@@ -943,7 +1150,8 @@ public with sharing class NativeFormsDesignerController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Choose an element type first.');
         }
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
+        String normalizedPreset = normalizeElementPreset(elementType, elementPreset);
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
@@ -952,12 +1160,18 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'fileUpload' && !NativeFormsFeatureFlags.isProLoadFileEnabled()) {
             throw new AuraHandledException('File Uploads are not available on your current TwinaForms plan.');
         }
+        if (elementType == 'signature' && !NativeFormsFeatureFlags.isProElectronicSignatureEnabled()) {
+            throw new AuraHandledException('Electronic Signature is not available on your current TwinaForms plan.');
+        }
+        if ((elementType == 'ranking' || String.isNotBlank(normalizedPreset)) && !NativeFormsFeatureFlags.isProSurveyFieldsEnabled()) {
+            throw new AuraHandledException('Survey Fields are not available on your current TwinaForms plan.');
+        }
 
         NF_Form_Version__c versionRecord = [
             SELECT Id, Form__c, UI_Settings_JSON__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         String languageCode = NativeFormsRuntimeI18n.normalizeLanguageCode(
             stringValue(parseJsonMap(versionRecord.UI_Settings_JSON__c).get('languageCode'))
@@ -967,7 +1181,7 @@ public with sharing class NativeFormsDesignerController {
         AggregateResult[] maxRows = [
             SELECT MAX(Order__c) maxOrder
             FROM NF_Form_Element__c
-            WHERE Form_Version__c = :versionId
+            WHERE Form_Version__c = :versionId WITH USER_MODE
         ];
         if (!maxRows.isEmpty() && maxRows[0].get('maxOrder') != null) {
             nextOrder = Integer.valueOf(String.valueOf(maxRows[0].get('maxOrder'))) + 10;
@@ -979,19 +1193,18 @@ public with sharing class NativeFormsDesignerController {
             Form_Version__c = versionId,
             Element_Id__c = buildElementId(elementType),
             Element_Type__c = elementType,
-            Field_Key__c = defaultFieldKeyForType(elementType, nextElementIndex),
+            Field_Key__c = defaultFieldKeyForType(elementType, nextElementIndex, normalizedPreset),
             Element_Index__c = nextElementIndex,
-            Label__c = defaultLabelForType(elementType),
-            Config_JSON__c = defaultConfigJsonForType(elementType, languageCode),
+            Label__c = defaultLabelForType(elementType, normalizedPreset),
+            Config_JSON__c = defaultConfigJsonForType(elementType, languageCode, normalizedPreset),
             Order__c = nextOrder
         );
-        insert elementRecord;
-
+        insert as user elementRecord;
         elementRecord = [
             SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementRecord.Id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         return toElementRecord(elementRecord);
     }
@@ -1013,7 +1226,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         Map<String, Object> draggedConfig = parseJsonMap(draggedRecord.Config_JSON__c);
@@ -1029,11 +1242,16 @@ public with sharing class NativeFormsDesignerController {
             WHERE Form_Version__c = :versionId
               AND Parent_Element_Id__c = null
               AND Id != :elementId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ];
         if (siblings.isEmpty()) {
             draggedRecord.Order__c = 10;
-            update draggedRecord;
+            update as user new NF_Form_Element__c(
+                Id = draggedRecord.Id,
+                Parent_Element_Id__c = draggedRecord.Parent_Element_Id__c,
+                Config_JSON__c = draggedRecord.Config_JSON__c,
+                Order__c = draggedRecord.Order__c
+            );
             return;
         }
 
@@ -1046,11 +1264,21 @@ public with sharing class NativeFormsDesignerController {
         siblings.add(targetIndex, draggedRecord);
 
         Integer orderValue = 10;
+        List<NF_Form_Element__c> siblingUpdates = new List<NF_Form_Element__c>();
         for (NF_Form_Element__c sibling : siblings) {
             sibling.Order__c = orderValue;
+            NF_Form_Element__c siblingUpdate = new NF_Form_Element__c(
+                Id = sibling.Id,
+                Order__c = sibling.Order__c
+            );
+            if (sibling.Id == draggedRecord.Id) {
+                siblingUpdate.Parent_Element_Id__c = draggedRecord.Parent_Element_Id__c;
+                siblingUpdate.Config_JSON__c = draggedRecord.Config_JSON__c;
+            }
+            siblingUpdates.add(siblingUpdate);
             orderValue += 10;
         }
-        update siblings;
+        update as user siblingUpdates;
     }
 
     @AuraEnabled
@@ -1070,7 +1298,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Element_Id__c, Element_Type__c
             FROM NF_Form_Element__c
             WHERE Id = :sectionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (sectionRecord.Element_Type__c != 'section' && sectionRecord.Element_Type__c != 'repeatGroup' && sectionRecord.Element_Type__c != 'group') {
             throw new AuraHandledException('Only sections, groups, or repeat groups can receive dropped elements.');
@@ -1080,7 +1308,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Element_Type__c, Config_JSON__c, Parent_Element_Id__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         validateContainerPlacement(sectionRecord, elementRecord);
@@ -1089,7 +1317,11 @@ public with sharing class NativeFormsDesignerController {
         config.put('sectionColumn', columnNumber);
         elementRecord.Config_JSON__c = JSON.serializePretty(config);
         elementRecord.Parent_Element_Id__c = sectionRecord.Element_Id__c;
-        update elementRecord;
+        update as user new NF_Form_Element__c(
+            Id = elementRecord.Id,
+            Parent_Element_Id__c = elementRecord.Parent_Element_Id__c,
+            Config_JSON__c = elementRecord.Config_JSON__c
+        );
     }
 
     @AuraEnabled
@@ -1106,13 +1338,13 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Form_Version__c, Element_Type__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         NF_Form_Element__c anchorRecord = [
             SELECT Id, Form_Version__c, Element_Id__c, Element_Type__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :anchorElementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         if (elementRecord.Form_Version__c != anchorRecord.Form_Version__c) {
@@ -1127,7 +1359,7 @@ public with sharing class NativeFormsDesignerController {
                 FROM NF_Form_Element__c
                 WHERE Element_Id__c = :targetParentElementId
                   AND Form_Version__c = :anchorRecord.Form_Version__c
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ];
             validateContainerPlacement(parentRecord, elementRecord);
         }
@@ -1147,7 +1379,7 @@ public with sharing class NativeFormsDesignerController {
             WHERE Form_Version__c = :anchorRecord.Form_Version__c
               AND Parent_Element_Id__c = :targetParentElementId
               AND Id != :elementId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ];
 
         Integer anchorIndex = -1;
@@ -1169,11 +1401,21 @@ public with sharing class NativeFormsDesignerController {
         }
 
         Integer orderValue = 10;
+        List<NF_Form_Element__c> siblingUpdates = new List<NF_Form_Element__c>();
         for (NF_Form_Element__c sibling : siblings) {
             sibling.Order__c = orderValue;
+            NF_Form_Element__c siblingUpdate = new NF_Form_Element__c(
+                Id = sibling.Id,
+                Order__c = sibling.Order__c
+            );
+            if (sibling.Id == elementRecord.Id) {
+                siblingUpdate.Parent_Element_Id__c = elementRecord.Parent_Element_Id__c;
+                siblingUpdate.Config_JSON__c = elementRecord.Config_JSON__c;
+            }
+            siblingUpdates.add(siblingUpdate);
             orderValue += 10;
         }
-        update siblings;
+        update as user siblingUpdates;
     }
 
     @AuraEnabled
@@ -1190,7 +1432,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         if (elementRecord.Element_Type__c != 'section' && elementRecord.Element_Type__c != 'group') {
@@ -1200,8 +1442,10 @@ public with sharing class NativeFormsDesignerController {
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         config.put('columns', columns);
         elementRecord.Config_JSON__c = JSON.serializePretty(config);
-        update elementRecord;
-
+        update as user new NF_Form_Element__c(
+            Id = elementRecord.Id,
+            Config_JSON__c = elementRecord.Config_JSON__c
+        );
         return toElementRecord(elementRecord);
     }
 
@@ -1228,7 +1472,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (elementRecord.Element_Type__c != 'image') {
             throw new AuraHandledException('Only image elements can receive uploaded image files.');
@@ -1240,13 +1484,12 @@ public with sharing class NativeFormsDesignerController {
             VersionData = EncodingUtil.base64Decode(base64Data),
             FirstPublishLocationId = versionId
         );
-        insert versionRecord;
-
+        insert as user versionRecord;
         versionRecord = [
             SELECT Id, ContentDocumentId, Title
             FROM ContentVersion
             WHERE Id = :versionRecord.Id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
@@ -1258,8 +1501,10 @@ public with sharing class NativeFormsDesignerController {
             config.put('altText', titleFromFileName(fileName));
         }
         elementRecord.Config_JSON__c = JSON.serializePretty(config);
-        update elementRecord;
-
+        update as user new NF_Form_Element__c(
+            Id = elementRecord.Id,
+            Config_JSON__c = elementRecord.Config_JSON__c
+        );
         UploadedImageResult result = new UploadedImageResult();
         result.contentDocumentId = versionRecord.ContentDocumentId;
         result.contentVersionId = versionRecord.Id;
@@ -1321,12 +1566,22 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultLabelForType(String elementType) {
+        return defaultLabelForType(elementType, null);
+    }
+
+    private static String defaultLabelForType(String elementType, String elementPreset) {
+        if (elementType == 'radio' && elementPreset == 'stars') return 'Rating';
+        if (elementType == 'radio' && elementPreset == 'nps') return 'How likely are you to recommend us?';
+        if (elementType == 'radio' && elementPreset == 'likert') return 'Agreement';
+        if (elementType == 'radio' && elementPreset == 'satisfaction') return 'Satisfaction';
+        if (elementType == 'ranking') return 'Rank these choices';
         if (elementType == 'section') return 'Section';
         if (elementType == 'repeatGroup') return 'Records List';
         if (elementType == 'group') return 'Group';
         if (elementType == 'heading') return 'Display Text';
         if (elementType == 'image') return 'Image';
         if (elementType == 'fileUpload') return 'File Upload';
+        if (elementType == 'signature') return 'Signature';
         if (elementType == 'checkbox') return 'Checkbox';
         if (elementType == 'textarea') return 'Textarea';
         if (elementType == 'number') return 'Number';
@@ -1341,7 +1596,11 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload', 'repeatGroup' }.contains(elementType)) {
+        return defaultFieldKeyForType(elementType, elementIndex, null);
+    }
+
+    private static String defaultFieldKeyForType(String elementType, Integer elementIndex, String elementPreset) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'fileUpload', 'signature', 'repeatGroup' }.contains(elementType)) {
             return null;
         }
         String prefix = 'field';
@@ -1355,7 +1614,13 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'url') prefix = 'url';
         if (elementType == 'select') prefix = 'picklist';
         if (elementType == 'radio') prefix = 'radio';
+        if (elementType == 'radio' && elementPreset == 'stars') prefix = 'rating';
+        if (elementType == 'radio' && elementPreset == 'nps') prefix = 'nps';
+        if (elementType == 'radio' && elementPreset == 'likert') prefix = 'likert';
+        if (elementType == 'radio' && elementPreset == 'satisfaction') prefix = 'satisfaction';
+        if (elementType == 'ranking') prefix = 'ranking';
         if (elementType == 'fileUpload') prefix = 'file';
+        if (elementType == 'signature') prefix = 'signature';
         if (elementType == 'text') prefix = 'text';
         if (elementType == 'repeatGroup') prefix = 'repeatGroup';
         Integer safeIndex = elementIndex == null || elementIndex <= 0 ? 1 : elementIndex;
@@ -1363,6 +1628,10 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultConfigJsonForType(String elementType, String languageCode) {
+        return defaultConfigJsonForType(elementType, languageCode, null);
+    }
+
+    private static String defaultConfigJsonForType(String elementType, String languageCode, String elementPreset) {
         Map<String, Object> config = new Map<String, Object>();
         if (elementType == 'text') {
             config.put('defaultValue', '');
@@ -1437,12 +1706,20 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'select' || elementType == 'radio') {
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
-            config.put('defaultValue', 'option1');
+            config.put('defaultValue', String.isNotBlank(elementPreset) ? '' : 'option1');
             config.put('required', false);
-            config.put('options', new List<Object>{
-                new Map<String, Object>{ 'label' => 'Option 1', 'value' => 'option1' },
-                new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
-            });
+            config.put('options', defaultOptionsForPreset(elementPreset));
+            if (String.isNotBlank(elementPreset)) {
+                config.put('presentation', elementPreset);
+            }
+        }
+        if (elementType == 'ranking') {
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+            config.put('defaultValue', '');
+            config.put('required', false);
+            config.put('presentation', 'ranking');
+            config.put('options', defaultOptionsForPreset('ranking'));
         }
         if (elementType == 'fileUpload') {
             config.put('labelPosition', 'above');
@@ -1450,6 +1727,13 @@ public with sharing class NativeFormsDesignerController {
             config.put('allowMultiple', false);
             config.put('allowedExtensions', new List<Object>{ 'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx' });
             config.put('maxFileSizeMb', 10);
+            config.put('targetSubmitActionKey', '');
+        }
+        if (elementType == 'signature') {
+            config.put('labelPosition', 'above');
+            config.put('required', false);
+            config.put('helpText', '');
+            config.put('clearButtonLabel', NativeFormsRuntimeI18n.text(languageCode, 'signatureClear', 'Clear'));
             config.put('targetSubmitActionKey', '');
         }
         if (elementType == 'section') {
@@ -1478,6 +1762,65 @@ public with sharing class NativeFormsDesignerController {
             config.put('altText', 'Image preview');
         }
         return JSON.serializePretty(config);
+    }
+
+    private static String normalizeElementPreset(String elementType, String elementPreset) {
+        String preset = String.isBlank(elementPreset) ? '' : elementPreset.trim().toLowerCase();
+        if (elementType == 'ranking') {
+            return 'ranking';
+        }
+        if (elementType != 'radio') {
+            return '';
+        }
+        return new Set<String>{ 'stars', 'nps', 'likert', 'satisfaction' }.contains(preset) ? preset : '';
+    }
+
+    private static List<Object> defaultOptionsForPreset(String elementPreset) {
+        if (elementPreset == 'stars') {
+            return new List<Object>{
+                new Map<String, Object>{ 'label' => '1 star', 'value' => '1' },
+                new Map<String, Object>{ 'label' => '2 stars', 'value' => '2' },
+                new Map<String, Object>{ 'label' => '3 stars', 'value' => '3' },
+                new Map<String, Object>{ 'label' => '4 stars', 'value' => '4' },
+                new Map<String, Object>{ 'label' => '5 stars', 'value' => '5' }
+            };
+        }
+        if (elementPreset == 'nps') {
+            List<Object> options = new List<Object>();
+            for (Integer index = 0; index <= 10; index++) {
+                options.add(new Map<String, Object>{ 'label' => String.valueOf(index), 'value' => String.valueOf(index) });
+            }
+            return options;
+        }
+        if (elementPreset == 'likert') {
+            return new List<Object>{
+                new Map<String, Object>{ 'label' => 'Strongly disagree', 'value' => 'strongly_disagree' },
+                new Map<String, Object>{ 'label' => 'Disagree', 'value' => 'disagree' },
+                new Map<String, Object>{ 'label' => 'Neutral', 'value' => 'neutral' },
+                new Map<String, Object>{ 'label' => 'Agree', 'value' => 'agree' },
+                new Map<String, Object>{ 'label' => 'Strongly agree', 'value' => 'strongly_agree' }
+            };
+        }
+        if (elementPreset == 'satisfaction') {
+            return new List<Object>{
+                new Map<String, Object>{ 'label' => 'Very unsatisfied', 'value' => 'very_unsatisfied' },
+                new Map<String, Object>{ 'label' => 'Unsatisfied', 'value' => 'unsatisfied' },
+                new Map<String, Object>{ 'label' => 'Neutral', 'value' => 'neutral' },
+                new Map<String, Object>{ 'label' => 'Satisfied', 'value' => 'satisfied' },
+                new Map<String, Object>{ 'label' => 'Very satisfied', 'value' => 'very_satisfied' }
+            };
+        }
+        if (elementPreset == 'ranking') {
+            return new List<Object>{
+                new Map<String, Object>{ 'label' => 'Quality', 'value' => 'quality' },
+                new Map<String, Object>{ 'label' => 'Price', 'value' => 'price' },
+                new Map<String, Object>{ 'label' => 'Support', 'value' => 'support' }
+            };
+        }
+        return new List<Object>{
+            new Map<String, Object>{ 'label' => 'Option 1', 'value' => 'option1' },
+            new Map<String, Object>{ 'label' => 'Option 2', 'value' => 'option2' }
+        };
     }
 
     private static String titleFromFileName(String fileName) {
@@ -1704,6 +2047,11 @@ public with sharing class NativeFormsDesignerController {
         return parsedValue < 0 ? 0 : parsedValue;
     }
 
+    private static String defaultSubmissionPdfTitle(String value) {
+        String trimmedValue = String.isBlank(value) ? '' : value.trim();
+        return String.isBlank(trimmedValue) ? 'Submitted Response' : trimmedValue.left(120);
+    }
+
     private static String defaultConditionalOperator(String value) {
         String normalized = String.isBlank(value) ? 'equals' : value.trim();
         Set<String> allowed = new Set<String>{ 'equals', 'notEquals', 'isTrue', 'isFalse', 'isBlank', 'isNotBlank' };
@@ -1813,6 +2161,9 @@ public with sharing class NativeFormsDesignerController {
         }
         if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'fileUpload') {
             throw new AuraHandledException('File Upload fields are not supported inside repeat groups in Pro V1.');
+        }
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'signature') {
+            throw new AuraHandledException('Signature fields are not supported inside repeat groups in Pro V1.');
         }
         if (sectionRecord.Element_Type__c == 'group' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group')) {
             throw new AuraHandledException('Groups can contain fields and display elements, but not other containers.');
@@ -1939,7 +2290,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Version_Status__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (versionRecord.Version_Status__c == 'Published') {
             throw new AuraHandledException('Published versions are read-only. Open the latest draft version to continue editing.');
@@ -1951,7 +2302,7 @@ public with sharing class NativeFormsDesignerController {
             SELECT Id, Form_Version__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         ensureVersionEditable(elementRecord.Form_Version__c);
     }
@@ -1963,7 +2314,7 @@ public with sharing class NativeFormsDesignerController {
         AggregateResult[] rows = [
             SELECT MAX(Element_Index__c) maxIndex
             FROM NF_Form_Element__c
-            WHERE Form_Version__r.Form__c = :formId
+            WHERE Form_Version__r.Form__c = :formId WITH USER_MODE
         ];
         if (!rows.isEmpty() && rows[0].get('maxIndex') != null) {
             return Integer.valueOf(String.valueOf(rows[0].get('maxIndex'))) + 1;

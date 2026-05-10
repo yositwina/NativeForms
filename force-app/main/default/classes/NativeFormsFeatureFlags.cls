@@ -31,6 +31,18 @@ public with sharing class NativeFormsFeatureFlags {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProLoadFile');
     }
 
+    public static Boolean isProElectronicSignatureEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProElectronicSignature');
+    }
+
+    public static Boolean isProSubmissionPdfEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSubmissionPdf');
+    }
+
+    public static Boolean isProSurveyFieldsEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSurveyFields');
+    }
+
     public static Boolean isProCustomJsEnabled() {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProCustomJs');
     }

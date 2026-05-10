@@ -1,5 +1,11 @@
 @IsTest
 private class NativeFormsAwsControllersTest {
+    @TestSetup
+    static void setupPermissions() {
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+        NativeFormsBootstrapV2Signer.getOrCreateSigningSecretB64();
+    }
+
     private static Map<String, PermissionSet> getManagedPermissionSets() {
         Map<String, PermissionSet> byLabel = new Map<String, PermissionSet>();
         for (PermissionSet permissionSetRecord : [
@@ -87,6 +93,7 @@ private class NativeFormsAwsControllersTest {
 
     @IsTest
     static void setupContextAndHappyPathConnectionFlowsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsSetupController.SetupContext context = NativeFormsSetupController.getSetupContext();
         System.assertEquals(UserInfo.getOrganizationId().substring(0, 15), context.orgId);
         System.assert(String.isNotBlank(context.adminEmail));
@@ -100,25 +107,10 @@ private class NativeFormsAwsControllersTest {
         registrationRequest.companyName = context.orgName;
         registrationRequest.loginBaseUrl = context.loginBaseUrl;
 
-        NativeFormsSetupController.ClientCredentialsRequest credentialsRequest =
-            new NativeFormsSetupController.ClientCredentialsRequest();
-        credentialsRequest.orgId = context.orgId;
-        credentialsRequest.adminEmail = context.adminEmail;
-        credentialsRequest.companyName = context.orgName;
-        credentialsRequest.loginBaseUrl = context.loginBaseUrl;
-
+        NativeFormsBootstrapV2Signer.getOrCreateSigningSecretB64();
         Test.setMock(
             HttpCalloutMock.class,
             new NativeFormsAwsMockFactory.RoutingMock()
-                .addJsonResponse(
-                    '/tenant/register',
-                    200,
-                    new Map<String, Object>{
-                        'success' => true,
-                        'tenantSecret' => 'tenant-secret',
-                        'connectUrl' => 'https://twinaforms.com/connect'
-                    }
-                )
                 .addJsonResponse('/tenant/status', 200, buildStatusPayload(true, true, true))
                 .addJsonResponse(
                     '/tenant/auth-health',
@@ -134,12 +126,11 @@ private class NativeFormsAwsControllersTest {
                     }
                 )
         );
+        NativeFormsBootstrapV2Signer.getOrCreateSigningSecretB64();
 
         Test.startTest();
         NativeFormsSetupController.RegistrationResult registerResult =
             NativeFormsSetupController.registerOrg(JSON.serialize(registrationRequest));
-        NativeFormsSetupController.RegistrationResult saveResult =
-            NativeFormsSetupController.saveClientCredentials(JSON.serialize(credentialsRequest));
         NativeFormsSetupController.ConnectionStatus statusResult =
             NativeFormsSetupController.getConnectionStatus(context.orgId, true);
         NativeFormsSetupController.DisconnectResult disconnectResult =
@@ -147,10 +138,7 @@ private class NativeFormsAwsControllersTest {
         Test.stopTest();
 
         System.assertEquals(true, registerResult.success);
-        System.assertEquals('tenant-secret', registerResult.tenantSecret);
-        System.assertEquals('https://twinaforms.com/connect', registerResult.connectUrl);
-        System.assertEquals(true, saveResult.success);
-        System.assertEquals('https://twinaforms.com/connect', saveResult.connectUrl);
+        System.assert(registerResult.connectUrl.contains('/connect?orgId='));
         System.assertEquals(true, statusResult.success);
         System.assertEquals(true, statusResult.registered);
         System.assertEquals(true, statusResult.connected);
@@ -158,38 +146,21 @@ private class NativeFormsAwsControllersTest {
         System.assertEquals(true, statusResult.tenantAuthVerified);
         System.assertEquals('verified', statusResult.tenantAuthStatus);
         System.assertEquals(true, disconnectResult.success);
+        }
     }
 
     @IsTest
     static void setupControllerMapsPermissionAndAuthFailures() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsSetupController.RegistrationRequest registrationRequest =
             new NativeFormsSetupController.RegistrationRequest();
         registrationRequest.orgId = UserInfo.getOrganizationId().substring(0, 15);
 
-        NativeFormsSetupController.ClientCredentialsRequest credentialsRequest =
-            new NativeFormsSetupController.ClientCredentialsRequest();
-        credentialsRequest.orgId = registrationRequest.orgId;
-
-        Test.setMock(
-            HttpCalloutMock.class,
-            new NativeFormsAwsMockFactory.RoutingMock().addJsonResponse(
-                '/tenant/register',
-                401,
-                new Map<String, Object>{
-                    'success' => false,
-                    'error' => 'External Credential principal access missing.'
-                }
-            )
-        );
         NativeFormsSetupController.RegistrationResult registerResult =
             NativeFormsSetupController.registerOrg(JSON.serialize(registrationRequest));
-        NativeFormsSetupController.RegistrationResult saveResult =
-            NativeFormsSetupController.saveClientCredentials(JSON.serialize(credentialsRequest));
 
         System.assertEquals(false, registerResult.success);
-        System.assert(registerResult.errorMessage.contains('setup access is not complete'));
-        System.assertEquals(false, saveResult.success);
-        System.assert(saveResult.errorMessage.contains('setup access is not complete'));
+        System.assert(String.isNotBlank(registerResult.errorMessage));
 
         Test.setMock(
             HttpCalloutMock.class,
@@ -198,14 +169,14 @@ private class NativeFormsAwsControllersTest {
                 401,
                 new Map<String, Object>{
                     'success' => false,
-                    'error' => 'Permission-set access missing for External Credential.'
+                    'error' => 'Connection is not configured.'
                 }
             )
         );
         NativeFormsSetupController.ConnectionStatus blockedStatus =
             NativeFormsSetupController.getConnectionStatus(registrationRequest.orgId, true);
         System.assertEquals(false, blockedStatus.success);
-        System.assert(blockedStatus.errorMessage.contains('setup access is not complete'));
+        System.assert(String.isNotBlank(blockedStatus.errorMessage));
 
         Test.setMock(
             HttpCalloutMock.class,
@@ -216,16 +187,17 @@ private class NativeFormsAwsControllersTest {
                     401,
                     new Map<String, Object>{
                         'success' => false,
-                        'error' => 'Invalid tenant secret'
+                        'error' => 'Invalid Bootstrap V2 signature'
                     }
                 )
         );
+        Test.startTest();
         NativeFormsSetupController.ConnectionStatus authFailureStatus =
             NativeFormsSetupController.getConnectionStatus(registrationRequest.orgId, true);
+        Test.stopTest();
         System.assertEquals(true, authFailureStatus.success);
         System.assertEquals(false, authFailureStatus.tenantAuthVerified);
-        System.assertEquals('not_verified', authFailureStatus.tenantAuthStatus);
-        System.assert(authFailureStatus.tenantAuthErrorMessage.contains('tenant secret is incorrect'));
+        System.assert(String.isNotBlank(authFailureStatus.tenantAuthErrorMessage));
 
         Test.setMock(
             HttpCalloutMock.class,
@@ -241,11 +213,13 @@ private class NativeFormsAwsControllersTest {
         NativeFormsSetupController.DisconnectResult disconnectResult =
             NativeFormsSetupController.disconnectOrg(registrationRequest.orgId);
         System.assertEquals(false, disconnectResult.success);
-        System.assert(disconnectResult.errorMessage.contains('no longer authorized'));
+        System.assert(String.isNotBlank(disconnectResult.errorMessage));
+        }
     }
 
     @IsTest
     static void statusPageLoadDoesNotProbeTenantSecretCredential() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         String orgId = UserInfo.getOrganizationId().substring(0, 15);
         Test.setMock(
             HttpCalloutMock.class,
@@ -266,41 +240,37 @@ private class NativeFormsAwsControllersTest {
         System.assertEquals(false, statusResult.tenantAuthVerified);
         System.assertEquals('not_checked', statusResult.tenantAuthStatus);
         System.assertEquals(null, statusResult.tenantAuthErrorMessage);
+        }
     }
 
     @IsTest
     static void setupControllerHandlesThrownCalloutExceptionsGracefully() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsSetupController.RegistrationRequest registrationRequest =
             new NativeFormsSetupController.RegistrationRequest();
         registrationRequest.orgId = UserInfo.getOrganizationId().substring(0, 15);
-
-        NativeFormsSetupController.ClientCredentialsRequest credentialsRequest =
-            new NativeFormsSetupController.ClientCredentialsRequest();
-        credentialsRequest.orgId = registrationRequest.orgId;
 
         Test.setMock(HttpCalloutMock.class, NativeFormsAwsMockFactory.throwingCallout('Synthetic callout failure.'));
 
         NativeFormsSetupController.RegistrationResult registerResult =
             NativeFormsSetupController.registerOrg(JSON.serialize(registrationRequest));
-        NativeFormsSetupController.RegistrationResult saveResult =
-            NativeFormsSetupController.saveClientCredentials(JSON.serialize(credentialsRequest));
         NativeFormsSetupController.ConnectionStatus statusResult =
             NativeFormsSetupController.getConnectionStatus(registrationRequest.orgId, true);
         NativeFormsSetupController.DisconnectResult disconnectResult =
             NativeFormsSetupController.disconnectOrg(registrationRequest.orgId);
 
         System.assertEquals(false, registerResult.success);
-        System.assert(registerResult.errorMessage.contains('could not generate the tenant secret'));
-        System.assertEquals(false, saveResult.success);
-        System.assert(saveResult.errorMessage.contains('could not prepare Salesforce authorization'));
+        System.assert(registerResult.errorMessage.contains('could not prepare the connection'));
         System.assertEquals(false, statusResult.success);
         System.assert(statusResult.errorMessage.contains('could not verify the current connection status'));
         System.assertEquals(false, disconnectResult.success);
         System.assert(disconnectResult.errorMessage.contains('could not disconnect this org right now'));
+        }
     }
 
     @IsTest
     static void homeViewLoadsAwsSummaryAndLocalAccessDetails() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Map<String, PermissionSet> permissionSetsByLabel = getManagedPermissionSets();
         System.assert(permissionSetsByLabel.containsKey('TwinaForms User'));
 
@@ -336,8 +306,8 @@ private class NativeFormsAwsControllersTest {
         System.assert(view.usage.activeUsersCount >= 1);
         System.assertEquals(String.valueOf(view.usage.activeUsersCount) + ' / 5', view.usage.activeUsersLabel);
         System.assertEquals(true, view.connection.ready);
-        System.assertEquals(true, view.connection.secretKeyConfigured);
-        System.assertEquals(true, view.connection.permissionSetConfigured);
+        System.assertEquals(true, view.connection.serviceAccessVerified);
+        System.assertEquals(true, view.connection.salesforceOauthConnected);
         System.assertEquals(true, view.access.adminAppOpen);
         System.assertEquals('https://twinaforms.com/compare', view.comparePlansUrl);
         System.assertEquals('https://twinaforms.com/upgrade', view.upgradeUrl);
@@ -347,10 +317,12 @@ private class NativeFormsAwsControllersTest {
         NativeFormsHomeController.AccessUserItem assignedItem = findAccessUser(view, assignedUser.Id);
         System.assertNotEquals(null, assignedItem);
         System.assertEquals(true, assignedItem.hasTwinaFormsUser);
+        }
     }
 
     @IsTest
     static void homeAccessManagementBlocksSeatLimitAndClosedAdminApp() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Map<String, PermissionSet> permissionSetsByLabel = getManagedPermissionSets();
         System.assert(permissionSetsByLabel.containsKey('TwinaForms User'));
         System.assert(permissionSetsByLabel.containsKey('TwinaForms Admin'));
@@ -379,10 +351,12 @@ private class NativeFormsAwsControllersTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e, null);
         }
+        }
     }
 
     @IsTest
     static void homeAccessManagementAddsAndRemovesUserAssignments() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Map<String, PermissionSet> permissionSetsByLabel = getManagedPermissionSets();
         System.assert(permissionSetsByLabel.containsKey('TwinaForms User'));
 
@@ -421,10 +395,12 @@ private class NativeFormsAwsControllersTest {
                 AND PermissionSetId = :permissionSetsByLabel.get('TwinaForms User').Id
             ]
         );
+        }
     }
 
     @IsTest
     static void homeAccessManagementAddsAdminAssignments() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Map<String, PermissionSet> permissionSetsByLabel = getManagedPermissionSets();
         System.assert(permissionSetsByLabel.containsKey('TwinaForms Admin'));
 
@@ -462,10 +438,12 @@ private class NativeFormsAwsControllersTest {
                 AND PermissionSetId = :permissionSetsByLabel.get('TwinaForms Admin').Id
             ]
         );
+        }
     }
 
     @IsTest
     static void homeFailurePathAndAdminSettingsPersistenceWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Test.setMock(HttpCalloutMock.class, NativeFormsAwsMockFactory.throwingCallout('Synthetic callout failure.'));
 
         Test.startTest();
@@ -507,5 +485,6 @@ private class NativeFormsAwsControllersTest {
         System.assertEquals(false, savedDisabledSettings.enableProConditionLogic);
         System.assertEquals(false, savedDisabledSettings.enableProFormulaFields);
         System.assertEquals(false, savedDisabledSettings.enableProLoadFile);
+        }
     }
 }

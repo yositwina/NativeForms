@@ -1,5 +1,10 @@
 @IsTest
 private class NativeFormsActionControllersTest {
+    @TestSetup
+    static void setupPermissions() {
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+    }
+
     private static NativeFormsTenantEntitlements.EntitlementSnapshot buildEntitlementsSnapshot(
         Boolean enableConditionLogic,
         Boolean enableRepeatGroups,
@@ -116,6 +121,7 @@ private class NativeFormsActionControllersTest {
 
     @IsTest
     static void prefillWorkspaceExposesActionsAliasesMappingsAndFieldOptions() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllActionFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Prefill Workspace Test');
@@ -177,10 +183,12 @@ private class NativeFormsActionControllersTest {
         System.assertEquals('Email', workspace.mappings[0].fieldPath);
         System.assertEquals(true, workspace.enableProConditionLogic);
         System.assertEquals(true, workspace.enableProPrefillAliasReferences);
+        }
     }
 
     @IsTest
     static void prefillAddSaveDeleteAndOptionLookupWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllActionFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Prefill CRUD Test');
@@ -243,10 +251,12 @@ private class NativeFormsActionControllersTest {
 
         NativeFormsPrefillActionsController.deletePrefillAction(addedAction.id);
         System.assertEquals(0, [SELECT count() FROM NF_Form_Action__c WHERE Id = :addedAction.id]);
+        }
     }
 
     @IsTest
     static void prefillEntitlementAndPublishedVersionGuardsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Prefill Guard Test');
         NF_Form_Version__c draftVersion = NativeFormsTestDataFactory.createDraftVersion(formRecord.Id);
         NF_Form_Version__c publishedVersion = NativeFormsTestDataFactory.createVersion(
@@ -314,10 +324,12 @@ private class NativeFormsActionControllersTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        }
     }
 
     @IsTest
     static void submitWorkspaceExposesActionsAliasesMappingsAndRepeatGroups() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllActionFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Submit Workspace Test');
@@ -383,10 +395,12 @@ private class NativeFormsActionControllersTest {
         System.assertEquals(1, workspace.mappings.size());
         System.assertEquals('submitContact', workspace.mappings[0].actionKey);
         System.assertEquals('Email', workspace.mappings[0].fieldPath);
+        }
     }
 
     @IsTest
     static void submitAddSaveDeleteAndFieldLookupWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllActionFlagsEnabled();
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Submit CRUD Test');
@@ -443,10 +457,12 @@ private class NativeFormsActionControllersTest {
 
         NativeFormsSubmitActionsController.deleteSubmitAction(addedAction.id);
         System.assertEquals(0, [SELECT count() FROM NF_Form_Action__c WHERE Id = :addedAction.id]);
+        }
     }
 
     @IsTest
     static void submitEntitlementAndPublishedVersionGuardsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Submit Guard Test');
         NF_Form_Version__c draftVersion = NativeFormsTestDataFactory.createDraftVersion(formRecord.Id);
         NF_Form_Version__c publishedVersion = NativeFormsTestDataFactory.createVersion(
@@ -590,6 +606,7 @@ private class NativeFormsActionControllersTest {
             System.assert(false, 'Published versions should remain read-only.');
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
+        }
         }
     }
 }

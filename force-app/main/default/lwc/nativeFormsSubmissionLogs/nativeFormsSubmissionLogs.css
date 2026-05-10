@@ -352,18 +352,6 @@
     margin: 0.8rem 0 0.55rem;
 }
 
-.raw-json {
-    background: #0f172a;
-    border-radius: 0.85rem;
-    color: #dbe7ff;
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: 0.8rem;
-    margin: 0;
-    overflow: auto;
-    padding: 1rem;
-    white-space: pre-wrap;
-}
-
 .empty-state {
     border: 1px dashed #ccd8e6;
     border-radius: 0.95rem;

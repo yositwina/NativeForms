@@ -1,5 +1,10 @@
 @IsTest
 private class NativeFormsDemoDataTest {
+    @TestSetup
+    static void setupPermissions() {
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+    }
+
     private static final List<String> DEMO_THEME_NAMES = new List<String>{
         'Ocean Blue',
         'Deep Blue',
@@ -26,15 +31,18 @@ private class NativeFormsDemoDataTest {
 
     @IsTest
     static void homeSnapshotShowsEmptyBaselineBeforeInstall() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsDemoDataService.HomeSnapshot serviceSnapshot = NativeFormsDemoDataService.getHomeSnapshot();
         NativeFormsDemoDataService.HomeSnapshot controllerSnapshot = NativeFormsDemoDataController.getHomeState();
 
         assertBaselineSnapshot(serviceSnapshot);
         assertBaselineSnapshot(controllerSnapshot);
+        }
     }
 
     @IsTest
     static void controllerFailureFormattingHelpersWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         System.assertEquals('Unknown error', NativeFormsDemoDataController.formatExceptionForTest(null), 'Null exceptions should fall back to the unknown-error label.');
 
         String formatted = NativeFormsDemoDataController.formatExceptionForTest(new IllegalArgumentException('Example install failure'));
@@ -49,10 +57,12 @@ private class NativeFormsDemoDataTest {
         } finally {
             NativeFormsDemoDataController.forceInstallFailureForTest = false;
         }
+        }
     }
 
     @IsTest
     static void installCreatesExpectedArtifactsAndControllerState() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         Test.startTest();
         NativeFormsDemoDataService.InstallSummary summary = NativeFormsDemoDataController.installDemoData();
         Test.stopTest();
@@ -99,10 +109,12 @@ private class NativeFormsDemoDataTest {
         System.assertEquals(2, controllerSnapshot.installedContactCount, 'Installed contact count should match seeded data.');
         System.assertEquals(4, controllerSnapshot.installedCaseCount, 'Installed case count should match seeded data.');
         System.assertEquals(2, controllerSnapshot.installedFormCount, 'Installed form count should match seeded data.');
+        }
     }
 
     @IsTest
     static void secondInstallReturnsAlreadyInstalledWithoutDuplicates() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsDemoDataService.installDemoData();
 
         Test.startTest();
@@ -123,10 +135,12 @@ private class NativeFormsDemoDataTest {
         System.assertEquals(2, demoFormIds.size(), 'Second install should not duplicate forms.');
         System.assertEquals(6, [SELECT Count() FROM NF_Form_Action__c WHERE Form_Version__r.Form__c IN :demoFormIds], 'Second install should not duplicate actions.');
         System.assertEquals(15, [SELECT Count() FROM NF_Form_Element__c WHERE Form_Version__r.Form__c IN :demoFormIds], 'Second install should not duplicate elements.');
+        }
     }
 
     @IsTest
     static void reinstallRepairsArtifactsWhenVersionDrifts() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsDemoDataService.installDemoData();
 
         NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
@@ -157,10 +171,12 @@ private class NativeFormsDemoDataTest {
         System.assertEquals(6, [SELECT Count() FROM NF_Form_Action__c WHERE Form_Version__r.Form__c IN :demoFormIds], 'Repair install should recreate missing demo actions.');
         System.assertEquals(2, demoFormIds.size(), 'Repair install should reuse the seeded form rows instead of creating duplicates.');
         System.assertEquals(2, [SELECT Count() FROM NF_Form_Version__c WHERE Form__c IN :demoFormIds], 'Repair install should reuse the seeded form versions.');
+        }
     }
 
     @IsTest
     static void jsonTrackerSnapshotAndHigherExistingKeysAreHandled() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         insert NativeFormsTestDataFactory.buildForm('Existing non-demo form', null, 'form9');
 
         NativeFormsDemoDataService.installDemoData();
@@ -201,6 +217,7 @@ private class NativeFormsDemoDataTest {
         System.assertEquals(2, snapshot.installedContactCount, 'JSON tracker should still count the installed contacts.');
         System.assertEquals(4, snapshot.installedCaseCount, 'JSON tracker should still count the installed cases.');
         System.assertEquals(2, snapshot.installedFormCount, 'JSON tracker should still count the installed forms.');
+        }
     }
 
     private static void assertBaselineSnapshot(NativeFormsDemoDataService.HomeSnapshot snapshot) {

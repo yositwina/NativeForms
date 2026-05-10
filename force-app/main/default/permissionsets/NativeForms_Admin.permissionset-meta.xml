@@ -168,11 +168,6 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>NativeForms_Config__c.Captcha_Secret_Key__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
         <field>NativeForms_Config__c.Captcha_Site_Key__c</field>
         <readable>true</readable>
     </fieldPermissions>

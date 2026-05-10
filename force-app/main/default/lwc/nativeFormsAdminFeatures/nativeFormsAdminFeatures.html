@@ -19,7 +19,7 @@
 
                         <div class="status-box">
                             <p class="status-line"><strong>Salesforce Connection:</strong> {salesforceConnectionLabel}</p>
-                            <p class="status-line"><strong>Tenant Secret Auth:</strong> {tenantSecretAuthLabel}</p>
+                            <p class="status-line"><strong>Signed Service Access:</strong> {serviceAccessLabel}</p>
                             <p class="status-line"><strong>Setup State:</strong> {setupState}</p>
                             <template if:true={tenantAuthErrorMessage}>
                                 <p class="status-error">{tenantAuthErrorMessage}</p>
@@ -39,7 +39,7 @@
                             </lightning-button>
                         </div>
 
-                        <p class="feature-copy">Disconnect clears the Salesforce OAuth connection only. It keeps the tenant registration and tenant secret in place so you can reconnect quickly.</p>
+                        <p class="feature-copy">Disconnect clears the Salesforce OAuth connection only. It keeps the customer registration in place so you can reconnect quickly.</p>
 
                         <h3>Google CAPTCHA</h3>
                         <p class="feature-copy">CAPTCHA is now managed centrally by TwinaForms for forms published on <strong>forms.twinaforms.com</strong>. Customers do not need to paste or manage Google CAPTCHA keys in Salesforce.</p>

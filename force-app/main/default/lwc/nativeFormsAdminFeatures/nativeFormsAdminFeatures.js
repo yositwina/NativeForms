@@ -97,7 +97,7 @@ export default class NativeFormsAdminFeatures extends LightningElement {
         return 'Not registered';
     }
 
-    get tenantSecretAuthLabel() {
+    get serviceAccessLabel() {
         if (this.tenantAuthVerified) {
             return 'Verified';
         }

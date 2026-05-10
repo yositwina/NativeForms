@@ -10,7 +10,7 @@
                     <p class="status-panel__title">Connection Status</p>
                     <p class="status-panel__line"><strong>Status:</strong> {connectionStatusLabel}</p>
                     <p class="status-panel__line"><strong>Salesforce Connection:</strong> {salesforceConnectionLabel}</p>
-                    <p class="status-panel__line"><strong>Tenant Secret Auth:</strong> {tenantSecretAuthLabel}</p>
+                    <p class="status-panel__line"><strong>Service Access:</strong> {serviceAccessLabel}</p>
                     <p class="status-panel__line"><strong>Setup State:</strong> {setupState}</p>
                     <p class="status-panel__line"><strong>Org Id:</strong> {orgId}</p>
                 </div>
@@ -20,10 +20,10 @@
                 <lightning-spinner alternative-text="Loading setup context" size="small"></lightning-spinner>
             </template>
 
-            <template if:true={showTenantSetupCompleteBanner}>
+            <template if:true={showOauthCompleteBanner}>
                 <div class="stage-complete slds-m-bottom_medium">
                     <p class="stage-complete__title">Step 1 Complete</p>
-                    <p class="stage-complete__text">Tenant secret is verified and TwinaForms can authenticate this org.</p>
+                    <p class="stage-complete__text">Salesforce OAuth connection is active.</p>
                 </div>
             </template>
 
@@ -32,46 +32,18 @@
                     <div class="setup-stage__header">
                         <div>
                             <p class="setup-stage__eyebrow">Step 1</p>
-                            <h2 class="setup-stage__title">Generate and verify the tenant secret</h2>
+                            <h2 class="setup-stage__title">Connect Salesforce</h2>
                         </div>
                     </div>
 
                     <div class="instruction-box slds-m-top_medium">
-                        <p class="instruction-title"><strong>Do this first</strong></p>
-                        <ol class="instruction-list">
-                            <li class="instruction-step">
-                                <div class="instruction-step__content">
-                                    <p class="instruction-text-block">
-                                        Create the service-access permission set that lets TwinaForms call AWS from this org.
-                                    </p>
-                                    <p class="instruction-text-block slds-m-top_small">
-                                        Create a new permission set with <strong>Label = TwinaForms Credentials</strong> and <strong>API Name = TwinaForms_Credentials</strong>.
-                                    </p>
-                                    <p class="instruction-text-block slds-m-top_small">
-                                        Open <strong>TwinaForms Credentials</strong>, then open <strong>External Credential Principal Access</strong>.
-                                    </p>
-                                </div>
-                            </li>
-                            <li class="instruction-step">
-                                <div class="instruction-step__content">
-                                    <p class="instruction-text-block">
-                                        Move these two principals from left to right, then click <strong>Save</strong>.
-                                    </p>
-                                    <div class="instruction-detail">TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal</div>
-                                    <div class="instruction-detail">TwinaFormsLambdaAuth - TwinaFormsSharedSecret</div>
-                                    <p class="instruction-text-block slds-m-top_small">
-                                        Assign <strong>TwinaForms Credentials</strong> to the setup admin opening this page. After Step 2, use <strong>Grant Seat</strong> below to add TwinaForms users.
-                                    </p>
-                                </div>
-                            </li>
-                            <li>Click <strong>Generate Secret</strong> below.</li>
-                            <li>
-                                Open <strong>Named Credentials &gt; TwinaForms &gt; TwinaFormsSharedSecret</strong>.
-                                Edit <strong>TwinaFormsSharedSecret</strong> with the right-arrow action, then click <strong>Add</strong>.
-                                Set <strong>Name</strong> to <strong>secret</strong> and set <strong>Value</strong> to the generated tenant secret code.
-                            </li>
-                            <li>Click <strong>Test Tenant Secret</strong> to verify the setup.</li>
-                        </ol>
+                        <p class="instruction-title"><strong>Start here</strong></p>
+                        <p class="instruction-text-block">
+                            Click <strong>Prepare Connection</strong>. TwinaForms will create the org registration and prepare the Salesforce authorization link.
+                        </p>
+                        <p class="instruction-text-block slds-m-top_small">
+                            Salesforce will open a secure OAuth connection to TwinaForms. After approval, secure service access is verified automatically.
+                        </p>
                     </div>
 
                     <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium">
@@ -89,14 +61,14 @@
                         <template if:true={showGenerateSecretAction}>
                             <lightning-button
                                 variant="brand"
-                                label="Generate Secret"
+                                label="Prepare Connection"
                                 onclick={handleGenerateSecret}
                                 disabled={actionDisabled}>
                             </lightning-button>
                         </template>
                         <template if:true={showTestTenantAction}>
                             <lightning-button
-                                label="Test Tenant Secret"
+                                label="Test Service Access"
                                 onclick={handleTestTenantSetup}
                                 disabled={actionDisabled}>
                             </lightning-button>
@@ -109,27 +81,13 @@
                         </div>
                     </template>
 
-                    <template if:true={hasTenantSecret}>
-                        <div class="instruction-box slds-m-top_medium">
-                            <p class="instruction-title">Tenant Secret Code</p>
-                            <p class="result-text">{tenantSecret}</p>
-                            <p class="tenant-secret-note">This code is shown here for 5 minutes only. After that, use the admin email inbox.</p>
-                        </div>
-                    </template>
-
-                    <template if:true={showTenantSecretExpiredMessage}>
-                        <div class="instruction-box slds-m-top_medium">
-                            <p class="instruction-title">Tenant Secret Code</p>
-                            <p class="result-text">This code is no longer shown here. Please check the admin email inbox for the tenant secret.</p>
-                        </div>
-                    </template>
                 </section>
             </template>
 
-            <template if:true={showOauthCompleteBanner}>
+            <template if:true={showServiceAccessCompleteBanner}>
                 <div class="stage-complete slds-m-bottom_medium">
                     <p class="stage-complete__title">Step 2 Complete</p>
-                    <p class="stage-complete__text">Salesforce OAuth connection is active.</p>
+                    <p class="stage-complete__text">TwinaForms secure service access is verified for this org.</p>
                 </div>
             </template>
 
@@ -137,7 +95,7 @@
                 <section class="setup-stage">
                     <div class="setup-stage__header">
                         <div>
-                            <p class="setup-stage__eyebrow">Step 2</p>
+                            <p class="setup-stage__eyebrow">Step 1</p>
                             <h2 class="setup-stage__title">Connect Salesforce</h2>
                         </div>
                     </div>
@@ -148,7 +106,7 @@
                             Click <strong>Connect TwinaForms</strong> and approve access in the Salesforce window that opens.
                         </p>
                         <p class="instruction-text-block slds-m-top_small">
-                            After approval, return here. This page will refresh the connection status automatically.
+                            After approval, return here. This page will refresh automatically and verify secure service access.
                         </p>
                     </div>
 
@@ -180,6 +138,36 @@
                             <p class="awaiting-auth-box__text">
                                 After you finish authentication there, this page will refresh the connection status automatically.
                             </p>
+                        </div>
+                    </template>
+                </section>
+            </template>
+
+            <template if:true={showServiceAccessStage}>
+                <section class="setup-stage slds-m-bottom_large">
+                    <div class="setup-stage__header">
+                        <div>
+                            <p class="setup-stage__eyebrow">Step 2</p>
+                            <h2 class="setup-stage__title">Verify secure service access</h2>
+                        </div>
+                    </div>
+
+                    <div class="instruction-box slds-m-top_medium">
+                        <p class="instruction-title"><strong>Confirm the secure connection</strong></p>
+                        <p class="instruction-text-block">
+                            TwinaForms uses a package-generated signing key so Salesforce can call AWS securely without manual credential setup.
+                        </p>
+                    </div>
+
+                    <template if:true={isVerifyingServiceAccess}>
+                        <div class="slds-m-top_medium">
+                            <lightning-spinner alternative-text="Verifying secure service access" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template if:true={showTenantTestMessage}>
+                        <div class={tenantTestMessageClass}>
+                            {tenantTestMessage}
                         </div>
                     </template>
                 </section>
@@ -231,7 +219,7 @@
                     </div>
 
                     <p class="access-section__copy">
-                        <strong>Grant Seat</strong> assigns both the TwinaForms user seat and the TwinaForms service access needed for secure AWS callouts.
+                        <strong>Grant Seat</strong> assigns TwinaForms user access.
                         <strong>TwinaForms Admin</strong> is support/debug access and only opens when enabled from the TwinaForms Admin console.
                     </p>
 
@@ -250,11 +238,6 @@
                                         <div class="access-list__copy">
                                             <strong>{userItem.name}</strong>
                                             <span>{userItem.email}</span>
-                                            <template if:true={userItem.missingTwinaFormsServiceAccess}>
-                                                <span class="access-list__warning">
-                                                    This user has a seat but is missing TwinaForms service access.
-                                                </span>
-                                            </template>
                                         </div>
                                         <lightning-button
                                             variant="neutral"

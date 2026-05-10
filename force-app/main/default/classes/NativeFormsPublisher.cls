@@ -73,7 +73,7 @@ public with sharing class NativeFormsPublisher {
                    Prefill_Params_JSON__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         if (versionRecord.Version_Status__c == 'Published') {
@@ -94,7 +94,7 @@ public with sharing class NativeFormsPublisher {
                    Order__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :versionId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ];
 
         List<NF_Form_Action__c> actions = [
@@ -108,7 +108,7 @@ public with sharing class NativeFormsPublisher {
                    Order__c
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :versionId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ];
 
         String orgId = UserInfo.getOrganizationId().substring(0, 15);
@@ -116,7 +116,11 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(formSlug)) {
             versionRecord.Publish_Status__c = 'Publish Failed';
             versionRecord.Last_Publish_Error__c = 'Friendly published URLs require NF Key before publish. Fill NF Key with lowercase letters, numbers, and hyphens, then publish again.';
-            update versionRecord;
+            update as user new NF_Form_Version__c(
+                Id = versionRecord.Id,
+                Publish_Status__c = versionRecord.Publish_Status__c,
+                Last_Publish_Error__c = versionRecord.Last_Publish_Error__c
+            );
             result.success = false;
             result.message = versionRecord.Last_Publish_Error__c;
             return result;
@@ -134,6 +138,12 @@ public with sharing class NativeFormsPublisher {
         NativeForms_Config__c orgConfig = NativeForms_Config__c.getOrgDefaults();
         Map<String, Object> captchaConfig = buildPublishedCaptchaConfig(versionRecord.Form__r.Enable_Captcha__c, orgConfig);
         List<NF_Form_Element__c> publishElements = prepareElementsForPublish(elements);
+        if (containsSurveyField(publishElements) && !NativeFormsFeatureFlags.isProSurveyFieldsEnabled()) {
+            result.success = false;
+            result.message = 'Survey Fields are not available on your current TwinaForms plan.';
+            return result;
+        }
+        Map<String, Object> versionUiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
         String html = buildHtml(versionRecord, publishElements, formId, publishToken, captchaConfig);
         String fileName = 'index.html';
 
@@ -165,10 +175,12 @@ public with sharing class NativeFormsPublisher {
                 'formSlug' => formSlug,
                 'captcha' => captchaConfig,
                 'uploadFields' => buildPublishedUploadFields(publishElements),
+                'signatureFields' => buildPublishedSignatureFields(publishElements),
+                'submissionPdf' => buildPublishedSubmissionPdfConfig(versionUiSettings, publishElements),
                 'secretCodeConfig' => buildPublishedSecretCodeConfig(
-                    parseJsonMap(versionRecord.UI_Settings_JSON__c),
+                    versionUiSettings,
                     NativeFormsRuntimeI18n.normalizeLanguageCode(
-                        stringValue(parseJsonMap(versionRecord.UI_Settings_JSON__c).get('languageCode'))
+                        stringValue(versionUiSettings.get('languageCode'))
                     )
                 ),
                 'prefillPolicy' => buildPolicy(filterReferencedActions(actions, 'Prefill', publishElements), publishElements, true),
@@ -192,8 +204,7 @@ public with sharing class NativeFormsPublisher {
                 AWS_Response_JSON__c = JSON.serialize(registerResponse),
                 Error_Message__c = null
             );
-            insert publicationRecord;
-
+            insert as user publicationRecord;
             versionRecord.Publish_Token__c = publishToken;
             versionRecord.Form_Id__c = formId;
             versionRecord.Publish_Status__c = 'Published';
@@ -201,9 +212,17 @@ public with sharing class NativeFormsPublisher {
             versionRecord.Last_Published_At__c = System.now();
             versionRecord.Last_Published_By__c = UserInfo.getUserId();
             versionRecord.Last_Publish_Error__c = null;
-            update versionRecord;
-
-            update new NF_Form__c(
+            update as user new NF_Form_Version__c(
+                Id = versionRecord.Id,
+                Publish_Token__c = versionRecord.Publish_Token__c,
+                Form_Id__c = versionRecord.Form_Id__c,
+                Publish_Status__c = versionRecord.Publish_Status__c,
+                Version_Status__c = versionRecord.Version_Status__c,
+                Last_Published_At__c = versionRecord.Last_Published_At__c,
+                Last_Published_By__c = versionRecord.Last_Published_By__c,
+                Last_Publish_Error__c = versionRecord.Last_Publish_Error__c
+            );
+            update as user new NF_Form__c(
                 Id = versionRecord.Form__c,
                 Current_Published_Version__c = versionRecord.Id,
                 Status__c = 'Active'
@@ -241,12 +260,14 @@ public with sharing class NativeFormsPublisher {
                 Published_Form_Id__c = formId,
                 Error_Message__c = detailedError
             );
-            insert failureRecord;
-
+            insert as user failureRecord;
             versionRecord.Publish_Status__c = 'Publish Failed';
             versionRecord.Last_Publish_Error__c = friendlyError;
-            update versionRecord;
-
+            update as user new NF_Form_Version__c(
+                Id = versionRecord.Id,
+                Publish_Status__c = versionRecord.Publish_Status__c,
+                Last_Publish_Error__c = versionRecord.Last_Publish_Error__c
+            );
             result.success = false;
             result.publicationId = failureRecord.Id;
             result.message = friendlyError;
@@ -365,8 +386,7 @@ public with sharing class NativeFormsPublisher {
             Last_Published_By__c = null,
             Last_Publish_Error__c = null
         );
-        insert draftVersion;
-
+        insert as user draftVersion;
         List<NF_Form_Element__c> clonedElements = new List<NF_Form_Element__c>();
         for (NF_Form_Element__c sourceElement : elements) {
             NF_Form_Element__c cloneElement = sourceElement.clone(false, true, false, false);
@@ -374,7 +394,7 @@ public with sharing class NativeFormsPublisher {
             clonedElements.add(cloneElement);
         }
         if (!clonedElements.isEmpty()) {
-            insert clonedElements;
+            insert as user clonedElements;
         }
 
         List<NF_Form_Action__c> clonedActions = new List<NF_Form_Action__c>();
@@ -384,14 +404,14 @@ public with sharing class NativeFormsPublisher {
             clonedActions.add(cloneAction);
         }
         if (!clonedActions.isEmpty()) {
-            insert clonedActions;
+            insert as user clonedActions;
         }
 
         return [
             SELECT Id, Name, Form__c, Form_Id__c, Version_Number__c, Version_Status__c, Publish_Status__c, Publish_Token__c
             FROM NF_Form_Version__c
             WHERE Id = :draftVersion.Id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
     }
 
@@ -399,7 +419,7 @@ public with sharing class NativeFormsPublisher {
         AggregateResult[] rows = [
             SELECT MAX(Version_Number__c) maxVersion
             FROM NF_Form_Version__c
-            WHERE Form__c = :formId
+            WHERE Form__c = :formId WITH USER_MODE
         ];
         if (!rows.isEmpty() && rows[0].get('maxVersion') != null) {
             return Integer.valueOf(String.valueOf(rows[0].get('maxVersion'))) + 1;
@@ -468,7 +488,7 @@ public with sharing class NativeFormsPublisher {
         for (ContentVersion versionRecord : [
             SELECT Id, PathOnClient, VersionData
             FROM ContentVersion
-            WHERE Id IN :contentVersionIds
+            WHERE Id IN :contentVersionIds WITH USER_MODE
         ]) {
             String mimeType = mimeTypeFromFileName(versionRecord.PathOnClient);
             if (String.isBlank(mimeType) || versionRecord.VersionData == null) {
@@ -497,7 +517,7 @@ public with sharing class NativeFormsPublisher {
             SELECT Id, PathOnClient, VersionData
             FROM ContentVersion
             WHERE ContentDocumentId = :contentDocumentId
-            ORDER BY VersionNumber DESC
+            WITH USER_MODE ORDER BY VersionNumber DESC
             LIMIT 1
         ];
         if (versions.isEmpty()) {
@@ -1305,7 +1325,7 @@ public with sharing class NativeFormsPublisher {
             SELECT Config_JSON__c
             FROM NF_Form_Action__c
             WHERE Command_Key__c = :actionKey
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ]) {
             Map<String, Object> actionConfig = parseJsonMap(actionRecord.Config_JSON__c);
             String relationshipField = canonicalFieldApiName(objectApiName, stringValue(actionConfig.get('relationshipField')));
@@ -1495,13 +1515,37 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-upload__file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--nf-text);}';
         html += '.nf-upload__file-status{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:rgba(22,91,51,0.08);color:#165b33;font-size:0.82em;font-weight:700;}';
         html += '.nf-field button[data-file-upload-clear]{justify-self:start;margin-top:2px;border:1px solid var(--nf-input-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:8px 12px;font:inherit;cursor:pointer;}';
+        html += '.nf-signature{display:grid;gap:10px;}';
+        html += '.nf-signature__canvas{width:100%;height:180px;border:1px dashed color-mix(in srgb,var(--nf-input-border) 82%,#9fc5ea 18%);border-radius:calc(var(--nf-field-radius) + 4px);background:linear-gradient(transparent calc(100% - 42px),rgba(15,108,189,0.07) calc(100% - 42px)),var(--nf-input-bg);touch-action:none;box-sizing:border-box;cursor:crosshair;}';
+        html += '.nf-signature__meta,.nf-signature__feedback{font-size:0.92em;line-height:1.4;color:var(--nf-hint);}';
+        html += '.nf-signature__feedback:empty{display:none;}';
+        html += '.nf-signature__clear{justify-self:start;border:1px solid var(--nf-input-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:8px 12px;font:inherit;cursor:pointer;}';
         html += '.nf-field--radio-group{display:grid;gap:10px;}';
+        html += '.nf-field--radio-group-stars{grid-template-columns:repeat(5,minmax(0,auto));align-items:center;}';
+        html += '.nf-field--radio-group-nps{grid-template-columns:repeat(auto-fit,minmax(42px,1fr));}';
+        html += '.nf-field--radio-group-likert,.nf-field--radio-group-satisfaction{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}';
         html += '.nf-radio-option{display:flex;gap:16px;align-items:center;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);background:var(--nf-input-bg);color:var(--nf-text);box-sizing:border-box;font:inherit;}';
         html += '.nf-radio-option input{width:auto;margin:0;flex:0 0 auto;}';
         html += '.nf-radio-option span{flex:1 1 auto;margin-left:8px;}';
+        html += '.nf-field--radio-group-stars .nf-radio-option,.nf-field--radio-group-nps .nf-radio-option{justify-content:center;padding:10px 12px;}';
+        html += '.nf-field--radio-group-stars .nf-radio-option span{color:#f5a623;font-size:1.2em;letter-spacing:0;}';
+        html += '.nf-ranking{display:grid;gap:10px;}';
+        html += '.nf-ranking__list{display:grid;gap:8px;list-style:none;margin:0;padding:0;}';
+        html += '.nf-ranking__item{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);background:var(--nf-input-bg);color:var(--nf-text);box-sizing:border-box;}';
+        html += '.nf-ranking__rank{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:rgba(15,108,189,.1);color:var(--nf-accent);font-weight:700;}';
+        html += '.nf-ranking__label{flex:1 1 auto;min-width:0;}';
+        html += '.nf-ranking__actions{display:flex;gap:6px;}';
+        html += '.nf-ranking__actions button{width:30px;height:30px;border:1px solid var(--nf-input-border);border-radius:999px;background:#fff;color:var(--nf-text);font:inherit;line-height:1;cursor:pointer;}';
         html += '.nf-status{margin-top:16px;padding:12px 14px;border-radius:12px;display:none;}';
+        html += '.nf-status--info{display:block;background:#eef6ff;color:#123b66;border:1px solid #bdd7f0;}';
         html += '.nf-status--success{display:block;background:#e8f6ee;color:#165b33;border:1px solid #b8e0c7;}';
         html += '.nf-status--error{display:block;background:#fde7e9;color:#7f1d1d;border:1px solid #f5c2c7;}';
+        html += '.nf-prefill-loading{display:grid;gap:10px;justify-items:center;text-align:center;padding:28px 22px;border:1px solid #d8e4f4;border-radius:18px;background:linear-gradient(180deg,#fbfdff 0%,#f4f8fc 100%);box-shadow:0 10px 24px rgba(15,35,65,.04);color:var(--nf-text);}';
+        html += '.nf-prefill-loading[hidden]{display:none !important;}';
+        html += '.nf-prefill-loading__spinner{width:28px;height:28px;border:3px solid #d8e4f4;border-top-color:var(--nf-accent);border-radius:999px;animation:nf-spin 900ms linear infinite;}';
+        html += '.nf-prefill-loading__title{font-weight:700;color:var(--nf-text);}';
+        html += '.nf-prefill-loading__message{margin:0;color:var(--nf-muted);line-height:1.5;}';
+        html += '@keyframes nf-spin{to{transform:rotate(360deg);}}';
         html += '.nf-result{margin-top:18px;}';
         html += '.nf-result[hidden]{display:none !important;}';
         html += '.nf-result__panel{padding:18px 20px;border-radius:18px;border:1px solid #d8e4f4;box-shadow:0 10px 24px rgba(15,35,65,.06);}';
@@ -1733,6 +1777,7 @@ public with sharing class NativeFormsPublisher {
         html += 'const postSubmitUrlTemplate=String((config.uiSettings&&config.uiSettings.postSubmitUrlTemplate)||"").trim();';
         html += 'const postSubmitButtonLabel=String((config.uiSettings&&config.uiSettings.postSubmitButtonLabel)||"' + escapeJsString(postSubmitButtonLabel) + '").trim()||"' + escapeJsString(postSubmitButtonLabel) + '";';
         html += 'const postSubmitDelaySeconds=Math.max(0,parseInt((config.uiSettings&&config.uiSettings.postSubmitDelaySeconds)!=null?config.uiSettings.postSubmitDelaySeconds:3,10)||0);';
+        html += 'const PREFILL_TIMEOUT_MS=10000;';
         html += 'let postSubmitRedirectTimer=null;let postSubmitRedirectCountdownTimer=null;let activePostSubmitRedirectUrl="";';
         html += 'const secretVerifyEl=document.querySelector("[data-secret-verification]");';
         html += 'const secretGatedEl=document.querySelector("[data-secret-gated]");';
@@ -1740,7 +1785,17 @@ public with sharing class NativeFormsPublisher {
         html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};';
         html += 'function setStatus(kind,message){if(!statusEl){return;}statusEl.className="nf-status nf-status--"+kind;statusEl.textContent=message||"";}';
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
+        html += 'function getPrefillParams(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});return params;}';
+        html += 'function hasPrefillParams(params){return !!(params&&Object.keys(params).length);}';
+        html += 'function getPrefillLoadingEl(){let loadingEl=runtimeEl.querySelector("[data-prefill-loading]");if(loadingEl){return loadingEl;}loadingEl=document.createElement("div");loadingEl.className="nf-prefill-loading";loadingEl.setAttribute("data-prefill-loading","true");loadingEl.setAttribute("role","status");loadingEl.setAttribute("aria-live","polite");loadingEl.hidden=true;loadingEl.innerHTML=\'<div class="nf-prefill-loading__spinner" aria-hidden="true"></div><div class="nf-prefill-loading__title"></div><p class="nf-prefill-loading__message"></p>\';runtimeEl.insertBefore(loadingEl,form);return loadingEl;}';
+        html += 'function setPrefillLoading(loading,message){const loadingEl=getPrefillLoadingEl();const titleEl=loadingEl.querySelector(".nf-prefill-loading__title");const messageEl=loadingEl.querySelector(".nf-prefill-loading__message");if(titleEl){titleEl.textContent=t("prefillLoadingTitle","Loading your saved details...");}if(messageEl){messageEl.textContent=message||t("prefillLoadingMessage","Please wait while we prepare your form.");}loadingEl.hidden=!loading;form.hidden=!!loading;form.style.display=loading?"none":"";}';
+        html += 'function hasPrefillData(payload){if(!payload){return false;}const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};return Object.keys(input).length>0||Object.keys(hidden).length>0||Object.keys(repeatGroups).some(function(key){const group=repeatGroups[key];return group&&Array.isArray(group.rows)&&group.rows.length>0;});}';
+        html += 'function withTimeout(promise,timeoutMs,message){let timeoutId=null;const timeoutPromise=new Promise(function(_,reject){timeoutId=window.setTimeout(function(){reject(new Error(message||"Request timed out"));},timeoutMs);});return Promise.race([promise,timeoutPromise]).finally(function(){if(timeoutId){window.clearTimeout(timeoutId);}});}';
         html += 'function escapeHtml(value){return String(value==null?"":value).replace(/[&<>"\']/g,function(ch){return({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","\'":"&#39;"})[ch]||ch;});}';
+        html += 'function rankingFields(){return Array.from(form.querySelectorAll("[data-ranking-field]"));}';
+        html += 'function updateRankingField(container){if(!container){return;}const input=container.querySelector("[data-ranking-input]");const items=Array.from(container.querySelectorAll("[data-ranking-item]"));items.forEach(function(item,index){const rank=item.querySelector(".nf-ranking__rank");if(rank){rank.textContent=String(index+1);}});if(input){input.value=JSON.stringify(items.map(function(item){return item.getAttribute("data-value")||"";}));}}';
+        html += 'function moveRankingItem(button){const item=button?button.closest("[data-ranking-item]"):null;const list=item?item.parentElement:null;const container=item?item.closest("[data-ranking-field]"):null;if(!item||!list||!container){return;}const direction=button.getAttribute("data-ranking-move");if(direction==="up"&&item.previousElementSibling){list.insertBefore(item,item.previousElementSibling);}if(direction==="down"&&item.nextElementSibling){list.insertBefore(item.nextElementSibling,item);}updateRankingField(container);handleRuntimeStateChange({target:{name:(container.querySelector("[data-ranking-input]")||{}).name||""}});}';
+        html += 'function wireRankingFields(){rankingFields().forEach(function(container){updateRankingField(container);container.addEventListener("click",function(event){const button=event.target.closest("[data-ranking-move]");if(!button){return;}event.preventDefault();moveRankingItem(button);});});}';
         html += 'function fileUploadControls(){return Array.from(form.querySelectorAll("input[data-nativeforms-file=\'true\']"));}';
         html += 'function fileUploadFieldKey(control){return control&&control.name?String(control.name):"";}';
         html += 'function fileUploadElements(control){const fieldWrap=control?control.closest(".nf-field"):null;return{feedback:fieldWrap?fieldWrap.querySelector("[data-file-upload-feedback]"):null,list:fieldWrap?fieldWrap.querySelector("[data-file-upload-list]"):null};}';
@@ -1749,13 +1804,23 @@ public with sharing class NativeFormsPublisher {
         html += 'async function uploadSelectedFiles(control){const fieldKey=fileUploadFieldKey(control);const files=Array.from((control&&control.files)||[]);if(!fieldKey){return;}if(!files.length){clearFileUploadField(fieldKey);return;}if(!config.uploadInitUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:true,message:t("fileUploading","Uploading files..."),error:""};renderFileUploadState(control);try{const uploaded=[];for(let index=0;index<files.length;index+=1){const file=files[index];const initResponse=await fetch(config.uploadInitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,fileName:file.name,contentType:file.type||"application/octet-stream",fileSize:file.size,sessionId:fileUploadSessionId})});const initData=await initResponse.json();if(!initResponse.ok||initData.success===false){throw new Error(initData.error||t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadResponse=await fetch(initData.uploadUrl,{method:"PUT",headers:{"Content-Type":initData.contentType||file.type||"application/octet-stream"},body:file});if(!uploadResponse.ok){throw new Error(t("fileUploadFailed","We could not upload this file. Please try again."));}uploaded.push({uploadToken:initData.uploadToken,fileName:initData.fileName||file.name,contentType:initData.contentType||file.type||"application/octet-stream",fileSize:initData.fileSize||file.size});}uploadedFilesByField[fieldKey]=uploaded;fileUploadStateByField[fieldKey]={uploading:false,message:uploaded.length?interpolate(t("fileReadyCount","{count} file(s) ready."),{count:String(uploaded.length)}):"",error:""};renderFileUploadState(control);}catch(error){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:false,message:"",error:error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again.")};renderFileUploadState(control);throw error;}}';
         html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading){return{valid:false,message:t("fileUploadPleaseWait","Please wait for file uploads to finish.")};}if(control.required&&refs.length===0){return{valid:false,message:t("fileUploadRequired","Please upload the required file before submitting.")};}}return{valid:true,message:""};}';
         html += 'function clearAllUploadedFiles(){fileUploadControls().forEach(function(control){clearFileUploadField(fileUploadFieldKey(control));});}';
+        html += 'function signaturePads(){return Array.from(form.querySelectorAll("[data-nativeforms-signature=\'true\']"));}';
+        html += 'function signatureCanvasForPad(pad){return pad?pad.querySelector("canvas[data-signature-canvas]"):null;}';
+        html += 'function signatureFieldKey(pad){return pad&&pad.dataset.signatureFieldKey?String(pad.dataset.signatureFieldKey):"";}';
+        html += 'function resizeSignatureCanvas(canvas){if(!canvas){return;}const rect=canvas.getBoundingClientRect();const ratio=window.devicePixelRatio||1;const width=Math.max(320,Math.floor(rect.width||canvas.clientWidth||600));const height=Math.max(140,Math.floor(rect.height||180));if(canvas.width===Math.floor(width*ratio)&&canvas.height===Math.floor(height*ratio)){return;}canvas.width=Math.floor(width*ratio);canvas.height=Math.floor(height*ratio);const ctx=canvas.getContext("2d");ctx.setTransform(ratio,0,0,ratio,0,0);ctx.lineWidth=2;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#102a43";}';
+        html += 'function setSignatureFeedback(pad,message,kind){const feedback=pad?pad.querySelector("[data-signature-feedback]"):null;if(!feedback){return;}feedback.textContent=message||"";feedback.style.color=kind==="error"?"#b42318":"";}';
+        html += 'function clearSignaturePad(pad){const canvas=signatureCanvasForPad(pad);if(!canvas){return;}const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);pad.dataset.signatureEmpty="true";setSignatureFeedback(pad,"","");}';
+        html += 'function initSignaturePad(pad){const canvas=signatureCanvasForPad(pad);if(!pad||!canvas){return;}resizeSignatureCanvas(canvas);let drawing=false;function point(event){const rect=canvas.getBoundingClientRect();const source=event.touches&&event.touches.length?event.touches[0]:event;return{x:source.clientX-rect.left,y:source.clientY-rect.top};}function start(event){event.preventDefault();resizeSignatureCanvas(canvas);drawing=true;const ctx=canvas.getContext("2d");const p=point(event);ctx.beginPath();ctx.moveTo(p.x,p.y);}function move(event){if(!drawing){return;}event.preventDefault();const ctx=canvas.getContext("2d");const p=point(event);ctx.lineTo(p.x,p.y);ctx.stroke();pad.dataset.signatureEmpty="false";setSignatureFeedback(pad,"","");}function end(){drawing=false;}canvas.addEventListener("pointerdown",start);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",end);canvas.addEventListener("pointerleave",end);canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end);const clearButton=pad.querySelector("[data-signature-clear]");if(clearButton){clearButton.addEventListener("click",function(event){event.preventDefault();clearSignaturePad(pad);});}pad.dataset.signatureEmpty="true";}';
+        html += 'function validateSignatures(){const pads=signaturePads();for(let index=0;index<pads.length;index+=1){const pad=pads[index];if(pad.dataset.signatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("signatureRequired","Please sign before submitting."),"error");return{valid:false,message:t("signatureRequired","Please sign before submitting.")};}}return{valid:true,message:""};}';
+        html += 'function collectSignatures(){const signatures={};signaturePads().forEach(function(pad){const fieldKey=signatureFieldKey(pad);const canvas=signatureCanvasForPad(pad);if(!fieldKey||!canvas||pad.dataset.signatureEmpty!=="false"){return;}signatures[fieldKey]={dataUrl:canvas.toDataURL("image/png"),contentType:"image/png",fileName:(fieldKey||"signature")+".png",signedAt:new Date().toISOString()};});return signatures;}';
+        html += 'function clearAllSignatures(){signaturePads().forEach(clearSignaturePad);}';
         html += 'function setSecretVerificationMessage(message,kind){if(!secretVerifyEl){return;}const target=secretVerifyEl.querySelector("[data-secret-message]");if(!target){return;}target.className="nf-secret-verify__message"+(kind==="success"?" nf-secret-verify__message--success":kind==="error"?" nf-secret-verify__message--error":"");target.textContent=message||"";}';
         html += 'function setSecretGatedState(unlocked){if(secretGatedEl){secretGatedEl.hidden=!unlocked;secretGatedEl.querySelectorAll("input,textarea,select,button").forEach(function(control){control.disabled=!unlocked;});}secretVerificationApproved=!!unlocked;}';
         html += 'function setSecretCodeStepVisible(visible){if(!secretVerifyEl){return;}const codeStep=secretVerifyEl.querySelector("[data-secret-code-step]");const resendWrap=secretVerifyEl.querySelector("[data-secret-resend-wrap]");if(codeStep){codeStep.hidden=!visible;}if(resendWrap){resendWrap.hidden=!visible;}}';
         html += 'function setSecretVerificationSectionVisible(visible){if(secretVerifyEl){secretVerifyEl.hidden=!visible;secretVerifyEl.style.display=visible?"":"none";}}';
         html += 'function readSecretVerificationEmail(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-email]"):null;return input?String(input.value||"").trim().toLowerCase():"";}';
         html += 'function readSecretVerificationCode(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-code]"):null;return input?String(input.value||"").trim():"";}';
-        html += 'async function runPrefillWithParams(params){if(!config.prefillUrl||!params||Object.keys(params).length===0){return;}emitTwinaFormsEvent("prefill:before",{params:params});const response=await fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})});const data=await response.json();if(!response.ok||data.success===false){const errorMessage=(data.error&&data.error.message)||data.error||"Prefill failed";emitTwinaFormsEvent("prefill:error",{params:params,message:errorMessage,response:data});throw new Error(errorMessage);}applyPrefillPayload(data);emitTwinaFormsEvent("prefill:after",{params:params,payload:data});}';
+        html += 'async function runPrefillWithParams(params){if(!config.prefillUrl||!params||Object.keys(params).length===0){return null;}emitTwinaFormsEvent("prefill:before",{params:params});const response=await withTimeout(fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})}),PREFILL_TIMEOUT_MS,t("prefillTimeout","Loading saved details took too long."));const data=await response.json();if(!response.ok||data.success===false){const errorMessage=(data.error&&data.error.message)||data.error||"Prefill failed";emitTwinaFormsEvent("prefill:error",{params:params,message:errorMessage,response:data});throw new Error(errorMessage);}applyPrefillPayload(data);emitTwinaFormsEvent("prefill:after",{params:params,payload:data});return data;}';
         html += 'async function sendSecretCodeRequest(action,payload){const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,formId:config.formId,publishToken:config.publishToken,publishedVersionId:config.versionId},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Secret code request failed");}return data;}';
         html += 'function clearPostSubmitRedirect(){if(postSubmitRedirectTimer){window.clearTimeout(postSubmitRedirectTimer);postSubmitRedirectTimer=null;}if(postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}activePostSubmitRedirectUrl="";}';
         html += 'function clearResult(){if(!resultEl){return;}clearPostSubmitRedirect();resultEl.hidden=true;resultEl.innerHTML="";form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}';
@@ -1797,7 +1862,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let hasValue=false;if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
         html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
         html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});evaluateAllFormulaFields();applyLockedFields();evaluateConditions();}';
-        html += 'async function runPrefill(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});if(Object.keys(params).length===0){return;}await runPrefillWithParams(params);}';
+        html += 'async function runInitialPrefill(){const params=getPrefillParams();if(!hasPrefillParams(params)||secretCodeEnabled){return;}setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const data=await runPrefillWithParams(params);if(!hasPrefillData(data)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(error){emitTwinaFormsEvent("prefill:error",{message:error&&error.message?error.message:t("prefillLoadFailed","We could not load prefill data for this form.")});setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("[data-nativeforms-date=\'true\']").forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
         html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}if(el.dataset.nativeformsTime==="true"){const valid=validateTimeField(el,true);if(valid&&el.value){el.value=formatTimeForField(el.value,el);}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
@@ -1811,7 +1876,9 @@ public with sharing class NativeFormsPublisher {
         html += 'function runGuardedCustomJs(){const customJsSource="' + escapeJsString(publishedCustomJs) + '";if(!String(customJsSource||"").trim()){return;}try{const runner=new Function("TwinaForms",customJsSource);runner(window.TwinaForms);}catch(error){console.error("TwinaForms custom JavaScript error",error);emitTwinaFormsEvent("customjs:error",{message:error&&error.message?error.message:"Custom JavaScript failed",source:"customjs"});}}';
         html += 'applyDateConstraints();';
         html += 'wireLiveValidation();';
+        html += 'wireRankingFields();';
         html += 'fileUploadControls().forEach(function(control){renderFileUploadState(control);control.addEventListener("change",function(){uploadSelectedFiles(control).catch(function(error){setStatus("error",error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again."));});});});';
+        html += 'signaturePads().forEach(initSignaturePad);window.addEventListener("resize",function(){signaturePads().forEach(function(pad){if(pad.dataset.signatureEmpty==="true"){resizeSignatureCanvas(signatureCanvasForPad(pad));}});});';
         html += 'form.addEventListener("click",function(event){const clearButton=event.target.closest("[data-file-upload-clear]");if(!clearButton){return;}event.preventDefault();clearFileUploadField(clearButton.getAttribute("data-file-upload-clear"));});';
         html += 'runGuardedCustomJs();';
         html += 'emitTwinaFormsEvent("form:init",{versionId:config.versionId,formId:config.formId});';
@@ -1823,13 +1890,14 @@ public with sharing class NativeFormsPublisher {
         html += 'setSecretGatedState(!secretCodeEnabled);';
         html += 'setSecretCodeStepVisible(false);';
         html += 'emitTwinaFormsEvent("form:ready",{versionId:config.versionId,formId:config.formId});';
-        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const data=await sendSecretCodeRequest("verifyCode",{email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId});if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);runPrefillWithParams({email:secretVerifiedEmail}).catch(function(){setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
-        html += 'runPrefill().catch(function(error){emitTwinaFormsEvent("prefill:error",{message:error&&error.message?error.message:t("prefillLoadFailed","We could not load prefill data for this form.")});setStatus("error",t("prefillLoadFailed","We could not load prefill data for this form."));});';
+        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const data=await sendSecretCodeRequest("verifyCode",{email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId});if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const prefillData=await runPrefillWithParams({email:secretVerifiedEmail});if(!hasPrefillData(prefillData)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(prefillError){setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
+        html += 'runInitialPrefill();';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
         html += 'if(secretCodeEnabled&&!secretVerificationApproved){setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
         html += 'if(!form.reportValidity()){return;}';
         html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){setStatus("error",uploadValidation.message||t("fileUploadReview","Please review the uploaded files and try again."));return;}';
+        html += 'const signatureValidation=validateSignatures();if(!signatureValidation.valid){setStatus("error",signatureValidation.message||t("signatureReview","Please review the signature fields and try again."));return;}';
         html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error",t("captchaRequired","Please complete the CAPTCHA."));return;}';
         html += 'setSubmitting(true);';
         html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const normalizedTimes=collectNormalizedTimeValues();if(!normalizedTimes.success){setStatus("error",normalizedTimes.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
@@ -1837,6 +1905,7 @@ public with sharing class NativeFormsPublisher {
         html += 'Object.keys(normalizedDates.values).forEach(function(key){input[key]=normalizedDates.values[key];});';
         html += 'Object.keys(normalizedTimes.values).forEach(function(key){input[key]=normalizedTimes.values[key];});';
         html += 'const uploadedFieldKeys=Object.keys(uploadedFilesByField).filter(function(key){return Array.isArray(uploadedFilesByField[key])&&uploadedFilesByField[key].length;});if(uploadedFieldKeys.length){input.fileUploads={};uploadedFieldKeys.forEach(function(key){input.fileUploads[key]=uploadedFilesByField[key];});input.fileUploadSessionId=fileUploadSessionId;}';
+        html += 'const signaturePayload=collectSignatures();if(Object.keys(signaturePayload).length){input.signatures=signaturePayload;}';
         html += 'if(secretCodeEnabled){input.secretVerificationToken=secretVerificationToken;input.secretVerificationSessionId=secretVerificationSessionId;input.secretVerificationEmail=secretVerifiedEmail;}';
         html += 'if(captchaEnabled){input.captchaToken=getCaptchaToken();}';
         html += 'input.repeatGroups=collectRepeatGroups();';
@@ -1844,7 +1913,7 @@ public with sharing class NativeFormsPublisher {
         html += 'const data=await response.json();';
         html += 'if(!response.ok||data.success===false){emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
         html += 'const resolvedPostSubmitUrl=postSubmitAutoLinkEnabled?resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload):"";';
-        html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
+        html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();clearAllSignatures();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
         html += '}catch(error){emitTwinaFormsEvent("submit:error",{error:{message:error&&error.message?error.message:"Submit failed"}});renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
         html += '});';
         html += '})();</script>';
@@ -2093,12 +2162,18 @@ public with sharing class NativeFormsPublisher {
             String controlHtml = '<select id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + requiredAttr + '>' + optionsHtml + '</select>';
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
+        if (typeValue == 'ranking' && config.containsKey('options')) {
+            String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String controlHtml = renderRankingControl(safeName, config, requiredAttr);
+            return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
         if (typeValue == 'radio' && config.containsKey('options')) {
+            String presentation = stringValue(config.get('presentation'));
             String radiosHtml = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + '>';
             if (labelPosition != 'hidden') {
                 radiosHtml += '<label' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
             }
-            radiosHtml += '<div class="nf-field--radio-group">';
+            radiosHtml += '<div class="nf-field--radio-group' + surveyPresentationClass(presentation) + '">';
             Integer optionIndex = 0;
             for (Object rawOption : (List<Object>) config.get('options')) {
                 if (rawOption instanceof Map<String, Object>) {
@@ -2108,7 +2183,7 @@ public with sharing class NativeFormsPublisher {
                     String checkedAttr = optionValue == defaultValue ? ' checked' : '';
                     radiosHtml += '<label class="nf-radio-option" for="' + escapeHtml(optionId) + '">';
                     radiosHtml += '<input type="radio" id="' + escapeHtml(optionId) + '" name="' + safeName + '" value="' + escapeHtml(optionValue) + '"' + lockOnPrefillAttr + checkedAttr + requiredAttr + '>';
-                    radiosHtml += '<span>' + escapeHtml(String.valueOf(option.get('label'))) + '</span>';
+                    radiosHtml += '<span>' + escapeHtml(surveyOptionDisplayLabel(presentation, option)) + '</span>';
                     radiosHtml += '</label>';
                     optionIndex += 1;
                 }
@@ -2164,6 +2239,23 @@ public with sharing class NativeFormsPublisher {
             }
             controlHtml += '<div class="nf-upload__feedback" data-file-upload-feedback></div>';
             controlHtml += '<div class="nf-upload__list" data-file-upload-list></div>';
+            controlHtml += '</div>';
+            return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
+
+        if (typeValue == 'signature') {
+            String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '-canvas"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String helpText = stringValue(config.get('helpText'));
+            String clearLabel = String.isNotBlank(stringValue(config.get('clearButtonLabel')))
+                ? stringValue(config.get('clearButtonLabel'))
+                : runtimeTextValue(languageCode, 'signatureClear', 'Clear');
+            String controlHtml = '<div class="nf-signature" data-nativeforms-signature="true" data-signature-field-key="' + safeName + '" data-signature-required="' + String.valueOf(required).toLowerCase() + '">';
+            controlHtml += '<canvas class="nf-signature__canvas" id="' + safeName + '-canvas" data-signature-canvas></canvas>';
+            if (String.isNotBlank(helpText)) {
+                controlHtml += '<div class="nf-signature__meta">' + escapeHtml(helpText) + '</div>';
+            }
+            controlHtml += '<button type="button" class="nf-signature__clear" data-signature-clear>' + escapeHtml(clearLabel) + '</button>';
+            controlHtml += '<div class="nf-signature__feedback" data-signature-feedback></div>';
             controlHtml += '</div>';
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
@@ -2237,10 +2329,17 @@ public with sharing class NativeFormsPublisher {
             return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
+        if (typeValue == 'ranking' && config.containsKey('options')) {
+            String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String controlHtml = renderRankingControl(baseId, config, requiredAttr);
+            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
+
         if (typeValue == 'radio' && config.containsKey('options')) {
+            String presentation = stringValue(config.get('presentation'));
             String html = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '">';
             html += '<label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
-            html += '<div class="nf-field--radio-group">';
+            html += '<div class="nf-field--radio-group' + surveyPresentationClass(presentation) + '">';
             Integer optionIndex = 0;
             for (Object rawOption : (List<Object>) config.get('options')) {
                 if (rawOption instanceof Map<String, Object>) {
@@ -2248,7 +2347,7 @@ public with sharing class NativeFormsPublisher {
                     String optionId = baseId + '-' + String.valueOf(optionIndex);
                     html += '<label class="nf-radio-option" for="' + escapeHtml(optionId) + '">';
                     html += '<input type="radio" id="' + escapeHtml(optionId) + '" value="' + escapeHtml(String.valueOf(option.get('value'))) + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + requiredAttr + '>';
-                    html += '<span>' + escapeHtml(String.valueOf(option.get('label'))) + '</span></label>';
+                    html += '<span>' + escapeHtml(surveyOptionDisplayLabel(presentation, option)) + '</span></label>';
                     optionIndex += 1;
                 }
             }
@@ -2301,6 +2400,10 @@ public with sharing class NativeFormsPublisher {
             return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
+        if (typeValue == 'signature') {
+            return '<div class="nf-field"><label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label><div class="nf-signature__meta">' + escapeHtml(runtimeTextValue(languageCode, 'signatureRepeatUnsupported', 'Signature is not supported inside repeated records.')) + '</div></div>';
+        }
+
         String htmlType = normalizeInputType(typeValue);
         String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
         String controlHtml = '<input' + inputDirectionClassAttr(typeValue) + ' type="' + escapeHtml(htmlType) + '" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + requiredAttr + '>';
@@ -2309,6 +2412,53 @@ public with sharing class NativeFormsPublisher {
 
     private static String appendRequiredMarker(String safeLabel, Boolean required) {
         return required ? safeLabel + '<span class="nf-required-marker">*</span>' : safeLabel;
+    }
+
+    private static Boolean isSurveyPresentation(String presentation) {
+        return new Set<String>{ 'stars', 'nps', 'likert', 'satisfaction' }.contains(String.isBlank(presentation) ? '' : presentation.trim().toLowerCase());
+    }
+
+    private static String surveyPresentationClass(String presentation) {
+        String normalized = String.isBlank(presentation) ? '' : presentation.trim().toLowerCase();
+        return isSurveyPresentation(normalized) ? ' nf-field--radio-group-' + escapeHtml(normalized) : '';
+    }
+
+    private static String surveyOptionDisplayLabel(String presentation, Map<String, Object> option) {
+        String optionValue = stringValue(option == null ? null : option.get('value'));
+        String optionLabel = stringValue(option == null ? null : option.get('label'));
+        return firstNonBlank(optionLabel, optionValue);
+    }
+
+    private static String renderRankingControl(String safeName, Map<String, Object> config, String requiredAttr) {
+        List<String> values = new List<String>();
+        String itemsHtml = '';
+        Integer optionIndex = 0;
+        for (Object rawOption : (List<Object>) config.get('options')) {
+            if (!(rawOption instanceof Map<String, Object>)) {
+                continue;
+            }
+            Map<String, Object> option = (Map<String, Object>) rawOption;
+            String optionValue = stringValue(option.get('value'));
+            String optionLabel = stringValue(option.get('label'));
+            if (String.isBlank(optionValue)) {
+                optionValue = 'choice' + String.valueOf(optionIndex + 1);
+            }
+            values.add(optionValue);
+            itemsHtml += '<li class="nf-ranking__item" data-ranking-item data-value="' + escapeHtml(optionValue) + '">';
+            itemsHtml += '<span class="nf-ranking__rank">' + String.valueOf(optionIndex + 1) + '</span>';
+            itemsHtml += '<span class="nf-ranking__label">' + escapeHtml(firstNonBlank(optionLabel, optionValue)) + '</span>';
+            itemsHtml += '<span class="nf-ranking__actions">';
+            itemsHtml += '<button type="button" data-ranking-move="up" aria-label="Move up">&#8593;</button>';
+            itemsHtml += '<button type="button" data-ranking-move="down" aria-label="Move down">&#8595;</button>';
+            itemsHtml += '</span></li>';
+            optionIndex += 1;
+        }
+        String defaultValue = JSON.serialize(values);
+        String controlHtml = '<div class="nf-ranking" data-ranking-field>';
+        controlHtml += '<input type="hidden" id="' + safeName + '" name="' + safeName + '" value="' + escapeHtml(defaultValue) + '"' + requiredAttr + ' data-ranking-input>';
+        controlHtml += '<ol class="nf-ranking__list" data-ranking-list>' + itemsHtml + '</ol>';
+        controlHtml += '</div>';
+        return controlHtml;
     }
 
     private static String inputDirectionClassAttr(String typeValue) {
@@ -2606,6 +2756,163 @@ public with sharing class NativeFormsPublisher {
         }
 
         return uploadFields;
+    }
+
+    private static List<Object> buildPublishedSignatureFields(List<NF_Form_Element__c> elements) {
+        List<Object> signatureFields = new List<Object>();
+        if (elements == null) {
+            return signatureFields;
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'signature') {
+                continue;
+            }
+
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            signatureFields.add(new Map<String, Object>{
+                'elementId' => elementRecord.Element_Id__c,
+                'fieldKey' => elementRecord.Field_Key__c,
+                'label' => elementRecord.Label__c,
+                'required' => booleanValue(config.get('required')),
+                'targetSubmitActionKey' => stringValue(config.get('targetSubmitActionKey'))
+            });
+        }
+
+        return signatureFields;
+    }
+
+    private static Boolean containsSurveyField(List<NF_Form_Element__c> elements) {
+        if (elements == null) {
+            return false;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null) {
+                continue;
+            }
+            if (elementRecord.Element_Type__c == 'ranking') {
+                return true;
+            }
+            if (elementRecord.Element_Type__c == 'radio') {
+                String presentation = stringValue(parseJsonMap(elementRecord.Config_JSON__c).get('presentation'));
+                if (isSurveyPresentation(presentation)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static Map<String, Object> buildPublishedSubmissionPdfConfig(Map<String, Object> uiSettings, List<NF_Form_Element__c> elements) {
+        uiSettings = uiSettings == null ? new Map<String, Object>() : uiSettings;
+        Boolean enabled = booleanValue(uiSettings.get('submissionPdfEnabled'));
+        return new Map<String, Object>{
+            'enabled' => enabled,
+            'attachToRecord' => uiSettings.containsKey('submissionPdfAttachToRecord')
+                ? booleanValue(uiSettings.get('submissionPdfAttachToRecord'))
+                : true,
+            'targetSubmitActionKey' => stringValue(uiSettings.get('submissionPdfTargetSubmitActionKey')),
+            'title' => firstNonBlank(stringValue(uiSettings.get('submissionPdfTitle')), 'Submitted Response'),
+            'includeEmptyFields' => uiSettings.containsKey('submissionPdfIncludeEmptyFields')
+                ? booleanValue(uiSettings.get('submissionPdfIncludeEmptyFields'))
+                : true,
+            'schema' => buildSubmissionPdfSchema(elements)
+        };
+    }
+
+    private static List<Object> buildSubmissionPdfSchema(List<NF_Form_Element__c> elements) {
+        List<Object> schema = new List<Object>();
+        if (elements == null) {
+            return schema;
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null) {
+                continue;
+            }
+
+            String elementType = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
+            if (elementType == 'hidden' || elementType == 'fileUpload') {
+                continue;
+            }
+
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            Map<String, Object> item = new Map<String, Object>{
+                'elementId' => elementRecord.Element_Id__c,
+                'fieldKey' => elementRecord.Field_Key__c,
+                'type' => elementType,
+                'label' => elementRecord.Label__c,
+                'presentation' => stringValue(config.get('presentation')),
+                'parentElementId' => elementRecord.Parent_Element_Id__c,
+                'order' => elementRecord.Order__c,
+                'sectionColumn' => readSectionColumn(elementRecord.Config_JSON__c),
+                'required' => booleanValue(config.get('required'))
+            };
+
+            if (elementType == 'section' || elementType == 'sectionBreak' || elementType == 'group' || elementType == 'repeatGroup') {
+                item.put('columns', safeSectionColumnCount(config));
+                item.put('showTitle', !config.containsKey('showTitle') || booleanValue(config.get('showTitle')));
+                item.put('boxed', !config.containsKey('boxed') || booleanValue(config.get('boxed')));
+                item.put('text', stripHtmlForPdf(stringValue(config.get('text'))));
+            } else if (elementType == 'heading' || elementType == 'paragraph' || elementType == 'richText') {
+                String html = stringValue(config.get('html'));
+                if (String.isBlank(html)) {
+                    html = stringValue(config.get('text'));
+                }
+                item.put('html', html);
+                item.put('text', stripHtmlForPdf(String.isBlank(html) ? elementRecord.Label__c : html));
+            } else if (elementType == 'image') {
+                item.put('imageUrl', config.containsKey('publishedAssetUrl') ? stringValue(config.get('publishedAssetUrl')) : stringValue(config.get('imageUrl')));
+                item.put('altText', firstNonBlank(stringValue(config.get('altText')), elementRecord.Label__c));
+                item.put('imageFit', firstNonBlank(stringValue(config.get('imageFit')), 'original'));
+                item.put('imageWidthPercent', integerValue(config.get('imageWidthPercent')));
+            } else if (elementType == 'select' || elementType == 'radio' || elementType == 'ranking') {
+                item.put('options', normalizePdfOptions(config.get('options')));
+            } else if (elementType == 'checkbox') {
+                item.put('checkedLabel', 'Yes');
+                item.put('uncheckedLabel', 'No');
+            }
+
+            schema.add(item);
+        }
+
+        return schema;
+    }
+
+    private static List<Object> normalizePdfOptions(Object rawOptions) {
+        List<Object> output = new List<Object>();
+        if (!(rawOptions instanceof List<Object>)) {
+            return output;
+        }
+        for (Object rawOption : (List<Object>) rawOptions) {
+            if (!(rawOption instanceof Map<String, Object>)) {
+                continue;
+            }
+            Map<String, Object> option = (Map<String, Object>) rawOption;
+            output.add(new Map<String, Object>{
+                'label' => stringValue(option.get('label')),
+                'value' => stringValue(option.get('value'))
+            });
+        }
+        return output;
+    }
+
+    private static String stripHtmlForPdf(String value) {
+        if (String.isBlank(value)) {
+            return '';
+        }
+        String output = value
+            .replaceAll('(?i)<br\\s*/?>', '\n')
+            .replaceAll('(?i)</p\\s*>', '\n')
+            .replaceAll('(?i)</div\\s*>', '\n')
+            .replaceAll('<[^>]+>', ' ')
+            .replace('&nbsp;', ' ')
+            .replace('&amp;', '&')
+            .replace('&lt;', '<')
+            .replace('&gt;', '>')
+            .replace('&quot;', '"')
+            .replace('&#39;', '\'');
+        return output.replaceAll('[ \\t\\x0B\\f\\r]+', ' ').replaceAll('\\n\\s+', '\n').trim();
     }
 
     private static Map<String, Object> buildPublishedSecretCodeConfig(Map<String, Object> uiSettings, String languageCode) {

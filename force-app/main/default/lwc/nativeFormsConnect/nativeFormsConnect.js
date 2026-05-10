@@ -9,8 +9,9 @@ import installDemoData from '@salesforce/apex/NativeFormsDemoDataController.inst
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const CONNECT_STATE_KEY = 'nativeforms:connectState';
-const TENANT_SECRET_VISIBLE_MS = 5 * 60 * 1000;
 const CONNECTION_POLL_MS = 5000;
+const SERVICE_ACCESS_RETRY_MS = 1500;
+const SERVICE_ACCESS_RETRY_COUNT = 4;
 
 export default class NativeFormsConnect extends NavigationMixin(LightningElement) {
     orgId = '';
@@ -25,7 +26,6 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     state = '';
     city = '';
 
-    tenantSecret = '';
     connectUrl = '';
     setupState = 'not_registered';
     errorMessage = '';
@@ -36,8 +36,7 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     tenantAuthVerified = false;
     tenantAuthStatus = 'not_checked';
     tenantAuthErrorMessage = '';
-    tenantSecretIssuedAt = null;
-    tenantSecretTimeoutId;
+    isVerifyingServiceAccess = false;
     connectionPollId;
     isAwaitingOauthReturn = false;
     hasClientCredentials = false;
@@ -61,7 +60,6 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     }
 
     disconnectedCallback() {
-        this.clearTenantSecretTimer();
         this.stopConnectionPolling();
     }
 
@@ -76,7 +74,10 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
             this.state = context.state || '';
             this.city = context.city || '';
             this.restoreConnectState(this.orgId);
-            await this.loadConnectionStatus(false);
+            const status = await this.loadConnectionStatus(false);
+            if (status?.success === true && status.registered === true && this.tenantAuthVerified !== true) {
+                await this.loadConnectionStatus(true);
+            }
             await this.loadAccessSummary();
         } catch (error) {
             this.errorMessage = `Unable to load org setup details.\n\n${this.formatError(error)}`;
@@ -111,36 +112,18 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     normalizeRegistrationError(error) {
         const rawMessage = this.formatError(error);
         const normalized = rawMessage.toLowerCase();
-        const isPrincipalAccessIssue =
-            normalized.includes('we couldn\'t access the credential') ||
-            normalized.includes('external credential') ||
-            normalized.includes('nativeforms_bootstrap') ||
-            normalized.includes('nativeformsbootstrap') ||
-            normalized.includes('nativeformslambd') ||
-            normalized.includes('principal access') ||
+        const isConnectionSetupIssue =
             normalized.includes('setup access is not complete') ||
-            normalized.includes('permission-set access') ||
-            normalized.includes('permission set access');
+            normalized.includes('connection is not configured') ||
+            normalized.includes('bootstrap v2 signing secret');
 
-        this.hasBlockingSetupAccessIssue = isPrincipalAccessIssue;
+        this.hasBlockingSetupAccessIssue = isConnectionSetupIssue;
 
-        if (isPrincipalAccessIssue) {
-            return 'TwinaForms could not connect yet because the required permission-set access is not fully enabled.';
+        if (isConnectionSetupIssue) {
+            return 'TwinaForms could not prepare the secure connection yet. Refresh and try again.';
         }
 
         return rawMessage;
-    }
-
-    get hasTenantSecret() {
-        return !!this.tenantSecret && !this.isTenantSecretExpired;
-    }
-
-    get isTenantSecretExpired() {
-        if (!this.tenantSecret || !this.tenantSecretIssuedAt) {
-            return false;
-        }
-
-        return Date.now() - this.tenantSecretIssuedAt >= TENANT_SECRET_VISIBLE_MS;
     }
 
     get isPendingConnection() {
@@ -151,15 +134,23 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
         return this.setupState === 'connected';
     }
 
+    get isRegistered() {
+        return this.isPendingConnection || this.isConnected;
+    }
+
     get tenantSetupComplete() {
         return this.tenantAuthVerified && !this.hasBlockingSetupAccessIssue;
     }
 
     get showTenantSetupStage() {
-        return this.hasBlockingSetupAccessIssue || !this.tenantAuthVerified;
+        return this.hasBlockingSetupAccessIssue || !this.isRegistered;
     }
 
     get showTenantSetupCompleteBanner() {
+        return this.tenantSetupComplete;
+    }
+
+    get showServiceAccessCompleteBanner() {
         return this.tenantSetupComplete;
     }
 
@@ -168,7 +159,7 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     }
 
     get showTenantSetupActions() {
-        return !this.isAwaitingOauthReturn && !this.tenantSetupComplete;
+        return !this.isAwaitingOauthReturn && !this.isRegistered;
     }
 
     get showGenerateSecretAction() {
@@ -176,23 +167,23 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     }
 
     get showTestTenantAction() {
-        return this.isPendingConnection || this.hasTenantSecret;
-    }
-
-    get showTenantSecretExpiredMessage() {
-        return !this.hasTenantSecret && !!this.tenantSecretIssuedAt && !this.tenantSetupComplete;
+        return false;
     }
 
     get showOauthStage() {
-        return this.tenantSetupComplete && !this.isConnected && !this.hasBlockingSetupAccessIssue;
+        return this.isRegistered && !this.isConnected && !this.hasBlockingSetupAccessIssue;
     }
 
     get showOauthCompleteBanner() {
-        return this.tenantSetupComplete && this.isConnected;
+        return this.isConnected;
     }
 
     get showDemoInstallStage() {
         return this.tenantSetupComplete && this.isConnected;
+    }
+
+    get showServiceAccessStage() {
+        return this.isConnected && !this.tenantSetupComplete && !this.hasBlockingSetupAccessIssue;
     }
 
     get showConnectAction() {
@@ -217,7 +208,7 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
         }
 
         if (this.isPendingConnection) {
-            return this.tenantSetupComplete ? 'Waiting for Salesforce OAuth connection' : 'Waiting for tenant secret setup';
+            return 'Waiting for Salesforce OAuth connection';
         }
 
         return 'Not registered';
@@ -243,7 +234,7 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
         return 'Not registered';
     }
 
-    get tenantSecretAuthLabel() {
+    get serviceAccessLabel() {
         if (this.isInitializing) {
             return 'Checking...';
         }
@@ -417,22 +408,19 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
                 throw new Error(data?.errorMessage || 'TwinaForms registration failed.');
             }
 
-            this.tenantSecret = data.tenantSecret || '';
-            this.tenantSecretIssuedAt = this.tenantSecret ? Date.now() : null;
             this.connectUrl = data.connectUrl || '';
             this.setupState = 'registered_pending_connection';
-            this.successMessage = 'Tenant secret generated. Add it to Named Credentials, then click Test Tenant Secret.';
+            this.successMessage = 'Connection prepared. Continue to Salesforce authorization.';
             this.dispatchEvent(new ShowToastEvent({
-                title: 'Tenant secret generated',
-                message: 'Add it to Named Credentials, then click Test Tenant Secret.',
+                title: 'Connection prepared',
+                message: 'Continue to Salesforce authorization.',
                 variant: 'success'
             }));
-            this.scheduleTenantSecretExpiry();
             this.persistConnectState();
         } catch (error) {
             this.errorMessage = this.normalizeRegistrationError(error);
             this.dispatchEvent(new ShowToastEvent({
-                title: 'Could not generate tenant secret',
+                title: 'Could not prepare connection',
                 message: this.errorMessage,
                 variant: 'error',
                 mode: 'sticky'
@@ -453,7 +441,9 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
             await this.loadConnectionStatus(true);
 
             if (this.tenantSetupComplete) {
-                this.tenantTestMessage = 'Tenant secret verified. You can continue to Step 2.';
+                this.tenantTestMessage = this.isConnected
+                    ? 'Signed service access verified. TwinaForms is ready for setup tasks.'
+                    : 'Signed service access verified. You can continue to Salesforce authorization.';
                 this.tenantTestMessageVariant = 'success';
             } else {
                 this.tenantTestMessage = this.getFriendlyTenantTestError();
@@ -500,7 +490,7 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
         this.errorMessage = '';
 
         try {
-            await this.loadConnectionStatus(false);
+            await this.loadConnectionStatus(true);
             await this.loadAccessSummary();
         } finally {
             this.isBusy = false;
@@ -589,75 +579,130 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
                 verifyTenantAuthNow: verifyTenantAuth
             });
             if (status?.success !== true) {
-                this.tenantAuthVerified = false;
-                this.tenantAuthStatus = 'not_verified';
-                this.tenantAuthErrorMessage = '';
-                this.isAwaitingOauthReturn = false;
-                this.successMessage = '';
-                this.errorMessage = this.normalizeRegistrationError(
-                    new Error(status?.errorMessage || 'Unable to verify TwinaForms connection status.')
-                );
-                return;
+                this.applyConnectionStatusError(status?.errorMessage || 'Unable to verify TwinaForms connection status.');
+                return status;
             }
 
-            this.hasBlockingSetupAccessIssue = false;
-            this.errorMessage = '';
-            this.setupState = status.setupState || 'not_registered';
-            this.connectUrl = status.connectUrl || '';
-            this.hasClientCredentials = status.hasClientCredentials === true;
-            const tenantAuthWasAlreadyVerified = this.tenantAuthVerified === true && status.tenantAuthStatus === 'not_checked';
-            const orgIsAlreadyConnected = status.setupState === 'connected' || status.connected === true;
-            this.tenantAuthVerified = tenantAuthWasAlreadyVerified || status.tenantAuthVerified === true || orgIsAlreadyConnected;
-            this.tenantAuthStatus = this.tenantAuthVerified
-                ? 'verified'
-                : (status.tenantAuthStatus || 'not_checked');
-            this.tenantAuthErrorMessage = status.tenantAuthErrorMessage || '';
+            await this.applyConnectionStatus(status, verifyTenantAuth);
 
-            if (this.tenantAuthVerified) {
-                this.clearTenantSecretDisplayState();
-            }
-
-            if (this.isConnected) {
-                this.isAwaitingOauthReturn = false;
-                this.stopConnectionPolling();
-                this.successMessage = 'TwinaForms is fully connected.';
-                try {
-                    await this.loadAccessSummary();
-                } catch (accessError) {
-                    this.errorMessage = this.formatError(accessError);
-                }
-            } else if (this.isAwaitingOauthReturn && !this.isPendingConnection) {
-                this.isAwaitingOauthReturn = false;
-                this.stopConnectionPolling();
-            } else if (this.tenantSetupComplete && !this.hasClientCredentials) {
-                this.isAwaitingOauthReturn = false;
+            if (this.isConnected && !this.tenantAuthVerified && verifyTenantAuth !== true) {
+                await this.verifyServiceAccessAfterOAuth();
             }
 
             this.persistConnectState();
+            return status;
         } catch (error) {
-            this.tenantAuthVerified = false;
-            this.tenantAuthStatus = 'not_verified';
-            this.tenantAuthErrorMessage = '';
-            this.isAwaitingOauthReturn = false;
-            this.successMessage = '';
-            this.errorMessage = this.normalizeRegistrationError(
-                new Error(`Unable to verify TwinaForms connection status.\n\n${this.formatError(error)}`)
-            );
+            this.applyConnectionStatusError(`Unable to verify TwinaForms connection status.\n\n${this.formatError(error)}`);
+            return null;
         }
+    }
+
+    async applyConnectionStatus(status, verifyTenantAuth) {
+        this.hasBlockingSetupAccessIssue = false;
+        this.errorMessage = '';
+        this.setupState = status.setupState || 'not_registered';
+        this.connectUrl = status.connectUrl || '';
+        this.hasClientCredentials = status.hasClientCredentials === true;
+        const tenantAuthWasAlreadyVerified =
+            this.tenantAuthVerified === true &&
+            status.tenantAuthStatus === 'not_checked' &&
+            verifyTenantAuth !== true;
+        this.tenantAuthVerified = tenantAuthWasAlreadyVerified || status.tenantAuthVerified === true;
+        this.tenantAuthStatus = this.tenantAuthVerified
+            ? 'verified'
+            : (status.tenantAuthStatus || 'not_checked');
+        this.tenantAuthErrorMessage = status.tenantAuthErrorMessage || '';
+
+        if (this.isConnected && this.tenantAuthVerified) {
+            this.isAwaitingOauthReturn = false;
+            this.stopConnectionPolling();
+            this.successMessage = 'TwinaForms is fully connected.';
+            this.tenantTestMessage = '';
+            this.tenantTestMessageVariant = '';
+            try {
+                await this.loadAccessSummary();
+            } catch (accessError) {
+                this.errorMessage = this.formatError(accessError);
+            }
+        } else if (this.isConnected) {
+            this.isAwaitingOauthReturn = false;
+            this.successMessage = 'Salesforce OAuth is connected. Verifying secure service access...';
+        } else if (this.isAwaitingOauthReturn && !this.isPendingConnection) {
+            this.isAwaitingOauthReturn = false;
+            this.stopConnectionPolling();
+        } else if (this.tenantSetupComplete && !this.hasClientCredentials) {
+            this.isAwaitingOauthReturn = false;
+        }
+    }
+
+    applyConnectionStatusError(message) {
+        this.tenantAuthVerified = false;
+        this.tenantAuthStatus = 'not_verified';
+        this.tenantAuthErrorMessage = '';
+        this.isAwaitingOauthReturn = false;
+        this.successMessage = '';
+        this.errorMessage = this.normalizeRegistrationError(new Error(message));
+    }
+
+    async verifyServiceAccessAfterOAuth() {
+        if (this.isVerifyingServiceAccess) {
+            return;
+        }
+
+        this.isVerifyingServiceAccess = true;
+        this.tenantTestMessage = '';
+        this.tenantTestMessageVariant = '';
+
+        try {
+            for (let attempt = 0; attempt < SERVICE_ACCESS_RETRY_COUNT && !this.tenantAuthVerified; attempt += 1) {
+                if (attempt > 0) {
+                    await this.sleep(SERVICE_ACCESS_RETRY_MS);
+                }
+
+                const status = await getConnectionStatus({
+                    orgId: this.orgId,
+                    verifyTenantAuthNow: true
+                });
+
+                if (status?.success === true) {
+                    await this.applyConnectionStatus(status, true);
+                    if (this.tenantAuthVerified) {
+                        break;
+                    }
+                } else {
+                    this.tenantAuthStatus = 'not_verified';
+                    this.tenantAuthErrorMessage = status?.errorMessage || '';
+                }
+            }
+
+            if (!this.tenantAuthVerified) {
+                this.tenantTestMessage = this.getFriendlyTenantTestError();
+                this.tenantTestMessageVariant = 'error';
+            }
+        } finally {
+            this.isVerifyingServiceAccess = false;
+            this.persistConnectState();
+        }
+    }
+
+    sleep(milliseconds) {
+        return new Promise((resolve) => {
+            window.setTimeout(resolve, milliseconds);
+        });
     }
 
     getFriendlyTenantTestError() {
         const raw = (this.tenantAuthErrorMessage || '').toLowerCase();
 
         if (raw.includes('invalid tenant secret') || raw.includes('401 unauthorized')) {
-            return 'The tenant secret is incorrect. Please update the secret in Named Credentials and test again.';
+            return 'TwinaForms service access is not authorized yet. Reconnect TwinaForms, then test again.';
         }
 
         if (raw.includes('unauthorized') || raw.includes('not verified')) {
-            return 'TwinaForms could not verify the tenant secret yet. Please check the secret value and try again.';
+            return 'TwinaForms could not verify signed service access yet. Reconnect TwinaForms or try again.';
         }
 
-        return 'Tenant secret is not verified yet. Please finish the Named Credential step and try Test again.';
+        return 'TwinaForms service access is not verified yet. Finish authorization, then try Test again.';
     }
 
     startConnectionPolling() {
@@ -674,54 +719,14 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
         }
     }
 
-    clearTenantSecretTimer() {
-        if (this.tenantSecretTimeoutId) {
-            window.clearTimeout(this.tenantSecretTimeoutId);
-            this.tenantSecretTimeoutId = null;
-        }
-    }
-
-    clearTenantSecretFromUi() {
-        this.clearTenantSecretTimer();
-        this.tenantSecret = '';
-        this.persistConnectState();
-    }
-
-    clearTenantSecretDisplayState() {
-        this.clearTenantSecretTimer();
-        this.tenantSecret = '';
-        this.tenantSecretIssuedAt = null;
-    }
-
-    scheduleTenantSecretExpiry() {
-        this.clearTenantSecretTimer();
-
-        if (!this.tenantSecret || !this.tenantSecretIssuedAt) {
-            return;
-        }
-
-        const remainingMs = TENANT_SECRET_VISIBLE_MS - (Date.now() - this.tenantSecretIssuedAt);
-        if (remainingMs <= 0) {
-            this.clearTenantSecretFromUi();
-            return;
-        }
-
-        this.tenantSecretTimeoutId = window.setTimeout(() => {
-            this.clearTenantSecretFromUi();
-        }, remainingMs);
-    }
-
     persistConnectState() {
         try {
             window.sessionStorage.setItem(CONNECT_STATE_KEY, JSON.stringify({
                 orgId: this.orgId,
-                tenantSecret: this.tenantSecret,
-                tenantSecretIssuedAt: this.tenantSecretIssuedAt,
                 connectUrl: this.connectUrl,
                 successMessage: this.successMessage,
                 setupState: this.setupState,
                 isAwaitingOauthReturn: this.isAwaitingOauthReturn,
-                tenantAuthVerified: this.tenantAuthVerified,
                 tenantAuthStatus: this.tenantAuthStatus,
                 tenantAuthErrorMessage: this.tenantAuthErrorMessage,
                 hasClientCredentials: this.hasClientCredentials
@@ -743,19 +748,14 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
                 return;
             }
 
-            this.tenantSecret = stored?.tenantSecret || '';
-            this.tenantSecretIssuedAt = typeof stored?.tenantSecretIssuedAt === 'number'
-                ? stored.tenantSecretIssuedAt
-                : null;
             this.connectUrl = stored?.connectUrl || '';
             this.successMessage = stored?.successMessage || '';
             this.setupState = stored?.setupState || 'not_registered';
             this.isAwaitingOauthReturn = stored?.isAwaitingOauthReturn === true;
-            this.tenantAuthVerified = stored?.tenantAuthVerified === true;
-            this.tenantAuthStatus = stored?.tenantAuthStatus || 'not_checked';
+            this.tenantAuthVerified = false;
+            this.tenantAuthStatus = 'not_checked';
             this.tenantAuthErrorMessage = stored?.tenantAuthErrorMessage || '';
             this.hasClientCredentials = stored?.hasClientCredentials === true;
-            this.scheduleTenantSecretExpiry();
             if (this.isAwaitingOauthReturn) {
                 this.startConnectionPolling();
             }

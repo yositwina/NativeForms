@@ -54,13 +54,14 @@ public with sharing class NativeFormsTenantEntitlements {
         snapshot.errorMessage = null;
 
         try {
+            String path = '/tenant/entitlements';
             HttpRequest request = new HttpRequest();
             request.setMethod('GET');
             request.setEndpoint(
-                'callout:' + NativeFormsAwsClient.namedCredentialName()
-                + '/tenant/entitlements?orgId='
+                NativeFormsAwsClient.backendEndpoint(path) + '?orgId='
                 + EncodingUtil.urlEncode(snapshot.orgId, 'UTF-8')
             );
+            NativeFormsAwsClient.applyBootstrapV2Signature(request, 'GET', path, '');
             request.setTimeout(TIMEOUT_MS);
 
             HttpResponse response = new Http().send(request);

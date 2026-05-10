@@ -59,7 +59,7 @@ public with sharing class NativeFormsThemesController {
         List<NF_Theme__c> themeRows = [
             SELECT Id, Name
             FROM NF_Theme__c
-            ORDER BY Name ASC, LastModifiedDate DESC
+            WITH USER_MODE ORDER BY Name ASC, LastModifiedDate DESC
             LIMIT 200
         ];
 
@@ -86,7 +86,7 @@ public with sharing class NativeFormsThemesController {
                        Button_Font__c, Button_Font_Size_Px__c, Button_Text_Color__c, Button_Background_Color__c, Button_Hover_Background_Color__c
                 FROM NF_Theme__c
                 WHERE Id = :effectiveThemeId
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ]);
         }
         return workspace;
@@ -129,7 +129,7 @@ public with sharing class NativeFormsThemesController {
             Button_Background_Color__c = '#0F6CBD',
             Button_Hover_Background_Color__c = '#0C5EA6'
         );
-        insert row;
+        insert as user row;
         return getWorkspace(row.Id).selectedTheme;
     }
 
@@ -149,12 +149,12 @@ public with sharing class NativeFormsThemesController {
                    Button_Font__c, Button_Font_Size_Px__c, Button_Text_Color__c, Button_Background_Color__c, Button_Hover_Background_Color__c
             FROM NF_Theme__c
             WHERE Id = :themeId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         NF_Theme__c clonedRow = sourceRow.clone(false, true, false, false);
         clonedRow.Name = sourceRow.Name + ' Copy';
-        insert clonedRow;
+        insert as user clonedRow;
         return getWorkspace(clonedRow.Id).selectedTheme;
     }
 
@@ -170,7 +170,7 @@ public with sharing class NativeFormsThemesController {
                 SELECT Id
                 FROM NF_Theme__c
                 WHERE Id = :inputValue.id
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ];
 
         row.Name = blankToDefault(inputValue.name, 'New Theme');
@@ -204,7 +204,7 @@ public with sharing class NativeFormsThemesController {
         row.Button_Background_Color__c = inputValue.buttonBackgroundColor;
         row.Button_Hover_Background_Color__c = inputValue.buttonHoverBackgroundColor;
 
-        upsert row;
+        upsert as user row;
         return getWorkspace(row.Id).selectedTheme;
     }
 
@@ -217,7 +217,7 @@ public with sharing class NativeFormsThemesController {
             SELECT Id
             FROM NF_Theme__c
             WHERE Id = :themeId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
     }
 
@@ -236,25 +236,23 @@ public with sharing class NativeFormsThemesController {
             VersionData = EncodingUtil.base64Decode(base64Data),
             FirstPublishLocationId = themeId
         );
-        insert versionRecord;
-
+        insert as user versionRecord;
         versionRecord = [
             SELECT Id, ContentDocumentId
             FROM ContentVersion
             WHERE Id = :versionRecord.Id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         NF_Theme__c row = [
             SELECT Id
             FROM NF_Theme__c
             WHERE Id = :themeId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         row.Logo_Content_Document_Id__c = String.valueOf(versionRecord.ContentDocumentId);
         row.Logo_URL__c = buildContentVersionUrl(versionRecord.Id);
-        update row;
-
+        update as user row;
         UploadedLogoResult result = new UploadedLogoResult();
         result.contentDocumentId = versionRecord.ContentDocumentId;
         result.contentVersionId = versionRecord.Id;
@@ -328,7 +326,7 @@ public with sharing class NativeFormsThemesController {
         for (NF_Theme__c row : [
             SELECT Id, Name
             FROM NF_Theme__c
-            WHERE Name IN :expectedNames
+            WHERE Name IN :expectedNames WITH USER_MODE
         ]) {
             existingByName.put(row.Name, row);
         }
@@ -467,7 +465,7 @@ public with sharing class NativeFormsThemesController {
         }
 
         if (!toUpsert.isEmpty()) {
-            upsert toUpsert;
+            upsert as user toUpsert;
         }
     }
 }

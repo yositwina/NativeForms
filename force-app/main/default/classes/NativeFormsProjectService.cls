@@ -14,7 +14,7 @@ public with sharing class NativeFormsProjectService {
         for (NF_Project__c existingRecord : [
             SELECT Id, Name
             FROM NF_Project__c
-            WHERE Name != null
+            WHERE Name != null WITH USER_MODE
         ]) {
             String normalized = normalizeProjectName(existingRecord.Name);
             if (normalized != null) {
@@ -65,7 +65,7 @@ public with sharing class NativeFormsProjectService {
             SELECT Project__c projectId, COUNT(Id) formCount
             FROM NF_Form__c
             WHERE Project__c IN :projectIds
-            GROUP BY Project__c
+            WITH USER_MODE GROUP BY Project__c
         ]) {
             formCounts.put((Id) row.get('projectId'), (Integer) row.get('formCount'));
         }
@@ -84,13 +84,13 @@ public with sharing class NativeFormsProjectService {
             SELECT Id
             FROM NF_Form__c
             WHERE Project__c = null
-            LIMIT 1000
+            WITH USER_MODE LIMIT 1000
         ];
         if (!formsToUpdate.isEmpty()) {
             for (NF_Form__c row : formsToUpdate) {
                 row.Project__c = defaultProjectId;
             }
-            update formsToUpdate;
+            update as user formsToUpdate;
         }
         return defaultProjectId;
     }
@@ -115,7 +115,7 @@ public with sharing class NativeFormsProjectService {
             SELECT Id, Name
             FROM NF_Project__c
             WHERE Name IN :new List<String>{ DEFAULT_PROJECT_NAME, ARCHIVE_PROJECT_NAME }
-            ORDER BY CreatedDate ASC
+            WITH USER_MODE ORDER BY CreatedDate ASC
         ]) {
             if (!existingByName.containsKey(row.Name)) {
                 existingByName.put(row.Name, row.Id);
@@ -143,7 +143,7 @@ public with sharing class NativeFormsProjectService {
             ));
         }
         if (!projectsToInsert.isEmpty()) {
-            insert projectsToInsert;
+            insert as user projectsToInsert;
             for (NF_Project__c row : projectsToInsert) {
                 if (row.Name == DEFAULT_PROJECT_NAME) {
                     defaultProjectIdCache = row.Id;
@@ -170,7 +170,7 @@ public with sharing class NativeFormsProjectService {
             SELECT Id
             FROM NF_Project__c
             WHERE Name = :projectName
-            ORDER BY CreatedDate ASC
+            WITH USER_MODE ORDER BY CreatedDate ASC
             LIMIT 1
         ];
         return matches.isEmpty() ? null : matches[0].Id;
@@ -186,7 +186,7 @@ public with sharing class NativeFormsProjectService {
                 throw new AuraHandledException('A project with this name already exists.');
             }
             NF_Project__c newProject = new NF_Project__c(Name = normalized);
-            insert newProject;
+            insert as user newProject;
             return newProject.Id;
         }
 

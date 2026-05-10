@@ -1,7 +1,5 @@
 public with sharing class NativeFormsSetupController {
     private static final Integer TIMEOUT_MS = 120000;
-    private static final String BASE_BOOTSTRAP_NC_NAME = 'NativeForms_Bootstrap';
-    private static String cachedBootstrapNc;
 
     public class SetupContext {
         @AuraEnabled public String orgId { get; set; }
@@ -28,16 +26,8 @@ public with sharing class NativeFormsSetupController {
         @AuraEnabled public String city { get; set; }
     }
 
-    public class ClientCredentialsRequest {
-        @AuraEnabled public String orgId { get; set; }
-        @AuraEnabled public String adminEmail { get; set; }
-        @AuraEnabled public String companyName { get; set; }
-        @AuraEnabled public String loginBaseUrl { get; set; }
-    }
-
     public class RegistrationResult {
         @AuraEnabled public Boolean success { get; set; }
-        @AuraEnabled public String tenantSecret { get; set; }
         @AuraEnabled public String connectUrl { get; set; }
         @AuraEnabled public String rawResponse { get; set; }
         @AuraEnabled public String errorMessage { get; set; }
@@ -73,7 +63,7 @@ public with sharing class NativeFormsSetupController {
         Organization orgRecord = [
             SELECT Name, City, State, Country
             FROM Organization
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         context.orgName = orgRecord.Name;
         context.country = orgRecord.Country;
@@ -89,70 +79,11 @@ public with sharing class NativeFormsSetupController {
 
         try {
             RegistrationRequest requestBody = parseRegistrationRequest(requestJson);
-            HttpRequest request = new HttpRequest();
-            request.setMethod('POST');
-            request.setEndpoint('callout:' + bootstrapNamedCredentialName() + '/tenant/register');
-            request.setHeader('Content-Type', 'application/json');
-            request.setTimeout(TIMEOUT_MS);
-            request.setBody(JSON.serialize(requestBody));
-
-            HttpResponse response = new Http().send(request);
-            result.rawResponse = response.getBody();
-
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                result.success = false;
-                result.errorMessage = buildRegisterOrgErrorMessage(response.getStatusCode(), response.getBody());
-                return result;
-            }
-
-            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
-            result.success = responseBody.containsKey('success') ? (Boolean) responseBody.get('success') : false;
-            result.tenantSecret = (String) responseBody.get('tenantSecret');
-            result.connectUrl = (String) responseBody.get('connectUrl');
-
-            if (!result.success && String.isBlank(result.errorMessage)) {
-                result.errorMessage = buildRegisterOrgErrorMessage(null, String.valueOf(responseBody.get('error')));
-            }
+            result.success = true;
+            result.connectUrl = buildDirectConnectUrl(requestBody);
         } catch (Exception e) {
             result.success = false;
             result.errorMessage = buildRegisterOrgExceptionMessage(e);
-        }
-
-        return result;
-    }
-
-    @AuraEnabled
-    public static RegistrationResult saveClientCredentials(String requestJson) {
-        RegistrationResult result = new RegistrationResult();
-
-        try {
-            ClientCredentialsRequest requestBody = parseClientCredentialsRequest(requestJson);
-            HttpRequest request = new HttpRequest();
-            request.setMethod('POST');
-            request.setEndpoint('callout:' + bootstrapNamedCredentialName() + '/tenant/register');
-            request.setHeader('Content-Type', 'application/json');
-            request.setTimeout(TIMEOUT_MS);
-            request.setBody(JSON.serialize(requestBody));
-
-            HttpResponse response = new Http().send(request);
-            result.rawResponse = response.getBody();
-
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                result.success = false;
-                result.errorMessage = buildSaveClientCredentialsErrorMessage(response.getStatusCode(), response.getBody());
-                return result;
-            }
-
-            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
-            result.success = responseBody.containsKey('success') ? (Boolean) responseBody.get('success') : false;
-            result.connectUrl = (String) responseBody.get('connectUrl');
-
-            if (!result.success && String.isBlank(result.errorMessage)) {
-                result.errorMessage = buildSaveClientCredentialsErrorMessage(null, String.valueOf(responseBody.get('error')));
-            }
-        } catch (Exception e) {
-            result.success = false;
-            result.errorMessage = buildSaveClientCredentialsExceptionMessage(e);
         }
 
         return result;
@@ -169,7 +100,7 @@ public with sharing class NativeFormsSetupController {
 
             HttpRequest request = new HttpRequest();
             request.setMethod('GET');
-            request.setEndpoint('callout:' + bootstrapNamedCredentialName() + '/tenant/status?orgId=' + EncodingUtil.urlEncode(effectiveOrgId, 'UTF-8'));
+            request.setEndpoint(NativeFormsAwsClient.backendEndpoint('/tenant/status') + '?orgId=' + EncodingUtil.urlEncode(effectiveOrgId, 'UTF-8'));
             request.setTimeout(TIMEOUT_MS);
 
             HttpResponse response = new Http().send(request);
@@ -221,13 +152,16 @@ public with sharing class NativeFormsSetupController {
                 : orgId.trim();
 
             HttpRequest request = new HttpRequest();
-            request.setMethod('POST');
-            request.setEndpoint('callout:' + bootstrapNamedCredentialName() + '/tenant/disconnect');
-            request.setHeader('Content-Type', 'application/json');
-            request.setTimeout(TIMEOUT_MS);
-            request.setBody(JSON.serialize(new Map<String, Object>{
+            String path = '/tenant/disconnect';
+            String body = JSON.serialize(new Map<String, Object>{
                 'orgId' => effectiveOrgId
-            }));
+            });
+            request.setMethod('POST');
+            request.setEndpoint(NativeFormsAwsClient.backendEndpoint(path));
+            request.setHeader('Content-Type', 'application/json');
+            NativeFormsAwsClient.applyBootstrapV2Signature(request, 'POST', path, body);
+            request.setTimeout(TIMEOUT_MS);
+            request.setBody(body);
 
             HttpResponse response = new Http().send(request);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
@@ -263,22 +197,17 @@ public with sharing class NativeFormsSetupController {
         return (RegistrationRequest) JSON.deserialize(requestJson, RegistrationRequest.class);
     }
 
-    private static ClientCredentialsRequest parseClientCredentialsRequest(String requestJson) {
-        if (String.isBlank(requestJson)) {
-            return new ClientCredentialsRequest();
-        }
-        return (ClientCredentialsRequest) JSON.deserialize(requestJson, ClientCredentialsRequest.class);
-    }
-
     private static TenantAuthStatus verifyTenantAuth(String orgId) {
         TenantAuthStatus result = new TenantAuthStatus();
         result.verified = false;
         result.status = 'not_checked';
 
         try {
+            String path = '/tenant/auth-health';
             HttpRequest request = new HttpRequest();
             request.setMethod('GET');
-            request.setEndpoint('callout:' + NativeFormsAwsClient.namedCredentialName() + '/tenant/auth-health?orgId=' + EncodingUtil.urlEncode(orgId, 'UTF-8'));
+            request.setEndpoint(NativeFormsAwsClient.backendEndpoint(path) + '?orgId=' + EncodingUtil.urlEncode(orgId, 'UTF-8'));
+            NativeFormsAwsClient.applyBootstrapV2Signature(request, 'GET', path, '');
             request.setTimeout(TIMEOUT_MS);
 
             HttpResponse response = new Http().send(request);
@@ -292,62 +221,47 @@ public with sharing class NativeFormsSetupController {
             result.errorMessage = buildTenantAuthErrorMessage(response.getStatusCode(), response.getBody());
         } catch (Exception e) {
             result.status = 'not_verified';
-            result.errorMessage = 'TwinaForms could not verify the tenant secret yet. Check the Named Credential secret and try again.';
+            result.errorMessage = 'TwinaForms could not verify secure service access yet. Reconnect TwinaForms and try again.';
         }
 
         return result;
     }
 
-    private static String bootstrapNamedCredentialName() {
-        if (cachedBootstrapNc != null) {
-            return cachedBootstrapNc;
+    private static String buildDirectConnectUrl(RegistrationRequest requestBody) {
+        if (requestBody == null) {
+            throw new AuraHandledException('Missing setup request.');
+        }
+        String orgId = String.isBlank(requestBody.orgId)
+            ? UserInfo.getOrganizationId().substring(0, 15)
+            : requestBody.orgId.trim();
+        if (String.isBlank(requestBody.loginBaseUrl)) {
+            throw new AuraHandledException('Missing Salesforce login URL.');
         }
 
-        String fullName = NativeFormsSetupController.class.getName();
-        Integer dot = fullName.indexOf('.');
-        String ns = dot > 0 ? fullName.substring(0, dot) : null;
-
-        cachedBootstrapNc = String.isBlank(ns)
-            ? BASE_BOOTSTRAP_NC_NAME
-            : ns + '__' + BASE_BOOTSTRAP_NC_NAME;
-
-        return cachedBootstrapNc;
+        List<String> parts = new List<String>{
+            'orgId=' + EncodingUtil.urlEncode(orgId, 'UTF-8'),
+            'loginBaseUrl=' + EncodingUtil.urlEncode(requestBody.loginBaseUrl, 'UTF-8')
+        };
+        addOptionalQueryPart(parts, 'adminEmail', requestBody.adminEmail);
+        addOptionalQueryPart(parts, 'companyName', requestBody.companyName);
+        addOptionalQueryPart(parts, 'country', requestBody.country);
+        addOptionalQueryPart(parts, 'state', requestBody.state);
+        addOptionalQueryPart(parts, 'city', requestBody.city);
+        return NativeFormsAwsClient.backendEndpoint('/connect') + '?' + String.join(parts, '&');
     }
 
-    private static String buildRegisterOrgErrorMessage(Integer statusCode, String rawBody) {
-        if (isPermissionSetAccessIssue(statusCode, rawBody)) {
-            return 'TwinaForms could not generate the tenant secret yet because setup access is not complete. Check permission-set access and try again.';
+    private static void addOptionalQueryPart(List<String> parts, String name, String value) {
+        if (parts == null || String.isBlank(name) || String.isBlank(value)) {
+            return;
         }
-        return 'TwinaForms could not generate the tenant secret. Check setup access and try again.';
+        parts.add(name + '=' + EncodingUtil.urlEncode(value, 'UTF-8'));
     }
 
     private static String buildRegisterOrgExceptionMessage(Exception e) {
-        String message = e == null ? '' : String.valueOf(e.getMessage());
-        if (isPermissionSetAccessIssue(null, message)) {
-            return 'TwinaForms could not generate the tenant secret yet because setup access is not complete. Check permission-set access and try again.';
-        }
-        return 'TwinaForms could not generate the tenant secret. Check setup access and try again.';
-    }
-
-    private static String buildSaveClientCredentialsErrorMessage(Integer statusCode, String rawBody) {
-        if (isPermissionSetAccessIssue(statusCode, rawBody)) {
-            return 'TwinaForms could not prepare Salesforce authorization yet because setup access is not complete. Check permission-set access and try again.';
-        }
-        return 'TwinaForms could not prepare Salesforce authorization. Refresh and try again.';
-    }
-
-    private static String buildSaveClientCredentialsExceptionMessage(Exception e) {
-        String message = e == null ? '' : String.valueOf(e.getMessage());
-        if (isPermissionSetAccessIssue(null, message)) {
-            return 'TwinaForms could not prepare Salesforce authorization yet because setup access is not complete. Check permission-set access and try again.';
-        }
-        return 'TwinaForms could not prepare Salesforce authorization. Refresh and try again.';
+        return 'TwinaForms could not prepare the connection. Refresh and try again.';
     }
 
     private static String buildConnectionStatusErrorMessage(Integer statusCode, String rawBody) {
-        if (isPermissionSetAccessIssue(statusCode, rawBody)) {
-            return 'TwinaForms could not verify the current connection status because setup access is not complete.';
-        }
         return 'TwinaForms could not verify the current connection status. Refresh and try again.';
     }
 
@@ -360,24 +274,12 @@ public with sharing class NativeFormsSetupController {
 
     private static String buildTenantAuthErrorMessage(Integer statusCode, String rawBody) {
         String normalized = normalizeMessage(rawBody);
-        if (normalized.contains('invalid tenant secret') || statusCode == 401) {
-            return 'The tenant secret is incorrect. Update the Named Credential secret and try again.';
+        if (normalized.contains('invalid tenant secret')
+            || normalized.contains('bootstrap')
+            || statusCode == 401) {
+            return 'TwinaForms secure service access is not authorized yet. Reconnect TwinaForms and try again.';
         }
-        return 'TwinaForms could not verify the tenant secret yet. Check the Named Credential secret and try again.';
-    }
-
-    private static Boolean isPermissionSetAccessIssue(Integer statusCode, String rawBody) {
-        String normalized = normalizeMessage(rawBody);
-        if (normalized.contains('external credential')
-            || normalized.contains('principal access')
-            || normalized.contains('nativeforms_bootstrap')
-            || normalized.contains('nativeformsbootstrap')
-            || normalized.contains('nativeforms shared secret')
-            || normalized.contains('permission-set access')
-            || normalized.contains('permission set access')) {
-            return true;
-        }
-        return statusCode == 401 && normalized.contains('credential');
+        return 'TwinaForms could not verify secure service access yet. Reconnect TwinaForms and try again.';
     }
 
     private static String normalizeMessage(String value) {

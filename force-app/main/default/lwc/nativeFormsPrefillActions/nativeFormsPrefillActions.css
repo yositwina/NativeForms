@@ -353,3 +353,107 @@
         grid-template-columns: 1fr;
     }
 }
+
+.shell {
+    --tf-blue: #1B96FF;
+    --tf-panel-header: #F3F8FF;
+    --tf-border: #D6E2F0;
+    --tf-text: #0f2e54;
+    --tf-muted: #5f6f89;
+    font-family: Inter, "Salesforce Sans", Arial, sans-serif;
+    color: var(--tf-text);
+}
+
+.toolbar {
+    margin-bottom: 1rem;
+}
+
+.version-meta {
+    padding: 1rem 1.35rem;
+    border-color: var(--tf-border);
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-shadow: 0 10px 26px rgba(15, 35, 65, 0.06);
+}
+
+.meta-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.8rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background: #eef6ff;
+    color: var(--tf-text);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.layout {
+    gap: 1rem;
+    grid-template-columns: minmax(16rem, 19.5rem) minmax(0, 1fr) minmax(20rem, 23rem);
+}
+
+.pane {
+    border-color: var(--tf-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 26px rgba(15, 35, 65, 0.06);
+}
+
+.pane-header {
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    background: linear-gradient(90deg, var(--tf-panel-header), #e8f4ff);
+}
+
+.pane-header h2,
+.condition-builder__title {
+    color: #0f4c8a;
+    font-size: 0.86rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.pane-copy,
+.concept-panel p,
+.help-copy p {
+    color: var(--tf-muted);
+}
+
+.pane-action-button {
+    border-color: var(--tf-blue);
+    border-radius: 0.45rem;
+    color: #006fe6;
+    font-weight: 700;
+}
+
+.pane-action-button--brand {
+    border-color: var(--tf-blue);
+    background: var(--tf-blue);
+    color: #ffffff;
+}
+
+.action-card,
+.condition-builder,
+.mapping-summary,
+.mapping-group,
+.mapping-row,
+.concept-panel {
+    border-color: var(--tf-border);
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-shadow: 0 8px 18px rgba(15, 35, 65, 0.04);
+}
+
+.action-card--selected,
+.mapping-group--selected {
+    border-color: var(--tf-blue);
+    background: #f3f8ff;
+    box-shadow: 0 0 0 2px rgba(27, 150, 255, 0.18), 0 10px 24px rgba(15, 108, 189, 0.12);
+}
+
+.action-title,
+.mapping-row__label,
+.concept-panel h3 {
+    color: var(--tf-text);
+}

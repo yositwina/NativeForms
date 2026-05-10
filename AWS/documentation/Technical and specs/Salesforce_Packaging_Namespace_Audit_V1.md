@@ -1,52 +1,44 @@
 # Salesforce Packaging Namespace Audit V1
 
-Current TwinaForms managed 2GP package:
+Last updated: 2026-05-10
+
+## Current TwinaForms Managed 2GP Package
+
 - package name: `TwinaForms`
 - package id: `0HogL0000002CUvSAM`
-- latest beta package version id: `08cgL0000008j81QAA`
-- latest package2 version id: `05igL0000002vYTQAY`
-- latest subscriber package version id: `04tgL000000ERGTQA4`
-- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000ERGTQA4`
+- latest beta package version create request id: `08cgL00000097WvQAI`
+- latest package2 version id: `05igL00000037mXQAQ`
+- latest subscriber package version id: `04tgL000000F7VpQAK`
+- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000F7VpQAK`
+- target namespace: `twinaforms`
 
-Packaging note:
-- do not rely on `externalCredentialPrincipalAccesses` packaging inside shipped permission sets for TwinaForms install flow
-- subscriber setup must still include the manual External Credential Principal Access enablement step
-- current beta packaging should include the package-safe External Client App header and OAuth settings metadata; subscriber setup should not ask for Consumer Key or Consumer Secret because OAuth settings are hidden for installed External Client Apps
-- AWS must use the TwinaForms-owned source-org External Client App client credentials centrally, while each subscriber org stores only its refresh token and instance URL
-- packageable External Client App source metadata must come from the persistent Dev Hub/source org, not an ephemeral scratch org; use retrieved `orgScopedExternalApp` and `oauthLink` values
-- package-owned email templates must not live in `unfiled$public`; use a dedicated package email folder to avoid install collisions with subscriber templates
-- ship only one packaged Salesforce app in App Launcher, `TwinaForms`; admin/support-debug tooling must live inside that app as a gated area controlled by the AWS admin flag plus the `TwinaForms Admin` permission set
-- LWC-to-Apex save/update/register calls should use primitive parameters or JSON string payloads, not custom Apex inner-class DTO parameters
+## Packaging Note
 
-Date: 2026-04-28
+The current target install flow is Bootstrap V2:
+
+- no Salesforce Named Credential metadata in the managed package
+- no Salesforce External Credential metadata in the managed package
+- no subscriber-created service-access permission set
+- package-to-AWS calls use direct HTTPS endpoints and Bootstrap V2 HMAC signatures
+- Salesforce OAuth remains the first trust anchor for the org connection
 
 ## Purpose
 
-Before creating the first managed package version, TwinaForms needs a namespace-readiness audit so a clean subscriber install does not fail because of string-based metadata names.
-
-Target namespace assumption:
-
-- `twinaforms`
-
-Expected managed names include:
-
-- `twinaforms__NF_Form__c`
-- `twinaforms__NF_Form_Version__c`
-- `twinaforms__NF_Form_Element__c`
-- `twinaforms__NF_Form_Action__c`
-- `twinaforms__NF_Form_Publication__c`
+Before creating a managed package version, TwinaForms needs a namespace-readiness audit so a clean subscriber install does not fail because of string-based metadata names.
 
 ## Audit Summary
 
 The core Apex object model is mostly package-safe because it uses compile-time Apex references such as `NF_Form__c`, `NF_Form_Version__c`, and direct SOQL. Managed packaging should resolve those references inside the package namespace.
 
-The main namespace risk is string-based metadata naming:
+The current namespace risks are:
 
-- Named Credential callout names
-- External Credential principal access names
 - Permission Set lookup/assignment logic
+- packaged Remote Site Settings
+- External Client App package metadata
 - customer-facing setup docs that mention technical names
 - clean-org install validation
+
+Named Credentials and External Credentials are intentionally removed from the package flow and are no longer namespace risks.
 
 ## Findings
 
@@ -65,8 +57,6 @@ Most package objects are referenced directly in Apex:
 - `NF_Theme__c`
 - `NativeForms_Config__c`
 
-These compile inside the namespace and should not require manual `twinaforms__` prefixes in Apex source.
-
 Rule:
 
 - Do not add namespace prefixes to Apex source object/field references.
@@ -76,16 +66,7 @@ Rule:
 
 Status: acceptable, with clean-install validation required.
 
-The app uses `Schema.getGlobalDescribe()` mostly for customer Salesforce objects and fields selected in Prefill/Submit/Designer mappings.
-
-Examples:
-
-- `NativeFormsDesignerController`
-- `NativeFormsPrefillActionsController`
-- `NativeFormsSubmitActionsController`
-- `NativeFormsPublisher`
-
-These helpers canonicalize object/field names through describe results. That is good for customer objects like `Contact`, `Case`, and custom customer fields.
+The app uses `Schema.getGlobalDescribe()` mostly for customer Salesforce objects and fields selected in Prefill, Submit, and Designer mappings.
 
 Risk:
 
@@ -96,78 +77,33 @@ Current recommendation:
 - No immediate code change.
 - Add clean-package QA that opens Designer, Prefill, Submit, and Publish in an installed subscriber org.
 
-### 3. Named Credentials
+### 3. Package-To-AWS Callouts
 
-Status: code is intentionally namespace-aware.
+Status: Bootstrap V2 direct HTTPS.
 
-The package has these Named Credentials:
+The package should use:
 
-- `NativeForms`
-- `NativeForms_Bootstrap`
-- `NativeForms_SubmissionLogs`
+- packaged Remote Site Settings for AWS Lambda and S3 endpoints
+- direct HTTPS endpoints in Apex
+- Bootstrap V2 HMAC request headers
 
-Apex callouts build names dynamically:
+The package should not use:
 
-- `NativeFormsAwsClient.namedCredentialName()`
-- `NativeFormsSetupController.bootstrapNamedCredentialName()`
-- `NativeFormsHomeController.bootstrapNamedCredentialName()`
-- `NativeFormsSubmissionLogsController.namedCredentialName()`
-
-The current pattern derives namespace from `ClassName.class.getName()` and returns:
-
-- unmanaged/dev org: `NativeForms`
-- managed subscriber org: `twinaforms__NativeForms`
-
-This is the right packaging-safe direction.
+- Salesforce Named Credentials
+- Salesforce External Credentials
+- External Credential Principal Access
 
 Clean-org validation required:
 
-- Connect Step 1 can call `twinaforms__NativeForms_Bootstrap`.
-- Publish can call `twinaforms__NativeForms`.
-- Submission Logs can call `twinaforms__NativeForms_SubmissionLogs`.
+- Connect can prepare the AWS OAuth URL without a Salesforce callout.
+- OAuth callback completes and stores the org connection in AWS.
+- `tenant/auth-health` verifies signed service access.
+- Publish can call AWS with HMAC signatures.
+- Submission Logs can call AWS with HMAC signatures.
 
-### 4. External Credentials And Principal Access
+### 4. Permission Sets
 
-Status: highest-risk area to validate.
-
-Packaged external credentials:
-
-- `TwinaFormsBootstrap`
-- `TwinaFormsLambdaAuth`
-
-Packaged principals:
-
-- `TwinaFormsBootstrapPrincipal`
-- `TwinaFormsSharedSecret`
-
-Permission-set metadata currently grants:
-
-- `TwinaFormsBootstrap-TwinaFormsBootstrapPrincipal`
-- `TwinaFormsLambdaAuth-TwinaFormsSharedSecret`
-
-Risk:
-
-- In a managed package install, Salesforce may display and/or internally reference these as namespaced principal entries.
-- The package metadata may resolve this correctly, but this must be verified in a real install org.
-
-Clean-org validation required:
-
-- Install package.
-- Assign `TwinaForms User`.
-- Confirm External Credential Principal Access is present/effective for:
-  - Bootstrap
-  - Shared Secret
-- Run Connect without manually adding principal access.
-- Publish without manually adding principal access.
-
-If this fails:
-
-- Treat it as packaging blocker.
-- Adjust permission-set metadata or post-install guidance before first release.
-
-### 5. Permission Sets
-
-Status: mostly safe in code, docs need namespace-aware wording.
+Status: mostly safe in code.
 
 Packaged permission sets:
 
@@ -179,34 +115,21 @@ Packaged permission sets:
 
 `NativeFormsHomeController` queries by permission set `Label`, not `DeveloperName`.
 
-That is good because labels should remain customer-visible and not namespace-prefixed.
-
-Risk:
-
-- Setup docs may mention permission-set API names or old technical names.
-- Subscriber Setup UI may show namespaced API names while labels stay friendly.
-
 Rule:
 
 - Customer-facing docs should tell users to assign by label:
   - `TwinaForms User`
   - `TwinaForms Admin`
 - Avoid telling users to search for developer names unless unavoidable.
+- Do not document a `TwinaForms Service Access` permission set for the Bootstrap V2 install flow.
 
-### 6. Lightning App And Tabs
+### 5. Lightning App And Tabs
 
-Status: packaging visibility needs a product rule.
+Status: packaging visibility needs validation.
 
-The labels seen by users can stay friendly:
+The label seen by users can stay friendly:
 
 - `TwinaForms`
-
-Internal names will be namespaced after packaging.
-
-Risk:
-
-- A separate packaged `TwinaForms Admin` app appears in App Launcher immediately after install, even when the tenant-level admin flag is closed.
-- AWS can gate admin/debug functionality, but it cannot dynamically hide or reveal a packaged Lightning app tile in App Launcher.
 
 Rule:
 
@@ -219,7 +142,7 @@ Clean-org validation required:
 - Assigned `TwinaForms User` can see the main app and tabs.
 - Assigned `TwinaForms Admin` can see the gated admin/debug area inside the main app when intended.
 
-### 7. AWS Side
+### 6. AWS Side
 
 Status: no direct dependency on Salesforce package namespace found.
 
@@ -227,76 +150,62 @@ AWS runtime endpoints identify tenants/forms by:
 
 - org id
 - form id / publish id
-- tenant secrets
+- per-form publish token
+- Bootstrap V2 signing secret stored per org
 - AWS plan/tenant records
 
-AWS does not need to know Salesforce Named Credential names.
+AWS does not need to know Salesforce package namespace details.
 
-Important:
+### 7. LWC-To-Apex DTO Binding
 
-- Do not add Salesforce namespace awareness to AWS unless a Salesforce payload contract explicitly requires it.
-- Keep namespace concerns inside Salesforce package code and metadata.
+Status: package-hardening rule.
 
-### 8. LWC-To-Apex DTO Binding
-
-Status: package-hardening required.
-
-Managed package QA found that `NativeFormsSetupController.registerOrg` could fail from LWC with only a Salesforce internal server error before Apex debug logs were written. The Aura request reached `aura://ApexActionController/ACTION$execute`, but the method used an Apex inner-class DTO parameter from packaged LWC.
+Managed package QA found that LWC calls can fail with a Salesforce internal server error before Apex debug logs are written when package-visible methods accept custom Apex inner-class DTO parameters.
 
 Rule:
 
 - For LWC-called package-visible save/update/register methods, avoid custom Apex DTO parameters.
 - Pass complex request bodies as `String inputJson` or `String requestJson`.
 - Deserialize inside Apex with `JSON.deserialize`.
-- Keep response DTOs as Apex classes; the observed risk is request parameter binding before Apex execution.
-
-Clean-org validation required:
-
-- Connect `Generate Secret`.
-- Admin feature save.
-- Theme save.
-- Builder element save.
-- Prefill action save.
-- Submit action save.
+- Keep response DTOs as Apex classes.
 
 ## Pre-Package Checklist
 
-Before first managed package version:
+Before the next managed package version:
 
 1. Confirm target namespace is final: `twinaforms`.
-2. Create a packaging org/package version.
+2. Create a package version.
 3. Install into a clean subscriber test org.
 4. Assign `TwinaForms User` by label.
 5. Open `TwinaForms Connect`.
-6. Verify Connect Step 1 without manually adding External Credential Principal Access.
-7. Save tenant secret into packaged Named Credential principal.
-8. Verify Connect Step 2.
-9. Open Designer.
-10. Create a form.
-11. Add fields, including Time, Formula, File Upload, and Records List if plan allows.
-12. Publish.
-13. Submit a public form.
-14. Open Submission Logs.
-15. Assign/remove `TwinaForms User` from Connect User Access.
+6. Verify Connect without creating Named Credentials or External Credentials.
+7. Complete Salesforce OAuth.
+8. Verify signed service access.
+9. Assign/remove `TwinaForms User` from Connect User Access.
+10. Open Designer.
+11. Create a form.
+12. Add fields, including Time, Formula, File Upload, and Records List if plan allows.
+13. Publish.
+14. Submit a public form.
+15. Open Submission Logs.
 16. If admin flag is open, assign/remove `TwinaForms Admin`.
-17. Confirm no setup screen or help text tells users to use unmanaged API names.
+17. Confirm no setup screen or help text tells users to configure old service credentials.
 
 ## Blockers To Watch
 
 Treat any of these as package blockers:
 
-- Named Credential callout fails because Apex used the wrong namespaced name.
-- External Credential Principal Access is not effective after assigning packaged permission set.
-- External Client App Manager does not show the packaged `TwinaForms` app after install.
-- Permission-set management cannot find packaged permission sets.
-- App/tabs are not visible after permission-set assignment.
-- Docs/screens instruct users to configure unmanaged principal names that do not exist in subscriber org.
-- LWC action returns a Salesforce internal server error with no Apex log because request DTO binding failed before the Apex method body.
+- any Apex/LWC/package metadata still references Salesforce Named Credentials
+- any Apex/LWC/package metadata still references Salesforce External Credentials
+- Connect fails in a clean org before OAuth because setup access is missing
+- Permission-set management cannot find packaged permission sets
+- App/tabs are not visible after permission-set assignment
+- LWC action returns a Salesforce internal server error with no Apex log because request DTO binding failed before the Apex method body
 
 ## Current Recommendation
 
 Do not create the release package until a clean managed-install org confirms:
 
-- named credential namespace helper works
-- external credential principal access is packaged correctly
-- `TwinaForms User` alone is enough for normal Connect/Designer/Publish flow
+- `TwinaForms User` alone is enough for normal Connect/Designer/Publish/Logs flow
+- Connect and publish use Bootstrap V2 HMAC, not Salesforce Named/External Credentials
+- customer-facing setup text does not mention the old service-access setup

@@ -105,7 +105,7 @@ public with sharing class NativeFormsBuilderController {
                    Form__r.NF_Key__c,
                    LastModifiedDate
             FROM NF_Form_Version__c
-            ORDER BY LastModifiedDate DESC
+            WITH USER_MODE ORDER BY LastModifiedDate DESC
             LIMIT 100
         ];
 
@@ -136,7 +136,7 @@ public with sharing class NativeFormsBuilderController {
                    Form__r.NF_Key__c
             FROM NF_Form_Version__c
             WHERE Id = :effectiveVersionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         workspace.selectedVersionId = selectedVersion.Id;
@@ -158,7 +158,7 @@ public with sharing class NativeFormsBuilderController {
                    Order__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :effectiveVersionId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             workspace.elements.add(toElementRecord(elementRecord));
         }
@@ -169,7 +169,7 @@ public with sharing class NativeFormsBuilderController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Prefill'
               AND Store_Result_As__c != null
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             PrefillAliasDetail detail = new PrefillAliasDetail();
             detail.alias = actionRecord.Store_Result_As__c;
@@ -184,7 +184,7 @@ public with sharing class NativeFormsBuilderController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Submit'
               AND Command_Key__c != null
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             SubmitActionDetail detail = new SubmitActionDetail();
             detail.actionKey = actionRecord.Command_Key__c;
@@ -214,14 +214,14 @@ public with sharing class NativeFormsBuilderController {
             SELECT Id, Form__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         Integer nextOrder = 10;
         AggregateResult[] maxRows = [
             SELECT MAX(Order__c) maxOrder
             FROM NF_Form_Element__c
-            WHERE Form_Version__c = :versionId
+            WHERE Form_Version__c = :versionId WITH USER_MODE
         ];
         if (!maxRows.isEmpty() && maxRows[0].get('maxOrder') != null) {
             nextOrder = Integer.valueOf(String.valueOf(maxRows[0].get('maxOrder'))) + 10;
@@ -239,8 +239,7 @@ public with sharing class NativeFormsBuilderController {
             Config_JSON__c = defaultConfigJsonForType(elementType),
             Order__c = nextOrder
         );
-        insert elementRecord;
-
+        insert as user elementRecord;
         elementRecord = [
             SELECT Id,
                    Name,
@@ -254,7 +253,7 @@ public with sharing class NativeFormsBuilderController {
                    Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementRecord.Id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         return toElementRecord(elementRecord);
@@ -281,7 +280,7 @@ public with sharing class NativeFormsBuilderController {
                    Order__c
             FROM NF_Form_Element__c
             WHERE Id = :inputValue.id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         elementRecord.Label__c = inputValue.label;
@@ -298,12 +297,15 @@ public with sharing class NativeFormsBuilderController {
             if (inputValue.elementType == 'fileUpload' && !NativeFormsFeatureFlags.isProLoadFileEnabled()) {
                 throw new AuraHandledException('File Uploads are not available on your current TwinaForms plan.');
             }
+            if (inputValue.elementType == 'signature' && !NativeFormsFeatureFlags.isProElectronicSignatureEnabled()) {
+                throw new AuraHandledException('Electronic Signature is not available on your current TwinaForms plan.');
+            }
             if (inputValue.elementType == 'fileUpload' && String.isNotBlank(elementRecord.Parent_Element_Id__c)) {
                 List<NF_Form_Element__c> parentRows = [
                     SELECT Id, Element_Type__c
                     FROM NF_Form_Element__c
                     WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
-                    LIMIT 1
+                    WITH USER_MODE LIMIT 1
                 ];
                 if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
                     throw new AuraHandledException('File Upload fields are not supported inside repeat groups in Pro V1.');
@@ -312,8 +314,15 @@ public with sharing class NativeFormsBuilderController {
             elementRecord.Element_Type__c = inputValue.elementType;
         }
         validateElementBeforeSave(elementRecord);
-        update elementRecord;
-
+        update as user new NF_Form_Element__c(
+            Id = elementRecord.Id,
+            Element_Type__c = elementRecord.Element_Type__c,
+            Label__c = elementRecord.Label__c,
+            Field_Key__c = elementRecord.Field_Key__c,
+            Config_JSON__c = elementRecord.Config_JSON__c,
+            Parent_Element_Id__c = elementRecord.Parent_Element_Id__c,
+            Order__c = elementRecord.Order__c
+        );
         return toElementRecord(elementRecord);
     }
 
@@ -328,7 +337,7 @@ public with sharing class NativeFormsBuilderController {
             SELECT Id
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
     }
 
@@ -346,14 +355,14 @@ public with sharing class NativeFormsBuilderController {
             SELECT Id, Form_Version__c, Order__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         List<NF_Form_Element__c> siblings = [
             SELECT Id, Order__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :currentElement.Form_Version__c
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ];
 
         Integer sequence = 10;
@@ -366,18 +375,18 @@ public with sharing class NativeFormsBuilderController {
             sequence += 10;
         }
         if (!resequenceUpdates.isEmpty()) {
-            update resequenceUpdates;
+            update as user resequenceUpdates;
             siblings = [
                 SELECT Id, Order__c
                 FROM NF_Form_Element__c
                 WHERE Form_Version__c = :currentElement.Form_Version__c
-                ORDER BY Order__c ASC, CreatedDate ASC
+                WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
             ];
             currentElement = [
                 SELECT Id, Form_Version__c, Order__c
                 FROM NF_Form_Element__c
                 WHERE Id = :elementId
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ];
         }
 
@@ -403,7 +412,10 @@ public with sharing class NativeFormsBuilderController {
 
         currentElement.Order__c = swapOrder;
         swapElement.Order__c = currentOrder;
-        update new List<NF_Form_Element__c>{ currentElement, swapElement };
+        update as user new List<NF_Form_Element__c>{
+            new NF_Form_Element__c(Id = currentElement.Id, Order__c = currentElement.Order__c),
+            new NF_Form_Element__c(Id = swapElement.Id, Order__c = swapElement.Order__c)
+        };
     }
 
     @AuraEnabled
@@ -546,12 +558,30 @@ public with sharing class NativeFormsBuilderController {
                     SELECT Id, Element_Type__c
                     FROM NF_Form_Element__c
                     WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
-                    LIMIT 1
+                    WITH USER_MODE LIMIT 1
                 ];
                 if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
                     throw new AuraHandledException('Formula fields are not supported inside repeat groups in Pro V1.');
                 }
             }
+        }
+
+        if (elementRecord.Element_Type__c == 'signature') {
+            if (String.isBlank(elementRecord.Field_Key__c)) {
+                throw new AuraHandledException('Signature fields must keep a field key.');
+            }
+            if (String.isNotBlank(elementRecord.Parent_Element_Id__c)) {
+                List<NF_Form_Element__c> parentRows = [
+                    SELECT Id, Element_Type__c
+                    FROM NF_Form_Element__c
+                    WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
+                    WITH USER_MODE LIMIT 1
+                ];
+                if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
+                    throw new AuraHandledException('Signature fields are not supported inside repeat groups in Pro V1.');
+                }
+            }
+            return;
         }
 
         if (elementRecord.Element_Type__c != 'fileUpload') {
@@ -639,7 +669,7 @@ public with sharing class NativeFormsBuilderController {
             SELECT Id, Version_Status__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (versionRecord.Version_Status__c == 'Published') {
             throw new AuraHandledException('Published versions are read-only. Open the latest draft version to continue editing.');
@@ -651,7 +681,7 @@ public with sharing class NativeFormsBuilderController {
             SELECT Id, Form_Version__c
             FROM NF_Form_Element__c
             WHERE Id = :elementId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         ensureVersionEditable(elementRecord.Form_Version__c);
     }
@@ -663,7 +693,7 @@ public with sharing class NativeFormsBuilderController {
         AggregateResult[] rows = [
             SELECT MAX(Element_Index__c) maxIndex
             FROM NF_Form_Element__c
-            WHERE Form_Version__r.Form__c = :formId
+            WHERE Form_Version__r.Form__c = :formId WITH USER_MODE
         ];
         if (!rows.isEmpty() && rows[0].get('maxIndex') != null) {
             return Integer.valueOf(String.valueOf(rows[0].get('maxIndex'))) + 1;

@@ -1,5 +1,11 @@
 @IsTest
 private class NativeFormsPublisherTest {
+    @TestSetup
+    static void setupPermissions() {
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+        NativeFormsBootstrapV2Signer.getOrCreateSigningSecretB64();
+    }
+
     private class PublisherCalloutMock implements HttpCalloutMock {
         Boolean failPresign;
         Boolean failRegister;
@@ -86,6 +92,9 @@ private class NativeFormsPublisherTest {
             'enableProPostSubmitAutoLink' => true,
             'enableProSfSecretCodeAuth' => true,
             'enableProLoadFile' => true,
+            'enableProElectronicSignature' => true,
+            'enableProSubmissionPdf' => true,
+            'enableProSurveyFields' => true,
             'enableProCustomJs' => true
         };
         snapshot.effectiveLimits = new Map<String, Object>{
@@ -101,6 +110,7 @@ private class NativeFormsPublisherTest {
 
     @IsTest
     static void publisherValidationGuardsWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
         NF_Form_Version__c readonlyVersion = createBaseVersion(
             'Readonly Published Form',
@@ -148,10 +158,12 @@ private class NativeFormsPublisherTest {
             NativeFormsPublisher.buildInternalFormId(UserInfo.getOrganizationId().substring(0, 15), readonlyVersion.Form__c).startsWith('nf-'),
             'Internal form ids should use the native publish prefix.'
         );
+        }
     }
 
     @IsTest
     static void publishSuccessCreatesPublicationRegisterPayloadAndSuccessorDraft() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
         PublisherCalloutMock mock = new PublisherCalloutMock();
         Test.setMock(HttpCalloutMock.class, mock);
@@ -186,6 +198,8 @@ private class NativeFormsPublisherTest {
         System.assert(mock.uploadedHtml.contains('window.NativeForms=window.TwinaForms'), 'Generated HTML should keep the NativeForms compatibility alias.');
         System.assert(mock.uploadedHtml.contains('new Function("TwinaForms",customJsSource)'), 'Generated HTML should run custom JavaScript through the guarded runner.');
         System.assert(mock.uploadedHtml.contains('runGuardedCustomJs();'), 'Generated HTML should execute custom JavaScript through the guarded helper.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-signature="true"'), 'Generated HTML should render signature pads.');
+        System.assert(mock.uploadedHtml.contains('collectSignatures()'), 'Generated HTML should collect signature payloads before submit.');
         System.assertEquals(false, mock.uploadedHtml.contains('</script><script>TwinaForms.on('), 'Custom JavaScript should no longer be appended as a raw trailing script tag.');
 
         Map<String, Object> registerPayload = (Map<String, Object>) JSON.deserializeUntyped(mock.registerBody);
@@ -205,6 +219,8 @@ private class NativeFormsPublisherTest {
 
         List<Object> uploadFields = (List<Object>) registerPayload.get('uploadFields');
         System.assertEquals(1, uploadFields.size(), 'Register payload should expose upload field metadata for file-upload controls.');
+        List<Object> signatureFields = (List<Object>) registerPayload.get('signatureFields');
+        System.assertEquals(1, signatureFields.size(), 'Register payload should expose signature field metadata for signature controls.');
 
         Map<String, Object> prefillDefinition = (Map<String, Object>) registerPayload.get('prefillDefinition');
         System.assertEquals(1, ((List<Object>) prefillDefinition.get('commands')).size(), 'Prefill definition should include the configured prefill command.');
@@ -264,12 +280,14 @@ private class NativeFormsPublisherTest {
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :successorDraft.Id
         ];
-        System.assertEquals(19, successorElementCount, 'Successor draft should clone all publishable elements.');
+        System.assertEquals(20, successorElementCount, 'Successor draft should clone all publishable elements.');
         System.assertEquals(3, successorActionCount, 'Successor draft should clone all configured actions.');
+        }
     }
 
     @IsTest
     static void publishFailureCreatesFailurePublicationAndFriendlyMessage() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
         PublisherCalloutMock mock = new PublisherCalloutMock();
         mock.failRegister = true;
@@ -323,6 +341,7 @@ private class NativeFormsPublisherTest {
         System.assertEquals('Failed', publication.Publication_Status__c, 'Failure path should create a failed publication row.');
         System.assertEquals('Publish', publication.Publication_Type__c, 'Failure row should still record publication type.');
         System.assert(String.isNotBlank(publication.Error_Message__c), 'Failure row should keep the detailed error message.');
+        }
     }
 
     private static NF_Form_Version__c createBaseVersion(
@@ -508,6 +527,7 @@ private class NativeFormsPublisherTest {
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'select', 'Priority', 'priority1', 12, 120, withSectionColumn(optionFieldConfig('above', selectOptions()), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'radio', 'Title', 'title1', 13, 130, withSectionColumn(optionFieldConfig('above', radioOptions()), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'fileUpload', 'Attachment', 'file1', 14, 140, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'allowMultiple' => true, 'allowedExtensions' => 'pdf,png', 'maxFileSizeMb' => 10, 'targetSubmitActionKey' => 'submitAction1' }), 1), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'signature', 'Signature', 'signature1', 21, 145, withSectionColumn(NativeFormsTestConfigFactory.signatureConfigJson('submitAction1'), 2), section.Element_Id__c);
 
         NF_Form_Element__c repeatGroup = NativeFormsTestDataFactory.createElement(
             versionRecord.Id,

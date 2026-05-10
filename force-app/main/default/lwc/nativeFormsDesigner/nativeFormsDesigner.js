@@ -1,8 +1,10 @@
 ﻿import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
 import updateFormSettings from '@salesforce/apex/NativeFormsDesignerController.updateFormSettings';
+import updateVersionSubmissionPdfSettings from '@salesforce/apex/NativeFormsDesignerController.updateVersionSubmissionPdfSettings';
 import updateVersionCustomJs from '@salesforce/apex/NativeFormsDesignerController.updateVersionCustomJs';
 import createFormWithDraftVersion from '@salesforce/apex/NativeFormsDesignerController.createFormWithDraftVersion';
+import cloneFormWithDraftVersion from '@salesforce/apex/NativeFormsDesignerController.cloneFormWithDraftVersion';
 import deleteDesignerForm from '@salesforce/apex/NativeFormsDesignerController.deleteForm';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPicklistFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistFieldOptions';
@@ -68,6 +70,11 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedVersionSubmitConditionalValue = '';
     selectedVersionSubmitConditionalConditions = [];
     selectedVersionSubmitConditionalExpression = '';
+    selectedVersionSubmissionPdfEnabled = false;
+    selectedVersionSubmissionPdfAttachToRecord = true;
+    selectedVersionSubmissionPdfTargetSubmitActionKey = '';
+    selectedVersionSubmissionPdfTitle = 'Submitted Response';
+    selectedVersionSubmissionPdfIncludeEmptyFields = true;
     selectedVersionCustomJs = '';
     draftSubmitSuccessMessage = 'Your form was submitted successfully.';
     draftSubmitLabel = 'Submit';
@@ -94,6 +101,11 @@ export default class NativeFormsDesigner extends LightningElement {
     draftSubmitConditionalValue = '';
     draftSubmitConditionalConditions = [];
     draftSubmitConditionalExpression = '';
+    draftSubmissionPdfEnabled = false;
+    draftSubmissionPdfAttachToRecord = true;
+    draftSubmissionPdfTargetSubmitActionKey = '';
+    draftSubmissionPdfTitle = 'Submitted Response';
+    draftSubmissionPdfIncludeEmptyFields = true;
     draftCustomJs = '';
     selectedPublishedUrl = '';
     selectedTheme = null;
@@ -103,6 +115,7 @@ export default class NativeFormsDesigner extends LightningElement {
     autoSaveTimeoutId = null;
     publishResult = null;
     showNewFormModal = false;
+    showCloneFormModal = false;
     showDisplayTextModal = false;
     showCustomJsModal = false;
     showDeleteFormModal = false;
@@ -110,6 +123,10 @@ export default class NativeFormsDesigner extends LightningElement {
     newFormProjectId = '';
     newFormProjectName = '';
     isCreatingForm = false;
+    cloneFormDescription = '';
+    cloneFormProjectId = '';
+    cloneFormProjectName = '';
+    isCloningForm = false;
     deleteFormConfirmText = '';
     isDeletingForm = false;
 
@@ -123,9 +140,13 @@ export default class NativeFormsDesigner extends LightningElement {
     @track picklistFieldOptions = [];
     @track prefillAliasDetails = [];
     @track submitActionDetails = [];
+    @track editorSurveyOptions = [];
     enableProConditionLogic = false;
     enableProRepeatGroups = false;
     enableProLoadFile = false;
+    enableProElectronicSignature = false;
+    enableProSubmissionPdf = false;
+    enableProSurveyFields = false;
     enableProFormulaFields = false;
     enableProPostSubmitAutoLink = false;
     enableProSfSecretCodeAuth = false;
@@ -194,6 +215,8 @@ export default class NativeFormsDesigner extends LightningElement {
     editorAllowedExtensionsText = '';
     editorMaxFileSizeMb = '10';
     editorTargetSubmitActionKey = '';
+    editorHelpText = '';
+    editorClearButtonLabel = 'Clear';
     editorUseFormula = false;
     editorFormulaExpression = '';
     editorFormulaPreviewValue = '';
@@ -202,18 +225,27 @@ export default class NativeFormsDesigner extends LightningElement {
     modalCustomJs = '';
 
     inputFieldOptions = [
-        { label: 'Text', value: 'text' },
-        { label: 'Number', value: 'number' },
-        { label: 'Date', value: 'date' },
-        { label: 'Time', value: 'time' },
-        { label: 'Email', value: 'email' },
-        { label: 'Phone', value: 'tel' },
-        { label: 'Picklist', value: 'select' },
-        { label: 'Radio groups', value: 'radio' },
-        { label: 'Checkbox', value: 'checkbox' },
-        { label: 'Text Area', value: 'textarea' },
-        { label: 'URL', value: 'url' },
-        { label: 'File Upload', value: 'fileUpload' }
+        { label: 'Text', value: 'text', iconName: 'utility:text' },
+        { label: 'Number', value: 'number', iconName: 'utility:number_input' },
+        { label: 'Date', value: 'date', iconName: 'utility:event' },
+        { label: 'Time', value: 'time', iconName: 'utility:clock' },
+        { label: 'Email', value: 'email', iconName: 'utility:email' },
+        { label: 'Phone', value: 'tel', iconName: 'utility:call' },
+        { label: 'Picklist', value: 'select', iconName: 'utility:picklist_type' },
+        { label: 'Radio groups', value: 'radio', iconName: 'utility:radio_button' },
+        { label: 'Checkbox', value: 'checkbox', iconName: 'utility:check' },
+        { label: 'Text Area', value: 'textarea', iconName: 'utility:note' },
+        { label: 'URL', value: 'url', iconName: 'utility:link' },
+        { label: 'File Upload', value: 'fileUpload', iconName: 'utility:upload' },
+        { label: 'Signature', value: 'signature', iconName: 'utility:edit_form' }
+    ];
+
+    surveyFieldOptions = [
+        { key: 'stars', label: '1-5 Star Rating', value: 'radio', preset: 'stars', iconName: 'utility:favorite' },
+        { key: 'nps', label: 'NPS 0-10', value: 'radio', preset: 'nps', iconName: 'utility:gauge' },
+        { key: 'likert', label: 'Likert Scale', value: 'radio', preset: 'likert', iconName: 'utility:slider' },
+        { key: 'ranking', label: 'Ranking', value: 'ranking', preset: 'ranking', iconName: 'utility:sort' },
+        { key: 'satisfaction', label: 'Satisfaction Scale', value: 'radio', preset: 'satisfaction', iconName: 'utility:smiley_and_people' }
     ];
 
     displayElementOptions = [
@@ -226,6 +258,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     editorElementTypeOptions = [
         ...this.inputFieldOptions,
+        { label: 'Ranking', value: 'ranking' },
         ...this.displayElementOptions
     ];
 
@@ -470,6 +503,22 @@ export default class NativeFormsDesigner extends LightningElement {
             || (requiresNewProjectName && !String(this.newFormProjectName || '').trim());
     }
 
+    get cloneFormDisabled() {
+        return !this.selectedFormId || !this.selectedVersionId || this.isCloningForm;
+    }
+
+    get cloneFormCreateDisabled() {
+        const projectSelection = String(this.cloneFormProjectId || '').trim();
+        const requiresNewProjectName = projectSelection === '__new__';
+        return this.isCloningForm
+            || this.formLimitReached
+            || !this.selectedFormId
+            || !this.selectedVersionId
+            || !String(this.cloneFormDescription || '').trim()
+            || (!projectSelection && !requiresNewProjectName)
+            || (requiresNewProjectName && !String(this.cloneFormProjectName || '').trim());
+    }
+
     get showFormLimitWarning() {
         return this.formLimitReached && !!this.formLimitMessage;
     }
@@ -484,10 +533,18 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.newFormProjectId === '__new__';
     }
 
+    get showCloneProjectNameInput() {
+        return this.cloneFormProjectId === '__new__';
+    }
+
     get newFormProjectOptions() {
         return (this.projectOptions || []).concat([
             { label: '+ Create New Project', value: '__new__' }
         ]);
+    }
+
+    get cloneFormProjectOptions() {
+        return this.newFormProjectOptions;
     }
 
     get isSelectedVersionReadOnly() {
@@ -553,23 +610,43 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get availableInputFieldOptions() {
-        return this.enableProLoadFile
-            ? this.inputFieldOptions
-            : this.inputFieldOptions.filter((option) => option.value !== 'fileUpload');
+        return this.inputFieldOptions.filter((option) => {
+            if (option.value === 'fileUpload') {
+                return this.enableProLoadFile;
+            }
+            if (option.value === 'signature') {
+                return this.enableProElectronicSignature;
+            }
+            return true;
+        });
+    }
+
+    get availableSurveyFieldOptions() {
+        return this.enableProSurveyFields ? this.surveyFieldOptions : [];
+    }
+
+    get showSurveyFieldOptions() {
+        return this.availableSurveyFieldOptions.length > 0;
     }
 
     get availableEditorElementTypeOptions() {
-        const allowedInputTypes = new Set(this.availableInputFieldOptions.map((option) => option.value));
+        const allowedInputTypes = new Set([
+            ...this.availableInputFieldOptions.map((option) => option.value),
+            ...this.availableSurveyFieldOptions.map((option) => option.value)
+        ]);
         return this.editorElementTypeOptions.filter((option) => {
             if (this.inputFieldOptions.some((inputOption) => inputOption.value === option.value)) {
                 return allowedInputTypes.has(option.value);
+            }
+            if (option.value === 'ranking') {
+                return this.enableProSurveyFields;
             }
             return option.value !== 'repeatGroup' || this.enableProRepeatGroups;
         });
     }
 
     get selectedElementSupportsLabelPosition() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDefaultValue() {
@@ -582,15 +659,15 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsBoldLabel() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsRequired() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsFieldBehavior() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'group'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'group'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDisplayFieldBehavior() {
@@ -613,6 +690,10 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorElementType === 'fileUpload';
     }
 
+    get selectedElementIsSignature() {
+        return this.editorElementType === 'signature';
+    }
+
     get selectedElementIsPicklist() {
         return this.editorElementType === 'select';
     }
@@ -625,8 +706,42 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorElementType === 'radio';
     }
 
+    get selectedElementIsRanking() {
+        return this.editorElementType === 'ranking';
+    }
+
+    get selectedElementPresentation() {
+        return this.parseConfig(this.selectedElement?.configJson).presentation || '';
+    }
+
+    get selectedElementIsSurveyRadio() {
+        return this.selectedElementIsRadio && ['stars', 'nps', 'likert', 'satisfaction'].includes(this.selectedElementPresentation);
+    }
+
+    get selectedElementSupportsSurveyChoices() {
+        return this.selectedElementIsRanking || this.selectedElementIsSurveyRadio;
+    }
+
+    get surveyChoicesTitle() {
+        return this.selectedElementIsRanking ? 'Ranking Choices' : 'Survey Choices';
+    }
+
+    get surveyChoicesHelpText() {
+        return this.selectedElementIsRanking
+            ? 'Edit the choices respondents will rank. Respondents move choices up or down, and TwinaForms saves the ordered values.'
+            : 'Edit the labels and saved values for this survey field.';
+    }
+
+    get canDeleteSurveyChoice() {
+        return (this.editorSurveyOptions || []).length > 1;
+    }
+
+    get cannotDeleteSurveyChoice() {
+        return !this.canDeleteSurveyChoice;
+    }
+
     get selectedElementUsesSalesforcePicklistSource() {
-        return this.selectedElementIsPicklist || this.selectedElementIsRadio;
+        return this.selectedElementIsPicklist || (this.selectedElementIsRadio && !this.selectedElementIsSurveyRadio);
     }
 
     get checkboxDefaultValueOptions() {
@@ -660,7 +775,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsSalesforceMapping() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking'].includes(this.editorElementType);
     }
 
     get selectedRepeatGroupParent() {
@@ -756,6 +871,10 @@ export default class NativeFormsDesigner extends LightningElement {
             : 'Add Custom JavaScript';
     }
 
+    get customJsFallbackClass() {
+        return 'slds-textarea designer-custom-js-textarea';
+    }
+
     get deleteFormConfirmationValue() {
         return this.selectedFormName || this.selectedFormKey || '';
     }
@@ -784,7 +903,7 @@ export default class NativeFormsDesigner extends LightningElement {
                     if (!item?.fieldKey || item.id === this.selectedElementId) {
                         return false;
                     }
-                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'hidden'].includes(item.elementType)) {
+                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'hidden'].includes(item.elementType)) {
                         return false;
                     }
                     if (item.parentElementId && this.isElementInsideRepeatGroup(item)) {
@@ -1214,7 +1333,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.elements
                 .filter((item) =>
                     item.fieldKey &&
-                    ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
+                    ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking'].includes(item.elementType)
                 )
                 .map((item) => ({
                     label: `${item.label} (${item.fieldKey})`,
@@ -1243,7 +1362,7 @@ export default class NativeFormsDesigner extends LightningElement {
             .filter((item) =>
                 item.id !== this.selectedElementId &&
                 item.fieldKey &&
-                ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(item.elementType)
+                ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking'].includes(item.elementType)
             )
             .map((item) => ({
                 label: `${item.label} (${item.fieldKey})`,
@@ -1453,6 +1572,10 @@ export default class NativeFormsDesigner extends LightningElement {
         );
     }
 
+    get submissionPdfTargetActionOptions() {
+        return this.fileUploadTargetActionOptions;
+    }
+
     async loadWorkspace(projectId = this.selectedProjectId, formId = this.selectedFormId, versionId = this.selectedVersionId, silent = false) {
         if (!silent) {
             this.isLoading = true;
@@ -1515,6 +1638,11 @@ export default class NativeFormsDesigner extends LightningElement {
                 workspace.selectedVersionSubmitConditionalExpression || '',
                 this.selectedVersionSubmitConditionalConditions.length
             );
+            this.selectedVersionSubmissionPdfEnabled = !!workspace.selectedVersionSubmissionPdfEnabled;
+            this.selectedVersionSubmissionPdfAttachToRecord = workspace.selectedVersionSubmissionPdfAttachToRecord !== false;
+            this.selectedVersionSubmissionPdfTargetSubmitActionKey = workspace.selectedVersionSubmissionPdfTargetSubmitActionKey || '';
+            this.selectedVersionSubmissionPdfTitle = workspace.selectedVersionSubmissionPdfTitle || 'Submitted Response';
+            this.selectedVersionSubmissionPdfIncludeEmptyFields = workspace.selectedVersionSubmissionPdfIncludeEmptyFields !== false;
             this.selectedVersionCustomJs = workspace.selectedVersionCustomJs || '';
             this.draftSubmitSuccessMessage = this.selectedVersionSubmitSuccessMessage;
             this.draftLanguageCode = this.selectedVersionLanguageCode;
@@ -1542,6 +1670,11 @@ export default class NativeFormsDesigner extends LightningElement {
             this.draftSubmitConditionalValue = this.selectedVersionSubmitConditionalValue;
             this.draftSubmitConditionalConditions = [...this.selectedVersionSubmitConditionalConditions];
             this.draftSubmitConditionalExpression = this.selectedVersionSubmitConditionalExpression;
+            this.draftSubmissionPdfEnabled = this.selectedVersionSubmissionPdfEnabled;
+            this.draftSubmissionPdfAttachToRecord = this.selectedVersionSubmissionPdfAttachToRecord;
+            this.draftSubmissionPdfTargetSubmitActionKey = this.selectedVersionSubmissionPdfTargetSubmitActionKey;
+            this.draftSubmissionPdfTitle = this.selectedVersionSubmissionPdfTitle;
+            this.draftSubmissionPdfIncludeEmptyFields = this.selectedVersionSubmissionPdfIncludeEmptyFields;
             this.draftCustomJs = this.selectedVersionCustomJs;
             this.ensureDraftSubmitConditionRow();
             this.selectedPublishedUrl = workspace.selectedPublishedUrl || '';
@@ -1550,6 +1683,9 @@ export default class NativeFormsDesigner extends LightningElement {
             this.enableProConditionLogic = !!workspace.enableProConditionLogic;
             this.enableProRepeatGroups = !!workspace.enableProRepeatGroups;
             this.enableProLoadFile = !!workspace.enableProLoadFile;
+            this.enableProElectronicSignature = !!workspace.enableProElectronicSignature;
+            this.enableProSubmissionPdf = !!workspace.enableProSubmissionPdf;
+            this.enableProSurveyFields = !!workspace.enableProSurveyFields;
             this.enableProFormulaFields = !!workspace.enableProFormulaFields;
             this.enableProPostSubmitAutoLink = !!workspace.enableProPostSubmitAutoLink;
             this.enableProSfSecretCodeAuth = !!workspace.enableProSfSecretCodeAuth;
@@ -1755,6 +1891,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     decorateRenderableElement(item, isChild) {
         const effectiveType = item.elementType === 'hidden' ? 'text' : item.elementType;
+        const config = this.parseConfig(item.configJson);
+        const presentation = config.presentation || '';
+        const isSurveyRadio = effectiveType === 'radio' && ['stars', 'nps', 'likert', 'satisfaction'].includes(presentation);
         const normalized = {
             ...item,
             effectiveElementType: effectiveType,
@@ -1774,7 +1913,10 @@ export default class NativeFormsDesigner extends LightningElement {
             isUrl: effectiveType === 'url',
             isSelect: effectiveType === 'select',
             isRadio: effectiveType === 'radio',
+            isSurveyRadio,
+            isRanking: effectiveType === 'ranking',
             isFileUpload: effectiveType === 'fileUpload',
+            isSignature: effectiveType === 'signature',
             isHidden: item.elementType === 'hidden',
             isFormula: this.isFormulaField(item),
             isHeading: effectiveType === 'heading',
@@ -1787,6 +1929,7 @@ export default class NativeFormsDesigner extends LightningElement {
             previewPlaceholder: this.previewPlaceholder(item),
             previewChecked: this.previewChecked(item),
             previewOptions: this.previewOptions(item),
+            previewRankingOptions: this.previewRankingOptions(item),
             previewImageUrl: this.previewImageUrl(item),
             previewImageAlt: this.previewImageAlt(item),
             previewImageFit: this.previewImageFit(item),
@@ -1817,6 +1960,7 @@ export default class NativeFormsDesigner extends LightningElement {
             cardStyle: this.elementCardStyle(normalized),
             cardClass: `designer-node ${!(normalized.isSectionLike || normalized.isRepeatGroup) ? 'designer-node--field ' : ''}${isChild ? 'designer-node--child ' : ''}designer-node--${normalized.elementType}${(normalized.isSectionLike || normalized.isRepeatGroup) && !normalized.showSectionBox ? ' designer-node--section-unboxed' : ''}${selected ? ' designer-node--selected' : ''}`,
             fieldPreviewClass: `preview-field preview-field--${normalized.labelPosition || 'above'}`,
+            previewRadioGroupClass: `preview-radio-group${isSurveyRadio ? ` preview-radio-group--${presentation}` : ''}`,
             previewInputDirection: this.previewInputDirection(item),
             previewTextClass: `preview-heading${selected ? ' preview-heading--selected' : ''}`,
             imageFrameClass: `preview-image__frame preview-image__frame--${normalized.previewImageFit || 'original'}`,
@@ -1923,7 +2067,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     supportsRequiredMarker(item) {
         const effectiveType = item?.elementType === 'hidden' ? 'text' : item?.elementType;
-        if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'fileUpload'].includes(effectiveType)) {
+        if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'fileUpload', 'signature'].includes(effectiveType)) {
             return false;
         }
         const config = this.parseConfig(item?.configJson);
@@ -1992,12 +2136,85 @@ export default class NativeFormsDesigner extends LightningElement {
     previewOptions(item) {
         const config = this.parseConfig(item.configJson);
         const defaultValue = config.defaultValue;
+        const presentation = config.presentation || '';
         return Array.isArray(config.options)
-            ? config.options.map((option) => ({
-                ...option,
-                checked: option?.value === defaultValue
+            ? config.options.map((option) => {
+                const value = option?.value;
+                let label = option?.label || '';
+                if (presentation === 'stars') {
+                    const starCount = Number(value);
+                    label = Number.isFinite(starCount) && starCount > 0 ? '\u2605'.repeat(starCount) : label;
+                }
+                return {
+                    ...option,
+                    label,
+                    checked: value === defaultValue
+                };
+            })
+            : [];
+    }
+
+    previewRankingOptions(item) {
+        const config = this.parseConfig(item.configJson);
+        return Array.isArray(config.options)
+            ? config.options.map((option, index) => ({
+                key: `${option?.value || index}`,
+                rank: index + 1,
+                label: option?.label || option?.value || `Choice ${index + 1}`,
+                isFirst: index === 0,
+                isLast: index === config.options.length - 1
             }))
             : [];
+    }
+
+    normalizeSurveyOptions(options) {
+        const normalized = Array.isArray(options)
+            ? options
+                .map((option, index) => ({
+                    rowKey: `${index}-${option?.value || option?.label || 'choice'}`,
+                    index,
+                    displayIndex: index + 1,
+                    isFirst: index === 0,
+                    isLast: index === options.length - 1,
+                    label: option?.label || '',
+                    value: option?.value || ''
+                }))
+                .filter((option) => option.label || option.value)
+            : [];
+
+        return normalized.length
+            ? this.decorateSurveyOptions(normalized)
+            : this.decorateSurveyOptions([{ rowKey: '0-choice', index: 0, displayIndex: 1, label: 'Choice 1', value: 'choice1' }]);
+    }
+
+    decorateSurveyOptions(options) {
+        const count = (options || []).length;
+        return (options || []).map((option, index) => ({
+            ...option,
+            index,
+            displayIndex: index + 1,
+            isFirst: index === 0,
+            isLast: index === count - 1
+        }));
+    }
+
+    surveyOptionsForSave() {
+        return (this.editorSurveyOptions || [])
+            .map((option, index) => {
+                const label = (option.label || '').trim() || `Choice ${index + 1}`;
+                const value = (option.value || '').trim() || this.valueFromLabel(label, index);
+                return { label, value };
+            })
+            .filter((option) => option.label || option.value);
+    }
+
+    valueFromLabel(label, index) {
+        const normalized = String(label || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return normalized || `choice${index + 1}`;
     }
 
     previewImageUrl(item) {
@@ -2248,6 +2465,17 @@ export default class NativeFormsDesigner extends LightningElement {
         this.showNewFormModal = true;
     }
 
+    handleOpenCloneFormModal() {
+        if (this.cloneFormDisabled) {
+            return;
+        }
+        const sourceName = this.selectedFormDescription || this.selectedFormName || 'Form';
+        this.cloneFormDescription = `${sourceName} Copy`;
+        this.cloneFormProjectId = this.selectedProjectId || '';
+        this.cloneFormProjectName = '';
+        this.showCloneFormModal = true;
+    }
+
     handleOpenDisplayTextModal() {
         this.modalDisplayText = this.editorDisplayText || '<p>Display text</p>';
         this.showDisplayTextModal = true;
@@ -2299,6 +2527,16 @@ export default class NativeFormsDesigner extends LightningElement {
         this.newFormProjectName = '';
     }
 
+    handleCloseCloneFormModal() {
+        if (this.isCloningForm) {
+            return;
+        }
+        this.showCloneFormModal = false;
+        this.cloneFormDescription = '';
+        this.cloneFormProjectId = '';
+        this.cloneFormProjectName = '';
+    }
+
     handleNewFormDescriptionChange(event) {
         this.newFormDescription = event.detail.value || '';
     }
@@ -2312,6 +2550,21 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleNewProjectNameChange(event) {
         this.newFormProjectName = event.detail.value || '';
+    }
+
+    handleCloneFormDescriptionChange(event) {
+        this.cloneFormDescription = event.detail.value || '';
+    }
+
+    handleCloneFormProjectChange(event) {
+        this.cloneFormProjectId = event.detail.value || '';
+        if (this.cloneFormProjectId !== '__new__') {
+            this.cloneFormProjectName = '';
+        }
+    }
+
+    handleCloneProjectNameChange(event) {
+        this.cloneFormProjectName = event.detail.value || '';
     }
 
     async handleCreateNewForm() {
@@ -2346,6 +2599,42 @@ export default class NativeFormsDesigner extends LightningElement {
             this.errorMessage = this.normalizeError(error);
         } finally {
             this.isCreatingForm = false;
+        }
+    }
+
+    async handleCloneForm() {
+        if (this.cloneFormCreateDisabled) {
+            return;
+        }
+
+        this.isCloningForm = true;
+        this.errorMessage = '';
+        try {
+            const result = await cloneFormWithDraftVersion({
+                sourceFormId: this.selectedFormId,
+                sourceVersionId: this.selectedVersionId,
+                description: this.cloneFormDescription,
+                projectId: this.cloneFormProjectId === '__new__' ? null : (this.cloneFormProjectId || null),
+                newProjectName: this.cloneFormProjectId === '__new__' ? this.cloneFormProjectName : ''
+            });
+            this.selectedProjectId = result.projectId;
+            this.selectedFormId = result.formId;
+            this.selectedVersionId = result.versionId;
+            this.selectedElementId = null;
+            this.publishResult = null;
+            this.storeSelectedProject(result.projectId);
+            this.storeSelectedForm(result.formId);
+            this.storeSelectedVersion(result.versionId);
+            this.showCloneFormModal = false;
+            this.cloneFormDescription = '';
+            this.cloneFormProjectId = '';
+            this.cloneFormProjectName = '';
+            await this.loadWorkspace(result.projectId, result.formId, result.versionId);
+            this.showToast('Form cloned', `${result.formName} is ready in Draft mode.`, 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isCloningForm = false;
         }
     }
 
@@ -2878,6 +3167,57 @@ export default class NativeFormsDesigner extends LightningElement {
         this.clearPostSubmitTokenInteraction();
     }
 
+    handleSubmissionPdfEnabledChange(event) {
+        this.draftSubmissionPdfEnabled = event.target.checked;
+        if (this.draftSubmissionPdfEnabled && !(this.draftSubmissionPdfTitle || '').trim()) {
+            this.draftSubmissionPdfTitle = 'Submitted Response';
+        }
+    }
+
+    handleSubmissionPdfAttachToRecordChange(event) {
+        this.draftSubmissionPdfAttachToRecord = event.target.checked;
+    }
+
+    handleSubmissionPdfTargetActionChange(event) {
+        this.draftSubmissionPdfTargetSubmitActionKey = event.detail.value || '';
+    }
+
+    handleSubmissionPdfTitleInput(event) {
+        this.draftSubmissionPdfTitle = event.target.value || '';
+    }
+
+    handleSubmissionPdfIncludeEmptyFieldsChange(event) {
+        this.draftSubmissionPdfIncludeEmptyFields = event.target.checked;
+    }
+
+    async handleSubmissionPdfSettingsCommit() {
+        if (!this.selectedFormId || !this.selectedVersionId) {
+            return;
+        }
+        this.isLoading = true;
+        this.errorMessage = '';
+        try {
+            await updateVersionSubmissionPdfSettings({
+                formId: this.selectedFormId,
+                versionId: this.selectedVersionId,
+                enabled: !!this.draftSubmissionPdfEnabled,
+                attachToRecord: this.draftSubmissionPdfAttachToRecord !== false,
+                targetSubmitActionKey: this.draftSubmissionPdfTargetSubmitActionKey || '',
+                title: this.draftSubmissionPdfTitle || '',
+                includeEmptyFields: this.draftSubmissionPdfIncludeEmptyFields !== false
+            });
+            this.selectedVersionSubmissionPdfEnabled = !!this.draftSubmissionPdfEnabled;
+            this.selectedVersionSubmissionPdfAttachToRecord = this.draftSubmissionPdfAttachToRecord !== false;
+            this.selectedVersionSubmissionPdfTargetSubmitActionKey = this.draftSubmissionPdfTargetSubmitActionKey || '';
+            this.selectedVersionSubmissionPdfTitle = (this.draftSubmissionPdfTitle || '').trim() || 'Submitted Response';
+            this.selectedVersionSubmissionPdfIncludeEmptyFields = this.draftSubmissionPdfIncludeEmptyFields !== false;
+            this.draftSubmissionPdfTitle = this.selectedVersionSubmissionPdfTitle;
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isLoading = false;
+        }
+    }
 
     handleSubmitButtonLabelInput(event) {
         this.draftSubmitLabel = event.target.value || '';
@@ -3022,6 +3362,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     async handleQuickAddField(event) {
         const elementType = event.currentTarget?.dataset?.type;
+        const elementPreset = event.currentTarget?.dataset?.preset || '';
         if (!elementType) {
             return;
         }
@@ -3033,15 +3374,23 @@ export default class NativeFormsDesigner extends LightningElement {
             this.showToast('Pro feature', 'Enable Pro File Uploads in your AWS plan entitlements first.', 'warning');
             return;
         }
-        await this.addElementType(elementType);
+        if (elementType === 'signature' && !this.enableProElectronicSignature) {
+            this.showToast('Pro feature', 'Enable Pro Electronic Signature in your AWS plan entitlements first.', 'warning');
+            return;
+        }
+        if ((elementType === 'ranking' || elementPreset) && !this.enableProSurveyFields) {
+            this.showToast('Pro feature', 'Enable Pro Survey Fields in your AWS plan entitlements first.', 'warning');
+            return;
+        }
+        await this.addElementType(elementType, elementPreset);
     }
 
-    async addElementType(elementType) {
+    async addElementType(elementType, elementPreset = '') {
         if (!this.selectedVersionId || this.isSelectedVersionReadOnly) {
             return;
         }
         try {
-            const created = await addElement({ versionId: this.selectedVersionId, elementType });
+            const created = await addElement({ versionId: this.selectedVersionId, elementType, elementPreset });
             const selectedElement = this.selectedElement;
             if (selectedElement) {
                 await insertElementAfter({
@@ -3282,6 +3631,64 @@ export default class NativeFormsDesigner extends LightningElement {
     async handleEditorPicklistFieldChange(event) {
         this.editorPicklistField = event.detail.value;
         await this.loadPicklistValuesIntoEditor(this.editorPicklistObject, this.editorPicklistField);
+        this.applyEditorDraft();
+    }
+
+    handleEditorSurveyOptionChange(event) {
+        const index = Number(event.currentTarget?.dataset?.index);
+        const field = event.currentTarget?.dataset?.field;
+        if (!Number.isInteger(index) || !field) {
+            return;
+        }
+        const nextOptions = (this.editorSurveyOptions || []).map((option, optionIndex) => {
+            if (optionIndex !== index) {
+                return option;
+            }
+            return {
+                ...option,
+                [field]: event.detail?.value || ''
+            };
+        });
+        this.editorSurveyOptions = this.decorateSurveyOptions(nextOptions);
+        this.applyEditorDraft(false);
+    }
+
+    handleAddEditorSurveyOption() {
+        const nextIndex = (this.editorSurveyOptions || []).length;
+        this.editorSurveyOptions = [
+            ...(this.editorSurveyOptions || []),
+            {
+                rowKey: `${Date.now()}-${nextIndex}`,
+                label: `Choice ${nextIndex + 1}`,
+                value: `choice${nextIndex + 1}`
+            }
+        ];
+        this.editorSurveyOptions = this.decorateSurveyOptions(this.editorSurveyOptions);
+        this.applyEditorDraft();
+    }
+
+    handleDeleteEditorSurveyOption(event) {
+        const index = Number(event.currentTarget?.dataset?.index);
+        if (!Number.isInteger(index) || (this.editorSurveyOptions || []).length <= 1) {
+            return;
+        }
+        this.editorSurveyOptions = this.decorateSurveyOptions(
+            this.editorSurveyOptions.filter((_, optionIndex) => optionIndex !== index)
+        );
+        this.applyEditorDraft();
+    }
+
+    handleMoveEditorSurveyOption(event) {
+        const index = Number(event.currentTarget?.dataset?.index);
+        const direction = event.currentTarget?.dataset?.direction;
+        const options = [...(this.editorSurveyOptions || [])];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (!Number.isInteger(index) || targetIndex < 0 || targetIndex >= options.length) {
+            return;
+        }
+        const [item] = options.splice(index, 1);
+        options.splice(targetIndex, 0, item);
+        this.editorSurveyOptions = this.decorateSurveyOptions(options);
         this.applyEditorDraft();
     }
 
@@ -3538,6 +3945,16 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorTargetSubmitActionChange(event) {
         this.editorTargetSubmitActionKey = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorHelpTextCommit(event) {
+        this.editorHelpText = event.target.value || '';
+        this.applyEditorDraft();
+    }
+
+    handleEditorClearButtonLabelCommit(event) {
+        this.editorClearButtonLabel = event.target.value || '';
         this.applyEditorDraft();
     }
 
@@ -3817,6 +4234,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorFormulaError = '';
             this.selectedFormulaFieldToken = '';
             this.picklistFieldOptions = [];
+            this.editorSurveyOptions = [];
             return;
         }
 
@@ -3824,6 +4242,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorLabel = '';
             this.editorElementType = '';
             this.picklistFieldOptions = [];
+            this.editorSurveyOptions = [];
             return;
         }
 
@@ -3888,6 +4307,9 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorAllowedExtensionsText = this.allowedExtensionsText(config.allowedExtensions);
         this.editorMaxFileSizeMb = config.maxFileSizeMb == null ? '10' : String(config.maxFileSizeMb);
         this.editorTargetSubmitActionKey = config.targetSubmitActionKey || '';
+        this.editorHelpText = config.helpText || '';
+        this.editorClearButtonLabel = config.clearButtonLabel || 'Clear';
+        this.editorSurveyOptions = this.normalizeSurveyOptions(config.options);
         this.editorUseFormula = config.isFormula === true;
         this.editorFormulaExpression = config.formulaExpression || '';
         this.selectedFormulaFieldToken = '';
@@ -3947,11 +4369,20 @@ export default class NativeFormsDesigner extends LightningElement {
             nextConfig.allowedExtensions = this.parseAllowedExtensionsText(this.editorAllowedExtensionsText);
             nextConfig.maxFileSizeMb = this.parsePositiveInteger(this.editorMaxFileSizeMb, 10);
             nextConfig.targetSubmitActionKey = this.editorTargetSubmitActionKey || '';
+        } else if (this.selectedElementIsSignature) {
+            nextConfig.helpText = this.editorHelpText || '';
+            nextConfig.clearButtonLabel = this.editorClearButtonLabel || 'Clear';
+            nextConfig.targetSubmitActionKey = this.editorTargetSubmitActionKey || '';
+            delete nextConfig.allowMultiple;
+            delete nextConfig.allowedExtensions;
+            delete nextConfig.maxFileSizeMb;
         } else {
             delete nextConfig.allowMultiple;
             delete nextConfig.allowedExtensions;
             delete nextConfig.maxFileSizeMb;
             delete nextConfig.targetSubmitActionKey;
+            delete nextConfig.helpText;
+            delete nextConfig.clearButtonLabel;
         }
 
         if (this.selectedElementUsesSalesforcePicklistSource) {
@@ -3977,6 +4408,10 @@ export default class NativeFormsDesigner extends LightningElement {
         } else {
             delete nextConfig.sourceObjectApiName;
             delete nextConfig.sourcePicklistFieldApiName;
+        }
+
+        if (this.selectedElementSupportsSurveyChoices) {
+            nextConfig.options = this.surveyOptionsForSave();
         }
 
         if (this.selectedElementSupportsBoldLabel) {
@@ -4231,7 +4666,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 return item;
             }
 
-            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'repeatGroup', 'fileUpload'].includes(this.editorElementType)
+            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio', 'ranking', 'repeatGroup', 'fileUpload', 'signature'].includes(this.editorElementType)
                 ? (item.fieldKey || this.generatedFieldKey(this.editorElementType))
                 : null;
 

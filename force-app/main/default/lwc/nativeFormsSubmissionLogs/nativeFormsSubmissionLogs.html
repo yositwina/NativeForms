@@ -1,5 +1,5 @@
 <template>
-    <lightning-card title="Submission Logs" icon-name="utility:receipt">
+    <lightning-card title="TwinaForms Submission Logs" icon-name="custom:custom18">
         <div class="shell">
             <p class="intro">
                 Review recent form submissions and inspect private detail when this org stores encrypted logs.
@@ -257,15 +257,6 @@
                                     </section>
                                 </template>
 
-                                <template if:true={selectedDetail.rawJson}>
-                                    <section class="detail-section">
-                                        <lightning-accordion allow-multiple-sections-open>
-                                            <lightning-accordion-section name="raw" label="Technical JSON">
-                                                <pre class="raw-json">{selectedDetail.rawJson}</pre>
-                                            </lightning-accordion-section>
-                                        </lightning-accordion>
-                                    </section>
-                                </template>
                             </template>
 
                             <template if:false={selectedDetail}>

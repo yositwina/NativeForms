@@ -112,7 +112,7 @@ public with sharing class NativeFormsSubmitActionsController {
                    Form__r.Description__c,
                    LastModifiedDate
             FROM NF_Form_Version__c
-            ORDER BY LastModifiedDate DESC
+            WITH USER_MODE ORDER BY LastModifiedDate DESC
             LIMIT 100
         ];
 
@@ -138,7 +138,7 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT Id, Name, Version_Number__c, Version_Status__c, Form__r.Name, Form__r.Description__c
             FROM NF_Form_Version__c
             WHERE Id = :effectiveVersionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         workspace.selectedVersionId = selectedVersion.Id;
         workspace.selectedVersionName = formatVersionDisplay(selectedVersion.Version_Number__c, selectedVersion.Name);
@@ -151,7 +151,7 @@ public with sharing class NativeFormsSubmitActionsController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Prefill'
               AND Store_Result_As__c != null
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             if (String.isNotBlank(actionRecord.Store_Result_As__c) && String.isNotBlank(actionRecord.Object_Api_Name__c)) {
                 PrefillAliasDetail aliasDetail = new PrefillAliasDetail();
@@ -171,7 +171,7 @@ public with sharing class NativeFormsSubmitActionsController {
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Submit'
               AND Store_Result_As__c != null
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             if (String.isNotBlank(actionRecord.Store_Result_As__c) && String.isNotBlank(actionRecord.Object_Api_Name__c)) {
                 PrefillAliasDetail aliasDetail = new PrefillAliasDetail();
@@ -198,7 +198,7 @@ public with sharing class NativeFormsSubmitActionsController {
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Submit'
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             workspace.actions.add(toRecord(actionRecord, actionNumber));
             actionNumber += 1;
@@ -208,7 +208,7 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT Id, Label__c, Field_Key__c, Element_Type__c, Config_JSON__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :effectiveVersionId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             if (elementRecord.Element_Type__c == 'repeatGroup' && String.isNotBlank(elementRecord.Field_Key__c)) {
                 SelectOption groupOption = new SelectOption();
@@ -263,7 +263,7 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT Id, Form__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
 
         Integer nextOrder = 10;
@@ -271,7 +271,7 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT MAX(Order__c) maxOrder
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :versionId
-              AND Action_Scope__c = 'Submit'
+              AND Action_Scope__c = 'Submit' WITH USER_MODE
         ];
         if (!maxRows.isEmpty() && maxRows[0].get('maxOrder') != null) {
             nextOrder = Integer.valueOf(String.valueOf(maxRows[0].get('maxOrder'))) + 10;
@@ -289,8 +289,7 @@ public with sharing class NativeFormsSubmitActionsController {
                 'targetBy' => 'create'
             })
         );
-        insert actionRecord;
-
+        insert as user actionRecord;
         actionRecord = [
             SELECT Id,
                    Name,
@@ -302,7 +301,7 @@ public with sharing class NativeFormsSubmitActionsController {
                    Config_JSON__c
             FROM NF_Form_Action__c
             WHERE Id = :actionRecord.Id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         return toRecord(actionRecord, null);
     }
@@ -336,7 +335,7 @@ public with sharing class NativeFormsSubmitActionsController {
                    Config_JSON__c
             FROM NF_Form_Action__c
             WHERE Id = :inputValue.id
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         ensureActionVersionEditable(actionRecord.Form_Version__c);
         enforceSubmitEntitlements(inputValue.commandType, inputValue.configJson);
@@ -348,8 +347,14 @@ public with sharing class NativeFormsSubmitActionsController {
         actionRecord.Object_Api_Name__c = canonicalObjectApiName(inputValue.objectApiName);
         actionRecord.Store_Result_As__c = inputValue.storeResultAs;
         actionRecord.Config_JSON__c = String.isBlank(inputValue.configJson) ? '{}' : inputValue.configJson;
-        update actionRecord;
-
+        update as user new NF_Form_Action__c(
+            Id = actionRecord.Id,
+            Command_Key__c = actionRecord.Command_Key__c,
+            Command_Type__c = actionRecord.Command_Type__c,
+            Object_Api_Name__c = actionRecord.Object_Api_Name__c,
+            Store_Result_As__c = actionRecord.Store_Result_As__c,
+            Config_JSON__c = actionRecord.Config_JSON__c
+        );
         return toRecord(actionRecord, null);
     }
 
@@ -363,11 +368,11 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT Id, Form_Version__c
             FROM NF_Form_Action__c
             WHERE Id = :actionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         ensureActionVersionEditable(actionRecord.Form_Version__c);
 
-        delete actionRecord;
+        delete as user actionRecord;
     }
 
     private static SubmitActionRecord toRecord(NF_Form_Action__c actionRecord, Integer displayNumber) {
@@ -582,7 +587,7 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT Command_Key__c, Store_Result_As__c
             FROM NF_Form_Action__c
             WHERE Form_Version__r.Form__c = :formId
-              AND Action_Scope__c = :actionScope
+              AND Action_Scope__c = :actionScope WITH USER_MODE
         ]) {
             String candidate = useCommandKey ? actionRecord.Command_Key__c : actionRecord.Store_Result_As__c;
             Integer parsedSuffix = readTrailingSequence(candidate, prefix);
@@ -634,7 +639,7 @@ public with sharing class NativeFormsSubmitActionsController {
             SELECT Id, Version_Status__c
             FROM NF_Form_Version__c
             WHERE Id = :versionId
-            LIMIT 1
+            WITH USER_MODE LIMIT 1
         ];
         if (versionRecord.Version_Status__c == 'Published') {
             throw new AuraHandledException('Published versions are read-only. Open the latest draft in TwinaForms Designer.');

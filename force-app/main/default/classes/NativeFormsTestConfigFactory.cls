@@ -70,6 +70,19 @@ public class NativeFormsTestConfigFactory {
         return json(config);
     }
 
+    public static String signatureConfigJson(String targetSubmitActionKey) {
+        Map<String, Object> config = new Map<String, Object>{
+            'labelPosition' => 'above',
+            'required' => false,
+            'helpText' => 'Sign inside the box.',
+            'clearButtonLabel' => 'Clear'
+        };
+        if (!String.isBlank(targetSubmitActionKey)) {
+            config.put('targetSubmitActionKey', targetSubmitActionKey);
+        }
+        return json(config);
+    }
+
     public static String repeatGroupConfigJson() {
         return json(new Map<String, Object>{
             'maxRows' => 10,

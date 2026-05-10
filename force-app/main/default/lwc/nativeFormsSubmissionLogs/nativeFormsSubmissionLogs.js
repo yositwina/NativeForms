@@ -385,8 +385,7 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
             hasErrorRows: errorRows.length > 0,
             errorRows,
             hasTechnicalRows: technicalRows.length > 0,
-            technicalRows,
-            rawJson: detailPayload ? JSON.stringify(detailPayload, null, 2) : ''
+            technicalRows
         };
     }
 

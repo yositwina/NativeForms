@@ -89,9 +89,9 @@ public with sharing class NativeFormsDemoDataService {
         config.Demo_Data_Record_Ids__c = serializeTracker(tracker);
 
         if (config.Id == null) {
-            insert config;
+            insert as user config;
         } else {
-            update config;
+            update as user config;
         }
         return buildSummary(true, false, config.Demo_Data_Last_Message__c, config.Demo_Data_Installed_At__c, tracker);
     }
@@ -193,7 +193,7 @@ public with sharing class NativeFormsDemoDataService {
         for (NF_Theme__c row : [
             SELECT Id
             FROM NF_Theme__c
-            WHERE Name IN ('Ocean Blue', 'Deep Blue', 'Clean Light', 'Business Dark')
+            WHERE Name IN ('Ocean Blue', 'Deep Blue', 'Clean Light', 'Business Dark') WITH USER_MODE
         ]) {
             tracker.themeIds.add(row.Id);
         }
@@ -202,7 +202,7 @@ public with sharing class NativeFormsDemoDataService {
         for (Contact row : [
             SELECT Id, Email
             FROM Contact
-            WHERE Email IN ('ava.reynolds@example.com', 'liam.carter@example.com')
+            WHERE Email IN ('ava.reynolds@example.com', 'liam.carter@example.com') WITH USER_MODE
         ]) {
             tracker.contactIds.add(row.Id);
             contactsByEmail.put(row.Email, row);
@@ -215,7 +215,7 @@ public with sharing class NativeFormsDemoDataService {
                 SELECT Id, NF_Key__c, Description__c
                 FROM NF_Form__c
                 WHERE NF_Key__c LIKE 'form%'
-                   OR Id IN :trackedFormIds
+                   OR Id IN :trackedFormIds WITH USER_MODE
             ]) {
                 if (row.Description__c == CONTACT_UPDATE_FORM_LABEL || row.Description__c == CASE_UPDATE_FORM_LABEL) {
                     tracker.formIds.add(row.Id);
@@ -225,7 +225,7 @@ public with sharing class NativeFormsDemoDataService {
             for (NF_Form__c row : [
                 SELECT Id, NF_Key__c, Description__c
                 FROM NF_Form__c
-                WHERE NF_Key__c LIKE 'form%'
+                WHERE NF_Key__c LIKE 'form%' WITH USER_MODE
             ]) {
                 if (row.Description__c == CONTACT_UPDATE_FORM_LABEL || row.Description__c == CASE_UPDATE_FORM_LABEL) {
                     tracker.formIds.add(row.Id);
@@ -240,7 +240,7 @@ public with sharing class NativeFormsDemoDataService {
                 SELECT Id
                 FROM Case
                 WHERE ContactId IN :contactIds
-                  AND Subject IN ('Laptop VPN issue', 'Benefits enrollment question', 'Software installation request', 'Monitor replacement')
+                  AND Subject IN ('Laptop VPN issue', 'Benefits enrollment question', 'Software installation request', 'Monitor replacement') WITH USER_MODE
             ]) {
                 tracker.caseIds.add(row.Id);
             }
@@ -271,7 +271,7 @@ public with sharing class NativeFormsDemoDataService {
         }
 
         Map<String, NF_Theme__c> existingByName = new Map<String, NF_Theme__c>();
-        for (NF_Theme__c row : [SELECT Id, Name FROM NF_Theme__c WHERE Name IN :names]) {
+        for (NF_Theme__c row : [SELECT Id, Name FROM NF_Theme__c WHERE Name IN :names WITH USER_MODE]) {
             existingByName.put(row.Name, row);
         }
 
@@ -282,10 +282,9 @@ public with sharing class NativeFormsDemoDataService {
             }
             toSave.add(seededTheme);
         }
-        upsert toSave;
-
+        upsert as user toSave;
         Map<String, NF_Theme__c> themesByName = new Map<String, NF_Theme__c>();
-        for (NF_Theme__c row : [SELECT Id, Name FROM NF_Theme__c WHERE Name IN :names]) {
+        for (NF_Theme__c row : [SELECT Id, Name FROM NF_Theme__c WHERE Name IN :names WITH USER_MODE]) {
             themesByName.put(row.Name, row);
             tracker.themeIds.add(row.Id);
         }
@@ -304,7 +303,7 @@ public with sharing class NativeFormsDemoDataService {
         }
 
         Map<String, Contact> existingByEmail = new Map<String, Contact>();
-        for (Contact row : [SELECT Id, FirstName, LastName, Email, Phone, Name FROM Contact WHERE Email IN :emails]) {
+        for (Contact row : [SELECT Id, FirstName, LastName, Email, Phone, Name FROM Contact WHERE Email IN :emails WITH USER_MODE]) {
             existingByEmail.put(row.Email, row);
         }
 
@@ -315,10 +314,9 @@ public with sharing class NativeFormsDemoDataService {
             }
             toSave.add(seededContact);
         }
-        upsert toSave;
-
+        upsert as user toSave;
         Map<String, Contact> contactsByEmail = new Map<String, Contact>();
-        for (Contact row : [SELECT Id, FirstName, LastName, Email, Phone, Name FROM Contact WHERE Email IN :emails]) {
+        for (Contact row : [SELECT Id, FirstName, LastName, Email, Phone, Name FROM Contact WHERE Email IN :emails WITH USER_MODE]) {
             contactsByEmail.put(row.Email, row);
             tracker.contactIds.add(row.Id);
         }
@@ -340,7 +338,7 @@ public with sharing class NativeFormsDemoDataService {
             contactIds.add(row.ContactId);
             subjects.add(row.Subject);
         }
-        for (Case row : [SELECT Id, ContactId, Subject FROM Case WHERE ContactId IN :contactIds AND Subject IN :subjects]) {
+        for (Case row : [SELECT Id, ContactId, Subject FROM Case WHERE ContactId IN :contactIds AND Subject IN :subjects WITH USER_MODE]) {
             existingByKey.put(buildCaseKey(row.ContactId, row.Subject), row);
         }
 
@@ -352,9 +350,8 @@ public with sharing class NativeFormsDemoDataService {
             }
             toSave.add(seededCase);
         }
-        upsert toSave;
-
-        for (Case row : [SELECT Id FROM Case WHERE ContactId IN :contactIds AND Subject IN :subjects]) {
+        upsert as user toSave;
+        for (Case row : [SELECT Id FROM Case WHERE ContactId IN :contactIds AND Subject IN :subjects WITH USER_MODE]) {
             tracker.caseIds.add(row.Id);
         }
     }
@@ -401,7 +398,7 @@ public with sharing class NativeFormsDemoDataService {
             SELECT Id, Theme__c, Description__c, Status__c, Current_Draft_Version__c, Enable_Captcha__c, NF_Key__c
             FROM NF_Form__c
             WHERE NF_Key__c = :formKey
-            ORDER BY LastModifiedDate DESC
+            WITH USER_MODE ORDER BY LastModifiedDate DESC
             LIMIT 1
         ];
         if (forms.isEmpty()) {
@@ -412,7 +409,7 @@ public with sharing class NativeFormsDemoDataService {
                 Theme__c = themeRecord != null ? themeRecord.Id : null,
                 Enable_Captcha__c = captchaEnabled == true
             );
-            insert formRecord;
+            insert as user formRecord;
         } else {
             formRecord = forms[0];
             formRecord.NF_Key__c = formKey;
@@ -420,11 +417,11 @@ public with sharing class NativeFormsDemoDataService {
             formRecord.Status__c = 'Draft';
             formRecord.Theme__c = themeRecord != null ? themeRecord.Id : null;
             formRecord.Enable_Captcha__c = captchaEnabled == true;
-            update formRecord;
+            update as user formRecord;
         }
 
         NF_Form_Version__c versionRecord;
-        List<NF_Form_Version__c> versions = [SELECT Id, Form__c FROM NF_Form_Version__c WHERE Form__c = :formRecord.Id AND Version_Number__c = 1 LIMIT 1];
+        List<NF_Form_Version__c> versions = [SELECT Id, Form__c FROM NF_Form_Version__c WHERE Form__c = :formRecord.Id AND Version_Number__c = 1 WITH USER_MODE LIMIT 1];
         if (versions.isEmpty()) {
             versionRecord = new NF_Form_Version__c(
                 Form__c = formRecord.Id,
@@ -434,19 +431,24 @@ public with sharing class NativeFormsDemoDataService {
                 Security_Mode__c = pickPreferredPicklistValue(NF_Form_Version__c.Security_Mode__c, new List<String>{ 'secure-edit', 'public-prefill', 'public-create' }),
                 Prefill_Params_JSON__c = '[{\"key\":\"' + escapeJsonValue(prefillParamKey) + '\",\"label\":\"Email\",\"required\":true}]'
             );
-            insert versionRecord;
+            insert as user versionRecord;
         } else {
             versionRecord = versions[0];
             versionRecord.Version_Status__c = 'Draft';
             versionRecord.Publish_Status__c = 'Never Published';
             versionRecord.Security_Mode__c = pickPreferredPicklistValue(NF_Form_Version__c.Security_Mode__c, new List<String>{ 'secure-edit', 'public-prefill', 'public-create' });
             versionRecord.Prefill_Params_JSON__c = '[{\"key\":\"' + escapeJsonValue(prefillParamKey) + '\",\"label\":\"Email\",\"required\":true}]';
-            update versionRecord;
+            update as user new NF_Form_Version__c(
+                Id = versionRecord.Id,
+                Version_Status__c = versionRecord.Version_Status__c,
+                Publish_Status__c = versionRecord.Publish_Status__c,
+                Security_Mode__c = versionRecord.Security_Mode__c,
+                Prefill_Params_JSON__c = versionRecord.Prefill_Params_JSON__c
+            );
         }
 
         formRecord.Current_Draft_Version__c = versionRecord.Id;
-        update formRecord;
-
+        update as user formRecord;
         DemoFormContext context = new DemoFormContext();
         context.formRecord = formRecord;
         context.versionRecord = versionRecord;
@@ -454,13 +456,13 @@ public with sharing class NativeFormsDemoDataService {
     }
 
     private static void clearVersionArtifacts(Id versionId) {
-        List<NF_Form_Action__c> actions = [SELECT Id FROM NF_Form_Action__c WHERE Form_Version__c = :versionId];
+        List<NF_Form_Action__c> actions = [SELECT Id FROM NF_Form_Action__c WHERE Form_Version__c = :versionId WITH USER_MODE];
         if (!actions.isEmpty()) {
-            delete actions;
+            delete as user actions;
         }
-        List<NF_Form_Element__c> elements = [SELECT Id FROM NF_Form_Element__c WHERE Form_Version__c = :versionId];
+        List<NF_Form_Element__c> elements = [SELECT Id FROM NF_Form_Element__c WHERE Form_Version__c = :versionId WITH USER_MODE];
         if (!elements.isEmpty()) {
-            delete elements;
+            delete as user elements;
         }
     }
 
@@ -496,8 +498,7 @@ public with sharing class NativeFormsDemoDataService {
                 'conditionExpression' => '1'
             }))
         };
-        insert actions;
-
+        insert as user actions;
         List<NF_Form_Element__c> elements = new List<NF_Form_Element__c>{
             element(context.versionRecord.Id, 'contact_details_section', 'section', 'contactDetailsSection', 'Contact details', 10, sectionConfig(2, true, true, ''), null),
             element(context.versionRecord.Id, 'contact_first_name', 'text', 'firstName', 'First Name', 20, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'FirstName', true, 'submitAction1', 'FirstName'), 1), 'contact_details_section'),
@@ -506,8 +507,7 @@ public with sharing class NativeFormsDemoDataService {
             element(context.versionRecord.Id, 'contact_phone', 'tel', 'phone', 'Phone', 50, withSectionColumn(fieldConfig('', 'above', 'editable', false, true, 'PrefilContact', 'Phone', true, 'submitAction1', 'Phone'), 2), 'contact_details_section'),
             element(context.versionRecord.Id, 'contact_email_opt_in', 'checkbox', 'acceptEmails', 'I agree to accept emails', 60, withSectionColumn(checkboxConfig(false, false, false, null, null, false, null, null), 1), 'contact_details_section')
         };
-        insert elements;
-
+        insert as user elements;
         tracker.formIds.add(context.formRecord.Id);
         tracker.versionIds.add(context.versionRecord.Id);
         for (NF_Form_Action__c row : actions) tracker.actionIds.add(row.Id);
@@ -569,8 +569,7 @@ public with sharing class NativeFormsDemoDataService {
                 'allowDelete' => false
             }))
         };
-        insert actions;
-
+        insert as user actions;
         List<Object> priorityOptions = new List<Object>();
         for (String priorityValue : getPicklistValues(Case.Priority)) {
             priorityOptions.add(new Map<String, Object>{ 'label' => priorityValue, 'value' => priorityValue });
@@ -590,8 +589,7 @@ public with sharing class NativeFormsDemoDataService {
             element(context.versionRecord.Id, 'case_row_priority', 'select', 'priority', 'Priority', 80, withSectionColumn(selectConfig(priorityOptions, false, true, 'PrefilCase', 'Priority', true, 'submitAction2', 'Priority'), 2), 'case_records_group'),
             element(context.versionRecord.Id, 'case_row_id', 'text', 'caseId', 'Case Id', 90, withSectionColumn(fieldConfig('', 'above', 'hidden', false, true, 'PrefilCase', 'Id', true, 'submitAction2', 'Id'), 2), 'case_records_group')
         };
-        insert elements;
-
+        insert as user elements;
         tracker.formIds.add(context.formRecord.Id);
         tracker.versionIds.add(context.versionRecord.Id);
         for (NF_Form_Action__c row : actions) tracker.actionIds.add(row.Id);
@@ -728,12 +726,12 @@ public with sharing class NativeFormsDemoDataService {
         for (NF_Form__c row : [
             SELECT NF_Key__c
             FROM NF_Form__c
-            WHERE NF_Key__c LIKE 'form%'
+            WHERE NF_Key__c LIKE 'form%' WITH USER_MODE
         ]) {
             maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(row.NF_Key__c));
         }
 
-        List<NF_Form__c> existingDemoForms = [SELECT Id, NF_Key__c, Description__c FROM NF_Form__c WHERE NF_Key__c LIKE 'form%' ORDER BY CreatedDate ASC];
+        List<NF_Form__c> existingDemoForms = [SELECT Id, NF_Key__c, Description__c FROM NF_Form__c WHERE NF_Key__c LIKE 'form%' WITH USER_MODE ORDER BY CreatedDate ASC];
 
         for (NF_Form__c formRecord : existingDemoForms) {
             if (String.isBlank(keys.contactUpdateKey) && formRecord.Description__c == CONTACT_UPDATE_FORM_LABEL) {

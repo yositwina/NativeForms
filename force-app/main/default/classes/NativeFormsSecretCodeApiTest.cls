@@ -1,7 +1,13 @@
 @IsTest
 private class NativeFormsSecretCodeApiTest {
+    @TestSetup
+    static void setupPermissions() {
+        NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
+    }
+
     @IsTest
     static void requestValidationAndDisabledFormFailuresWork() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form_Version__c secretDisabledVersion = createVersionWithSecretCode(false, NativeFormsTestConfigFactory.basicUiSettingsJson());
 
         NativeFormsSecretCodeApi.ResponsePayload missingAction = invoke(new Map<String, Object>{
@@ -45,10 +51,12 @@ private class NativeFormsSecretCodeApiTest {
         System.assertEquals(false, disabledResponse.success, 'Secret-code-disabled forms should return an error response.');
         System.assertEquals('Secret code verification is not enabled for this form.', disabledResponse.message, 'Disabled forms should return the feature-disabled message.');
         System.assertEquals(403, RestContext.response.statusCode, 'Disabled forms should set a 403 status code.');
+        }
     }
 
     @IsTest
     static void sendCodeHandlesMissingContactsSafely() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form_Version__c enabledVersion = createVersionWithSecretCode(true, secretEnabledUiSettingsJson());
 
         NativeFormsSecretCodeApi.ResponsePayload noMatchResponse = invoke(new Map<String, Object>{
@@ -61,10 +69,12 @@ private class NativeFormsSecretCodeApiTest {
         System.assertEquals(false, noMatchResponse.emailSent, 'No-contact sendCode should not send an email.');
         System.assertEquals('missing@example.com', noMatchResponse.normalizedEmail, 'No-contact sendCode should normalize the email to lowercase.');
         System.assertEquals('If we found a matching contact, a code was sent.', noMatchResponse.message, 'No-contact sendCode should keep the privacy-safe message.');
+        }
     }
 
     @IsTest
     static void sendCodeReturnsExplicitEmailFailureMessage() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form_Version__c enabledVersion = createVersionWithSecretCode(true, secretEnabledUiSettingsJson());
         createContact('mail.failure@example.com');
 
@@ -81,10 +91,12 @@ private class NativeFormsSecretCodeApiTest {
         } finally {
             NativeFormsSecretCodeApi.forcedEmailFailureMessageForTest = null;
         }
+        }
     }
 
     @IsTest
     static void sendCodeStoresSecretAndVerifyHandlesSuccessInvalidExpiredAndLockout() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
         NF_Form_Version__c enabledVersion = createVersionWithSecretCode(true, secretEnabledUiSettingsJson());
         Contact target = createContact('qa.secret@example.com');
 
@@ -207,6 +219,7 @@ private class NativeFormsSecretCodeApiTest {
         System.assertEquals(true, alreadyLockedResponse.success, 'Already-locked responses should still be successful API responses.');
         System.assertEquals(true, alreadyLockedResponse.lockedOut, 'Already-locked contacts should stay locked.');
         System.assertEquals('Too many attempts. Request a new code and try again.', alreadyLockedResponse.message, 'Already-locked contacts should return the lockout message.');
+        }
     }
 
     private static NativeFormsSecretCodeApi.ResponsePayload invoke(Map<String, Object> payload) {

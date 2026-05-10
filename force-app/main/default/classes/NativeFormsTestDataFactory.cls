@@ -260,4 +260,34 @@ public class NativeFormsTestDataFactory {
             WHERE Id = :userRecord.Id
         ];
     }
+
+    public static void assignTwinaFormsUserPermissionSet() {
+        List<PermissionSet> permissionSets = [
+            SELECT Id
+            FROM PermissionSet
+            WHERE Label = 'TwinaForms User'
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (permissionSets.isEmpty()) {
+            return;
+        }
+
+        List<PermissionSetAssignment> existingAssignments = [
+            SELECT Id
+            FROM PermissionSetAssignment
+            WHERE AssigneeId = :UserInfo.getUserId()
+            AND PermissionSetId = :permissionSets[0].Id
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (!existingAssignments.isEmpty()) {
+            return;
+        }
+
+        insert as user new PermissionSetAssignment(
+            AssigneeId = UserInfo.getUserId(),
+            PermissionSetId = permissionSets[0].Id
+        );
+    }
 }

@@ -1,7 +1,6 @@
 public with sharing class NativeFormsSubmissionLogsController {
     private static final Integer TIMEOUT_MS = 120000;
-    private static final String BASE_LOGS_NC_NAME = 'NativeForms_SubmissionLogs';
-    private static String cachedLogsNc;
+    private static final String SUBMISSION_LOGS_BASE_URL = 'https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws';
 
     public class SyncResult {
         @AuraEnabled public Boolean success { get; set; }
@@ -99,10 +98,12 @@ public with sharing class NativeFormsSubmissionLogsController {
         try {
             HttpRequest request = new HttpRequest();
             request.setMethod('GET');
-            request.setEndpoint(
-                'callout:' + namedCredentialName()
-                + '/submission-log-config/status?orgId='
-                + EncodingUtil.urlEncode(result.orgId, 'UTF-8')
+            sendSignedSubmissionLogRequest(
+                request,
+                'GET',
+                '/submission-log-config/status',
+                '?orgId=' + EncodingUtil.urlEncode(result.orgId, 'UTF-8'),
+                null
             );
             request.setTimeout(TIMEOUT_MS);
 
@@ -152,7 +153,7 @@ public with sharing class NativeFormsSubmissionLogsController {
             : new NF_Submission_Log_Key__c(Id = existingRecord.recordId);
 
         keyRecord.Public_Key__c = publicKeyB64.trim();
-        keyRecord.Private_Key__c = privateKeyPkcs8B64.trim();
+        keyRecord.Sealed_Log_Data__c = sealSubmissionLogPrivateKey(privateKeyPkcs8B64.trim());
         keyRecord.Key_Version__c = String.isBlank(keyVersion) ? 'v2' : keyVersion.trim();
 
         if (existingRecord == null) {
@@ -166,7 +167,7 @@ public with sharing class NativeFormsSubmissionLogsController {
         result.orgId = currentOrgId();
         result.keyVersion = keyRecord.Key_Version__c;
         result.hasPublicKey = !String.isBlank(keyRecord.Public_Key__c);
-        result.hasPrivateKey = !String.isBlank(keyRecord.Private_Key__c);
+        result.hasPrivateKey = !String.isBlank(keyRecord.Sealed_Log_Data__c);
         result.publicKeySyncedAt = null;
         result.errorMessage = null;
         return result;
@@ -184,16 +185,17 @@ public with sharing class NativeFormsSubmissionLogsController {
 
             HttpRequest request = new HttpRequest();
             request.setMethod('POST');
-            request.setEndpoint('callout:' + namedCredentialName() + '/submission-log-config/sync');
-            request.setHeader('Content-Type', 'application/json');
-            request.setTimeout(TIMEOUT_MS);
-            request.setBody(JSON.serialize(new Map<String, Object>{
+            String body = JSON.serialize(new Map<String, Object>{
                 'orgId' => currentOrgId(),
                 'submissionLogPublicKey' => keyRecord.publicKeyB64,
                 'submissionLogKeyVersion' => String.isBlank(keyRecord.keyVersion)
                     ? 'v2'
                     : keyRecord.keyVersion
-            }));
+            });
+            sendSignedSubmissionLogRequest(request, 'POST', '/submission-log-config/sync', null, body);
+            request.setHeader('Content-Type', 'application/json');
+            request.setTimeout(TIMEOUT_MS);
+            request.setBody(body);
 
             HttpResponse response = new Http().send(request);
             Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
@@ -260,7 +262,13 @@ public with sharing class NativeFormsSubmissionLogsController {
 
             HttpRequest request = new HttpRequest();
             request.setMethod('GET');
-            request.setEndpoint('callout:' + namedCredentialName() + '/submission-logs?' + String.join(parts, '&'));
+            sendSignedSubmissionLogRequest(
+                request,
+                'GET',
+                '/submission-logs',
+                '?' + String.join(parts, '&'),
+                null
+            );
             request.setTimeout(TIMEOUT_MS);
 
             HttpResponse response = new Http().send(request);
@@ -305,10 +313,13 @@ public with sharing class NativeFormsSubmissionLogsController {
 
             HttpRequest request = new HttpRequest();
             request.setMethod('GET');
-            request.setEndpoint(
-                'callout:' + namedCredentialName()
-                + '/submission-logs/' + EncodingUtil.urlEncode(submissionId, 'UTF-8')
-                + '?orgId=' + EncodingUtil.urlEncode(currentOrgId(), 'UTF-8')
+            String path = '/submission-logs/' + EncodingUtil.urlEncode(submissionId, 'UTF-8');
+            sendSignedSubmissionLogRequest(
+                request,
+                'GET',
+                path,
+                '?orgId=' + EncodingUtil.urlEncode(currentOrgId(), 'UTF-8'),
+                null
             );
             request.setTimeout(TIMEOUT_MS);
 
@@ -331,18 +342,11 @@ public with sharing class NativeFormsSubmissionLogsController {
 
             if (logData != null && logData.containsKey('encryptedDetail') && result.log != null && result.log.detailMode == 'encrypted_detail') {
                 Map<String, Object> encryptedDetail = (Map<String, Object>) logData.get('encryptedDetail');
-                if (String.isNotBlank(stringValue(encryptedDetail, 'detailEncryptedKeyB64'))) {
-                    SubmissionLogKeyRecord keyRecord = getSubmissionLogKeyRecord();
-                    result.clientEncryptedDetailJson = JSON.serialize(encryptedDetail);
-                    result.privateKeyPkcs8B64 = keyRecord == null ? null : keyRecord.privateKeyB64;
-                    if (String.isBlank(result.privateKeyPkcs8B64)) {
-                        result.detailAccessMessage = 'This org has encrypted detail for this log, but the private log key is not ready in Salesforce yet.';
-                    }
-                } else {
-                    result.decryptedDetailJson = decryptLegacyEncryptedDetail(
-                        stringValue(encryptedDetail, 'detailCiphertextB64'),
-                        stringValue(encryptedDetail, 'detailIvB64')
-                    );
+                SubmissionLogKeyRecord keyRecord = getSubmissionLogKeyRecord();
+                result.clientEncryptedDetailJson = JSON.serialize(encryptedDetail);
+                result.privateKeyPkcs8B64 = keyRecord == null ? null : keyRecord.privateKeyB64;
+                if (String.isBlank(result.privateKeyPkcs8B64)) {
+                    result.detailAccessMessage = 'This org has encrypted detail for this log, but the private log key is not ready in Salesforce yet.';
                 }
             }
         } catch (Exception e) {
@@ -353,30 +357,9 @@ public with sharing class NativeFormsSubmissionLogsController {
         return result;
     }
 
-    @AuraEnabled
-    public static String decryptEncryptedDetail(String detailCiphertextB64, String detailIvB64) {
-        return decryptLegacyEncryptedDetail(detailCiphertextB64, detailIvB64);
-    }
-
-    private static String decryptLegacyEncryptedDetail(String detailCiphertextB64, String detailIvB64) {
-        NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
-        if (config == null || String.isBlank(config.Submission_Log_Key__c)) {
-            throw new AuraHandledException('Legacy submission log key is not configured for this org.');
-        }
-        if (String.isBlank(detailCiphertextB64) || String.isBlank(detailIvB64)) {
-            throw new AuraHandledException('Encrypted detail payload is incomplete.');
-        }
-
-        Blob key = EncodingUtil.base64Decode(config.Submission_Log_Key__c);
-        Blob iv = EncodingUtil.base64Decode(detailIvB64);
-        Blob ciphertext = EncodingUtil.base64Decode(detailCiphertextB64);
-        Blob plaintext = Crypto.decrypt('AES256', key, iv, ciphertext);
-        return plaintext.toString();
-    }
-
     private static SubmissionLogKeyRecord getSubmissionLogKeyRecord() {
         List<NF_Submission_Log_Key__c> records = [
-            SELECT Id, Name, Public_Key__c, Private_Key__c, Key_Version__c
+            SELECT Id, Name, Public_Key__c, Sealed_Log_Data__c, Key_Version__c
             FROM NF_Submission_Log_Key__c
             WHERE Name = :currentOrgId()
             LIMIT 1
@@ -389,9 +372,53 @@ public with sharing class NativeFormsSubmissionLogsController {
         SubmissionLogKeyRecord output = new SubmissionLogKeyRecord();
         output.recordId = recordValue.Id;
         output.publicKeyB64 = recordValue.Public_Key__c;
-        output.privateKeyB64 = recordValue.Private_Key__c;
+        output.privateKeyB64 = unsealSubmissionLogPrivateKey(recordValue.Sealed_Log_Data__c);
         output.keyVersion = recordValue.Key_Version__c;
         return output;
+    }
+
+    private static String sealSubmissionLogPrivateKey(String privateKeyB64) {
+        if (String.isBlank(privateKeyB64)) {
+            return null;
+        }
+        Blob ciphertext = Crypto.encryptWithManagedIV(
+            'AES256',
+            getOrCreateSubmissionLogWrapSecret(),
+            Blob.valueOf(privateKeyB64)
+        );
+        return EncodingUtil.base64Encode(ciphertext);
+    }
+
+    private static String unsealSubmissionLogPrivateKey(String sealedValue) {
+        if (String.isBlank(sealedValue)) {
+            return null;
+        }
+        Blob plaintext = Crypto.decryptWithManagedIV(
+            'AES256',
+            getOrCreateSubmissionLogWrapSecret(),
+            EncodingUtil.base64Decode(sealedValue)
+        );
+        return plaintext.toString();
+    }
+
+    private static Blob getOrCreateSubmissionLogWrapSecret() {
+        NativeForms_Protected_Config__c config = NativeForms_Protected_Config__c.getOrgDefaults();
+        if (config != null && String.isNotBlank(config.Submission_Log_Wrap_Secret__c)) {
+            return EncodingUtil.base64Decode(config.Submission_Log_Wrap_Secret__c);
+        }
+
+        Blob secret = Crypto.generateAesKey(256);
+        if (config == null) {
+            config = new NativeForms_Protected_Config__c();
+        }
+        config.SetupOwnerId = UserInfo.getOrganizationId();
+        config.Submission_Log_Wrap_Secret__c = EncodingUtil.base64Encode(secret);
+        if (config.Id == null) {
+            insert config;
+        } else {
+            update config;
+        }
+        return secret;
     }
 
     private static void validateBase64(String value, String fieldLabel) {
@@ -454,20 +481,25 @@ public with sharing class NativeFormsSubmissionLogsController {
         return UserInfo.getOrganizationId().substring(0, 15);
     }
 
-    private static String namedCredentialName() {
-        if (cachedLogsNc != null) {
-            return cachedLogsNc;
+    private static void sendSignedSubmissionLogRequest(
+        HttpRequest request,
+        String method,
+        String path,
+        String queryString,
+        String body
+    ) {
+        String normalizedPath = String.isBlank(path) ? '/' : path.trim();
+        if (!normalizedPath.startsWith('/')) {
+            normalizedPath = '/' + normalizedPath;
         }
 
-        String fullName = NativeFormsSetupController.class.getName();
-        Integer dot = fullName.indexOf('.');
-        String ns = dot > 0 ? fullName.substring(0, dot) : null;
+        String normalizedQuery = String.isBlank(queryString) ? '' : queryString.trim();
+        if (String.isNotBlank(normalizedQuery) && !normalizedQuery.startsWith('?')) {
+            normalizedQuery = '?' + normalizedQuery;
+        }
 
-        cachedLogsNc = String.isBlank(ns)
-            ? BASE_LOGS_NC_NAME
-            : ns + '__' + BASE_LOGS_NC_NAME;
-
-        return cachedLogsNc;
+        request.setEndpoint(SUBMISSION_LOGS_BASE_URL + normalizedPath + normalizedQuery);
+        NativeFormsAwsClient.applyBootstrapV2Signature(request, method, normalizedPath, body);
     }
 
     private static void hydrateSummaryDescriptions(List<SubmissionLogSummary> logs) {
@@ -491,7 +523,7 @@ public with sharing class NativeFormsSubmissionLogsController {
         Map<Id, NF_Form_Version__c> byId = new Map<Id, NF_Form_Version__c>([
             SELECT Id, Form__r.Description__c
             FROM NF_Form_Version__c
-            WHERE Id IN :versionIds
+            WHERE Id IN :versionIds WITH USER_MODE
         ]);
         for (SubmissionLogSummary summary : logs) {
             if (summary == null || String.isBlank(summary.formVersionId)) {
@@ -520,7 +552,7 @@ public with sharing class NativeFormsSubmissionLogsController {
                 SELECT Id, Name, Form__r.Name, Form__r.Description__c
                 FROM NF_Form_Version__c
                 WHERE Id = :formVersionId
-                LIMIT 1
+                WITH USER_MODE LIMIT 1
             ];
             result.formTitle = String.isNotBlank(versionRecord.Form__r.Name)
                 ? versionRecord.Form__r.Name
@@ -538,7 +570,7 @@ public with sharing class NativeFormsSubmissionLogsController {
             SELECT Field_Key__c, Label__c, Element_Type__c, Order__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :formVersionId
-            ORDER BY Order__c ASC, CreatedDate ASC
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
             String fieldKey = elementRecord.Field_Key__c;
             if (String.isBlank(fieldKey)) {
