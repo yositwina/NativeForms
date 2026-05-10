@@ -22,6 +22,7 @@ Use for package-visible metadata, object changes, tabs/apps/pages, Apex/LWC chan
 - Branding rule: do not introduce new user-facing `NativeForms` text. Use `TwinaForms` in emails, labels, help text, and UI copy unless the user explicitly asks otherwise or the string is a fixed technical identifier.
 - Multilingual rule: do not introduce fixed English customer-facing text inside form canvas previews or published forms unless it is an error/debug message. If helper/action text is needed, make it configurable in Salesforce properties/settings or omit it. Preserve label-placement flexibility instead of compensating with hard-coded English guidance.
 - Secret-code rule: avoid fixed English-only preview/runtime copy such as `Locked Until Verified`, `Secret Code Verification`, or `Code step appears after the user presses Enter`. Public-form button labels should be configurable when they are part of the customer experience.
+- External Client App packaging rule: do not include External Client App metadata, OAuth settings, generated ECA policy metadata, or global OAuth settings in TwinaForms package versions. Keep the External Client App setup only in the Dev Hub / source org. The managed package should ship core Salesforce metadata without the External Client App; subscriber auth/setup remains a Dev Hub/source-org operational concern unless explicitly redesigned.
 
 ## Escalate When
 - A change introduces metadata or behavior that may fail in a clean org or subscriber org.
