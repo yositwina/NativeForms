@@ -3,14 +3,6 @@
     <description>Customer-facing access for the main TwinaForms workspace and counted package seats.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>TwinaForms User</label>
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>NativeFormsBootstrap-NativeFormsBootstrapPrincipal</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>NativeFormsLambdaAuth-NativeFormsSharedSecret</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
     <applicationVisibilities>
         <application>NativeForms</application>
         <visible>true</visible>

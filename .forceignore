@@ -1,2 +1,8 @@
 **/jsconfig.json
 **/.eslintrc.json
+force-app/main/default/extlClntAppGlobalOauthSets/**
+force-app/main/default/externalClientApps/**
+force-app/main/default/extlClntAppOauthSettings/**
+force-app/main/default/extlClntAppOauthConfigurablePolicies/**
+force-app/main/default/extlClntAppOauthPolicies/**
+force-app/main/default/extlClntAppPolicies/**

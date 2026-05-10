@@ -3,15 +3,6 @@
     <description>Support and debug access for the separate TwinaForms Admin app and raw package objects.</description>
     <hasActivationRequired>false</hasActivationRequired>
     <label>TwinaForms Admin</label>
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>NativeFormsBootstrap-NativeFormsBootstrapPrincipal</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
-    <externalCredentialPrincipalAccesses>
-        <enabled>true</enabled>
-        <externalCredentialPrincipal>NativeFormsLambdaAuth-NativeFormsSharedSecret</externalCredentialPrincipal>
-    </externalCredentialPrincipalAccesses>
-
     <applicationVisibilities>
         <application>NativeForms</application>
         <visible>true</visible>
