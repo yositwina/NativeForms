@@ -68,10 +68,10 @@ Review risks:
 Salesforce-facing logs API.
 
 Scan:
-- log list/detail/sync/config endpoints reachable from Salesforce Named Credentials.
+- log list/detail/sync/config endpoints reachable from packaged Salesforce Apex direct HTTPS callouts.
 
 Review risks:
-- missing tenant bearer secret
+- missing or invalid Bootstrap V2 HMAC signature
 - log cross-tenant access
 - leaking sensitive submitted values beyond intended admin access
 
@@ -97,15 +97,15 @@ These are not DAST endpoints themselves, but they drive AWS calls and should be 
   - tenant register/status/disconnect/auth-health
 - `force-app/main/default/classes/NativeFormsHomeController.cls`
   - home summary/access management callouts
-  - External Credential permission-set detection
+  - permission-set seat management
 - `force-app/main/default/classes/NativeFormsSubmissionLogsController.cls`
   - submission log API calls
 - `force-app/main/default/classes/NativeFormsTenantEntitlements.cls`
   - entitlement/home-summary calls
 
 Review risks:
-- Named Credential namespace resolution
-- tenant secret only via External Credential / Named Credential
+- packaged Remote Site Settings cover direct AWS endpoints
+- Bootstrap V2 HMAC signatures are applied to protected package-to-AWS calls
 - handled errors only
 - no raw AWS response leakage into UI
 - LWC-to-Apex methods use primitive/JSON-string boundaries where managed packages are sensitive

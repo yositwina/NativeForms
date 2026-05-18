@@ -138,6 +138,7 @@ Numbers are entered normally:
 
 ### String
 - `CONCAT(...)`
+- `URLENCODE(value)`
 
 ### Conversion
 - `VALUE(text)`

@@ -266,6 +266,7 @@ button:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  align-items: center;
 }
 
 .meta-pill {
@@ -417,6 +418,12 @@ button:focus-visible {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 245, 253, 0.92));
   color: var(--brand-deep);
   box-shadow: 0 10px 18px rgba(17, 63, 116, 0.06);
+}
+
+.ghost-button--compact {
+  min-height: 2.55rem;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.85rem;
 }
 
 .primary-button:hover:not(:disabled),
@@ -1010,6 +1017,52 @@ button:focus-visible {
   background: linear-gradient(180deg, #dbeefe, #cbdef4);
   color: var(--brand-deep);
   box-shadow: inset 0 2px 6px rgba(17, 63, 116, 0.12);
+}
+
+.detail-section--danger {
+  border-top-color: rgba(180, 35, 24, 0.28);
+}
+
+.detail-section--danger h5 {
+  color: var(--danger);
+}
+
+.danger-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid rgba(180, 35, 24, 0.25);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #fff7f5, var(--danger-bg));
+}
+
+.danger-panel strong {
+  color: var(--danger);
+}
+
+.danger-panel p {
+  margin: 0.35rem 0 0;
+  color: #7f1d1d;
+  line-height: 1.55;
+}
+
+.action-button--danger {
+  border-color: rgba(180, 35, 24, 0.45);
+  background: linear-gradient(135deg, #b42318, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 16px 28px rgba(180, 35, 24, 0.22);
+}
+
+.action-button--danger:hover:not(:disabled) {
+  box-shadow: 0 20px 34px rgba(180, 35, 24, 0.3);
+}
+
+.action-button--danger:active:not(:disabled) {
+  background: linear-gradient(135deg, #8f1c13, #b91c1c);
+  border-color: rgba(127, 29, 29, 0.55);
+  box-shadow:
+    inset 0 3px 10px rgba(127, 29, 29, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .stack-form {

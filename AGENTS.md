@@ -55,3 +55,12 @@ Escalate whenever a change is technically correct but risky, unclear, or not yet
 
 ## Working Rule
 Update the relevant source doc first when a stable project decision changes, then update the matching `/skills` summary so the operating layer stays aligned.
+
+## Completion Signal
+When a substantive requested processing task is finished, run this PowerShell command before the final handoff so the PC speaks the completion message:
+
+```powershell
+$voice = New-Object -ComObject SAPI.SpVoice; $voice.Speak('I am done') | Out-Null
+```
+
+If sandboxed execution denies SAPI access, rerun the same command with escalation and explain that it is only for Windows speech synthesis.

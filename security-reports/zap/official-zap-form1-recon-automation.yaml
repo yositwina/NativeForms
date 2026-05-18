@@ -1,0 +1,33 @@
+---
+env:
+  contexts:
+    - name: TwinaForms Published Form
+      urls:
+        - https://forms.twinaforms.com/
+      includePaths:
+        - https://forms\.twinaforms\.com/twinaforms/form1.*
+      excludePaths: []
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    parameters:
+      user:
+    requests:
+      - url: https://forms.twinaforms.com/twinaforms/form1?email=liam.carter@example.com
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\zap\official
+      reportFile: official-zap-form1-recon-2026-04-29.html
+      reportTitle: TwinaForms Published Form ZAP Reconnaissance Report
+      reportDescription: Passive ZAP reconnaissance report for the TwinaForms published test form at https://forms.twinaforms.com/twinaforms/form1?email=liam.carter@example.com. This run sends a single GET request to the published form and waits for passive scan rules to complete. It does not run an active attack scan.

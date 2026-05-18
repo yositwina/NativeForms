@@ -1,5 +1,6 @@
 public with sharing class NativeFormsDemoDataService {
     public static final String DEMO_DATA_VERSION = '2.1';
+    @TestVisible private static Boolean forceStandardObjectSeedFailureForTest = false;
     private static final String CONTACT_UPDATE_FORM_LABEL = 'Contact details update demo';
     private static final String CASE_UPDATE_FORM_LABEL = 'Prefill multi record demo';
 
@@ -78,14 +79,22 @@ public with sharing class NativeFormsDemoDataService {
 
         DemoTracker tracker = new DemoTracker();
         Map<String, NF_Theme__c> themesByName = ensureThemes(tracker);
-        Map<String, Contact> contactsByEmail = ensureContacts(tracker);
-        ensureCases(contactsByEmail, tracker);
+        String installMessage = 'Demo data installed successfully.';
+        try {
+            if (Test.isRunningTest() && forceStandardObjectSeedFailureForTest) {
+                throw new DmlException('Injected standard object seed failure.');
+            }
+            Map<String, Contact> contactsByEmail = ensureContacts(tracker);
+            ensureCases(contactsByEmail, tracker);
+        } catch (Exception e) {
+            installMessage = 'Demo forms installed. Sample Contacts/Cases were skipped because Salesforce automation blocked them.';
+        }
         ensureDemoForms(themesByName, tracker);
 
         config.Demo_Data_Installed__c = true;
         config.Demo_Data_Installed_At__c = Datetime.now();
         config.Demo_Data_Version__c = DEMO_DATA_VERSION;
-        config.Demo_Data_Last_Message__c = 'Demo data installed successfully.';
+        config.Demo_Data_Last_Message__c = installMessage;
         config.Demo_Data_Record_Ids__c = serializeTracker(tracker);
 
         if (config.Id == null) {
@@ -252,8 +261,6 @@ public with sharing class NativeFormsDemoDataService {
     private static Boolean isDemoDataComplete(DemoTracker tracker) {
         return tracker != null
             && tracker.themeIds.size() >= 4
-            && tracker.contactIds.size() >= 2
-            && tracker.caseIds.size() >= 4
             && tracker.formIds.size() >= 2;
     }
 
@@ -324,6 +331,9 @@ public with sharing class NativeFormsDemoDataService {
     }
 
     private static void ensureCases(Map<String, Contact> contactsByEmail, DemoTracker tracker) {
+        if (!hasSeedContact(contactsByEmail, 'ava.reynolds@example.com') || !hasSeedContact(contactsByEmail, 'liam.carter@example.com')) {
+            return;
+        }
         List<Case> seededCases = new List<Case>{
             new Case(ContactId = contactsByEmail.get('ava.reynolds@example.com').Id, Subject = 'Laptop VPN issue', Priority = pickPreferredPicklistValue(Case.Priority, new List<String>{ 'High', 'Medium', 'Low' }), Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'New', 'Working', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Web', 'Email', 'Phone' }), Description = 'User cannot connect to VPN after password reset.'),
             new Case(ContactId = contactsByEmail.get('ava.reynolds@example.com').Id, Subject = 'Benefits enrollment question', Priority = pickPreferredPicklistValue(Case.Priority, new List<String>{ 'Medium', 'High', 'Low' }), Status = pickPreferredPicklistValue(Case.Status, new List<String>{ 'Working', 'New', 'Escalated' }), Origin = pickPreferredPicklistValue(Case.Origin, new List<String>{ 'Email', 'Web', 'Phone' }), Description = 'Needs help understanding medical coverage options.'),
@@ -354,6 +364,13 @@ public with sharing class NativeFormsDemoDataService {
         for (Case row : [SELECT Id FROM Case WHERE ContactId IN :contactIds AND Subject IN :subjects WITH USER_MODE]) {
             tracker.caseIds.add(row.Id);
         }
+    }
+
+    private static Boolean hasSeedContact(Map<String, Contact> contactsByEmail, String email) {
+        return contactsByEmail != null
+            && contactsByEmail.containsKey(email)
+            && contactsByEmail.get(email) != null
+            && contactsByEmail.get(email).Id != null;
     }
 
     private static String firstNonBlank(String value, String fallbackValue) {

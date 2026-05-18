@@ -43,16 +43,7 @@ Top-level response
   },
   "meta": {
     "foundContact": true
-  },
-  "results": [
-    {
-      "commandKey": "findContact",
-      "type": "findOne",
-      "objectApiName": "Contact",
-      "found": true,
-      "success": true
-    }
-  ]
+  }
 }
 
 Supported command types (V1)
@@ -117,7 +108,7 @@ Execution model
 - Commands are loaded from the stored server-side form definition, not from the browser.
 - Later commands may reference earlier stored results.
 - Results are stored under storeResultAs.
-- Lambda returns both normalized mapped output and command result summaries.
+- Lambda returns only normalized mapped output to the public browser runtime.
 - Commands may include optional `runIf` guards, matching the submit engine pattern.
 
 V1 boundaries
@@ -304,6 +295,12 @@ function deriveTenantRuntimeStatus(tenantRecord) {
 function ensureFormToken(formSecurity, publishToken, mode) {
   if (!publishToken) {
     const error = new Error("Missing required field: publishToken");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!formSecurity) {
+    const error = new Error("Unauthorized: invalid publish token");
     error.statusCode = 401;
     throw error;
   }
@@ -603,33 +600,78 @@ function applyResponseMapping(responseMapping, context) {
   return output;
 }
 
-function buildPrefillAliases(commands, context) {
-  const aliases = {};
-
-  for (const command of commands || []) {
-    const alias = command?.storeResultAs;
-    if (!alias) {
-      continue;
+function collectParamReferences(value, out) {
+  if (typeof value === "string") {
+    const regex = /\{?\bparams\.([A-Za-z0-9_.]+)\}?/g;
+    let match;
+    while ((match = regex.exec(value)) !== null) {
+      const paramName = String(match[1] || "").trim().toLowerCase();
+      if (paramName) {
+        out.add(paramName);
+      }
     }
-    if (Object.prototype.hasOwnProperty.call(context || {}, alias)) {
-      aliases[alias] = context[alias];
-    }
+    return;
   }
 
-  return aliases;
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectParamReferences(item, out));
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((item) => collectParamReferences(item, out));
+  }
 }
 
-function buildPrefillResponse({ formId, mapped, results, aliases }) {
+function allowedPrefillParams(formSecurity) {
+  const allowed = new Set(
+    (formSecurity?.prefillPolicy?.allowedParams || [])
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  const definition = formSecurity?.prefillDefinition || {};
+  collectParamReferences(definition.commands || [], allowed);
+  collectParamReferences(definition.responseMapping || {}, allowed);
+
+  return allowed;
+}
+
+function normalizePrefillParams(params, formSecurity) {
+  const rawParams = params && typeof params === "object" && !Array.isArray(params) ? params : {};
+  const allowed = allowedPrefillParams(formSecurity);
+  const normalized = {};
+  const unexpected = [];
+
+  for (const [key, value] of Object.entries(rawParams)) {
+    const normalizedKey = String(key || "").trim().toLowerCase();
+    if (!normalizedKey) {
+      continue;
+    }
+    if (allowed.size > 0 && !allowed.has(normalizedKey)) {
+      unexpected.push(key);
+      continue;
+    }
+    normalized[normalizedKey] = value;
+  }
+
+  if (unexpected.length > 0) {
+    const error = new Error("Unexpected prefill parameter");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
+function buildPrefillResponse({ formId, mapped }) {
   return {
     success: true,
     formId,
     input: mapped.input || {},
     hidden: mapped.hidden || {},
     meta: mapped.meta || {},
-    repeatGroups: mapped.repeatGroups || {},
-    aliases: aliases || {},
-    output: mapped,
-    results
+    repeatGroups: mapped.repeatGroups || {}
   };
 }
 
@@ -934,6 +976,13 @@ export const handler = async (event) => {
         ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
         : {};
 
+    if (!payload.publishToken) {
+      return jsonResponse(401, {
+        success: false,
+        error: "Missing required field: publishToken"
+      });
+    }
+
     if (!payload.request || typeof payload.request !== "object") {
       return jsonResponse(400, {
         success: false,
@@ -953,6 +1002,7 @@ export const handler = async (event) => {
     const formSecurity = await getFormSecurityRecord(request.formId);
     ensureFormToken(formSecurity, payload.publishToken, "prefill");
     const prefillDefinition = formSecurity.prefillDefinition;
+    const prefillParams = normalizePrefillParams(request.params || {}, formSecurity);
 
     const tenantRecord = await ensureActiveTenantForForm(formSecurity);
     const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
@@ -961,7 +1011,7 @@ export const handler = async (event) => {
     const accessToken = await refreshAccessToken(secret, tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com");
 
     const context = {
-      params: request.params || {},
+      params: prefillParams,
       request: {
         onNotFound: prefillDefinition.onNotFound || "ignore"
       }
@@ -1011,27 +1061,16 @@ export const handler = async (event) => {
       } catch (err) {
         return jsonResponse(400, {
           success: false,
-          error: {
-            message: err.message,
-            commandKey: command.commandKey || null,
-            commandType: command.type || null,
-            objectApiName: command.objectApiName || null
-          },
-          partialResults: results
+          error: "Prefill failed"
         });
       }
     }
 
-    console.log("Context after commands:", JSON.stringify(context));
-
     const mapped = applyResponseMapping(prefillDefinition.responseMapping, context);
-    console.log("Mapped output:", JSON.stringify(mapped));
     
     return jsonResponse(200, buildPrefillResponse({
       formId: request.formId,
-      mapped,
-      results,
-      aliases: buildPrefillAliases(prefillDefinition.commands, context)
+      mapped
     }));
 
   } catch (error) {

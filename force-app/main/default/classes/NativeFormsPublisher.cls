@@ -4,6 +4,7 @@ public with sharing class NativeFormsPublisher {
     private static final String TEMP_PREFILL_URL = 'https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_SUBMIT_URL = 'https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_UPLOAD_INIT_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/upload/init';
+    private static final String TEMP_LOOKUP_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/lookup';
     private static final Pattern FRIENDLY_FORM_SLUG_PATTERN = Pattern.compile('^[a-z0-9]+(?:-[a-z0-9]+)*$');
 
     public class PublishResult {
@@ -144,6 +145,20 @@ public with sharing class NativeFormsPublisher {
             return result;
         }
         Map<String, Object> versionUiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        if (containsRecordsListRowSignature(publishElements)) {
+            if (!NativeFormsFeatureFlags.isProRecordsListRowSignaturePdfEnabled()
+                || !NativeFormsFeatureFlags.isProElectronicSignatureEnabled()
+                || !NativeFormsFeatureFlags.isProSubmissionPdfEnabled()) {
+                result.success = false;
+                result.message = 'Records List Row Signature + PDF is not available on your current TwinaForms plan.';
+                return result;
+            }
+            if (!booleanValue(versionUiSettings.get('submissionPdfEnabled'))) {
+                result.success = false;
+                result.message = 'Enable Submission PDF before publishing a Records List with row signatures.';
+                return result;
+            }
+        }
         String html = buildHtml(versionRecord, publishElements, formId, publishToken, captchaConfig);
         String fileName = 'index.html';
 
@@ -176,6 +191,8 @@ public with sharing class NativeFormsPublisher {
                 'captcha' => captchaConfig,
                 'uploadFields' => buildPublishedUploadFields(publishElements),
                 'signatureFields' => buildPublishedSignatureFields(publishElements),
+                'recordsListRowSignatures' => buildPublishedRecordsListRowSignatures(publishElements),
+                'lookupDefinition' => buildPublishedLookupDefinition(publishElements),
                 'submissionPdf' => buildPublishedSubmissionPdfConfig(versionUiSettings, publishElements),
                 'secretCodeConfig' => buildPublishedSecretCodeConfig(
                     versionUiSettings,
@@ -821,6 +838,7 @@ public with sharing class NativeFormsPublisher {
         command.put('type', 'upsertMany');
         command.put('commandKey', actionRecord.Command_Key__c);
         command.put('objectApiName', canonicalObjectApiName);
+        command.put('repeatGroupKey', repeatGroupKey);
         if (String.isNotBlank(actionRecord.Store_Result_As__c)) {
             command.put('storeResultAs', actionRecord.Store_Result_As__c);
         }
@@ -1455,10 +1473,11 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-section__top{position:absolute;top:0;left:1.1rem;transform:translateY(-50%);background:var(--nf-form-bg,#ffffff);padding:0 0.4rem;line-height:1;}';
         html += '.nf-section__top h2{margin:0;font-size:var(--nf-section-size);font-family:var(--nf-section-font);color:var(--nf-section-color);line-height:1;white-space:nowrap;}';
         html += '.nf-section__grid{display:grid;gap:16px;}';
-        html += '.nf-section__grid--1{grid-template-columns:1fr;}';
-        html += '.nf-section__grid--2{grid-template-columns:repeat(2,minmax(0,1fr));}';
-        html += '.nf-section__grid--3{grid-template-columns:repeat(3,minmax(0,1fr));}';
-        html += '.nf-section__grid--4{grid-template-columns:repeat(4,minmax(0,1fr));}';
+        for (Integer columnIndex = 1; columnIndex <= 10; columnIndex++) {
+            html += '.nf-section__grid--' + String.valueOf(columnIndex) + '{grid-template-columns:' +
+                (columnIndex == 1 ? '1fr' : 'repeat(' + String.valueOf(columnIndex) + ',minmax(0,1fr))') +
+                ';}';
+        }
         html += '.nf-section__column{display:grid;gap:14px;align-content:start;}';
         html += '.nf-repeat{display:grid;gap:16px;}';
         html += '.nf-repeat__meta{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;color:var(--nf-muted);font-size:12px;}';
@@ -1471,6 +1490,8 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-repeat__row-delete button{border:1px solid #d5e6f8;background:#fff;color:#9aa8ba;border-radius:10px;padding:4px 7px;font-size:11px;line-height:1;cursor:pointer;white-space:nowrap;}';
         html += '.nf-repeat__row-delete button:hover{border-color:#f5c2c7;color:#b42318;background:#fde7e9;}';
         html += '.nf-repeat__row-body{flex:1 1 auto;min-width:0;display:grid;gap:14px;}';
+        html += '.nf-repeat__row-signature{flex:0 0 260px;min-width:220px;}';
+        html += '.nf-repeat__row-signature .nf-signature__canvas{height:120px;}';
         html += '.nf-repeat__header-row{display:flex;gap:12px;align-items:flex-end;padding:10px 12px 10px;margin-bottom:0;background:#e7edf5;border-radius:calc(var(--nf-radius) - 6px) calc(var(--nf-radius) - 6px) 0 0;font-weight:700;color:#355070;}';
         html += '.nf-repeat__header-spacer{flex:0 0 auto;width:32px;}';
         html += '.nf-repeat__header-body{flex:1 1 auto;min-width:0;}';
@@ -1500,6 +1521,13 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-field--hidden > label{display:none;}';
         html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:var(--nf-input-bg);color:var(--nf-text);box-shadow:none;}';
         html += '.nf-field textarea{min-height:120px;resize:vertical;}';
+        html += '.nf-lookup{position:relative;display:grid;gap:8px;}';
+        html += '.nf-lookup__clear{justify-self:start;border:1px solid var(--nf-input-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:6px 10px;font:inherit;font-size:.9em;cursor:pointer;}';
+        html += '.nf-lookup__results{position:absolute;z-index:20;top:48px;left:0;right:0;max-height:240px;overflow:auto;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);background:var(--nf-input-bg);box-shadow:0 16px 36px rgba(15,35,65,.16);}';
+        html += '.nf-lookup__results[hidden]{display:none !important;}';
+        html += '.nf-lookup__option{display:block;width:100%;border:0;border-bottom:1px solid rgba(15,35,65,.08);background:transparent;color:var(--nf-text);padding:10px 12px;text-align:left;font:inherit;cursor:pointer;}';
+        html += '.nf-lookup__option:hover,.nf-lookup__option:focus{background:rgba(15,108,189,.08);outline:none;}';
+        html += '.nf-lookup__status{min-height:1.2em;color:var(--nf-muted);font-size:.92em;line-height:1.35;}';
         html += '.nf-field--checkbox label{display:flex;gap:10px;align-items:center;font-weight:400;}';
         html += '.nf-field--checkbox input{width:auto;}';
         html += '.nf-upload{display:grid;gap:10px;}';
@@ -1610,7 +1638,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-section{padding:1.2rem 0.95rem 1rem;border-radius:18px;}';
         html += '.nf-section__top{left:0.85rem;padding:0 0.35rem;}';
         html += '.nf-section__top h2{font-size:calc(var(--nf-section-size) * 0.95);}';
-        html += '.nf-section__grid--2,.nf-section__grid--3,.nf-section__grid--4{grid-template-columns:1fr;}';
+        html += '.nf-section__grid{grid-template-columns:1fr;}';
         html += '.nf-field--left,.nf-field--right{grid-template-columns:1fr;row-gap:8px;}';
         html += '.nf-field--left label,.nf-field--right label{padding-top:0;text-align:left;}';
         html += '.nf-repeat__header-row{display:none;}';
@@ -1619,6 +1647,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-repeat__row:nth-child(even){background:#eef3f8;}';
         html += '.nf-repeat__row-delete{width:auto;display:flex;justify-content:flex-end;align-items:center;margin-top:10px;}';
         html += '.nf-repeat__row-body{display:grid;gap:12px;}';
+        html += '.nf-repeat__row-signature{margin-top:12px;min-width:0;}';
         html += '.nf-repeat__row-body .nf-section__grid{grid-template-columns:1fr;}';
         html += '.nf-repeat__row .nf-field{gap:6px;}';
         html += '.nf-repeat__row .nf-field label{display:block;}';
@@ -1729,6 +1758,7 @@ public with sharing class NativeFormsPublisher {
             'prefillUrl' => TEMP_PREFILL_URL,
             'submitUrl' => TEMP_SUBMIT_URL,
             'uploadInitUrl' => TEMP_UPLOAD_INIT_URL,
+            'lookupUrl' => TEMP_LOOKUP_URL,
             'captcha' => publicCaptchaConfig,
             'secretCode' => secretCodeConfig,
             'theme' => theme,
@@ -1760,7 +1790,8 @@ public with sharing class NativeFormsPublisher {
         html += 'function formulaIsoLocalDate(dateValue){return dateValue.getFullYear()+"-"+formulaPad2(dateValue.getMonth()+1)+"-"+formulaPad2(dateValue.getDate());}';
         html += 'function formulaIsoLocalDateTime(dateValue){return formulaIsoLocalDate(dateValue)+"T"+formulaPad2(dateValue.getHours())+":"+formulaPad2(dateValue.getMinutes())+":"+formulaPad2(dateValue.getSeconds());}';
         html += 'function formulaParseIsoDateLike(rawValue){const value=String(rawValue||"").trim();if(!value){return null;}const parsed=new Date(value);return Number.isNaN(parsed.getTime())?null:parsed;}';
-        html += 'function createFormulaParser(){if(!(window.exprEval&&window.exprEval.Parser)){return null;}const parser=new window.exprEval.Parser({operators:{add:true,subtract:true,multiply:true,divide:true,remainder:false,power:false,factorial:false,comparison:true,logical:true,conditional:true,concatenate:false,assignment:false,array:false,fndef:false,in:false},allowMemberAccess:false});parser.unaryOps={"-":function(value){return-Number(value);},"+":Number,not:function(value){return!value;}};parser.binaryOps={"+":function(left,right){return Number(left)+Number(right);},"-":function(left,right){return Number(left)-Number(right);},"*":function(left,right){return Number(left)*Number(right);},"/":function(left,right){return Number(left)/Number(right);},"==":function(left,right){return formulaNormalizeComparable(left)===formulaNormalizeComparable(right);},"!=":function(left,right){return formulaNormalizeComparable(left)!==formulaNormalizeComparable(right);},">":function(left,right){return left>right;},"<":function(left,right){return left<right;},">=":function(left,right){return left>=right;},"<=":function(left,right){return left<=right;},and:function(left,right){return Boolean(left&&right);},or:function(left,right){return Boolean(left||right);}};parser.ternaryOps={"?":function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;}};parser.functions={CONCAT:function(){return Array.prototype.slice.call(arguments).map(formulaToText).join("");},IF:function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;},COALESCE:function(){for(let index=0;index<arguments.length;index+=1){if(!formulaIsBlank(arguments[index])){return arguments[index];}}return null;},ISBLANK:function(value){return formulaIsBlank(value);},VALUE:function(value){return formulaToNumber(value);},TEXT:function(value){return formulaToText(value);},ROUND:function(value,digits){const numericValue=formulaToNumber(value);const numericDigits=Number.isFinite(Number(digits))?Number(digits):0;if(numericValue===null){return null;}const factor=Math.pow(10,numericDigits);return Math.round(numericValue*factor)/factor;},ABS:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.abs(numericValue);},MIN:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.min.apply(Math,values):null;},MAX:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.max.apply(Math,values):null;},TODAY:function(){return formulaIsoLocalDate(new Date());},NOW:function(){return formulaIsoLocalDateTime(new Date());},YEAR:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getFullYear():null;},MONTH:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getMonth()+1:null;},DAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDate():null;}};parser.consts={true:true,false:false};return parser;}';
+        html += 'function formulaIsIsoDateValue(value){return typeof value==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(value.trim())&&formulaParseIsoDateLike(value)!==null;}function formulaAddDays(dateValue,days){const parsed=formulaParseIsoDateLike(dateValue);const numericDays=Number(days);if(!parsed||!Number.isFinite(numericDays)){return NaN;}parsed.setDate(parsed.getDate()+numericDays);return formulaIsoLocalDate(parsed);}function formulaDiffDays(leftDateValue,rightDateValue){const leftDate=formulaParseIsoDateLike(leftDateValue);const rightDate=formulaParseIsoDateLike(rightDateValue);if(!leftDate||!rightDate){return NaN;}return Math.round((leftDate.getTime()-rightDate.getTime())/(24*60*60*1000));}function formulaAddValues(left,right){if(formulaIsIsoDateValue(left)&&Number.isFinite(Number(right))){return formulaAddDays(left,right);}if(Number.isFinite(Number(left))&&formulaIsIsoDateValue(right)){return formulaAddDays(right,left);}return Number(left)+Number(right);}function formulaSubtractValues(left,right){if(formulaIsIsoDateValue(left)&&Number.isFinite(Number(right))){return formulaAddDays(left,-Number(right));}if(formulaIsIsoDateValue(left)&&formulaIsIsoDateValue(right)){return formulaDiffDays(left,right);}return Number(left)-Number(right);}';
+        html += 'function createFormulaParser(){if(!(window.exprEval&&window.exprEval.Parser)){return null;}const parser=new window.exprEval.Parser({operators:{add:true,subtract:true,multiply:true,divide:true,remainder:false,power:false,factorial:false,comparison:true,logical:true,conditional:true,concatenate:false,assignment:false,array:false,fndef:false,in:false},allowMemberAccess:false});parser.unaryOps={"-":function(value){return-Number(value);},"+":Number,not:function(value){return!value;}};parser.binaryOps={"+":formulaAddValues,"-":formulaSubtractValues,"*":function(left,right){return Number(left)*Number(right);},"/":function(left,right){return Number(left)/Number(right);},"==":function(left,right){return formulaNormalizeComparable(left)===formulaNormalizeComparable(right);},"!=":function(left,right){return formulaNormalizeComparable(left)!==formulaNormalizeComparable(right);},">":function(left,right){return left>right;},"<":function(left,right){return left<right;},">=":function(left,right){return left>=right;},"<=":function(left,right){return left<=right;},and:function(left,right){return Boolean(left&&right);},or:function(left,right){return Boolean(left||right);}};parser.ternaryOps={"?":function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;}};parser.functions={CONCAT:function(){return Array.prototype.slice.call(arguments).map(formulaToText).join("");},URLENCODE:function(value){return encodeURIComponent(formulaToText(value));},IF:function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;},COALESCE:function(){for(let index=0;index<arguments.length;index+=1){if(!formulaIsBlank(arguments[index])){return arguments[index];}}return null;},ISBLANK:function(value){return formulaIsBlank(value);},VALUE:function(value){return formulaToNumber(value);},TEXT:function(value){return formulaToText(value);},ROUND:function(value,digits){const numericValue=formulaToNumber(value);const numericDigits=Number.isFinite(Number(digits))?Number(digits):0;if(numericValue===null){return null;}const factor=Math.pow(10,numericDigits);return Math.round(numericValue*factor)/factor;},ABS:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.abs(numericValue);},MIN:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.min.apply(Math,values):null;},MAX:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.max.apply(Math,values):null;},TODAY:function(){return formulaIsoLocalDate(new Date());},NOW:function(){return formulaIsoLocalDateTime(new Date());},YEAR:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getFullYear():null;},MONTH:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getMonth()+1:null;},DAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDate():null;}};parser.consts={true:true,false:false};return parser;}';
         html += 'const formulaParser=createFormulaParser();';
         html += 'function formulaFieldKeySet(){return new Set(formulaFieldControls().map(function(control){return String(control.name||control.dataset.formulaFieldKey||"");}).filter(function(value){return !!value;}));}';
         html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
@@ -1774,15 +1805,18 @@ public with sharing class NativeFormsPublisher {
         html += 'const secretCodeConfig=config.secretCode||{};';
         html += 'const secretCodeEnabled=!!secretCodeConfig.enabled;';
         html += 'const postSubmitAutoLinkEnabled=!!(config.uiSettings&&config.uiSettings.postSubmitAutoLinkEnabled);';
+        html += 'const postSubmitUrlMode=String((config.uiSettings&&config.uiSettings.postSubmitUrlMode)||"template").trim().toLowerCase()==="formula"?"formula":"template";';
         html += 'const postSubmitUrlTemplate=String((config.uiSettings&&config.uiSettings.postSubmitUrlTemplate)||"").trim();';
+        html += 'const postSubmitUrlFormula=String((config.uiSettings&&config.uiSettings.postSubmitUrlFormula)||"").trim();';
         html += 'const postSubmitButtonLabel=String((config.uiSettings&&config.uiSettings.postSubmitButtonLabel)||"' + escapeJsString(postSubmitButtonLabel) + '").trim()||"' + escapeJsString(postSubmitButtonLabel) + '";';
         html += 'const postSubmitDelaySeconds=Math.max(0,parseInt((config.uiSettings&&config.uiSettings.postSubmitDelaySeconds)!=null?config.uiSettings.postSubmitDelaySeconds:3,10)||0);';
         html += 'const PREFILL_TIMEOUT_MS=10000;';
         html += 'let postSubmitRedirectTimer=null;let postSubmitRedirectCountdownTimer=null;let activePostSubmitRedirectUrl="";';
         html += 'const secretVerifyEl=document.querySelector("[data-secret-verification]");';
         html += 'const secretGatedEl=document.querySelector("[data-secret-gated]");';
+        html += 'const secretCodeSessionMode=String(secretCodeConfig.sessionMode||"short").trim()==="sameTabUntilMidnight"?"sameTabUntilMidnight":"short";';
         html += 'let secretVerificationToken="";let secretVerificationApproved=!secretCodeEnabled;let secretVerifiedEmail="";let secretVerificationSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-"+Math.random().toString(36).slice(2)+"-"+Date.now());';
-        html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};';
+        html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};const lookupTimersByField={};const lookupAbortByField={};';
         html += 'function setStatus(kind,message){if(!statusEl){return;}statusEl.className="nf-status nf-status--"+kind;statusEl.textContent=message||"";}';
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
         html += 'function getPrefillParams(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});return params;}';
@@ -1814,6 +1848,9 @@ public with sharing class NativeFormsPublisher {
         html += 'function validateSignatures(){const pads=signaturePads();for(let index=0;index<pads.length;index+=1){const pad=pads[index];if(pad.dataset.signatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("signatureRequired","Please sign before submitting."),"error");return{valid:false,message:t("signatureRequired","Please sign before submitting.")};}}return{valid:true,message:""};}';
         html += 'function collectSignatures(){const signatures={};signaturePads().forEach(function(pad){const fieldKey=signatureFieldKey(pad);const canvas=signatureCanvasForPad(pad);if(!fieldKey||!canvas||pad.dataset.signatureEmpty!=="false"){return;}signatures[fieldKey]={dataUrl:canvas.toDataURL("image/png"),contentType:"image/png",fileName:(fieldKey||"signature")+".png",signedAt:new Date().toISOString()};});return signatures;}';
         html += 'function clearAllSignatures(){signaturePads().forEach(clearSignaturePad);}';
+        html += 'function rowSignaturePads(root){return Array.from((root||form).querySelectorAll("[data-nativeforms-row-signature=\'true\']"));}';
+        html += 'function initRepeatRowSignatures(rowEl){rowSignaturePads(rowEl).forEach(initSignaturePad);}';
+        html += 'function validateRepeatRowSignatures(){const rows=form.querySelectorAll("[data-repeat-row]");for(let index=0;index<rows.length;index+=1){const rowEl=rows[index];const pad=rowEl.querySelector("[data-nativeforms-row-signature=\'true\']");if(pad&&pad.dataset.rowSignatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("rowSignatureRequired","Please sign each required row before submitting."),"error");const canvas=signatureCanvasForPad(pad);if(canvas&&typeof canvas.focus==="function"){canvas.focus();}return{valid:false,message:t("rowSignatureReview","Please review the row signatures and try again.")};}}return{valid:true,message:""};}';
         html += 'function setSecretVerificationMessage(message,kind){if(!secretVerifyEl){return;}const target=secretVerifyEl.querySelector("[data-secret-message]");if(!target){return;}target.className="nf-secret-verify__message"+(kind==="success"?" nf-secret-verify__message--success":kind==="error"?" nf-secret-verify__message--error":"");target.textContent=message||"";}';
         html += 'function setSecretGatedState(unlocked){if(secretGatedEl){secretGatedEl.hidden=!unlocked;secretGatedEl.querySelectorAll("input,textarea,select,button").forEach(function(control){control.disabled=!unlocked;});}secretVerificationApproved=!!unlocked;}';
         html += 'function setSecretCodeStepVisible(visible){if(!secretVerifyEl){return;}const codeStep=secretVerifyEl.querySelector("[data-secret-code-step]");const resendWrap=secretVerifyEl.querySelector("[data-secret-resend-wrap]");if(codeStep){codeStep.hidden=!visible;}if(resendWrap){resendWrap.hidden=!visible;}}';
@@ -1822,6 +1859,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function readSecretVerificationCode(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-code]"):null;return input?String(input.value||"").trim():"";}';
         html += 'async function runPrefillWithParams(params){if(!config.prefillUrl||!params||Object.keys(params).length===0){return null;}emitTwinaFormsEvent("prefill:before",{params:params});const response=await withTimeout(fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})}),PREFILL_TIMEOUT_MS,t("prefillTimeout","Loading saved details took too long."));const data=await response.json();if(!response.ok||data.success===false){const errorMessage=(data.error&&data.error.message)||data.error||"Prefill failed";emitTwinaFormsEvent("prefill:error",{params:params,message:errorMessage,response:data});throw new Error(errorMessage);}applyPrefillPayload(data);emitTwinaFormsEvent("prefill:after",{params:params,payload:data});return data;}';
         html += 'async function sendSecretCodeRequest(action,payload){const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,formId:config.formId,publishToken:config.publishToken,publishedVersionId:config.versionId},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Secret code request failed");}return data;}';
+        html += 'function sameTabSecretSessionEnabled(){return secretCodeEnabled&&secretCodeSessionMode==="sameTabUntilMidnight"&&window.sessionStorage;}function secretSessionStorageKey(){return "twinaforms.secretSession."+String(config.formId||"")+"."+String(config.versionId||"");}function clearStoredSecretVerificationSession(){if(!sameTabSecretSessionEnabled()){return;}try{window.sessionStorage.removeItem(secretSessionStorageKey());}catch(error){}}function secretSessionExpiresAtForRequest(){const expiresAt=new Date();expiresAt.setHours(24,0,0,0);return expiresAt.toISOString();}function storeSecretVerificationSession(data,email){if(!sameTabSecretSessionEnabled()||!data||!data.verificationToken){return;}const expiresAt=String(data.expiresAt||"");if(!expiresAt){return;}try{window.sessionStorage.setItem(secretSessionStorageKey(),JSON.stringify({token:data.verificationToken,email:String(email||data.normalizedEmail||"").trim().toLowerCase(),sessionId:data.sessionId||secretVerificationSessionId,expiresAt:expiresAt}));}catch(error){}}async function continueAfterSecretVerification(email){setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const prefillData=await runPrefillWithParams(Object.assign({},getPrefillParams(),{email:email}));if(!hasPrefillData(prefillData)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(prefillError){setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}function restoreSecretVerificationSession(){if(!sameTabSecretSessionEnabled()){return false;}let stored=null;try{stored=JSON.parse(window.sessionStorage.getItem(secretSessionStorageKey())||"null");}catch(error){clearStoredSecretVerificationSession();return false;}if(!stored||!stored.token||!stored.sessionId||!stored.email||!stored.expiresAt){clearStoredSecretVerificationSession();return false;}if(new Date(stored.expiresAt).getTime()<=Date.now()){clearStoredSecretVerificationSession();return false;}secretVerificationToken=stored.token;secretVerificationSessionId=stored.sessionId;secretVerifiedEmail=stored.email;continueAfterSecretVerification(secretVerifiedEmail).catch(function(){clearStoredSecretVerificationSession();});return true;}function isSecretVerificationExpiredResponse(data){const message=String((data&&data.error&&data.error.message)||data&&data.error||"").toLowerCase();return message.includes("secret")&&message.includes("code")&&message.includes("verify");}';
         html += 'function clearPostSubmitRedirect(){if(postSubmitRedirectTimer){window.clearTimeout(postSubmitRedirectTimer);postSubmitRedirectTimer=null;}if(postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}activePostSubmitRedirectUrl="";}';
         html += 'function clearResult(){if(!resultEl){return;}clearPostSubmitRedirect();resultEl.hidden=true;resultEl.innerHTML="";form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}';
         html += 'function setSubmitting(isSubmitting){const submitButton=form.querySelector("button[type=\'submit\']");if(!submitButton){return;}submitButton.disabled=!!isSubmitting;submitButton.textContent=isSubmitting?t("submitting","Submitting..."):defaultSubmitLabel;}';
@@ -1829,6 +1867,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function readPathValue(source,path){if(!source||!path){return source;}return String(path).split(".").reduce(function(current,segment){if(current==null){return undefined;}return current[segment];},source);}';
         html += 'function isAbsoluteHttpUrl(value){try{const parsed=new URL(value);return parsed.protocol==="http:"||parsed.protocol==="https:";}catch(error){return false;}}';
         html += 'function resolvePostSubmitUrl(template,fieldValues,prefillPayload){const sourceTemplate=String(template||"").trim();if(!sourceTemplate){return "";}const aliases=(prefillPayload&&prefillPayload.aliases&&typeof prefillPayload.aliases==="object")?prefillPayload.aliases:{};const resolved=sourceTemplate.replace(/\\{\\{\\s*(field|prefill)\\.([^}]+?)\\s*\\}\\}/g,function(_,kind,path){let rawValue="";if(kind==="field"){rawValue=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,path)?fieldValues[path]:"";}else{const pieces=String(path||"").split(".");const aliasName=pieces.shift();rawValue=readPathValue(aliases[aliasName],pieces.join("."));}if(rawValue===undefined||rawValue===null){return "";}if(typeof rawValue==="object"){try{return encodeURIComponent(JSON.stringify(rawValue));}catch(error){return "";}}return encodeURIComponent(String(rawValue));});return isAbsoluteHttpUrl(resolved)?resolved:"";}';
+        html += 'function resolveFormulaPostSubmitUrl(expression,fieldValues){const sourceExpression=normalizeFormulaExpression(expression||"");if(!sourceExpression||!formulaParser){return "";}const variableMap={};let normalizedExpression=sourceExpression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,fieldKey)?fieldValues[fieldKey]:"";});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const resolved=formulaToText(rawValue).trim();return resolved&&isAbsoluteHttpUrl(resolved)?resolved:"";}catch(error){console.error("TwinaForms redirect formula failed",error);return "";}}';
         html += 'function startPostSubmitRedirect(url,delaySeconds){clearPostSubmitRedirect();activePostSubmitRedirectUrl=url||"";if(!activePostSubmitRedirectUrl){return;}const continueButton=resultEl.querySelector("[data-post-submit-continue]");if(continueButton){continueButton.addEventListener("click",function(){if(activePostSubmitRedirectUrl){window.location.assign(activePostSubmitRedirectUrl);}});}const countdownEl=resultEl.querySelector("[data-post-submit-countdown]");let remaining=Math.max(0,Number(delaySeconds)||0);if(countdownEl){countdownEl.textContent=String(remaining);}if(remaining<=0){window.location.assign(activePostSubmitRedirectUrl);return;}postSubmitRedirectTimer=window.setTimeout(function(){if(activePostSubmitRedirectUrl){window.location.assign(activePostSubmitRedirectUrl);}},remaining*1000);if(countdownEl){postSubmitRedirectCountdownTimer=window.setInterval(function(){remaining=Math.max(remaining-1,0);countdownEl.textContent=String(remaining);if(remaining<=0&&postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}},1000);}}';
         html += 'function renderResult(kind,options){if(!resultEl){return;}const opts=options||{};clearPostSubmitRedirect();if(kind==="success"){const hasRedirect=!!opts.redirectUrl;const countdownLabel=interpolate(t("postSubmitContinuingIn","Continuing in {seconds} seconds..."),{seconds:String(Math.max(0,Number(opts.redirectDelaySeconds)||0))});const countdownText=hasRedirect?\'<p class="nf-result__meta">\'+escapeHtml(countdownLabel).replace(escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0))),\'<span data-post-submit-countdown>\'+escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0)))+\'</span>\')+\'</p>\':"";const actionText=hasRedirect?\'<div class="nf-result__actions"><button type="button" data-post-submit-continue>\'+escapeHtml(opts.redirectButtonLabel||postSubmitButtonLabel)+\'</button></div>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--success"><h2 class="nf-result__title">\'+escapeHtml(t("submitSuccessTitle","Submitted successfully"))+\'</h2><p class="nf-result__message">\'+escapeHtml(opts.message||submitSuccessMessage)+\'</p>\'+countdownText+actionText+\'</div>\';form.hidden=true;form.style.display="none";if(shellEl){shellEl.classList.add("nf-shell--result-only");}if(hasRedirect){startPostSubmitRedirect(opts.redirectUrl,opts.redirectDelaySeconds);}}else if(kind==="error"){const bucket=opts.bucket||failureBucket(opts.errorPayload);const detailsText=opts.detailsText?\'<details class="nf-result__details"><summary>Technical details</summary><pre>\'+escapeHtml(opts.detailsText)+\'</pre></details>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--error"><h2 class="nf-result__title">\'+escapeHtml(t("submitErrorTitle","Submit failed"))+\'</h2><p class="nf-result__message">\'+escapeHtml(bucket.detail)+\'</p><p class="nf-result__subtitle">\'+escapeHtml(bucket.label)+\'</p>\'+detailsText+\'</div>\';form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}resultEl.hidden=false;}';
         html += 'function getCaptchaToken(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");return responseField?responseField.value||"":"";}';
@@ -1847,17 +1886,27 @@ public with sharing class NativeFormsPublisher {
         html += 'function evaluateSingleCondition(condition){if(!condition||!condition.fieldKey||!condition.operator){return true;}const actual=readFieldValue(condition.fieldKey);const compare=condition.value||"";if(condition.operator==="equals"){return String(actual)===compare;}if(condition.operator==="notEquals"){return String(actual)!==compare;}if(condition.operator==="isTrue"){return actual===true||String(actual).toLowerCase()==="true";}if(condition.operator==="isFalse"){return actual===false||String(actual).toLowerCase()==="false"||String(actual)==="";}if(condition.operator==="isBlank"){return String(actual)==="";}if(condition.operator==="isNotBlank"){return String(actual)!=="";}return true;}';
         html += 'function evaluateConditionExpression(results,expression){if(!results.length){return true;}if(results.length===1){return results[0];}const normalized=((expression||"").trim()||results.map(function(_,index){return String(index+1);}).join(" AND ")).replace(/\\(/g," ( ").replace(/\\)/g," ) ").replace(/\\s+/g," ").trim();const tokens=normalized?normalized.split(" "):[];const values=[];const operators=[];function applyOperator(){if(values.length<2||!operators.length){return;}const operator=operators.pop();const right=values.pop();const left=values.pop();values.push(operator==="AND"?(left&&right):(left||right));}function precedence(operator){return operator==="AND"?2:1;}for(let index=0;index<tokens.length;index+=1){const token=tokens[index];if(!token){continue;}if(token==="("){operators.push(token);continue;}if(token===")"){while(operators.length&&operators[operators.length-1]!=="("){applyOperator();}if(operators.length&&operators[operators.length-1]==="("){operators.pop();}continue;}if(token==="AND"||token==="OR"){while(operators.length&&operators[operators.length-1]!=="("&&precedence(operators[operators.length-1])>=precedence(token)){applyOperator();}operators.push(token);continue;}if(/^\\d+$/.test(token)){const refIndex=Number(token)-1;values.push(refIndex>=0&&refIndex<results.length?results[refIndex]:false);}}while(operators.length){applyOperator();}return values.length?!!values[0]:false;}';
         html += 'function evaluateElementConditions(el){let conditions=[];try{conditions=JSON.parse(el.dataset.conditions||"[]")||[];}catch(error){conditions=[];}if(!conditions.length&&el.dataset.conditionSource){conditions=[{fieldKey:el.dataset.conditionSource,operator:el.dataset.conditionOperator,value:el.dataset.conditionValue||""}];}if(!conditions.length){return true;}const results=conditions.map(function(condition){return evaluateSingleCondition(condition);});return evaluateConditionExpression(results,el.dataset.conditionExpression||"");}';
-        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function lookupForField(fieldKey){return form.querySelector("[data-nativeforms-lookup=\'true\'][data-lookup-field-key=\'"+String(fieldKey||"").replace(/\'/g,"\\\\\'")+"\']");}';
+        html += 'function setLookupValue(fieldKey,id,label){const lookupEl=lookupForField(fieldKey);if(!lookupEl){return false;}const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");if(hidden){hidden.value=id==null?"":String(id);}if(input){input.value=label||id||"";}if(clear){clear.hidden=!id;}lookupEl.dataset.lookupSelectedLabel=label||"";return true;}';
+        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}if(setLookupValue(fieldKey,value,"")){resolveLookupLabel(fieldKey,value);return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function lookupControls(){return Array.from(form.querySelectorAll("[data-nativeforms-lookup=\'true\']"));}';
+        html += 'function setLookupStatus(lookupEl,message,isError){const status=lookupEl?lookupEl.querySelector("[data-lookup-status]"):null;if(status){status.textContent=message||"";status.style.color=isError?"#b42318":"";}}';
+        html += 'function renderLookupResults(lookupEl,items){const results=lookupEl?lookupEl.querySelector("[data-lookup-results]"):null;if(!results){return;}if(!items||!items.length){results.innerHTML="";results.hidden=true;return;}results.innerHTML=items.map(function(item){return \'<button type="button" class="nf-lookup__option" data-lookup-id="\'+escapeHtml(item.id||"")+\'" data-lookup-label="\'+escapeHtml(item.label||item.id||"")+\'">\'+escapeHtml(item.label||item.id||"")+\'</button>\';}).join("");results.hidden=false;}';
+        html += 'async function callLookup(payload){if(!config.lookupUrl){throw new Error(t("lookupConfigMissing","Lookup is not configured for this published form."));}const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({formId:config.formId,publishToken:config.publishToken},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}return data;}';
+        html += 'async function resolveLookupLabel(fieldKey,value){const id=String(value||"").trim();if(!id){return;}try{const data=await callLookup({fieldKey:fieldKey,recordId:id});if(data.record){setLookupValue(fieldKey,data.record.id,data.record.label||data.record.id);}}catch(error){}}';
+        html += 'async function runLookupSearch(lookupEl){const fieldKey=lookupEl&&lookupEl.dataset.lookupFieldKey;const input=lookupEl?lookupEl.querySelector("[data-lookup-input]"):null;if(!fieldKey||!input){return;}const search=String(input.value||"").trim();const hidden=lookupEl.querySelector("[data-lookup-hidden]");if(hidden){hidden.value="";}const minLength=Math.max(1,Number(lookupEl.dataset.lookupMinLength||2)||2);if(search.length<minLength){renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}if(lookupAbortByField[fieldKey]){lookupAbortByField[fieldKey].abort();}const controller=window.AbortController?new AbortController():null;lookupAbortByField[fieldKey]=controller;setLookupStatus(lookupEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,search:search})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}renderLookupResults(lookupEl,data.records||[]);setLookupStatus(lookupEl,(data.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
+        html += 'function initLookupControls(){lookupControls().forEach(function(lookupEl){const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const results=lookupEl.querySelector("[data-lookup-results]");if(input){input.addEventListener("input",function(){const fieldKey=lookupEl.dataset.lookupFieldKey;window.clearTimeout(lookupTimersByField[fieldKey]);lookupTimersByField[fieldKey]=window.setTimeout(function(){runLookupSearch(lookupEl);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLookupResults(lookupEl,[]);},180);});}if(results){results.addEventListener("click",function(event){const button=event.target.closest("[data-lookup-id]");if(!button){return;}setLookupValue(lookupEl.dataset.lookupFieldKey,button.dataset.lookupId||"",button.dataset.lookupLabel||button.dataset.lookupId||"");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}if(clear){clear.addEventListener("click",function(){setLookupValue(lookupEl.dataset.lookupFieldKey,"","");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}});}';
+        html += 'function validateLookupFields(){const controls=lookupControls();for(let index=0;index<controls.length;index+=1){const lookupEl=controls[index];const input=lookupEl.querySelector("[data-lookup-input]");const hidden=lookupEl.querySelector("[data-lookup-hidden]");const required=lookupEl.dataset.lookupRequired==="true";const hasId=!!(hidden&&String(hidden.value||"").trim());if(required&&!hasId){setLookupStatus(lookupEl,t("lookupRequired","Select a record before submitting."),true);if(input){input.focus();}return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}if(input&&String(input.value||"").trim()&&!hasId){setLookupStatus(lookupEl,t("lookupSelectResult","Choose a result from the lookup list."),true);input.focus();return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}}return{valid:true,message:""};}';
         html += 'function readAllFieldValues(){const values={};form.querySelectorAll("[name]").forEach(function(control){const fieldKey=String(control.name||"");if(!fieldKey||Object.prototype.hasOwnProperty.call(values,fieldKey)){return;}values[fieldKey]=readRuntimeFieldValue(fieldKey);});return values;}';
         html += 'const repeatDeleteState={};';
         html += 'let lastPrefillPayload=null;';
         html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
         html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}if(field.dataset.nativeformsTime==="true"){field.value=formatTimeForField(value,field);validateTimeField(field,false);return;}field.value=value==null?"":value;}';
         html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:"";if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
-        html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);});}';
+        html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);initRepeatRowSignatures(rowsHost.lastElementChild);});}';
         html += 'function clearRepeatGroups(){form.querySelectorAll("[data-repeat-rows]").forEach(function(host){host.innerHTML="";});Object.keys(repeatDeleteState).forEach(function(key){repeatDeleteState[key]=[];});}';
-        html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);}';
-        html += 'function collectRepeatGroups(){const groups={};form.querySelectorAll("[data-repeat-group]").forEach(function(groupEl){const groupKey=groupEl.dataset.repeatGroup;const rows=[];groupEl.querySelectorAll("[data-repeat-row]").forEach(function(rowEl){const row={};const seen={};rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;if(seen[fieldKey]){return;}row[fieldKey]=readRepeatFieldValueByKey(rowEl,fieldKey);seen[fieldKey]=true;});rows.push(row);});groups[groupKey]={rows:rows,deletedIds:repeatDeleteState[groupKey]||[]};});return groups;}';
+        html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);initRepeatRowSignatures(rowsHost.lastElementChild);}';
+        html += 'function collectRepeatGroups(){const groups={};form.querySelectorAll("[data-repeat-group]").forEach(function(groupEl){const groupKey=groupEl.dataset.repeatGroup;const rows=[];groupEl.querySelectorAll("[data-repeat-row]").forEach(function(rowEl,rowIndex){const row={};const seen={};rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;if(seen[fieldKey]){return;}row[fieldKey]=readRepeatFieldValueByKey(rowEl,fieldKey);seen[fieldKey]=true;});const rowSignaturePad=rowEl.querySelector("[data-nativeforms-row-signature=\'true\']");const rowSignatureCanvas=signatureCanvasForPad(rowSignaturePad);if(rowSignaturePad&&rowSignatureCanvas&&rowSignaturePad.dataset.signatureEmpty==="false"){row._rowSignature={dataUrl:rowSignatureCanvas.toDataURL("image/png"),contentType:"image/png",fileName:groupKey+"-row-"+String(rowIndex+1)+"-signature.png",signedAt:new Date().toISOString()};}rows.push(row);});groups[groupKey]={rows:rows,deletedIds:repeatDeleteState[groupKey]||[]};});return groups;}';
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
         html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let hasValue=false;if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
         html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
@@ -1877,6 +1926,7 @@ public with sharing class NativeFormsPublisher {
         html += 'applyDateConstraints();';
         html += 'wireLiveValidation();';
         html += 'wireRankingFields();';
+        html += 'initLookupControls();';
         html += 'fileUploadControls().forEach(function(control){renderFileUploadState(control);control.addEventListener("change",function(){uploadSelectedFiles(control).catch(function(error){setStatus("error",error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again."));});});});';
         html += 'signaturePads().forEach(initSignaturePad);window.addEventListener("resize",function(){signaturePads().forEach(function(pad){if(pad.dataset.signatureEmpty==="true"){resizeSignatureCanvas(signatureCanvasForPad(pad));}});});';
         html += 'form.addEventListener("click",function(event){const clearButton=event.target.closest("[data-file-upload-clear]");if(!clearButton){return;}event.preventDefault();clearFileUploadField(clearButton.getAttribute("data-file-upload-clear"));});';
@@ -1889,15 +1939,18 @@ public with sharing class NativeFormsPublisher {
         html += 'evaluateConditions();';
         html += 'setSecretGatedState(!secretCodeEnabled);';
         html += 'setSecretCodeStepVisible(false);';
+        html += 'restoreSecretVerificationSession();';
         html += 'emitTwinaFormsEvent("form:ready",{versionId:config.versionId,formId:config.formId});';
-        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const data=await sendSecretCodeRequest("verifyCode",{email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId});if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const prefillData=await runPrefillWithParams({email:secretVerifiedEmail});if(!hasPrefillData(prefillData)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(prefillError){setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
+        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const verifyPayload={email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId,sessionMode:secretCodeSessionMode};if(secretCodeSessionMode==="sameTabUntilMidnight"){verifyPayload.sessionExpiresAt=secretSessionExpiresAtForRequest();}const data=await sendSecretCodeRequest("verifyCode",verifyPayload);if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;secretVerificationSessionId=data.sessionId||secretVerificationSessionId;storeSecretVerificationSession(data,secretVerifiedEmail);await continueAfterSecretVerification(secretVerifiedEmail);}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
         html += 'runInitialPrefill();';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
         html += 'if(secretCodeEnabled&&!secretVerificationApproved){setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
         html += 'if(!form.reportValidity()){return;}';
+        html += 'const lookupValidation=validateLookupFields();if(!lookupValidation.valid){setStatus("error",lookupValidation.message||t("lookupReview","Please review the lookup fields and try again."));return;}';
         html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){setStatus("error",uploadValidation.message||t("fileUploadReview","Please review the uploaded files and try again."));return;}';
         html += 'const signatureValidation=validateSignatures();if(!signatureValidation.valid){setStatus("error",signatureValidation.message||t("signatureReview","Please review the signature fields and try again."));return;}';
+        html += 'const rowSignatureValidation=validateRepeatRowSignatures();if(!rowSignatureValidation.valid){setStatus("error",rowSignatureValidation.message||t("rowSignatureReview","Please review the row signatures and try again."));return;}';
         html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error",t("captchaRequired","Please complete the CAPTCHA."));return;}';
         html += 'setSubmitting(true);';
         html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const normalizedTimes=collectNormalizedTimeValues();if(!normalizedTimes.success){setStatus("error",normalizedTimes.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
@@ -1911,8 +1964,8 @@ public with sharing class NativeFormsPublisher {
         html += 'input.repeatGroups=collectRepeatGroups();';
         html += 'emitTwinaFormsEvent("submit:before",{input:input,prefillSnapshot:lastPrefillPayload});const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input,prefillSnapshot:lastPrefillPayload})});';
         html += 'const data=await response.json();';
-        html += 'if(!response.ok||data.success===false){emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
-        html += 'const resolvedPostSubmitUrl=postSubmitAutoLinkEnabled?resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload):"";';
+        html += 'if(!response.ok||data.success===false){emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});if(secretCodeEnabled&&isSecretVerificationExpiredResponse(data)){clearStoredSecretVerificationSession();secretVerificationToken="";secretVerifiedEmail="";setSecretGatedState(false);setSecretVerificationSectionVisible(true);setSecretCodeStepVisible(false);}renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
+        html += 'const resolvedPostSubmitUrl=postSubmitAutoLinkEnabled?(postSubmitUrlMode==="formula"?resolveFormulaPostSubmitUrl(postSubmitUrlFormula,input):resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload)):"";';
         html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();clearAllSignatures();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
         html += '}catch(error){emitTwinaFormsEvent("submit:error",{error:{message:error&&error.message?error.message:"Submit failed"}});renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
         html += '});';
@@ -1983,6 +2036,10 @@ public with sharing class NativeFormsPublisher {
             Boolean allowAddRows = !config.containsKey('allowAddRows') || booleanValue(config.get('allowAddRows'));
             Boolean allowDeleteRows = !config.containsKey('allowDeleteRows') || booleanValue(config.get('allowDeleteRows'));
             Boolean showLabelsOnEachRow = !config.containsKey('showLabelsOnEachRow') || booleanValue(config.get('showLabelsOnEachRow'));
+            Boolean rowSignatureEnabled = booleanValue(config.get('rowSignatureEnabled'));
+            Boolean rowSignatureRequired = !config.containsKey('rowSignatureRequired') || booleanValue(config.get('rowSignatureRequired'));
+            String rowSignatureLabel = firstNonBlank(stringValue(config.get('rowSignatureLabel')), runtimeTextValue(languageCode, 'rowSignatureLabel', 'Signature'));
+            String rowSignatureHelpText = stringValue(config.get('rowSignatureHelpText'));
             Integer columnCount = safeSectionColumnCount(config);
             String idFieldKey = repeatGroupIdFieldKey(childElements);
             Boolean hasHeader = !showLabelsOnEachRow && childElements != null && !childElements.isEmpty();
@@ -2039,6 +2096,19 @@ public with sharing class NativeFormsPublisher {
                 repeatHtml += '</div>';
             }
             repeatHtml += '</div>';
+            if (rowSignatureEnabled) {
+                String clearLabel = runtimeTextValue(languageCode, 'signatureClear', 'Clear');
+                repeatHtml += '<div class="nf-repeat__row-signature">';
+                repeatHtml += '<div class="nf-field nf-field--above"><label>' + appendRequiredMarker(escapeHtml(rowSignatureLabel), rowSignatureRequired) + '</label>';
+                repeatHtml += '<div class="nf-signature" data-nativeforms-row-signature="true" data-row-signature-required="' + String.valueOf(rowSignatureRequired).toLowerCase() + '">';
+                repeatHtml += '<canvas class="nf-signature__canvas" data-signature-canvas></canvas>';
+                if (String.isNotBlank(rowSignatureHelpText)) {
+                    repeatHtml += '<div class="nf-signature__meta">' + escapeHtml(rowSignatureHelpText) + '</div>';
+                }
+                repeatHtml += '<button type="button" class="nf-signature__clear" data-signature-clear>' + escapeHtml(clearLabel) + '</button>';
+                repeatHtml += '<div class="nf-signature__feedback" data-signature-feedback></div>';
+                repeatHtml += '</div></div></div>';
+            }
             repeatHtml += '</div></template>';
             return repeatHtml;
         }
@@ -2200,6 +2270,22 @@ public with sharing class NativeFormsPublisher {
         }
         if (typeValue == 'hidden') {
             return '<input type="hidden" data-element-id="' + safeElementId + '" name="' + safeName + '" value="' + escapeHtml(hiddenValue) + '">';
+        }
+
+        if (typeValue == 'lookup') {
+            String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '-lookup"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            Integer minSearchLength = integerValue(config.get('lookupMinSearchLength'));
+            if (minSearchLength == null || minSearchLength <= 0) {
+                minSearchLength = 2;
+            }
+            String controlHtml = '<div class="nf-lookup" data-nativeforms-lookup="true" data-lookup-field-key="' + safeName + '" data-lookup-required="' + String.valueOf(required).toLowerCase() + '" data-lookup-min-length="' + String.valueOf(minSearchLength) + '">';
+            controlHtml += '<input type="hidden" name="' + safeName + '" data-lookup-hidden="true"' + lockOnPrefillAttr + '>';
+            controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '-lookup" autocomplete="off" data-lookup-input="true"' + placeholderAttr + '>';
+            controlHtml += '<button type="button" class="nf-lookup__clear" data-lookup-clear hidden aria-label="Clear selection">Clear</button>';
+            controlHtml += '<div class="nf-lookup__results" data-lookup-results hidden></div>';
+            controlHtml += '<div class="nf-lookup__status" data-lookup-status></div>';
+            controlHtml += '</div>';
+            return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'date') {
@@ -2537,8 +2623,8 @@ public with sharing class NativeFormsPublisher {
             if (columns < 1) {
                 return 1;
             }
-            if (columns > 4) {
-                return 4;
+            if (columns > 10) {
+                return 10;
             }
             return columns;
         } catch (Exception e) {
@@ -2556,8 +2642,8 @@ public with sharing class NativeFormsPublisher {
             if (columnValue < 1) {
                 return 1;
             }
-            if (columnValue > 4) {
-                return 4;
+            if (columnValue > 10) {
+                return 10;
             }
             return columnValue;
         } catch (Exception e) {
@@ -2782,6 +2868,132 @@ public with sharing class NativeFormsPublisher {
         return signatureFields;
     }
 
+    private static Boolean containsRecordsListRowSignature(List<NF_Form_Element__c> elements) {
+        if (elements == null) {
+            return false;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'repeatGroup') {
+                continue;
+            }
+            if (booleanValue(parseJsonMap(elementRecord.Config_JSON__c).get('rowSignatureEnabled'))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Object> buildPublishedRecordsListRowSignatures(List<NF_Form_Element__c> elements) {
+        List<Object> rowSignatures = new List<Object>();
+        if (elements == null) {
+            return rowSignatures;
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'repeatGroup' || String.isBlank(elementRecord.Field_Key__c)) {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            if (!booleanValue(config.get('rowSignatureEnabled'))) {
+                continue;
+            }
+            rowSignatures.add(new Map<String, Object>{
+                'elementId' => elementRecord.Element_Id__c,
+                'groupKey' => elementRecord.Field_Key__c,
+                'label' => firstNonBlank(stringValue(config.get('rowSignatureLabel')), 'Signature'),
+                'required' => !config.containsKey('rowSignatureRequired') || booleanValue(config.get('rowSignatureRequired')),
+                'attachToRowRecord' => booleanValue(config.get('rowSignatureAttachToRowRecord'))
+            });
+        }
+
+        return rowSignatures;
+    }
+
+    private static Map<String, Object> buildPublishedLookupDefinition(List<NF_Form_Element__c> elements) {
+        Map<String, Object> definition = new Map<String, Object>{
+            'schemaVersion' => 'v1',
+            'fields' => new Map<String, Object>()
+        };
+        Map<String, Object> fields = (Map<String, Object>) definition.get('fields');
+        if (elements == null) {
+            return definition;
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'lookup' || String.isBlank(elementRecord.Field_Key__c)) {
+                continue;
+            }
+
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            String objectApiName = canonicalObjectApiName(stringValue(config.get('lookupTargetObject')));
+            if (String.isBlank(objectApiName)) {
+                continue;
+            }
+
+            Set<String> allowedFieldNames = Schema.getGlobalDescribe().get(objectApiName).getDescribe().fields.getMap().keySet();
+            List<String> searchFields = canonicalLookupFields(config.get('lookupSearchFields'), allowedFieldNames);
+            List<String> displayFields = canonicalLookupFields(config.get('lookupDisplayFields'), allowedFieldNames);
+            if (searchFields.isEmpty()) {
+                searchFields.add(allowedFieldNames.contains('Name') ? 'Name' : 'Id');
+            }
+            if (displayFields.isEmpty()) {
+                displayFields.add(searchFields[0]);
+            }
+            if (!displayFields.contains('Id')) {
+                displayFields.add('Id');
+            }
+
+            Integer minSearchLength = integerValue(config.get('lookupMinSearchLength'));
+            Integer resultLimit = integerValue(config.get('lookupLimit'));
+            fields.put(elementRecord.Field_Key__c, new Map<String, Object>{
+                'elementId' => elementRecord.Element_Id__c,
+                'fieldKey' => elementRecord.Field_Key__c,
+                'label' => elementRecord.Label__c,
+                'targetObject' => objectApiName,
+                'searchFields' => searchFields,
+                'displayFields' => displayFields,
+                'minSearchLength' => minSearchLength == null || minSearchLength <= 0 ? 2 : Math.min(minSearchLength, 10),
+                'limit' => resultLimit == null || resultLimit <= 0 ? 10 : Math.min(resultLimit, 25)
+            });
+        }
+
+        return definition;
+    }
+
+    private static List<String> canonicalLookupFields(Object rawFields, Set<String> allowedFieldNames) {
+        List<String> fields = new List<String>();
+        if (allowedFieldNames == null || allowedFieldNames.isEmpty()) {
+            return fields;
+        }
+
+        List<Object> rawValues = new List<Object>();
+        if (rawFields instanceof List<Object>) {
+            rawValues.addAll((List<Object>) rawFields);
+        } else if (rawFields != null) {
+            for (String value : String.valueOf(rawFields).split(',')) {
+                rawValues.add(value);
+            }
+        }
+
+        for (Object rawValue : rawValues) {
+            String requestedField = stringValue(rawValue);
+            if (String.isBlank(requestedField)) {
+                continue;
+            }
+            String canonicalField = null;
+            for (String allowedFieldName : allowedFieldNames) {
+                if (allowedFieldName.equalsIgnoreCase(requestedField.trim())) {
+                    canonicalField = allowedFieldName;
+                    break;
+                }
+            }
+            if (String.isNotBlank(canonicalField) && !fields.contains(canonicalField)) {
+                fields.add(canonicalField);
+            }
+        }
+        return fields;
+    }
+
     private static Boolean containsSurveyField(List<NF_Form_Element__c> elements) {
         if (elements == null) {
             return false;
@@ -2854,6 +3066,14 @@ public with sharing class NativeFormsPublisher {
                 item.put('showTitle', !config.containsKey('showTitle') || booleanValue(config.get('showTitle')));
                 item.put('boxed', !config.containsKey('boxed') || booleanValue(config.get('boxed')));
                 item.put('text', stripHtmlForPdf(stringValue(config.get('text'))));
+                if (elementType == 'repeatGroup' && booleanValue(config.get('rowSignatureEnabled'))) {
+                    item.put('rowSignature', new Map<String, Object>{
+                        'enabled' => true,
+                        'label' => firstNonBlank(stringValue(config.get('rowSignatureLabel')), 'Signature'),
+                        'required' => !config.containsKey('rowSignatureRequired') || booleanValue(config.get('rowSignatureRequired')),
+                        'attachToRowRecord' => booleanValue(config.get('rowSignatureAttachToRowRecord'))
+                    });
+                }
             } else if (elementType == 'heading' || elementType == 'paragraph' || elementType == 'richText') {
                 String html = stringValue(config.get('html'));
                 if (String.isBlank(html)) {
@@ -2930,8 +3150,14 @@ public with sharing class NativeFormsPublisher {
             'resendButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeResendButtonLabel', normalizedLanguageCode, 'Resend Code'),
             'expiryMinutes' => integerValue(uiSettings.get('secretCodeExpiryMinutes')) == null ? 10 : Math.max(1, integerValue(uiSettings.get('secretCodeExpiryMinutes'))),
             'maxAttempts' => integerValue(uiSettings.get('secretCodeMaxAttempts')) == null ? 5 : Math.max(1, integerValue(uiSettings.get('secretCodeMaxAttempts'))),
-            'allowResend' => uiSettings.containsKey('secretCodeAllowResend') ? booleanValue(uiSettings.get('secretCodeAllowResend')) : true
+            'allowResend' => uiSettings.containsKey('secretCodeAllowResend') ? booleanValue(uiSettings.get('secretCodeAllowResend')) : true,
+            'sessionMode' => defaultSecretCodeSessionMode(stringValue(uiSettings.get('secretCodeSessionMode')))
         };
+    }
+
+    private static String defaultSecretCodeSessionMode(String value) {
+        String normalized = String.isBlank(value) ? 'short' : value.trim();
+        return normalized == 'sameTabUntilMidnight' ? 'sameTabUntilMidnight' : 'short';
     }
 
     private static String localizedSecretCodeConfigValue(Map<String, Object> uiSettings, String key, String languageCode, String fallback) {
@@ -2955,7 +3181,7 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(trimmedCandidate)) {
             return false;
         }
-        for (String languageCode : new List<String>{ 'en', 'he', 'es' }) {
+        for (String languageCode : new List<String>{ 'en', 'he', 'es', 'de', 'fr' }) {
             if (localizedFormUiDefault(key, languageCode, '') == trimmedCandidate) {
                 return true;
             }
@@ -2966,21 +3192,29 @@ public with sharing class NativeFormsPublisher {
     private static String localizedFormUiDefault(String key, String languageCode, String fallback) {
         String normalizedLanguageCode = NativeFormsRuntimeI18n.normalizeLanguageCode(languageCode);
         if (key == 'submitLabel') {
+            if (normalizedLanguageCode == 'de') return 'Senden';
+            if (normalizedLanguageCode == 'fr') return 'Envoyer';
             if (normalizedLanguageCode == 'he') return 'שלח';
             if (normalizedLanguageCode == 'es') return 'Enviar';
             return 'Submit';
         }
         if (key == 'submitSuccessMessage') {
+            if (normalizedLanguageCode == 'de') return 'Ihr Formular wurde erfolgreich gesendet.';
+            if (normalizedLanguageCode == 'fr') return 'Votre formulaire a été envoyé avec succès.';
             if (normalizedLanguageCode == 'he') return 'הטופס נשלח בהצלחה.';
             if (normalizedLanguageCode == 'es') return 'Tu formulario se envió correctamente.';
             return 'Your form was submitted successfully.';
         }
         if (key == 'postSubmitButtonLabel') {
+            if (normalizedLanguageCode == 'de') return 'Weiter';
+            if (normalizedLanguageCode == 'fr') return 'Continuer';
             if (normalizedLanguageCode == 'he') return 'המשך';
             if (normalizedLanguageCode == 'es') return 'Continuar';
             return 'Continue';
         }
         if (key == 'submitFailedMessage') {
+            if (normalizedLanguageCode == 'de') return 'Wir konnten dieses Formular im Moment nicht senden. Bitte versuchen Sie es erneut.';
+            if (normalizedLanguageCode == 'fr') return 'Nous ne pouvons pas envoyer ce formulaire pour le moment. Veuillez réessayer.';
             if (normalizedLanguageCode == 'he') return 'לא הצלחנו לשלוח את הטופס כרגע. נסו שוב.';
             if (normalizedLanguageCode == 'es') return 'No pudimos enviar este formulario ahora mismo. Inténtalo de nuevo.';
             return 'We could not submit this form right now. Please try again.';

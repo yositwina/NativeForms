@@ -22,6 +22,7 @@
             <value><fullName>tel</fullName><default>false</default><label>Phone</label></value>
             <value><fullName>url</fullName><default>false</default><label>URL</label></value>
             <value><fullName>select</fullName><default>false</default><label>Select</label></value>
+            <value><fullName>lookup</fullName><default>false</default><label>Lookup</label></value>
             <value><fullName>checkbox</fullName><default>false</default><label>Checkbox</label></value>
             <value><fullName>radio</fullName><default>false</default><label>Radio</label></value>
             <value><fullName>ranking</fullName><default>false</default><label>Ranking</label></value>

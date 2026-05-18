@@ -47,6 +47,7 @@ Supported element types in the current runtime:
 - select
 - checkbox
 - radio
+- lookup
 - time
 - image
 - section
@@ -67,6 +68,42 @@ Supported element types in the current runtime:
 - AWS submit does not normalize Time fields or add GMT/UTC suffixes in V1.
 - The field can be mapped directly to Salesforce Time or Text fields when the customer expects `HH:mm`.
 - Custom JavaScript and formulas read the field as a text value, for example `TwinaForms.getValue("time1")`.
+
+### Salesforce Lookup Field V1
+`lookup` is a Starter/basic input field for selecting one Salesforce record and submitting that record Id into a Salesforce reference field.
+
+- Lookup fields do not preload records into the published HTML.
+- The public form starts empty and searches Salesforce only after the visitor types the minimum search length.
+- Default V1 search behavior:
+  - minimum search length: `2`
+  - debounce: about `400ms`
+  - result limit: `10`
+- The browser sends only `formId`, `publishToken`, `fieldKey`, and search text to the lookup endpoint.
+- The browser must not send object names, SOQL, filters, or field lists.
+- AWS loads the server-side lookup definition for the published form and field key, then queries only the configured target object and fields.
+- The selected value submitted with the form is the Salesforce record `Id`.
+- The visible lookup label is UI state only.
+- Prefill can resolve an existing lookup Id into a display label through the same lookup definition.
+- V1 supports single-select lookups only.
+- Deferred: default/preloaded records, multi-select lookup, dependent lookup filters, lookup inside `repeatGroup`, and create-new-from-lookup.
+
+Example registered lookup definition:
+```json
+{
+  "lookupDefinition": {
+    "fields": {
+      "volunteerContact": {
+        "targetObject": "Contact",
+        "searchFields": ["Name", "Email"],
+        "displayFields": ["Name", "Email"],
+        "valueField": "Id",
+        "limit": 10,
+        "minSearchLength": 2
+      }
+    }
+  }
+}
+```
 
 Planned/documented but not yet implemented in this runtime sample:
 - link
@@ -167,6 +204,60 @@ Elements can define optional conditional visibility rules.
 Customer-facing naming:
 - the technical element type remains `repeatGroup`
 - the Builder / setup UI should label this element as `Records List`
+
+## Section / Group Column Limit
+Sections, Groups, and Records List row layouts share the same column-count model.
+
+- Supported column counts are `1` through `10`.
+- The Designer, Apex publisher, generated public HTML, and submission PDF renderer must all accept the same range.
+- Published forms should collapse multi-column section grids to a single column on mobile.
+- Values outside the supported range should be rejected or clamped by the layer that reads them.
+
+## Records List Row Label Mode
+Records List rows support a label display choice for desktop layout.
+
+- `showLabelsOnEachRow: true` shows each field label inside every row.
+- `showLabelsOnEachRow: false` shows a single table-style header row on desktop and hides repeated row labels.
+- Mobile runtime must always show labels inside each row and hide the table-style header, regardless of the desktop choice.
+- The Designer should expose this as an explicit Records List setting, not as a hidden runtime behavior.
+
+## Records List Row Signature + PDF
+Records List row signatures are an opt-in Pro capability for timesheet-style related-record workflows.
+
+- Feature flag: `enableProRecordsListRowSignaturePdf`.
+- The feature also requires Electronic Signature and Submission PDF entitlements.
+- The setting lives on each Records List element so admins choose exactly which repeated rows require signatures.
+- When an admin enables row signatures on a Records List, Designer should automatically enable and save the form-level Submission PDF setting.
+- Normal Signature elements remain top-level fields and should still be blocked inside Records List rows.
+- Runtime payload stores row signatures under each submitted row as `_rowSignature`; top-level `input.signatures` remains reserved for normal Signature fields.
+- AWS validates required row signatures before Salesforce submit actions run.
+- AWS maps each submitted row to the corresponding `upsertMany` result row id after submit.
+- The final Submission PDF renders Records List rows as readable row cards and embeds each captured row signature below its row.
+- Optional row signature file attachment can save each row signature PNG to the saved child row record.
+- Submission logs must sanitize row signature image data and keep only metadata such as file name, signed time, and hash.
+
+Example row payload:
+```json
+{
+  "repeatGroups": {
+    "timeRows": {
+      "rows": [
+        {
+          "Id": "a01...",
+          "Work_Date__c": "2026-05-14",
+          "Hours__c": "8",
+          "_rowSignature": {
+            "dataUrl": "data:image/png;base64,...",
+            "contentType": "image/png",
+            "fileName": "timeRows-row-1-signature.png",
+            "signedAt": "2026-05-14T09:00:00.000Z"
+          }
+        }
+      ]
+    }
+  }
+}
+```
 
 ### Table Rendering Rules
 - `viewMode: "table"` renders repeat-group rows in a grid instead of stacked cards.

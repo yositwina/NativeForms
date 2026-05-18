@@ -39,7 +39,7 @@ Use for package-visible metadata, object changes, tabs/apps/pages, Apex/LWC chan
 - Multilingual rule: do not introduce fixed English customer-facing text inside form canvas previews or published forms unless it is an error/debug message. If helper/action text is needed, make it configurable in Salesforce properties/settings or omit it. Preserve label-placement flexibility instead of compensating with hard-coded English guidance.
 - Secret-code rule: avoid fixed English-only preview/runtime copy such as `Locked Until Verified`, `Secret Code Verification`, or `Code step appears after the user presses Enter`. Public-form button labels should be configurable when they are part of the customer experience.
 - Current managed 2GP package id for this repo is `0HogL0000002CUvSAM` (`TwinaForms`). Keep `sfdx-project.json` and packaging notes aligned if Salesforce ever returns a replacement package id.
-- Current latest beta install link is `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000F7VpQAK`. Update this skill and `AWS/documentation/Technical and specs/Salesforce_Packaging_Namespace_Audit_V1.md` every time a new package version is created.
+- Current latest beta install link is `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000FmynQAC` for `TwinaForms@0.4.0-1` / version `0.4.0.1`. Update this skill and `AWS/documentation/Technical and specs/Salesforce_Packaging_Namespace_Audit_V1.md` every time a new package version is created.
 - Package-test reset rule: after creating a new TwinaForms beta package for this test cycle, delete the DynamoDB tenant record `orgId=00Dg5000008sWZN` from `NativeFormsTenants` in `eu-north-1` so the install test starts with a fresh AWS tenant state.
 
 ## Escalate When

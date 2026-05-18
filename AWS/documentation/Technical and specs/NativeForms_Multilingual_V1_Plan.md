@@ -44,6 +44,7 @@ V1 decision:
 - Locale-sensitive date hint text
 - Designer secret-code preview text
 - Form-level language selection in Salesforce
+- New Designer element default labels in the selected form language
 
 ### Out of scope for V1
 - Full Salesforce admin/designer UI localization
@@ -71,6 +72,7 @@ Examples:
 
 Rule for V1:
 - if these fields are blank or still match a packaged default from another language, the runtime should resolve them to the current form language instead of keeping stale English text
+- new elements added in Designer should receive a default label in the selected form language (`en`, `he`, `es`, `de`, `fr`); changing the form language later must not rewrite existing/admin-edited labels
 
 ### 2. Packaged runtime dictionary
 Use Salesforce-package-owned language dictionaries for reusable generic runtime text.
@@ -101,7 +103,7 @@ Examples:
 - Publisher resolves the selected language plus form overrides and embeds the final text bundle in the published config.
 - English remains the fallback language only.
 - Hebrew uses RTL-aware layout verification.
-- Spanish may be included as a starter dictionary scaffold, but `en` and `he` are the release priority.
+- Supported form runtime language codes are `en`, `he`, `es`, `de`, and `fr`. English remains the fallback language; Hebrew remains the RTL QA priority.
 
 ## Text Categories
 ### A. Must be multilingual in V1
@@ -460,7 +462,7 @@ Concrete tasks:
 - preserve existing forms by treating missing `languageCode` as `en`
 
 Definition of done:
-- admins can pick `English`, `Hebrew`, or `Spanish`
+- admins can pick `English`, `Hebrew`, `Spanish`, `German`, or `French`
 - no runtime text changes yet
 - old forms still load without migration scripts
 
@@ -476,7 +478,7 @@ Primary files:
 - possibly supporting test/helper class later
 
 Concrete tasks:
-- implement language normalization: `en`, `he`, `es`
+- implement language normalization: `en`, `he`, `es`, `de`, `fr`
 - implement English fallback
 - implement dictionary maps for V1 keys
 - add date placeholder/validation helper methods tied to locale and format
@@ -489,7 +491,7 @@ Recommended structure:
 Definition of done:
 - one class returns resolved runtime text for all V1 keys
 - Hebrew and English complete
-- Spanish scaffold present, even if lightly reviewed
+- Spanish, German, and French scaffold present, even if lightly reviewed
 
 User testing gate:
 - no manual testing yet
@@ -655,21 +657,21 @@ User testing gate:
 - yes, required
 - this is the main user approval checkpoint before calling V1 complete
 
-### Phase 9. Spanish scaffold pass
+### Phase 9. Latin-language scaffold pass
 Objective:
-- leave the system ready for a third language without blocking V1 on perfect Spanish QA
+- leave the system ready for Spanish, German, and French without blocking V1 on perfect non-English QA
 
 Primary files:
 - [NativeFormsRuntimeI18n.cls](/c:/Users/Yosi/NativeFormsAWS/force-app/main/default/classes/NativeFormsRuntimeI18n.cls)
 
 Concrete tasks:
-- populate Spanish keys
+- populate Spanish, German, and French keys
 - verify no missing-key crashes
 - keep English fallback for anything intentionally deferred
 
 Definition of done:
-- `es` is selectable
-- forms publish safely with Spanish selected
+- `es`, `de`, and `fr` are selectable
+- forms publish safely with Spanish, German, or French selected
 
 User testing gate:
 - optional unless Spanish becomes launch-critical

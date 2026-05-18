@@ -1,0 +1,12 @@
+﻿[
+    {
+        "Name":  "tenant/status deleted tenant",
+        "Status":  200,
+        "Body":  "{\"success\":true,\"registered\":false,\"connected\":false,\"setupState\":\"not_registered\",\"connectUrl\":null,\"tenant\":null,\"hasClientCredentials\":true,\"oauthClientConfigured\":true,\"hasRefreshToken\":false,\"hasInstanceUrl\":false}"
+    },
+    {
+        "Name":  "tenant/disconnect fake org without bearer",
+        "Status":  401,
+        "Body":  "{\"success\":false,\"error\":\"Missing Authorization bearer token\"}"
+    }
+]

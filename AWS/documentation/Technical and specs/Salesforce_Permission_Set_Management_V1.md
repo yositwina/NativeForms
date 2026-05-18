@@ -1,6 +1,6 @@
 # Salesforce Permission Set Management V1
 
-Last updated: 2026-04-21
+Last updated: 2026-05-06
 
 ## Purpose
 
@@ -9,24 +9,22 @@ Define the V1 model for:
 - Salesforce user access to the customer-facing `TwinaForms` app
 - a gated support/debug access path inside the main `TwinaForms` app
 - seat limits driven from AWS tenant data
-- package-safe permission-set structure before Apex test work and packaging
+- package-safe permission-set structure
 
-This document is intentionally limited to the Salesforce package + AWS tenant contract for seat management.
-
----
+This document is intentionally limited to Salesforce package access and the AWS tenant contract for seat management.
 
 ## Main Product Decisions
 
-### 1. Split the package into two permission sets
+### 1. Use Two Packaged Permission Sets
 
-The package should no longer rely on one permission set that grants both apps.
-
-V1 should use:
+V1 uses:
 
 - `TwinaForms User`
 - `TwinaForms Admin`
 
-### 2. AWS is the source of truth for seat limits
+There is no separate subscriber-created service-access permission set. The package-to-AWS service trust is handled by Bootstrap V2 HMAC signatures, not by Salesforce External Credential Principal Access.
+
+### 2. AWS Is The Source Of Truth For Seat Limits
 
 The number of allowed Salesforce users comes from:
 
@@ -37,27 +35,20 @@ This value is resolved in AWS from:
 - tenant override if present
 - otherwise the selected plan default
 
-### 3. Salesforce counts real assignments locally
+### 3. Salesforce Counts Real Assignments Locally
 
-AWS owns the allowed limit.
-
-Salesforce should count the actual assigned users by querying:
+AWS owns the allowed limit. Salesforce counts the actual assigned users by querying:
 
 - `PermissionSetAssignment`
 
 V1 rule:
 
 - `TwinaForms User` assignments count against `maxSfUsers`
-- `TwinaForms Admin` assignments do **not** count against `maxSfUsers`
+- `TwinaForms Admin` assignments do not count against `maxSfUsers`
 
-Reason:
+### 4. TwinaForms Admin Access Is Controlled By A Tenant Support Flag
 
-- the user seat limit is for the real customer-facing TwinaForms workspace
-- the admin/debug area is a support/debug path, not a normal customer seat
-
-### 4. TwinaForms Admin access is controlled by a tenant support flag
-
-The admin/debug area should not be open by default.
+The admin/debug area is closed by default.
 
 V1 rule:
 
@@ -75,16 +66,6 @@ Recommended AWS field:
 }
 ```
 
-This should be tenant-level only, not a commercial plan feature.
-
-Reason:
-
-- it is not part of Starter vs Pro packaging
-- it is an operations/support control
-- it should not appear in customer plan comparison
-
----
-
 ## Permission Set Model
 
 ## TwinaForms User
@@ -97,16 +78,9 @@ Purpose:
 
 Should include:
 
-- `NativeForms` app visibility
+- `TwinaForms` app visibility
 - main customer-facing TwinaForms tabs
-- Apex/class/object/field access needed for:
-  - Home
-  - Designer
-  - Prefill
-  - Submit
-  - Themes
-  - Logs
-  - Connect/setup path needed for customer use
+- Apex/class/object/field access needed for Home, Designer, Prefill, Submit, Themes, Logs, and Connect
 
 Should not include:
 
@@ -123,67 +97,14 @@ Purpose:
 
 Should include:
 
-- `NativeForms` app visibility
+- `TwinaForms` app visibility
 - admin/debug object tabs
 - `NativeForms_Admin_Features`
 - any admin/setup classes and object permissions required by that app
 
-Should not be treated as the standard package assignment for ordinary users.
-
----
-
-## AWS Tenant Contract
-
-## Existing limit source
-
-Keep using:
-
-- `effectiveLimits.maxSfUsers`
-
-This remains the seat cap for `TwinaForms User`.
-
-## New support flag
-
-Add tenant-level support flags:
-
-```json
-{
-  "supportFlags": {
-    "enableSalesforceAdminApp": false
-  }
-}
-```
-
-V1 behavior:
-
-- if missing, treat as `false`
-- the Admin console can toggle it per tenant
-- this flag is not part of plan defaults and not part of commercial feature flags
-
-## Home summary contract
-
-The Salesforce Home/bootstrap response should continue to provide:
-
-- `usage.maxSfUsers`
-
-It should also provide:
-
-- `supportFlags.enableSalesforceAdminApp`
-
-or a flattened equivalent such as:
-
-- `support.enableSalesforceAdminApp`
-
-V1 note:
-
-- `activeUsersCount` should no longer be hardcoded in AWS
-- Salesforce should calculate the local count for display using permission-set assignments
-
----
-
 ## Salesforce Enforcement Model
 
-## Counting seats
+## Counting Seats
 
 Seat usage is the number of active users assigned to:
 
@@ -202,21 +123,9 @@ When assigning `TwinaForms User`:
 1. read `maxSfUsers` from AWS tenant data
 2. count current active `TwinaForms User` assignments locally
 3. if the limit is not null and the assignment would exceed it, block with a customer-safe error
-4. also assign the subscriber-created `TwinaForms Credentials` permission set to the same user, so the user can access the External Credential principals needed for TwinaForms AWS callouts
+4. assign only the packaged `TwinaForms User` permission set
 
 The server-side assignment method must enforce the seat limit from a freshly fetched access summary. The UI can disable obvious over-limit actions, but Apex must not trust the UI's current count.
-
-The preferred subscriber-created permission set naming is:
-
-- Label: `TwinaForms Credentials`
-- API Name: `TwinaForms_Credentials`
-
-If that exact permission set is not found, Apex can fall back to a permission set that already includes both known TwinaForms External Credential Principal Access entries:
-
-- `TwinaFormsBootstrap - TwinaFormsBootstrapPrincipal`
-- `TwinaFormsLambdaAuth - TwinaFormsSharedSecret`
-
-If the user already has `TwinaForms User` but is missing `TwinaForms Credentials`, granting the seat again should repair the missing service access without counting it as a new seat.
 
 Example:
 
@@ -233,13 +142,11 @@ Example:
 
 `TwinaForms Admin is currently closed for this tenant. Enable it from the TwinaForms Admin console before assigning access.`
 
-## Revoking access
+## Revoking Access
 
 Revoking either permission set should always be allowed.
 
-When revoking `TwinaForms User` from the Connect page, also revoke the subscriber-created `TwinaForms Credentials` permission set from that same user.
-
----
+Revoking `TwinaForms User` removes only the packaged `TwinaForms User` assignment. There is no paired service-access permission set to remove.
 
 ## Salesforce UI Recommendation
 
@@ -248,14 +155,10 @@ V1 should manage permission sets from the Salesforce `TwinaForms Connect` page.
 Reason:
 
 - this work is part of connection/setup readiness
-- permission-set access and external credential access belong next to Connect troubleshooting
+- access troubleshooting belongs next to Connect
 - it avoids splitting setup-related decisions across Home and Connect
 
-## Connect page access section
-
-Add a new section such as:
-
-- `User Access`
+## Connect Page Access Section
 
 Show:
 
@@ -265,7 +168,7 @@ Show:
 
 Recommended actions:
 
-- grant/remove `TwinaForms User`; this also grants/removes `TwinaForms Credentials`
+- grant/remove `TwinaForms User`
 - grant/remove `TwinaForms Admin`
 
 Recommended UX:
@@ -273,73 +176,30 @@ Recommended UX:
 - normal user access is the main action
 - admin/debug access is visually secondary
 - if admin/debug access is closed, explain that it is controlled from the TwinaForms Admin console
-- if a listed user has `TwinaForms User` but not `TwinaForms Credentials`, show: `This user has a seat but is missing TwinaForms service access.`
-- after Step 2 becomes complete, reload the access summary immediately so stale browser state cannot offer invalid seat actions
+- after the connection becomes complete, reload the access summary immediately so stale browser state cannot offer invalid seat actions
 
----
-
-## Package and Clean-Org Rules
-
-### 1. Package both permission sets
+## Package And Clean-Org Rules
 
 The package should include:
 
 - `TwinaForms User`
 - `TwinaForms Admin`
 
-### 2. Main app should not depend on the admin permission set
+The package should not include:
 
-The current packaged setup should be refactored so ordinary use works with:
+- Salesforce Named Credential metadata
+- Salesforce External Credential metadata
+- setup instructions that ask the subscriber to create External Credential Principal Access
+- a separate service-access permission set
+
+Ordinary use should work with:
 
 - `TwinaForms User`
 
-only.
+Admin/debug tooling stays inside the main `TwinaForms` app and is gated by:
 
-### 3. Admin/debug tooling stays inside the main app
-
-Do not ship a separate `TwinaForms Admin` app in App Launcher.
-
-Instead:
-
-- ship only the main `TwinaForms` app
-- keep `NativeForms_Admin_Features` inside that app
-- expose the admin/debug area only to users with `TwinaForms Admin`
-- keep grant/removal of `TwinaForms Admin` controlled by the AWS support flag
-
-### 4. Setup docs must be updated
-
-Any current setup/help text saying:
-
-- `Open the TwinaForms Admin permission set and assign it to the admins who will manage the app`
-
-must be reviewed and rewritten to match the split model.
-
-V1 likely needs wording closer to:
-
-- `Assign TwinaForms User to people who should use the main TwinaForms workspace.`
-- `Assign TwinaForms Admin only when support/debug admin access is needed.`
-
----
-
-## V1 Scope
-
-Included:
-
-- split packaged permission sets
-- local Salesforce seat counting
-- enforcement against AWS `maxSfUsers`
-- tenant support flag for admin/debug access open/closed
-- admin-console toggle for that support flag
-- Connect-page user access management in Salesforce
-
-Not included:
-
-- automatic syncing of seat counts back into AWS tenant metrics
-- automatic assignment from the AWS admin console into Salesforce users
-- complex role hierarchies or permission-set groups
-- plan-level exposure of the Admin app flag
-
----
+- `TwinaForms Admin`
+- AWS support flag
 
 ## Final Recommendation
 
@@ -349,5 +209,4 @@ V1 should be implemented with this simple model:
 - `TwinaForms Admin` = support/debug access inside the main app, controlled by tenant support flag
 - AWS owns the seat limit and the Admin-open flag
 - Salesforce owns the real assignment count and local enforcement
-
-This gives a package-safe design that is simple, commercially correct, and usable before Apex test work and packaging.
+- Bootstrap V2 HMAC owns package-to-AWS service authentication

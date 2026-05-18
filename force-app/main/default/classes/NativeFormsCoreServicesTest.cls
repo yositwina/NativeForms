@@ -205,6 +205,20 @@ private class NativeFormsCoreServicesTest {
                     'success' => true,
                     'formSlug' => 'contact-form'
                 }
+            )
+            .addJsonResponse(
+                '/salesforce/layouts',
+                200,
+                new Map<String, Object>{
+                    'success' => true,
+                    'defaultLayoutKey' => 'assigned:012000000000000AAA',
+                    'layouts' => new List<Object>{
+                        new Map<String, Object>{
+                            'label' => 'Contact assigned layout',
+                            'value' => 'assigned:012000000000000AAA'
+                        }
+                    }
+                }
             );
 
         Test.setMock(HttpCalloutMock.class, mock);
@@ -217,6 +231,10 @@ private class NativeFormsCoreServicesTest {
             'orgId' => requestBody.orgId,
             'formSlug' => requestBody.formSlug
         });
+        Map<String, Object> layoutResponse = NativeFormsAwsClient.getSalesforceLayouts(new Map<String, Object>{
+            'orgId' => requestBody.orgId,
+            'objectApiName' => 'Contact'
+        });
         Test.stopTest();
 
         System.assertEquals('https://upload.example.com/nativeforms/contact-form.html', presignResponse.putUrl);
@@ -224,6 +242,7 @@ private class NativeFormsCoreServicesTest {
         System.assertEquals('company/contact-form.html', presignResponse.key);
         System.assertEquals(true, registerResponse.get('success'));
         System.assertEquals('contact-form', String.valueOf(registerResponse.get('formSlug')));
+        System.assertEquals('assigned:012000000000000AAA', String.valueOf(layoutResponse.get('defaultLayoutKey')));
         }
     }
 
@@ -295,6 +314,21 @@ private class NativeFormsCoreServicesTest {
         } catch (CalloutException e) {
             System.assert(String.isNotBlank(e.getMessage()));
         }
+
+        Test.setMock(
+            HttpCalloutMock.class,
+            new NativeFormsAwsMockFactory.RoutingMock().addJsonResponse(
+                '/salesforce/layouts',
+                500,
+                new Map<String, Object>{ 'error' => 'Layouts down' }
+            )
+        );
+        try {
+            NativeFormsAwsClient.getSalesforceLayouts(new Map<String, Object>{ 'objectApiName' => 'Contact' });
+            System.assert(false, 'A failed Salesforce layout response should throw.');
+        } catch (CalloutException e) {
+            System.assert(String.isNotBlank(e.getMessage()));
+        }
         }
     }
 
@@ -308,6 +342,7 @@ private class NativeFormsCoreServicesTest {
             'enableProRepeatGroups' => false,
             'enableProPrefillAliasReferences' => 'true',
             'enableProAdvancedSubmitModes' => true,
+            'enableProPageLayoutClone' => true,
             'enableProFormulaFields' => true,
             'enableProPostSubmitAutoLink' => 'true',
             'enableProSfSecretCodeAuth' => true,
@@ -328,6 +363,7 @@ private class NativeFormsCoreServicesTest {
         Boolean repeatGroups = NativeFormsFeatureFlags.isProRepeatGroupsEnabled();
         Boolean prefillAliases = NativeFormsFeatureFlags.isProPrefillAliasReferencesEnabled();
         Boolean advancedSubmit = NativeFormsFeatureFlags.isProAdvancedSubmitModesEnabled();
+        Boolean pageLayoutClone = NativeFormsFeatureFlags.isProPageLayoutCloneEnabled();
         Boolean formulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         Boolean autoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
         Boolean secretCode = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
@@ -342,6 +378,7 @@ private class NativeFormsCoreServicesTest {
         System.assertEquals(false, repeatGroups);
         System.assertEquals(true, prefillAliases);
         System.assertEquals(true, advancedSubmit);
+        System.assertEquals(true, pageLayoutClone);
         System.assertEquals(true, formulaFields);
         System.assertEquals(true, autoLink);
         System.assertEquals(true, secretCode);
@@ -388,11 +425,16 @@ private class NativeFormsCoreServicesTest {
     static void runtimeI18nAndFormulaBundleProvideExpectedFallbacks() {
         System.runAs(new User(Id = UserInfo.getUserId())) {
         System.assertEquals('he', NativeFormsRuntimeI18n.normalizeLanguageCode(' HE '));
-        System.assertEquals('en', NativeFormsRuntimeI18n.normalizeLanguageCode('fr'));
+        System.assertEquals('fr', NativeFormsRuntimeI18n.normalizeLanguageCode('fr'));
+        System.assertEquals('de', NativeFormsRuntimeI18n.normalizeLanguageCode(' DE '));
+        System.assertEquals('en', NativeFormsRuntimeI18n.normalizeLanguageCode('it'));
         System.assertEquals('Listo', NativeFormsRuntimeI18n.text('es', 'fileReady', 'fallback'));
-        System.assertEquals('Add Row', NativeFormsRuntimeI18n.text('fr', 'repeatAddRow', 'fallback'));
+        System.assertEquals('Ajouter une ligne', NativeFormsRuntimeI18n.text('fr', 'repeatAddRow', 'fallback'));
+        System.assertEquals('Zeile hinzufügen', NativeFormsRuntimeI18n.text('de', 'repeatAddRow', 'fallback'));
         System.assertEquals('fallback', NativeFormsRuntimeI18n.text('en', 'missingKey', 'fallback'));
         System.assertEquals(true, NativeFormsRuntimeI18n.matchesAnyLanguageValue('fileReady', 'Listo'));
+        System.assertEquals(true, NativeFormsRuntimeI18n.matchesAnyLanguageValue('fileReady', 'Bereit'));
+        System.assertEquals(true, NativeFormsRuntimeI18n.matchesAnyLanguageValue('fileReady', 'Prêt'));
         System.assertEquals(true, NativeFormsRuntimeI18n.matchesAnyLanguageValue('fileReady', 'Ready'));
         System.assertEquals(false, NativeFormsRuntimeI18n.matchesAnyLanguageValue('fileReady', ''));
         System.assertEquals(false, NativeFormsRuntimeI18n.matchesAnyLanguageValue(null, 'Ready'));

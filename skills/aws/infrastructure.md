@@ -14,14 +14,19 @@ Use for S3 website publishing, Lambda deployment targets, region-aware AWS chang
 - The correct admin console publish target is `s3://nativeformspublish/admin-console/dev/`.
 - Current upgrade page publish target is `s3://nativeformspublish/upgrade/`.
 - Published forms also use `nativeformspublish`, and the runtime public base URL in AWS is `https://forms.twinaforms.com`.
-- `NativeFormsBackend` owns publish lifecycle routes such as `POST /forms/register`, `POST /forms/publish/presign`, and `POST /forms/unpublish`.
+- `NativeFormsBackend` owns publish lifecycle routes such as `POST /forms/register`, `POST /forms/publish/presign`, and `POST /forms/unpublish`, plus signed Salesforce admin-assist routes such as `POST /salesforce/layouts`.
+- `NativeFormsBackend` timeout is 15 seconds because Salesforce OAuth refresh plus UI API layout metadata reads can exceed the old 3-second default.
 - `POST /forms/unpublish` marks the `NativeFormsFormSecurity` record as `unpublished` and replaces the hosted form HTML with a small unavailable page when the publish key is known; it must not delete submission logs.
 - Pro V1 browser file uploads use presigned S3 `PUT` requests into `nativeformspublish`, so that bucket must allow CORS from `https://forms.twinaforms.com` for at least `PUT`, `GET`, and `HEAD`.
 - Confirmed deployed Lambda region is `eu-north-1`.
 - Confirmed Lambda function names used in this project include `NativeFormsBackend` and `NativeFormsAdminApi`.
 - Repo also contains the public runtime Lambdas `NativeForms-PrefillForm` and `NativeForms-SubmitForm`; do not change those without explicit user approval.
-- Known public web domains in this project include `twinaforms.com`, `admin.twinaforms.com`, and `forms.twinaforms.com`.
-- CloudFront distribution IDs and internal distribution names are not yet verified in-repo because the current IAM user cannot list CloudFront distributions.
+- Known public web domains in this project include `twinaforms.com`, `www.twinaforms.com`, `admin.twinaforms.com`, and `forms.twinaforms.com`.
+- Current TwinaForms CloudFront distribution map:
+  - `E2YFHJ9TF0SW5N`: `forms.twinaforms.com`, description begins `NativeForms published HTML`, origin `nativeformspublish`, pricing plan `Free`. Use for published customer forms only.
+  - `E3BZPH4WKETIFB`: `admin.twinaforms.com`, description begins `TwinaForms admin console static site`, origin `nativeformspublish`, pricing plan `Pay-as-you-go`. Use for the internal admin console only.
+  - `E2LZYP4RR814H`: `www.twinaforms.com`, description begins `www.twinaforms.com`, origin `nativeformspublish`, pricing plan `Pay-as-you-go`. Use for the public TwinaForms marketing/product website.
+- Ignore unrelated CloudFront distributions for `evhomelink` and `case2web` when working on TwinaForms.
 - On this workstation, the confirmed AWS CLI profile for Codex AWS work is `nativeforms-codex`.
 - Avoid the default AWS credentials when they resolve to `evhomelinkUser`; use `nativeforms-codex` for TwinaForms AWS reads, deploys, and tenant test resets.
 

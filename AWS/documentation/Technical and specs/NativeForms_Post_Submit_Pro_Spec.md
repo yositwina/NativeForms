@@ -55,6 +55,7 @@ The preferred user experience is:
 - success title
 - success message
 - post-submit next-step URL
+- formula-generated post-submit URL using the shared formula engine
 - post-submit button label
 - redirect delay in seconds
 - automatic redirect after successful submit
@@ -63,12 +64,27 @@ The preferred user experience is:
   - or custom label
 
 ### Not Included in V1
-- conditional redirect logic
 - different redirects by submit outcome
-- formula-generated redirect URLs
 - opening the next step in a new tab
 - branching by plan or user profile
-- token forwarding rules beyond simple query passthrough
+- token forwarding rules beyond simple query passthrough or explicit formula output
+
+### Formula URL Mode
+Redirect URL supports two authoring modes:
+- Static URL template: existing `{{field.fieldKey}}` merge tokens.
+- Formula URL: the existing TwinaForms formula engine with `{fieldKey}` references.
+
+Formula URL examples:
+
+```text
+IF(
+  {Country} == "US",
+  CONCAT("https://example.com/us-thank-you?email=", URLENCODE({Email})),
+  CONCAT("https://example.com/global-thank-you?email=", URLENCODE({Email}))
+)
+```
+
+Formula URL mode must use the same parser, validation model, and field picker pattern as formula fields. It is a Pro redirect capability, not a Starter feature.
 
 ---
 
@@ -152,6 +168,9 @@ Best long-term model:
 
 ### Validation
 - redirect URL must be a valid URL
+- formula redirect expressions must be syntactically valid before publish
+- formula redirect field references must resolve to fields in the form
+- formula redirect output must be blank or a valid absolute `http://` or `https://` URL
 - delay must be a non-negative integer
 - empty URL means redirect is off
 
@@ -177,11 +196,13 @@ Keep redirect URL simple.
 
 Supported:
 - static absolute URL
-- static relative URL if needed later
+- formula-generated absolute URL
+- field insertion into formula mode with `{fieldKey}` references
+- static relative URL only if explicitly approved later
 
 Not included in V1:
 - advanced token merge
-- automatic form output injection into the URL
+- automatic form output injection into the URL beyond explicit static tokens or formula references
 
 Reason:
 - reduces security risk
@@ -199,6 +220,8 @@ Reason:
 
 ### Publisher Must Emit
 - success flow settings into the published form config
+- redirect URL mode
+- redirect URL formula expression when formula mode is enabled
 
 ### AWS Submit Runtime
 No special AWS submit command change is required for the redirect itself.

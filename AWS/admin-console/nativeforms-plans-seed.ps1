@@ -20,11 +20,17 @@ $items = @(
         enableProRepeatGroups = @{ BOOL = $false }
         enableProPrefillAliasReferences = @{ BOOL = $false }
         enableProAdvancedSubmitModes = @{ BOOL = $false }
+        enableProPageLayoutClone = @{ BOOL = $false }
         enableProFormulaFields = @{ BOOL = $false }
         enableProPostSubmitAutoLink = @{ BOOL = $false }
         enableProSfSecretCodeAuth = @{ BOOL = $false }
         enableProLoadFile = @{ BOOL = $false }
+        enableProElectronicSignature = @{ BOOL = $false }
+        enableProSubmissionPdf = @{ BOOL = $false }
+        enableProRecordsListRowSignaturePdf = @{ BOOL = $false }
+        enableProSurveyFields = @{ BOOL = $false }
         enableProCustomJs = @{ BOOL = $false }
+        enableDetailedSubmissionLogs = @{ BOOL = $false }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }
@@ -50,11 +56,17 @@ $items = @(
         enableProRepeatGroups = @{ BOOL = $true }
         enableProPrefillAliasReferences = @{ BOOL = $true }
         enableProAdvancedSubmitModes = @{ BOOL = $true }
+        enableProPageLayoutClone = @{ BOOL = $true }
         enableProFormulaFields = @{ BOOL = $true }
         enableProPostSubmitAutoLink = @{ BOOL = $true }
         enableProSfSecretCodeAuth = @{ BOOL = $true }
         enableProLoadFile = @{ BOOL = $true }
+        enableProElectronicSignature = @{ BOOL = $true }
+        enableProSubmissionPdf = @{ BOOL = $true }
+        enableProRecordsListRowSignaturePdf = @{ BOOL = $true }
+        enableProSurveyFields = @{ BOOL = $true }
         enableProCustomJs = @{ BOOL = $true }
+        enableDetailedSubmissionLogs = @{ BOOL = $true }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }
@@ -80,11 +92,17 @@ $items = @(
         enableProRepeatGroups = @{ BOOL = $false }
         enableProPrefillAliasReferences = @{ BOOL = $false }
         enableProAdvancedSubmitModes = @{ BOOL = $false }
+        enableProPageLayoutClone = @{ BOOL = $false }
         enableProFormulaFields = @{ BOOL = $false }
         enableProPostSubmitAutoLink = @{ BOOL = $false }
         enableProSfSecretCodeAuth = @{ BOOL = $false }
         enableProLoadFile = @{ BOOL = $false }
+        enableProElectronicSignature = @{ BOOL = $false }
+        enableProSubmissionPdf = @{ BOOL = $false }
+        enableProRecordsListRowSignaturePdf = @{ BOOL = $false }
+        enableProSurveyFields = @{ BOOL = $false }
         enableProCustomJs = @{ BOOL = $false }
+        enableDetailedSubmissionLogs = @{ BOOL = $true }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }
@@ -110,11 +128,17 @@ $items = @(
         enableProRepeatGroups = @{ BOOL = $true }
         enableProPrefillAliasReferences = @{ BOOL = $true }
         enableProAdvancedSubmitModes = @{ BOOL = $true }
+        enableProPageLayoutClone = @{ BOOL = $true }
         enableProFormulaFields = @{ BOOL = $true }
         enableProPostSubmitAutoLink = @{ BOOL = $true }
         enableProSfSecretCodeAuth = @{ BOOL = $true }
         enableProLoadFile = @{ BOOL = $true }
+        enableProElectronicSignature = @{ BOOL = $true }
+        enableProSubmissionPdf = @{ BOOL = $true }
+        enableProRecordsListRowSignaturePdf = @{ BOOL = $true }
+        enableProSurveyFields = @{ BOOL = $true }
         enableProCustomJs = @{ BOOL = $true }
+        enableDetailedSubmissionLogs = @{ BOOL = $true }
       }
     }
     updatedAt = @{ S = "2026-04-13T07:45:00.000Z" }

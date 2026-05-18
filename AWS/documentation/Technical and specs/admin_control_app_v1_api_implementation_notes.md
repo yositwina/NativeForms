@@ -82,8 +82,14 @@ Salesforce delete rule:
 ## Authentication behavior
 
 - controlled by environment variable `REQUIRE_ADMIN_AUTH`
-- if `true`, requests must send `Authorization: Bearer <token>`
-- if `false`, the scaffold allows local/S3 prototype access during early development
+- production `admin.twinaforms.com` now uses Cognito Hosted UI for browser sign-in
+- when `REQUIRE_ADMIN_AUTH=true`, requests must send `Authorization: Bearer <Cognito JWT>`
+- `NativeFormsAdminApi` validates the JWT issuer, signature, token lifetime, app client id, and required Cognito group
+- current required group: `TwinaFormsAdmins`
+- current User Pool: `eu-north-1_ofYRC83LO`
+- current app client: `23smj51rvoqsni85ai4e4rde3p`
+- current Hosted UI domain: `https://twinaforms-admin.auth.eu-north-1.amazoncognito.com`
+- keep the admin auth setup on low-cost Cognito features: Lite tier, admin-created users only, no SMS MFA, no Plus tier, and no advanced security features unless explicitly approved
 
 ## Important implementation note
 
@@ -97,7 +103,7 @@ Not implemented yet:
 - trial extension actions
 - suspend / reactivate actions
 - resend setup / regenerate secret / refresh health actions
-- Cognito token verification logic
+- API Gateway + Cognito authorizer migration
 
 ## Suggested next step
 

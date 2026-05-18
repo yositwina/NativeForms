@@ -15,6 +15,10 @@ public with sharing class NativeFormsFeatureFlags {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProAdvancedSubmitModes');
     }
 
+    public static Boolean isProPageLayoutCloneEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProPageLayoutClone');
+    }
+
     public static Boolean isProFormulaFieldsEnabled() {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProFormulaFields');
     }
@@ -37,6 +41,10 @@ public with sharing class NativeFormsFeatureFlags {
 
     public static Boolean isProSubmissionPdfEnabled() {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSubmissionPdf');
+    }
+
+    public static Boolean isProRecordsListRowSignaturePdfEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProRecordsListRowSignaturePdf');
     }
 
     public static Boolean isProSurveyFieldsEnabled() {

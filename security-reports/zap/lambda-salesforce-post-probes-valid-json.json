@@ -1,0 +1,32 @@
+﻿[
+    {
+        "Name":  "Backend forms register without bearer valid JSON",
+        "Method":  "POST",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/register",
+        "Status":  400,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Missing required field: prefillDefinition.commands\"}",
+        "BodyFile":  ".codex_tmp\\zap-probes\\forms-register.json"
+    },
+    {
+        "Name":  "Backend tenant disconnect fake org without bearer valid JSON",
+        "Method":  "POST",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/disconnect",
+        "Status":  400,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Tenant not found\"}",
+        "BodyFile":  ".codex_tmp\\zap-probes\\tenant-disconnect-fake.json"
+    },
+    {
+        "Name":  "Submission logs sync without bearer valid JSON",
+        "Method":  "POST",
+        "Url":  "https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-log-config/sync",
+        "Status":  401,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Missing Authorization bearer token\"}",
+        "BodyFile":  ".codex_tmp\\zap-probes\\logs-sync.json"
+    }
+]

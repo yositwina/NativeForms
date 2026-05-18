@@ -1,0 +1,72 @@
+---
+env:
+  contexts:
+    - name: TwinaForms Salesforce Backend Lambda
+      urls:
+        - https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Public plans endpoint
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/public/plans
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        responseCode: 200
+      - name: Tenant status public setup endpoint
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/status?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        responseCode: 200
+      - name: Tenant auth-health missing bearer is rejected
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/auth-health?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        responseCode: 401
+      - name: Forms register missing bearer is rejected
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/register
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"orgId\":\"00Dg5000008sWZN\",\"formId\":\"zap-form\",\"publishToken\":\"zap-token\",\"publishedVersionId\":\"zap-version\",\"status\":\"active\",\"securityMode\":\"public\",\"companySlug\":\"zap-company\",\"formSlug\":\"zap-form\",\"prefillPolicy\":{},\"submitPolicy\":{},\"prefillDefinition\":{\"commands\":[],\"responseMapping\":{}},\"submitDefinition\":{\"commands\":[]}}"
+        responseCode: 401
+      - name: Forms publish presign missing bearer is rejected
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/publish/presign
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"orgId\":\"00Dg5000008sWZN\",\"formId\":\"zap-form\",\"formSlug\":\"zap-form\",\"fileName\":\"zap-form.html\"}"
+        responseCode: 401
+      - name: Forms unpublish missing bearer is rejected
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/unpublish
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"orgId\":\"00Dg5000008sWZN\",\"formId\":\"zap-form\"}"
+        responseCode: 401
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\zap\isv-submission-2026-04-29\official-reports
+      reportFile: 04-salesforce-backend-lambda.html
+      reportTitle: TwinaForms Salesforce Backend Lambda ZAP Report
+      reportDescription: Passive ZAP requestor report for the Salesforce-to-AWS backend Lambda. Protected routes are scanned with missing bearer tokens to prove unauthenticated rejection without exposing tenant secrets. This report does not run an active attack scan.

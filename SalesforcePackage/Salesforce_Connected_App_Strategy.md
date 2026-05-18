@@ -1,78 +1,96 @@
 # Salesforce Connected App Strategy
 
 ## Goal
-Define the NativeForms subscriber-org Salesforce connection model for packaged multi-tenant use.
 
-## Why this exists
-NativeForms needs a per-org Salesforce API connection so AWS can:
+Define the TwinaForms subscriber-org Salesforce connection model for packaged multi-tenant use.
+
+## Why This Exists
+
+TwinaForms needs a per-org Salesforce API connection so AWS can:
+
 - prefill from the subscriber org
 - submit updates into the subscriber org
-- keep one refreshable connection per tenant org
-- reuse the TwinaForms-owned packaged External Client App credentials safely across tenants
+- keep one refreshable connection per Salesforce org
+- reuse the TwinaForms-owned packaged External Client App credentials safely across customers
 
-This must be separate from:
-- tenant secret auth between Salesforce and AWS
-- per-form `publishToken` auth between public HTML and AWS
+This connection is separate from public form publish-token validation and from the Bootstrap V2 HMAC signatures used by packaged Apex calls into AWS.
 
-## Target model
-Each subscriber org installs the NativeForms package and then completes a one-time Salesforce connection step.
+## Target Model
+
+Each subscriber org installs the TwinaForms package and completes a one-time OAuth connection from the packaged Connect page.
 
 That connection should:
+
 - belong to that subscriber org
 - be refreshable
 - allow API access
 - be stored in AWS under that org's `orgId`
-- use the central TwinaForms OAuth client id/secret configured in AWS, not subscriber-entered client credentials
+- use the central TwinaForms OAuth client id/secret configured in AWS
+- avoid customer-created Salesforce Named Credentials and External Credentials
 
-## User-facing setup flow
-1. Install package
-2. Create a subscriber-owned permission set:
-   - Label: `TwinaForms Credentials`
-   - API Name: `TwinaForms_Credentials`
-3. In `TwinaForms Credentials`, open `External Credential Principal Access` and enable:
-   - `TwinaFormsBootstrapPrincipal`
-   - `TwinaFormsSharedSecret`
-4. Register org with AWS
-5. Click `Connect Salesforce`
-6. Approve access
-7. Use the Connect page `Grant Seat` action to assign normal users. Connect assigns both `TwinaForms User` and `TwinaForms Credentials` for the selected user.
-8. Assign `TwinaForms Admin` only for support/debug access when the tenant admin flag allows it.
-9. NativeForms stores the Salesforce connection for that org
-10. Publish forms
+## User-Facing Setup Flow
 
-## OAuth flow
+1. Install the managed package.
+2. Open the `TwinaForms` app.
+3. Open `Connect`.
+4. Click `Prepare Connection`.
+5. Click `Connect TwinaForms`.
+6. Approve Salesforce OAuth access.
+7. Return to Connect and assign `TwinaForms User` seats.
+8. Install demo records or continue to Home.
+
+No subscriber admin should need to create a Salesforce Named Credential, External Credential, External Credential Principal Access, or extra service-access permission set.
+
+## OAuth Flow
+
 Use:
+
 - authorization code flow
 - refresh token / offline access
 
 Minimum scopes:
+
 - `api`
 - `refresh_token`
 - `offline_access`
 
-## Callback target
-Preferred first implementation:
-- AWS callback endpoint
+## Callback Target
+
+The OAuth callback target is the AWS backend callback endpoint.
 
 Example:
-- `https://<nativeforms-backend>/oauth/callback`
 
-The auth request should include:
-- `state=<orgId>`
+- `https://<twinaforms-backend>/oauth/callback`
 
-This allows AWS to bind the callback result to the correct tenant.
+The auth request includes org context, and AWS validates that the Salesforce org returned by OAuth matches the org that started the connection.
 
-## What AWS stores
+## Bootstrap V2 Trust Flow
+
+After OAuth succeeds:
+
+1. AWS exchanges the authorization code server-to-server using TwinaForms-owned OAuth client credentials.
+2. AWS verifies the returned Salesforce org id.
+3. AWS calls the packaged Apex REST endpoint in that authenticated org.
+4. Apex returns a per-org Bootstrap V2 signing secret generated and stored in protected package storage.
+5. AWS stores the signing secret in the org-specific Salesforce connection secret.
+6. Future package-to-AWS calls are signed with HMAC-SHA256 from Apex.
+
+The signing secret is not shown to the browser or customer.
+
+## What AWS Stores
+
 Store the TwinaForms source-org External Client App credentials once in AWS:
+
 - recommended secret name: `TwinaForms/SalesforceOAuthClient`
 - fields: `client_id`, `client_secret`
 - Lambda env var: `SALESFORCE_OAUTH_CLIENT_SECRET_NAME`
-- apply the env var and Secrets Manager read permission to `NativeFormsBackend`, `NativeForms-PrefillForm`, and `NativeForms-SubmitForm`
 
-Store one Secrets Manager entry per org:
+Store one Secrets Manager entry per Salesforce org:
+
 - `NativeForms/SalesforceConnection/<orgId>`
 
 Suggested fields:
+
 - `orgId`
 - `loginBaseUrl`
 - `oauth_client_source`
@@ -82,73 +100,72 @@ Suggested fields:
 - `id_url`
 - `token_issued_at`
 - `updated_at`
+- `bootstrap_v2_signing_secret_b64`
+- `bootstrap_v2_status`
+- `bootstrap_v2_updated_at`
 
 Also update the tenant record in DynamoDB:
+
 - `salesforceConnectionStatus`
 - `salesforceConnectionUpdatedAt`
 - optional connected user metadata
 
-## Runtime usage
+## Runtime Usage
+
 At runtime:
-1. Lambda loads form by `formId`
-2. Lambda gets `orgId` from the form record
-3. Lambda loads `NativeForms/SalesforceConnection/<orgId>`
-4. Lambda loads the central TwinaForms OAuth client credentials from AWS config/Secrets Manager
-5. Lambda refreshes access token with the tenant refresh token plus central client credentials
-6. Lambda reads or writes that subscriber org's Salesforce data
 
-## Important separation
-NativeForms has three separate trust layers:
+1. Lambda loads form data by form id / publish id.
+2. Lambda gets `orgId` from the form or tenant record.
+3. Lambda loads `NativeForms/SalesforceConnection/<orgId>`.
+4. Lambda loads the central TwinaForms OAuth client credentials from AWS Secrets Manager.
+5. Lambda refreshes the Salesforce access token with the tenant refresh token.
+6. Lambda reads or writes that subscriber org's Salesforce data.
 
-1. Tenant admin auth
-- tenant secret
-- used for `/tenant/register` and `/forms/register`
+Package-originated management calls from Salesforce to AWS use direct HTTPS endpoints plus Bootstrap V2 HMAC signatures.
 
-2. Public form auth
-- per-form `publishToken`
-- used by HTML prefill and submit
+## Important Separation
 
-3. Salesforce org connection
-- central TwinaForms OAuth client credentials
-- org-specific OAuth refresh token and instance URL
+TwinaForms has three separate trust layers:
+
+1. Salesforce org connection
+- Salesforce OAuth
+- org-specific refresh token and instance URL
 - used by AWS to call Salesforce APIs
+
+2. Package-to-AWS service access
+- per-org Bootstrap V2 signing secret
+- HMAC-signed Apex requests
+- used by Salesforce package calls to AWS
+
+3. Public form auth
+- per-form publish token
+- used by published HTML prefill and submit endpoints
 
 These should remain separate.
 
-## Packaging direction
+## Packaging Direction
+
 For the next TwinaForms managed beta package:
+
 - include the package-safe External Client App metadata in the managed package
 - package the app header and OAuth settings
-- do not package global OAuth settings, consumer credential material, or configurable policy metadata
-- do not ask subscribers to copy Consumer Key or Consumer Secret; those settings are hidden for installed External Client Apps
-- keep the subscriber setup step limited to authorizing the packaged TwinaForms app after tenant secret setup is verified
-- keep the source External Client App in the persistent Dev Hub/source org; package source must use the retrieved `orgScopedExternalApp` and `oauthLink` values from that org
-- set the Dev Hub/source External Client App refresh token policy to `Refresh token is valid until revoked`; AWS owns refresh-token use and tenant disconnect/revocation handling
-- use a subscriber-created `TwinaForms Credentials` permission set for External Credential Principal Access, because the packaged permission sets are not the right manual assignment surface in subscriber orgs
+- do not package Salesforce Named Credential metadata
+- do not package Salesforce External Credential metadata
+- do not ask subscribers to copy Consumer Key or Consumer Secret
+- do not ask subscribers to create service-access permission sets
+- keep the source External Client App in the persistent Dev Hub/source org
+- set the Dev Hub/source External Client App refresh token policy to `Refresh token is valid until revoked`
+- use packaged Remote Site Settings for direct AWS HTTPS endpoints
 
-This keeps setup customer-light while respecting Salesforce's External Client App packaging model.
+This keeps setup customer-light while keeping the Salesforce OAuth trust boundary explicit.
 
-Longer-term direction:
-- validate the packageable associated External Client App model in clean subscriber orgs
-- package only the External Client App header and OAuth settings
-- keep global OAuth settings, consumer credentials, and generated policy artifacts outside the managed package source
+## Current Implementation Note
 
-Likely package areas:
-- setup UI
-- external client app metadata
-- external credential / named credential support where needed
-- admin permission set updates
+The Lambdas support:
 
-## Current implementation note
-The Lambdas already support:
 - tenant registration
 - tenant status/subscription enforcement
 - per-org Salesforce connection lookup in Secrets Manager
+- Bootstrap V2 HMAC verification for Salesforce-originated package calls
 
-What still needs to be finalized is the package-supported connection bootstrap flow itself and the generated policies metadata after first deploy/retrieve.
-
-## Next implementation step
-Create the package-side auth scaffolding:
-- metadata folders for auth assets
-- setup UI artifact for `Connect Salesforce`
-- final decision on how the subscriber org provides the connected app/auth context
+The package should now be validated in a clean subscriber org with no Named Credential or External Credential setup.

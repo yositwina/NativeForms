@@ -1,0 +1,12 @@
+﻿HTTP/1.1 401 Unauthorized
+Date: Wed, 29 Apr 2026 07:16:42 GMT
+Content-Type: application/json
+Content-Length: 62
+Connection: keep-alive
+x-amzn-RequestId: 426d394c-7a8a-4714-beb0-fa2c75d50954
+access-control-allow-origin: *
+access-control-allow-headers: Content-Type,Authorization
+access-control-allow-methods: GET,POST,OPTIONS
+X-Amzn-Trace-Id: Root=1-69f1b05a-23082f7347667d3e34eb2e16;Parent=3c9c700a54522fc3;Sampled=0;Lineage=1:057f327a:0
+
+{"success":false,"error":"Missing Authorization bearer token"}

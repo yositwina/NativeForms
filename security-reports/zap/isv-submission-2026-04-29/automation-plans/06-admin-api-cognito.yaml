@@ -1,0 +1,50 @@
+---
+env:
+  contexts:
+    - name: TwinaForms Admin API
+      urls:
+        - https://q3ldy3bqmksfqaacu376ktnmhi0xnhok.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://q3ldy3bqmksfqaacu376ktnmhi0xnhok\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Admin health missing Cognito token is rejected
+        url: https://q3ldy3bqmksfqaacu376ktnmhi0xnhok.lambda-url.eu-north-1.on.aws/admin/health
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        responseCode: 401
+      - name: Admin tenants missing Cognito token is rejected
+        url: https://q3ldy3bqmksfqaacu376ktnmhi0xnhok.lambda-url.eu-north-1.on.aws/admin/tenants
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        responseCode: 401
+      - name: Admin settings update missing Cognito token is rejected
+        url: https://q3ldy3bqmksfqaacu376ktnmhi0xnhok.lambda-url.eu-north-1.on.aws/admin/settings
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"statusAlertEmailRecipient\":\"zap@example.com\"}"
+        responseCode: 401
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\zap\isv-submission-2026-04-29\official-reports
+      reportFile: 06-admin-api-cognito.html
+      reportTitle: TwinaForms Admin API Cognito Protection ZAP Report
+      reportDescription: Passive ZAP requestor report for the TwinaForms Admin API. Routes are scanned without Cognito tokens to prove unauthenticated rejection. This report does not run an active attack scan.

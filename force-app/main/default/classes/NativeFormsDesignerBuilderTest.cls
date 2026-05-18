@@ -31,8 +31,10 @@ private class NativeFormsDesignerBuilderTest {
             'enableProSfSecretCodeAuth' => enableSecretCode == true,
             'enableProPrefillAliasReferences' => enablePrefillAliasReferences == true,
             'enableProAdvancedSubmitModes' => enableAdvancedSubmitModes == true,
+            'enableProPageLayoutClone' => enableAdvancedSubmitModes == true,
             'enableProElectronicSignature' => enableLoadFile == true,
             'enableProSubmissionPdf' => enableLoadFile == true,
+            'enableProRecordsListRowSignaturePdf' => enableLoadFile == true,
             'enableProSurveyFields' => enableLoadFile == true,
             'enableProCustomJs' => enableCustomJs == true
         };
@@ -63,6 +65,61 @@ private class NativeFormsDesignerBuilderTest {
         );
         snapshot.effectiveLimits.put('maxForms', maxForms);
         NativeFormsTenantEntitlements.setCachedSnapshot(snapshot);
+    }
+
+    private static void setPageLayoutMock() {
+        NativeFormsDesignerController.pageLayoutImportMetadataMock = new Map<String, Object>{
+            'success' => true,
+            'objectApiName' => 'Contact',
+            'objectLabel' => 'Contact',
+            'defaultLayoutKey' => 'assigned:012000000000000AAA',
+            'layouts' => new List<Object>{
+                new Map<String, Object>{
+                    'label' => 'Contact assigned layout',
+                    'value' => 'assigned:012000000000000AAA'
+                }
+            },
+            'layout' => new Map<String, Object>{
+                'layoutKey' => 'assigned:012000000000000AAA',
+                'layoutLabel' => 'Contact assigned layout',
+                'objectApiName' => 'Contact',
+                'objectLabel' => 'Contact',
+                'sections' => new List<Object>{
+                    new Map<String, Object>{
+                        'heading' => 'Contact Information',
+                        'fields' => new List<Object>{
+                            new Map<String, Object>{
+                                'apiName' => 'FirstName',
+                                'label' => 'First Name',
+                                'required' => false,
+                                'editableForNew' => true,
+                                'editableForUpdate' => true
+                            },
+                            new Map<String, Object>{
+                                'apiName' => 'Email',
+                                'label' => 'Email',
+                                'required' => false,
+                                'editableForNew' => true,
+                                'editableForUpdate' => true
+                            }
+                        }
+                    },
+                    new Map<String, Object>{
+                        'heading' => 'Description Information',
+                        'fields' => new List<Object>{
+                            new Map<String, Object>{
+                                'apiName' => 'Description',
+                                'label' => 'Description',
+                                'required' => false,
+                                'editableForNew' => true,
+                                'editableForUpdate' => true
+                            }
+                        }
+                    }
+                },
+                'warnings' => new List<Object>()
+            }
+        };
     }
 
     private static void setFeatureFlags(
@@ -213,6 +270,8 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals(true, workspace.enableProRepeatGroups);
         System.assertEquals(true, workspace.enableProLoadFile);
         System.assertEquals(true, workspace.enableProFormulaFields);
+        System.assertEquals(true, workspace.enableProAdvancedSubmitModes);
+        System.assertEquals(true, workspace.enableProPageLayoutClone);
         System.assertEquals(true, workspace.enableProCustomJs);
         System.assertEquals(1000, workspace.maxForms);
         System.assertEquals(false, workspace.formLimitReached);
@@ -299,6 +358,21 @@ private class NativeFormsDesignerBuilderTest {
             JSON.serialize(conditionalConditions),
             ''
         );
+        NativeFormsDesignerController.updateSecretCodeSessionMode(
+            createResult.formId,
+            createResult.versionId,
+            'sameTabUntilMidnight'
+        );
+        NativeFormsDesignerController.updateVersionPostSubmitRedirectSettings(
+            createResult.formId,
+            createResult.versionId,
+            true,
+            'formula',
+            'https://example.com/thanks?id={email1}',
+            'IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")',
+            '',
+            5
+        );
         NativeFormsDesignerController.updateVersionSubmissionPdfSettings(
             createResult.formId,
             createResult.versionId,
@@ -333,9 +407,12 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('es', String.valueOf(updatedUiSettings.get('languageCode')));
         System.assertEquals(true, updatedUiSettings.get('rtlEnabled'));
         System.assertEquals(true, updatedUiSettings.get('postSubmitAutoLinkEnabled'));
+        System.assertEquals('formula', String.valueOf(updatedUiSettings.get('postSubmitUrlMode')));
         System.assertEquals('https://example.com/thanks?id={email1}', String.valueOf(updatedUiSettings.get('postSubmitUrlTemplate')));
+        System.assertEquals('IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")', String.valueOf(updatedUiSettings.get('postSubmitUrlFormula')));
         System.assertEquals(true, updatedUiSettings.get('submitConditionalEnabled'));
         System.assertEquals(false, updatedUiSettings.get('secretCodeAllowResend'));
+        System.assertEquals('sameTabUntilMidnight', String.valueOf(updatedUiSettings.get('secretCodeSessionMode')));
         System.assertEquals('window.TwinaForms.setValue("text6","+972");', updatedVersion.Custom_JS__c);
 
         NativeFormsDesignerController.DesignerWorkspace updatedWorkspace = NativeFormsDesignerController.getWorkspace(
@@ -348,10 +425,102 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('Continuar', updatedWorkspace.selectedVersionPostSubmitButtonLabel);
         System.assertEquals(true, updatedWorkspace.selectedVersionRtlEnabled);
         System.assertEquals(true, updatedWorkspace.selectedVersionPostSubmitAutoLinkEnabled);
+        System.assertEquals('formula', updatedWorkspace.selectedVersionPostSubmitUrlMode);
         System.assertEquals('https://example.com/thanks?id={email1}', updatedWorkspace.selectedVersionPostSubmitUrlTemplate);
+        System.assertEquals('IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")', updatedWorkspace.selectedVersionPostSubmitUrlFormula);
+        System.assertEquals('sameTabUntilMidnight', updatedWorkspace.selectedVersionSecretCodeSessionMode);
         System.assertEquals(true, updatedWorkspace.selectedVersionSubmitConditionalEnabled);
         System.assertEquals('email1', updatedWorkspace.selectedVersionSubmitConditionalFieldKey);
         System.assertEquals('window.TwinaForms.setValue("text6","+972");', updatedWorkspace.selectedVersionCustomJs);
+        }
+    }
+
+    @IsTest
+    static void pageLayoutImportCreatesSecureContactVerifiedDraft() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllProFlagsEnabled();
+        setPageLayoutMock();
+
+        List<NativeFormsDesignerController.SelectOption> layoutOptions = NativeFormsDesignerController.getPageLayoutImportOptions('Contact');
+        System.assertEquals(1, layoutOptions.size());
+        System.assertEquals('assigned:012000000000000AAA', layoutOptions[0].value);
+
+        NativeFormsDesignerController.PageLayoutImportPreview preview = NativeFormsDesignerController.previewPageLayoutImport(
+            'Contact',
+            layoutOptions[0].value,
+            'secureUpdateOrCreate'
+        );
+        System.assertEquals('Contact', preview.objectApiName);
+        System.assertEquals(3, preview.supportedFieldCount);
+        System.assert(preview.warnings.size() > 0);
+
+        NativeFormsDesignerController.NewFormResult result = NativeFormsDesignerController.createFormFromPageLayout(
+            '  Contact Layout Form  ',
+            null,
+            null,
+            null,
+            'Contact',
+            layoutOptions[0].value,
+            'secureUpdateOrCreate'
+        );
+
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c, Security_Mode__c, Prefill_Params_JSON__c, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :result.versionId
+        ];
+        Map<String, Object> uiSettings = jsonMap(versionRecord.UI_Settings_JSON__c);
+        System.assertEquals(true, uiSettings.get('secretCodeVerificationEnabled'));
+        System.assertEquals('Email', String.valueOf(uiSettings.get('secretCodeMatchField')));
+        System.assert(versionRecord.Prefill_Params_JSON__c.contains('recordId'));
+        System.assertEquals(result.versionId, [
+            SELECT Current_Draft_Version__c
+            FROM NF_Form__c
+            WHERE Id = :result.formId
+        ].Current_Draft_Version__c);
+
+        NF_Form_Action__c submitAction = [
+            SELECT Command_Type__c, Config_JSON__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :result.versionId
+              AND Action_Scope__c = 'Submit'
+            LIMIT 1
+        ];
+        Map<String, Object> submitConfig = jsonMap(submitAction.Config_JSON__c);
+        System.assertEquals('updateById', submitAction.Command_Type__c);
+        System.assertEquals('create', String.valueOf(submitConfig.get('onNotFound')));
+        System.assertEquals('{input.recordId}', String.valueOf(submitConfig.get('recordIdSource')));
+
+        System.assertEquals(1, [
+            SELECT COUNT()
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+              AND Element_Type__c = 'hidden'
+              AND Field_Key__c = 'recordId'
+        ]);
+        System.assert([
+            SELECT COUNT()
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+              AND Parent_Element_Id__c IN ('layout-section-1', 'layout-section-2')
+        ] > 0);
+        NF_Form_Element__c firstNameElement = [
+            SELECT Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+              AND Label__c = 'First Name'
+            LIMIT 1
+        ];
+        NF_Form_Element__c emailElement = [
+            SELECT Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+              AND Label__c = 'Email'
+            LIMIT 1
+        ];
+        System.assertEquals(2, (Integer) jsonMap(firstNameElement.Config_JSON__c).get('sectionColumn'));
+        System.assertEquals(1, (Integer) jsonMap(emailElement.Config_JSON__c).get('sectionColumn'));
+        System.assertEquals(3, result.importedFieldCount);
         }
     }
 
@@ -522,6 +691,53 @@ private class NativeFormsDesignerBuilderTest {
     }
 
     @IsTest
+    static void designerDefaultElementLabelsFollowSelectedLanguage() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllProFlagsEnabled();
+
+        NF_Form__c hebrewForm = NativeFormsTestDataFactory.createForm('Hebrew Label Defaults');
+        NF_Form_Version__c hebrewVersion = NativeFormsTestDataFactory.createDraftVersion(hebrewForm.Id);
+        hebrewVersion.UI_Settings_JSON__c = JSON.serialize(new Map<String, Object>{ 'languageCode' => 'he' });
+        update hebrewVersion;
+
+        System.assertEquals(
+            '\u05EA\u05D0\u05E8\u05D9\u05DA',
+            NativeFormsDesignerController.addElement(hebrewVersion.Id, 'date').label
+        );
+        System.assertEquals(
+            '\u05DE\u05E1\u05E4\u05E8',
+            NativeFormsDesignerController.addElement(hebrewVersion.Id, 'number').label
+        );
+        System.assertEquals(
+            '\u05D8\u05DC\u05E4\u05D5\u05DF',
+            NativeFormsDesignerController.addElement(hebrewVersion.Id, 'tel').label
+        );
+        System.assertEquals(
+            '\u05E8\u05E9\u05D9\u05DE\u05EA \u05D1\u05D7\u05D9\u05E8\u05D4',
+            NativeFormsDesignerController.addElement(hebrewVersion.Id, 'select').label
+        );
+
+        Map<String, String> expectedDateLabels = new Map<String, String>{
+            'en' => 'Date',
+            'es' => 'Fecha',
+            'de' => 'Datum',
+            'fr' => 'Date'
+        };
+        for (String languageCode : expectedDateLabels.keySet()) {
+            NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Label Defaults ' + languageCode);
+            NF_Form_Version__c versionRecord = NativeFormsTestDataFactory.createDraftVersion(formRecord.Id);
+            versionRecord.UI_Settings_JSON__c = JSON.serialize(new Map<String, Object>{ 'languageCode' => languageCode });
+            update versionRecord;
+            System.assertEquals(
+                expectedDateLabels.get(languageCode),
+                NativeFormsDesignerController.addElement(versionRecord.Id, 'date').label,
+                'Date label should follow language ' + languageCode
+            );
+        }
+        }
+    }
+
+    @IsTest
     static void designerElementPlacementUploadAndDeleteBehaviorsWork() {
         System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllProFlagsEnabled();
@@ -536,10 +752,10 @@ private class NativeFormsDesignerBuilderTest {
         NativeFormsDesignerController.ElementRecord emailRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'email');
         NativeFormsDesignerController.ElementRecord imageRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'image');
 
-        NativeFormsDesignerController.placeElementInSection(textRecord.id, sectionRecord.id, 2);
+        NativeFormsDesignerController.placeElementInSection(textRecord.id, sectionRecord.id, 10);
         NativeFormsDesignerController.insertElementAfter(emailRecord.id, textRecord.id);
         NativeFormsDesignerController.reorderElement(versionRecord.Id, emailRecord.id, 0);
-        NativeFormsDesignerController.ElementRecord updatedSection = NativeFormsDesignerController.updateSectionColumns(sectionRecord.id, 3);
+        NativeFormsDesignerController.ElementRecord updatedSection = NativeFormsDesignerController.updateSectionColumns(sectionRecord.id, 10);
 
         String encodedFile = EncodingUtil.base64Encode(Blob.valueOf('pngdata'));
         NativeFormsDesignerController.UploadedImageResult uploadedImage = NativeFormsDesignerController.uploadImageFile(
@@ -567,7 +783,7 @@ private class NativeFormsDesignerBuilderTest {
         ];
 
         System.assertEquals(sectionRecord.elementId, placedText.Parent_Element_Id__c);
-        System.assertEquals(2, (Integer) jsonMap(placedText.Config_JSON__c).get('sectionColumn'));
+        System.assertEquals(10, (Integer) jsonMap(placedText.Config_JSON__c).get('sectionColumn'));
         System.assertEquals('Time', timeRecord.label);
         System.assertEquals('time', timeRecord.elementType);
         System.assert(String.valueOf(timeRecord.fieldKey).startsWith('time'));
@@ -575,7 +791,7 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('24h', String.valueOf(jsonMap(timeRecord.configJson).get('timeFormat')));
         System.assertEquals(null, reorderedEmail.Parent_Element_Id__c);
         System.assertEquals(10, Integer.valueOf(String.valueOf(reorderedEmail.Order__c)));
-        System.assertEquals(3, (Integer) jsonMap(updatedSection.configJson).get('columns'));
+        System.assertEquals(10, (Integer) jsonMap(updatedSection.configJson).get('columns'));
         System.assertNotEquals(null, uploadedImage.contentVersionId);
         System.assert(uploadedImage.previewUrl.contains('/sfc/servlet.shepherd/version/download/'));
         System.assert(jsonMap(updatedImage.Config_JSON__c).containsKey('contentVersionId'));
@@ -648,9 +864,18 @@ private class NativeFormsDesignerBuilderTest {
             assertAuraHandled(e);
         }
 
+        NativeFormsDesignerController.ElementRecord updatedRepeatGroup = NativeFormsDesignerController.updateSectionColumns(repeatGroupRecord.id, 10);
+        System.assertEquals(10, (Integer) jsonMap(updatedRepeatGroup.configJson).get('columns'));
+
         try {
-            NativeFormsDesignerController.updateSectionColumns(repeatGroupRecord.id, 2);
-            System.assert(false, 'Only sections and groups should support explicit column counts.');
+            NativeFormsDesignerController.updateSectionColumns(sectionRecord.id, 11);
+            System.assert(false, 'Column counts above 10 should be rejected.');
+        } catch (AuraHandledException e) {
+            assertAuraHandled(e);
+        }
+        try {
+            NativeFormsDesignerController.placeElementInSection(fileUploadRecord.id, sectionRecord.id, 11);
+            System.assert(false, 'Section placement above column 10 should be rejected.');
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }

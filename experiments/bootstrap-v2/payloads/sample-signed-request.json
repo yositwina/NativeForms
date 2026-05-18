@@ -1,0 +1,28 @@
+{
+  "method": "POST",
+  "path": "/tenant/bootstrap-v2/verify-signed-call",
+  "headers": {
+    "x-twinaforms-org-id": "00Dg5000008sWZN",
+    "x-twinaforms-bootstrap-v2-timestamp": "2026-05-06T12:00:00.000Z",
+    "x-twinaforms-bootstrap-v2-nonce": "6f4f8a8b72e847a8a0a8d4d6a2c86f9f",
+    "x-twinaforms-bootstrap-v2-body-sha256": "generated-from-body",
+    "x-twinaforms-bootstrap-v2-signature": "generated-from-canonical-string",
+    "x-twinaforms-bootstrap-v2-algorithm": "HMAC-SHA256"
+  },
+  "body": {
+    "message": "hello bootstrap v2"
+  },
+  "canonicalFormat": [
+    "METHOD",
+    "PATH",
+    "ORG_ID",
+    "TIMESTAMP",
+    "NONCE",
+    "BODY_SHA256_HEX"
+  ],
+  "notes": [
+    "This is an experimental shape only.",
+    "The live Phase 1 AWS verifier uses BOOTSTRAP_V2_SPIKE_SECRET_B64 from Lambda environment.",
+    "Do not send the signing secret in request headers, query parameters, or browser-visible payloads."
+  ]
+}

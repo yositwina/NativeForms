@@ -55,14 +55,16 @@
                             </lightning-combobox>
                         </div>
 
+                        <template if:true={showPublishFormButton}>
                         <div class="designer-topbar__action">
                             <lightning-button
                                 variant="brand"
-                                label="Publish Form"
+                                label="Publish"
                                 disabled={publishDisabled}
                                 onclick={handlePublishVersion}>
                             </lightning-button>
                         </div>
+                        </template>
 
                         <template if:true={isSelectedVersionReadOnly}>
                             <div class="designer-topbar__result designer-topbar__result--error">
@@ -95,6 +97,12 @@
                             label="Clone Form"
                             onclick={handleOpenCloneFormModal}
                             disabled={cloneFormDisabled}>
+                        </lightning-button>
+                        <lightning-button
+                            variant="brand-outline"
+                            label="Create From Layout"
+                            onclick={handleOpenLayoutImportModal}
+                            disabled={layoutImportDisabled}>
                         </lightning-button>
                         <lightning-button
                             variant="brand-outline"
@@ -1085,6 +1093,7 @@
                                     </lightning-input>
                                 </template>
                                 <template if:true={selectedElementSupportsBehaviorFieldBehavior}>
+                                    <div class="settings-divider"></div>
                                     <div class="behavior-radio-group">
                                         <div class="behavior-radio-group__label-row">
                                             <label class="slds-form-element__label">User Access</label>
@@ -1106,63 +1115,6 @@
                                             </template>
                                         </div>
                                     </div>
-                                </template>
-
-                                <template if:true={showFormulaSettings}>
-                                    <div class="settings-divider"></div>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Use Formula"
-                                        checked={editorUseFormula}
-                                        onchange={handleEditorUseFormulaChange}>
-                                    </lightning-input>
-                                    <template if:true={editorUseFormula}>
-                                        <div class="selection-label-row">
-                                            <p class="selection-label selection-label--inline">Formula Expression</p>
-                                            <lightning-helptext content={formulaHelpTooltip}></lightning-helptext>
-                                            <a
-                                                class="selection-inline-link"
-                                                href={formulaHelpUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer">
-                                                Learn formulas
-                                            </a>
-                                        </div>
-                                        <div class="property-inline-row property-inline-row--label formula-token-row">
-                                            <div class="property-inline-row__grow">
-                                                <lightning-combobox
-                                                    variant="label-hidden"
-                                                    label="Insert Field"
-                                                    value={selectedFormulaFieldToken}
-                                                    options={formulaFieldTokenOptions}
-                                                    placeholder="Insert field"
-                                                    onchange={handleFormulaFieldTokenChange}>
-                                                </lightning-combobox>
-                                            </div>
-                                            <lightning-button
-                                                variant="neutral"
-                                                label="Insert"
-                                                onclick={handleInsertFormulaFieldToken}>
-                                            </lightning-button>
-                                        </div>
-                                        <div class={formulaExpressionShellClass}>
-                                            <lightning-textarea
-                                                data-id="formula-expression"
-                                                variant="label-hidden"
-                                                label="Formula Expression"
-                                                value={editorFormulaExpression}
-                                                placeholder='Example: CONCAT({firstName}, " ", {lastName})'
-                                                oninput={handleEditorFormulaExpressionInput}
-                                                onblur={handleEditorFormulaExpressionBlur}>
-                                            </lightning-textarea>
-                                        </div>
-                                        <template if:true={editorFormulaError}>
-                                            <div class="panel-error">{editorFormulaError}</div>
-                                        </template>
-                                        <template if:false={editorFormulaError}>
-                                            <p class="selection-hint">Preview: {formulaPreviewText}</p>
-                                        </template>
-                                    </template>
                                 </template>
 
                                 <template if:true={selectedElementIsNumber}>
@@ -1194,6 +1146,7 @@
                                 </template>
 
                                 <template if:true={selectedElementSupportsTextValidation}>
+                                    <div class="settings-divider"></div>
                                     <div class="selection-label-row">
                                         <p class="field-inline-label">Validation Rules</p>
                                         <lightning-helptext content={validationRulesHelpText}></lightning-helptext>
@@ -1208,6 +1161,7 @@
                                 </template>
 
                                 <template if:true={selectedElementSupportsConditional}>
+                                    <div class="settings-divider"></div>
                                     <div class="selection-label-row">
                                         <p class="field-inline-label">Show Conditionally</p>
                                         <lightning-helptext content={showConditionallyHelpText}></lightning-helptext>
@@ -1305,6 +1259,41 @@
                                         options={picklistFieldOptions}
                                         onchange={handleEditorPicklistFieldChange}>
                                     </lightning-combobox>
+                                </template>
+
+                                <template if:true={selectedElementIsLookup}>
+                                    <lightning-combobox
+                                        label="Lookup Object"
+                                        value={editorLookupTargetObject}
+                                        options={salesforceObjectOptions}
+                                        onchange={handleEditorLookupTargetObjectChange}>
+                                    </lightning-combobox>
+                                    <lightning-input
+                                        label="Search Fields"
+                                        value={editorLookupSearchFieldsText}
+                                        onblur={handleEditorLookupSearchFieldsCommit}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        label="Display Fields"
+                                        value={editorLookupDisplayFieldsText}
+                                        onblur={handleEditorLookupDisplayFieldsCommit}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="number"
+                                        label="Minimum Search Characters"
+                                        min="1"
+                                        max="10"
+                                        value={editorLookupMinSearchLength}
+                                        onblur={handleEditorLookupMinSearchLengthCommit}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="number"
+                                        label="Result Limit"
+                                        min="1"
+                                        max="25"
+                                        value={editorLookupResultLimit}
+                                        onblur={handleEditorLookupResultLimitCommit}>
+                                    </lightning-input>
                                 </template>
 
                                 <template if:true={selectedElementSupportsSurveyChoices}>
@@ -1462,14 +1451,98 @@
                                         checked={editorAllowDeleteRows}
                                         onchange={handleEditorAllowDeleteRowsChange}>
                                     </lightning-input>
-                                    <lightning-input
-                                        type="checkbox"
-                                        label="Show Labels on Each Row"
-                                        checked={editorShowLabelsOnEachRow}
-                                        onchange={handleEditorShowLabelsOnEachRowChange}>
-                                    </lightning-input>
+                                    <lightning-combobox
+                                        label="Row Field Labels"
+                                        value={editorRepeatLabelMode}
+                                        options={repeatLabelModeOptions}
+                                        onchange={handleEditorRepeatLabelModeChange}>
+                                    </lightning-combobox>
+                                    <div class="settings-divider"></div>
+                                    <div class="selection-label-row">
+                                        <p class="field-inline-label">Row Signature + PDF</p>
+                                        <lightning-helptext content="Require a physical signature on each Records List row and include those signatures in the Submission PDF."></lightning-helptext>
+                                    </div>
+                                    <template if:true={rowSignatureFeatureAvailable}>
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Require row signatures"
+                                            checked={editorRowSignatureEnabled}
+                                            onchange={handleEditorRowSignatureEnabledChange}>
+                                        </lightning-input>
+                                        <template if:true={editorRowSignatureEnabled}>
+                                            <lightning-input
+                                                type="checkbox"
+                                                label="Signature required on every submitted row"
+                                                checked={editorRowSignatureRequired}
+                                                onchange={handleEditorRowSignatureRequiredChange}>
+                                            </lightning-input>
+                                            <lightning-input
+                                                label="Signature Label"
+                                                value={editorRowSignatureLabel}
+                                                oninput={handleEditorRowSignatureLabelInput}
+                                                onblur={handleEditorRowSignatureLabelCommit}>
+                                            </lightning-input>
+                                            <lightning-input
+                                                label="Signature Help Text"
+                                                value={editorRowSignatureHelpText}
+                                                oninput={handleEditorRowSignatureHelpTextInput}
+                                                onblur={handleEditorRowSignatureHelpTextCommit}>
+                                            </lightning-input>
+                                            <lightning-input
+                                                type="checkbox"
+                                                label="Attach each row signature file to its saved row record"
+                                                checked={editorRowSignatureAttachToRowRecord}
+                                                onchange={handleEditorRowSignatureAttachToRowRecordChange}>
+                                            </lightning-input>
+                                            <p class="selection-hint selection-hint--compact">
+                                                Submission PDF is enabled automatically. The PDF title and attachment target are configured in Form Settings > Submission PDF.
+                                            </p>
+                                        </template>
+                                    </template>
+                                    <template if:false={rowSignatureFeatureAvailable}>
+                                        <p class="selection-hint selection-hint--compact">
+                                            Available on Pro when Electronic Signature, Submission PDF, and Records List Row Signature + PDF are enabled.
+                                        </p>
+                                    </template>
                                 </template>
                             </div>
+
+                            <template if:true={showFormulaSettings}>
+                                <div class="selection-card">
+                                    <p class="selection-label">Formula</p>
+                                    <div class="checkbox-help-row">
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Use Formula"
+                                            checked={editorUseFormula}
+                                            onchange={handleEditorUseFormulaChange}>
+                                        </lightning-input>
+                                        <lightning-helptext content={formulaHelpTooltip}></lightning-helptext>
+                                    </div>
+                                    <template if:true={editorUseFormula}>
+                                        <div class="settings-divider"></div>
+                                        <div class="selection-label-row">
+                                            <p class="field-inline-label">Formula Expression</p>
+                                            <lightning-helptext content={formulaHelpTooltip}></lightning-helptext>
+                                            <a
+                                                class="selection-inline-link"
+                                                href={formulaHelpUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer">
+                                                Learn formulas
+                                            </a>
+                                        </div>
+                                        <p class="selection-hint">{formulaStatusText}</p>
+                                        <button
+                                            type="button"
+                                            class="post-submit-token-row__button"
+                                            onmousedown={handleFormulaButtonMouseDown}
+                                            onclick={handleOpenFieldFormulaModal}>
+                                            {formulaButtonLabel}
+                                        </button>
+                                    </template>
+                                </div>
+                            </template>
 
                             <template if:true={selectedElementSupportsSalesforceMapping}>
                                 <div class="selection-card selection-card--salesforce">
@@ -1512,6 +1585,7 @@
                                         </div>
                                     </template>
 
+                                    <div class="settings-divider"></div>
                                     <div class="selection-label-row">
                                         <p class="field-inline-label">Enable Submit</p>
                                         <lightning-helptext content={enableSubmitHelpText}></lightning-helptext>
@@ -1561,6 +1635,16 @@
                             </template>
                         </template>
                         <template if:false={selectedElement}>
+                            <template if:true={isSavingFormSettings}>
+                                <div class="settings-saving" role="status">
+                                    <lightning-spinner
+                                        alternative-text="Saving form settings"
+                                        size="xx-small">
+                                    </lightning-spinner>
+                                    <span>Saving...</span>
+                                </div>
+                            </template>
+
                             <div class="selection-card">
                                 <p class="selection-label">Display Settings</p>
 
@@ -1594,6 +1678,7 @@
                                 </lightning-combobox>
 
                                 <lightning-input
+                                    class="form-rtl-toggle"
                                     type="checkbox"
                                     label="Enable right-to-left (RTL) layout"
                                     checked={draftRtlEnabled}
@@ -1615,21 +1700,30 @@
                                 <template if:true={showPostSubmitAutoLinkSettings}>
                                     <div class="settings-divider"></div>
 
-                                    <div class="selection-label-row">
-                                        <p class="field-inline-label">Redirect After Submit</p>
+                                    <div class="checkbox-help-row checkbox-help-row--submit-root">
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Redirect After Submit"
+                                            checked={draftPostSubmitAutoLinkEnabled}
+                                            onchange={handlePostSubmitAutoLinkChange}
+                                            onblur={handlePostSubmitAutoLinkCommit}>
+                                        </lightning-input>
                                         <lightning-helptext content={postSubmitRedirectHelpText}></lightning-helptext>
                                     </div>
-                                    <lightning-input
-                                        type="checkbox"
-                                        variant="label-hidden"
-                                        label="Redirect After Submit"
-                                        checked={draftPostSubmitAutoLinkEnabled}
-                                        onchange={handlePostSubmitAutoLinkChange}
-                                        onblur={handlePostSubmitAutoLinkCommit}>
-                                    </lightning-input>
 
                                     <template if:true={draftPostSubmitAutoLinkEnabled}>
                                         <div class="post-submit-settings" data-id="post-submit-settings">
+                                            <div class="checkbox-help-row checkbox-help-row--flush">
+                                                <lightning-input
+                                                    type="checkbox"
+                                                    label="Use Formula"
+                                                    checked={postSubmitUrlModeIsFormula}
+                                                    onchange={handlePostSubmitUrlModeFormulaChange}>
+                                                </lightning-input>
+                                                <lightning-helptext content={postSubmitFormulaHelpText}></lightning-helptext>
+                                            </div>
+
+                                            <template if:true={postSubmitUrlModeIsTemplate}>
                                             <div class="post-submit-settings__field">
                                                 <div class="selection-label-row selection-label-row--flush">
                                                     <p class="field-inline-label">URL Redirect</p>
@@ -1674,26 +1768,49 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            </template>
+
+                                            <template if:true={postSubmitUrlModeIsFormula}>
+                                            <div class="post-submit-settings__field">
+                                                <div class="selection-label-row selection-label-row--flush">
+                                                    <p class="field-inline-label">Redirect Formula</p>
+                                                    <lightning-helptext content={formulaHelpTooltip}></lightning-helptext>
+                                                    <a
+                                                        class="formula-help-link"
+                                                        href={formulaHelpUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer">
+                                                        Learn formulas
+                                                    </a>
+                                                </div>
+                                                <p class="selection-hint">{postSubmitFormulaStatusText}</p>
+                                                <button
+                                                    type="button"
+                                                    class="post-submit-token-row__button"
+                                                    onmousedown={handlePostSubmitFormulaButtonMouseDown}
+                                                    onclick={handleOpenPostSubmitFormulaModal}>
+                                                    {postSubmitFormulaButtonLabel}
+                                                </button>
+                                            </div>
+                                            </template>
                                         </div>
                                     </template>
                                 </template>
                             </div>
 
                             <div class="selection-card">
-                                <div class="selection-label-row">
-                                    <p class="field-inline-label">Submission PDF</p>
-                                    <lightning-helptext content="Generate a readable PDF copy of the submitted response. V1 includes fields, display text, and images in the published form order."></lightning-helptext>
-                                </div>
+                                <p class="selection-label">Submission PDF</p>
 
                                 <template if:true={enableProSubmissionPdf}>
-                                    <lightning-input
-                                        type="checkbox"
-                                        variant="label-hidden"
-                                        label="Generate Submission PDF"
-                                        checked={draftSubmissionPdfEnabled}
-                                        onchange={handleSubmissionPdfEnabledChange}
-                                        onblur={handleSubmissionPdfSettingsCommit}>
-                                    </lightning-input>
+                                    <div class="checkbox-help-row">
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Generate PDF"
+                                            checked={draftSubmissionPdfEnabled}
+                                            onchange={handleSubmissionPdfEnabledChange}>
+                                        </lightning-input>
+                                        <lightning-helptext content="Generate a readable PDF copy of the submitted response. V1 includes fields, display text, and images in the published form order."></lightning-helptext>
+                                    </div>
 
                                     <template if:true={draftSubmissionPdfEnabled}>
                                         <lightning-input
@@ -1709,16 +1826,14 @@
                                             type="checkbox"
                                             label="Include empty fields"
                                             checked={draftSubmissionPdfIncludeEmptyFields}
-                                            onchange={handleSubmissionPdfIncludeEmptyFieldsChange}
-                                            onblur={handleSubmissionPdfSettingsCommit}>
+                                            onchange={handleSubmissionPdfIncludeEmptyFieldsChange}>
                                         </lightning-input>
 
                                         <lightning-input
                                             type="checkbox"
                                             label="Attach PDF to Salesforce record"
                                             checked={draftSubmissionPdfAttachToRecord}
-                                            onchange={handleSubmissionPdfAttachToRecordChange}
-                                            onblur={handleSubmissionPdfSettingsCommit}>
+                                            onchange={handleSubmissionPdfAttachToRecordChange}>
                                         </lightning-input>
 
                                         <template if:true={draftSubmissionPdfAttachToRecord}>
@@ -1726,8 +1841,7 @@
                                                 label="Attach to Submit Action"
                                                 value={draftSubmissionPdfTargetSubmitActionKey}
                                                 options={submissionPdfTargetActionOptions}
-                                                onchange={handleSubmissionPdfTargetActionChange}
-                                                onblur={handleSubmissionPdfSettingsCommit}>
+                                                onchange={handleSubmissionPdfTargetActionChange}>
                                             </lightning-combobox>
                                         </template>
                                     </template>
@@ -1905,6 +2019,18 @@
                                                 checked={draftSecretCodeAllowResend}
                                                 onchange={handleSecretCodeAllowResendChange}>
                                             </lightning-input>
+
+                                            <div class="selection-label-row selection-label-row--flush">
+                                                <p class="field-inline-label">Keep Session Until Midnight</p>
+                                                <lightning-helptext content={secretCodeSameTabSessionHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-input
+                                                type="checkbox"
+                                                variant="label-hidden"
+                                                label="Keep verified session until midnight in this browser tab"
+                                                checked={draftSecretCodeKeepSessionUntilMidnight}
+                                                onchange={handleSecretCodeSessionModeChange}>
+                                            </lightning-input>
                                         </div>
                                     </template>
                                 </template>
@@ -1993,6 +2119,105 @@
                                     class="slds-m-left_small"
                                     disabled={newFormCreateDisabled}
                                     onclick={handleCreateNewForm}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showLayoutImportModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="layout-import-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-new-form-modal designer-layout-import-modal">
+                            <header class="slds-modal__header designer-layout-import-modal__header">
+                                <h2 id="layout-import-modal-heading" class="slds-modal__title slds-hyphenate designer-layout-import-modal__title">Create a Form Based on Object Page Layout</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <template if:true={showFormLimitWarning}>
+                                    <div class="designer-limit-alert">
+                                        <p><strong>{formLimitUsageLabel}</strong></p>
+                                        <p>{formLimitMessage}</p>
+                                        <a href={upgradeUrl} target="_blank" rel="noopener">Upgrade plan</a>
+                                    </div>
+                                </template>
+                                <lightning-textarea
+                                    label="Form Name"
+                                    value={layoutImportDescription}
+                                    disabled={formLimitReached}
+                                    onchange={handleLayoutImportDescriptionChange}
+                                    max-length="255">
+                                </lightning-textarea>
+                                <lightning-combobox
+                                    label="Project"
+                                    value={layoutImportProjectId}
+                                    options={layoutImportProjectOptions}
+                                    disabled={formLimitReached}
+                                    onchange={handleLayoutImportProjectChange}>
+                                </lightning-combobox>
+                                <template if:true={showLayoutImportProjectNameInput}>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <p class="field-inline-label">Project Name</p>
+                                        <lightning-helptext content={projectNameHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-input
+                                        type="text"
+                                        variant="label-hidden"
+                                        label="Project Name"
+                                        value={layoutImportProjectName}
+                                        disabled={formLimitReached}
+                                        onchange={handleLayoutImportProjectNameChange}
+                                        max-length="80">
+                                    </lightning-input>
+                                </template>
+                                <lightning-combobox
+                                    label="Salesforce Object"
+                                    value={layoutImportObjectApiName}
+                                    options={salesforceObjectOptions}
+                                    disabled={formLimitReached}
+                                    onchange={handleLayoutImportObjectChange}>
+                                </lightning-combobox>
+                                <lightning-combobox
+                                    label="Page Layout Source"
+                                    value={layoutImportLayoutKey}
+                                    options={layoutImportLayoutOptions}
+                                    disabled={layoutImportLayoutSourceDisabled}
+                                    onchange={handleLayoutImportLayoutChange}>
+                                </lightning-combobox>
+                                <lightning-combobox
+                                    label="Submit Mode"
+                                    value={layoutImportMode}
+                                    options={layoutImportModeOptions}
+                                    disabled={formLimitReached}
+                                    onchange={handleLayoutImportModeChange}>
+                                </lightning-combobox>
+                                <template if:true={isLoadingLayoutMetadata}>
+                                    <div class="designer-layout-import-loading">
+                                        <lightning-spinner
+                                            size="small"
+                                            alternative-text="Loading Salesforce layout">
+                                        </lightning-spinner>
+                                    </div>
+                                </template>
+                                <template if:true={layoutImportPreviewSummary}>
+                                    <p class="designer-new-form-help">{layoutImportPreviewSummary}</p>
+                                </template>
+                                <template for:each={layoutImportWarnings} for:item="warning">
+                                    <p key={warning} class="designer-new-form-help">{warning}</p>
+                                </template>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    disabled={isImportingLayout}
+                                    onclick={handleCloseLayoutImportModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Create Form"
+                                    class="slds-m-left_small"
+                                    disabled={layoutImportCreateDisabled}
+                                    onclick={handleCreateFromLayout}>
                                 </lightning-button>
                             </footer>
                         </div>
@@ -2089,6 +2314,157 @@
                                     label="Save"
                                     class="slds-m-left_small"
                                     onclick={handleSaveDisplayTextModal}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showPostSubmitFormulaModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="post-submit-formula-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-custom-js-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="post-submit-formula-modal-heading" class="slds-modal__title slds-hyphenate">Edit Redirect Formula</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Redirect Formula</p>
+                                    <lightning-helptext content={postSubmitFormulaHelpText}></lightning-helptext>
+                                    <a
+                                        class="selection-inline-link"
+                                        href={formulaHelpUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer">
+                                        Learn formulas
+                                    </a>
+                                </div>
+                                <p class="selection-hint">
+                                    Help page:
+                                    <a href="https://twinaforms.com/help/formulas" target="_blank" rel="noopener noreferrer">
+                                        Open formula help
+                                    </a>
+                                </p>
+                                <div class="post-submit-token-row">
+                                    <lightning-combobox
+                                        variant="label-hidden"
+                                        label="Insert Field"
+                                        value={selectedPostSubmitFormulaFieldToken}
+                                        options={postSubmitFormulaFieldTokenOptions}
+                                        onchange={handlePostSubmitFormulaFieldTokenChange}>
+                                    </lightning-combobox>
+                                    <div class="post-submit-token-row__action">
+                                        <button
+                                            type="button"
+                                            class="post-submit-token-row__button"
+                                            onclick={handleInsertPostSubmitFormulaFieldToken}>
+                                            Insert
+                                        </button>
+                                        <lightning-helptext content={insertTokenButtonHelpText}></lightning-helptext>
+                                    </div>
+                                </div>
+                                <div class={postSubmitFormulaExpressionShellClass}>
+                                    <textarea
+                                        class="slds-textarea post-submit-formula-modal__textarea"
+                                        data-id="post-submit-url-formula"
+                                        rows="6"
+                                        oninput={handlePostSubmitUrlFormulaInput}
+                                        spellcheck="false"></textarea>
+                                </div>
+                                <template if:true={modalPostSubmitUrlFormulaError}>
+                                    <p class="selection-hint selection-hint--error">{modalPostSubmitUrlFormulaError}</p>
+                                </template>
+                                <template if:true={modalPostSubmitUrlFormulaPreviewValue}>
+                                    <p class="selection-hint">Preview: {postSubmitModalFormulaPreviewText}</p>
+                                </template>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    onclick={handleClosePostSubmitFormulaModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Save"
+                                    class="slds-m-left_small"
+                                    onclick={handleSavePostSubmitFormulaModal}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showFieldFormulaModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="field-formula-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-custom-js-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="field-formula-modal-heading" class="slds-modal__title slds-hyphenate">Edit Field Formula</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Formula Expression</p>
+                                    <lightning-helptext content={formulaHelpTooltip}></lightning-helptext>
+                                    <a
+                                        class="selection-inline-link"
+                                        href={formulaHelpUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer">
+                                        Learn formulas
+                                    </a>
+                                </div>
+                                <p class="selection-hint">
+                                    Help page:
+                                    <a href="https://twinaforms.com/help/formulas" target="_blank" rel="noopener noreferrer">
+                                        Open formula help
+                                    </a>
+                                </p>
+                                <div class="post-submit-token-row">
+                                    <lightning-combobox
+                                        variant="label-hidden"
+                                        label="Insert Field"
+                                        value={selectedFormulaFieldToken}
+                                        options={formulaFieldTokenOptions}
+                                        placeholder="Insert field"
+                                        onchange={handleFormulaFieldTokenChange}>
+                                    </lightning-combobox>
+                                    <div class="post-submit-token-row__action">
+                                        <button
+                                            type="button"
+                                            class="post-submit-token-row__button"
+                                            onclick={handleInsertFormulaFieldToken}>
+                                            Insert
+                                        </button>
+                                        <lightning-helptext content={insertTokenButtonHelpText}></lightning-helptext>
+                                    </div>
+                                </div>
+                                <div class={formulaExpressionShellClass}>
+                                    <textarea
+                                        class="slds-textarea post-submit-formula-modal__textarea"
+                                        data-id="formula-expression"
+                                        rows="6"
+                                        oninput={handleEditorFormulaExpressionInput}
+                                        spellcheck="false"></textarea>
+                                </div>
+                                <template if:true={modalFormulaError}>
+                                    <p class="selection-hint selection-hint--error">{modalFormulaError}</p>
+                                </template>
+                                <template if:true={modalFormulaPreviewText}>
+                                    <p class="selection-hint">Preview: {modalFormulaPreviewText}</p>
+                                </template>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    onclick={handleCloseFieldFormulaModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Save"
+                                    class="slds-m-left_small"
+                                    onclick={handleSaveFieldFormulaModal}>
                                 </lightning-button>
                             </footer>
                         </div>

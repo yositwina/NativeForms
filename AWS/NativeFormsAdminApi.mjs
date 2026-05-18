@@ -1,4 +1,5 @@
 import {
+  DeleteItemCommand,
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
@@ -19,6 +20,10 @@ const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const REQUIRE_ADMIN_AUTH = String(process.env.REQUIRE_ADMIN_AUTH || "").toLowerCase() === "true";
+const COGNITO_REGION = process.env.COGNITO_REGION || process.env.AWS_REGION || "eu-north-1";
+const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || "";
+const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID || "";
+const COGNITO_REQUIRED_GROUP = process.env.COGNITO_REQUIRED_GROUP || "";
 const EDITABLE_PLAN_CODES = new Set(["free", "trial", "starter", "pro"]);
 const DEFAULT_STATUS_ALERT_EMAIL = process.env.DEFAULT_STATUS_ALERT_EMAIL || "yosi@harmony-it.co.il";
 const SES_FROM = process.env.SES_FROM || "yosi@harmony-it.co.il";
@@ -40,6 +45,10 @@ const FEATURE_FLAG_METADATA = {
     label: "Advanced Submit Actions",
     description: "Use richer submit flows like find-and-update or update-by-id for more advanced Salesforce writeback behavior."
   },
+  enableProPageLayoutClone: {
+    label: "Page Layout Clone",
+    description: "Create a draft TwinaForms form from supported Salesforce page-layout fields."
+  },
   enableProFormulaFields: {
     label: "Calculated Fields",
     description: "Generate values automatically inside the form instead of asking users to enter them manually."
@@ -56,6 +65,18 @@ const FEATURE_FLAG_METADATA = {
     label: "File Uploads",
     description: "Allow Pro forms to upload files as part of the form experience and submission flow."
   },
+  enableProElectronicSignature: {
+    label: "Electronic Signature",
+    description: "Capture drawn signatures and attach them to submitted Salesforce records."
+  },
+  enableProSubmissionPdf: {
+    label: "Submission PDF",
+    description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
+  },
+  enableProSurveyFields: {
+    label: "Survey Fields",
+    description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
+  },
   enableProCustomJs: {
     label: "Custom JavaScript",
     description: "Run supported TwinaForms custom JavaScript in published forms for advanced behavior."
@@ -65,6 +86,12 @@ const FEATURE_FLAG_METADATA = {
     description: "See richer troubleshooting detail for submissions, runtime behavior, and processing outcomes."
   }
 };
+
+const cognitoIssuer = COGNITO_USER_POOL_ID
+  ? `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`
+  : "";
+let cognitoJwksCache = null;
+let cognitoJwksCacheExpiresAt = 0;
 
 const DEFAULT_PLANS = [
   {
@@ -86,10 +113,14 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: false,
       enableProPrefillAliasReferences: false,
       enableProAdvancedSubmitModes: false,
+      enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
       enableProLoadFile: false,
+      enableProElectronicSignature: false,
+      enableProSubmissionPdf: false,
+      enableProSurveyFields: false,
       enableProCustomJs: false,
       enableDetailedSubmissionLogs: false
     }
@@ -113,10 +144,14 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: true,
       enableProPrefillAliasReferences: true,
       enableProAdvancedSubmitModes: true,
+      enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
       enableProLoadFile: true,
+      enableProElectronicSignature: true,
+      enableProSubmissionPdf: true,
+      enableProSurveyFields: true,
       enableProCustomJs: true,
       enableDetailedSubmissionLogs: true
     }
@@ -140,10 +175,14 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: false,
       enableProPrefillAliasReferences: false,
       enableProAdvancedSubmitModes: false,
+      enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
       enableProLoadFile: false,
+      enableProElectronicSignature: false,
+      enableProSubmissionPdf: false,
+      enableProSurveyFields: false,
       enableProCustomJs: false,
       enableDetailedSubmissionLogs: true
     }
@@ -167,10 +206,14 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: true,
       enableProPrefillAliasReferences: true,
       enableProAdvancedSubmitModes: true,
+      enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
       enableProLoadFile: true,
+      enableProElectronicSignature: true,
+      enableProSubmissionPdf: true,
+      enableProSurveyFields: true,
       enableProCustomJs: true,
       enableDetailedSubmissionLogs: true
     }
@@ -221,7 +264,97 @@ function getBearerToken(headers) {
   return match ? match[1].trim() : null;
 }
 
-function assertAdminAccess(headers) {
+function decodeBase64Url(value) {
+  const normalized = String(value || "").replaceAll("-", "+").replaceAll("_", "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return Buffer.from(padded, "base64");
+}
+
+function decodeJwtPart(value) {
+  return JSON.parse(decodeBase64Url(value).toString("utf8"));
+}
+
+async function getCognitoJwks() {
+  const now = Date.now();
+  if (cognitoJwksCache && cognitoJwksCacheExpiresAt > now) {
+    return cognitoJwksCache;
+  }
+
+  const response = await fetch(`${cognitoIssuer}/.well-known/jwks.json`);
+  if (!response.ok) {
+    throw new Error(`Could not load Cognito signing keys (${response.status}).`);
+  }
+
+  cognitoJwksCache = await response.json();
+  cognitoJwksCacheExpiresAt = now + (60 * 60 * 1000);
+  return cognitoJwksCache;
+}
+
+async function verifyCognitoJwt(token) {
+  if (!COGNITO_USER_POOL_ID || !COGNITO_CLIENT_ID || !cognitoIssuer) {
+    const error = new Error("Admin authentication is enabled but Cognito is not configured.");
+    error.statusCode = 500;
+    error.code = "ADMIN_AUTH_NOT_CONFIGURED";
+    throw error;
+  }
+
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) {
+    const error = new Error("Missing or invalid admin token.");
+    error.statusCode = 401;
+    error.code = "UNAUTHORIZED";
+    throw error;
+  }
+
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const header = decodeJwtPart(encodedHeader);
+  const payload = decodeJwtPart(encodedPayload);
+  const jwks = await getCognitoJwks();
+  const jwk = (jwks.keys || []).find((candidate) => candidate.kid === header.kid);
+
+  if (!jwk || header.alg !== "RS256") {
+    const error = new Error("Missing or invalid admin token.");
+    error.statusCode = 401;
+    error.code = "UNAUTHORIZED";
+    throw error;
+  }
+
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+
+  const verified = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    decodeBase64Url(encodedSignature),
+    new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
+  );
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const clientMatches = payload.client_id === COGNITO_CLIENT_ID || payload.aud === COGNITO_CLIENT_ID;
+  const groupMatches = !COGNITO_REQUIRED_GROUP || (payload["cognito:groups"] || []).includes(COGNITO_REQUIRED_GROUP);
+
+  if (!verified
+    || payload.iss !== cognitoIssuer
+    || !["access", "id"].includes(payload.token_use)
+    || !clientMatches
+    || Number(payload.exp || 0) <= nowSeconds
+    || Number(payload.nbf || 0) > nowSeconds
+    || !groupMatches) {
+    const error = new Error("Missing or invalid admin token.");
+    error.statusCode = 401;
+    error.code = "UNAUTHORIZED";
+    throw error;
+  }
+
+  return payload;
+}
+
+async function assertAdminAccess(headers) {
   if (!REQUIRE_ADMIN_AUTH) {
     return;
   }
@@ -233,6 +366,8 @@ function assertAdminAccess(headers) {
     error.code = "UNAUTHORIZED";
     throw error;
   }
+
+  await verifyCognitoJwt(token);
 }
 
 function fromAttributeValue(attributeValue) {
@@ -348,6 +483,15 @@ async function putItem(tableName, item) {
   await dynamoClient.send(new PutItemCommand({
     TableName: tableName,
     Item: marshallItem(item)
+  }));
+}
+
+async function deleteItemByKey(tableName, keyName, keyValue) {
+  await dynamoClient.send(new DeleteItemCommand({
+    TableName: tableName,
+    Key: {
+      [keyName]: { S: keyValue }
+    }
   }));
 }
 
@@ -1388,7 +1532,7 @@ export const handler = async (event) => {
   }
 
   try {
-    assertAdminAccess(event?.headers);
+    await assertAdminAccess(event?.headers);
 
     const plansResult = await loadPlans();
     const plans = plansResult.items;
@@ -1474,6 +1618,39 @@ export const handler = async (event) => {
 
       return jsonResponse(200, success({
         tenant: detail
+      }));
+    }
+
+    if (((method === "DELETE" && parts.length === 3) || (method === "POST" && parts.length === 4 && parts[3] === "delete-tenant"))
+      && parts[0] === "admin"
+      && parts[1] === "tenants") {
+      const orgId = normalizeOrgId(parts[2]);
+      const tenant = await getItemByKey(TENANT_TABLE, "orgId", orgId);
+
+      if (!tenant) {
+        return failure("TENANT_NOT_FOUND", "Tenant was not found.", 404);
+      }
+
+      const body = parseJsonBody(event?.body);
+      await deleteItemByKey(TENANT_TABLE, "orgId", orgId);
+      const auditEntries = await recordAuditEntries([
+        buildAuditEntry({
+          orgId,
+          actionType: "delete_tenant_record",
+          actionLabel: "Deleted tenant record",
+          actorEmail: body.actorEmail,
+          reason: body.reason || "Tenant DynamoDB record was deleted from the Admin Control App. Secrets Manager was not changed.",
+          summary: `Deleted tenant DynamoDB record for ${tenant.companyName || orgId}. Secrets Manager was not changed.`,
+          before: buildTenantDetail(tenant, plansByCode),
+          after: null
+        })
+      ]);
+
+      return jsonResponse(200, success({
+        orgId,
+        deleted: true,
+        auditEntries,
+        message: "Tenant DynamoDB record deleted. Secrets Manager was not changed."
       }));
     }
 

@@ -9,6 +9,8 @@ import installDemoData from '@salesforce/apex/NativeFormsDemoDataController.inst
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const CONNECT_STATE_KEY = 'nativeforms:connectState';
+const HOME_REFRESH_EVENT = 'nativeforms:home-refresh-requested';
+const HOME_REFRESH_SESSION_KEY = 'nativeforms:home-refresh-pending';
 const CONNECTION_POLL_MS = 5000;
 const SERVICE_ACCESS_RETRY_MS = 1500;
 const SERVICE_ACCESS_RETRY_COUNT = 4;
@@ -534,12 +536,45 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
     }
 
     navigateToHome() {
+        this.markHomeRefreshPending();
+        this.requestHomeRefresh();
         this[NavigationMixin.Navigate]({
             type: 'standard__navItemPage',
             attributes: {
                 apiName: this.homeTabApiName || 'NativeForms_Home'
             }
         });
+        this.requestHomeRefreshAfterNavigation();
+    }
+
+    markHomeRefreshPending() {
+        try {
+            window.sessionStorage?.setItem(HOME_REFRESH_SESSION_KEY, 'true');
+        } catch (error) {
+            // The event-based refresh still runs if session storage is unavailable.
+        }
+    }
+
+    requestHomeRefreshAfterNavigation() {
+        [250, 800, 1600].forEach((delayMs) => {
+            window.setTimeout(() => {
+                this.requestHomeRefresh();
+            }, delayMs);
+        });
+    }
+
+    requestHomeRefresh() {
+        try {
+            window.dispatchEvent(new CustomEvent(HOME_REFRESH_EVENT, {
+                detail: {
+                    source: 'connect',
+                    orgId: this.orgId,
+                    timestamp: Date.now()
+                }
+            }));
+        } catch (error) {
+            // Navigation still works if the refresh signal cannot be dispatched.
+        }
     }
 
     async changeAccess(userId, accessType, enabled, successToastMessage) {

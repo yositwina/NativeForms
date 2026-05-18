@@ -28,6 +28,7 @@ Define the first supported scope for the NativeForms Salesforce builder so devel
 - select
 - checkbox
 - radio
+- lookup
 - image
 - section
 - columns
@@ -43,6 +44,7 @@ Define the first supported scope for the NativeForms Salesforce builder so devel
 - select
 - checkbox
 - radio
+- lookup
 - hidden
 
 ### Supported repeat group capabilities

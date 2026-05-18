@@ -5,13 +5,21 @@ import {
   QueryCommand,
   ScanCommand,
 } from "@aws-sdk/client-dynamodb";
+import {
+  GetSecretValueCommand,
+  SecretsManagerClient
+} from "@aws-sdk/client-secrets-manager";
 import crypto from "node:crypto";
+import { verifyBootstrapV2SignedPayload } from "./bootstrap-v2-hmac.mjs";
 
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
+const SALESFORCE_CONNECTION_SECRET_PREFIX =
+  process.env.SALESFORCE_CONNECTION_SECRET_PREFIX || "NativeForms/SalesforceConnection";
 
 const dynamoClient = new DynamoDBClient({});
+const secretsClient = new SecretsManagerClient({});
 
 function jsonResponse(statusCode, payload) {
   return {
@@ -20,7 +28,7 @@ function jsonResponse(statusCode, payload) {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization"
+      "Access-Control-Allow-Headers": "Content-Type,Authorization,X-TwinaForms-Org-Id,X-TwinaForms-Bootstrap-V2-Timestamp,X-TwinaForms-Bootstrap-V2-Nonce,X-TwinaForms-Bootstrap-V2-Body-Sha256,X-TwinaForms-Bootstrap-V2-Signature,X-TwinaForms-Bootstrap-V2-Algorithm"
     },
     body: JSON.stringify(payload)
   };
@@ -34,16 +42,6 @@ function getHeaderValue(headers, name) {
     }
   }
   return undefined;
-}
-
-function getBearerToken(headers) {
-  const authorization = getHeaderValue(headers, "Authorization");
-  if (!authorization) {
-    return null;
-  }
-
-  const match = String(authorization).match(/^Bearer\s+(.+)$/i);
-  return match ? match[1].trim() : null;
 }
 
 function validateOrgId(orgId) {
@@ -324,7 +322,64 @@ async function getTenantRecord(orgId) {
   return result.Item ? unmarshallItem(result.Item) : null;
 }
 
-async function requireTenantSecret(headers, orgId) {
+function getSalesforceConnectionSecretName(orgId) {
+  return `${SALESFORCE_CONNECTION_SECRET_PREFIX}/${normalizeOrgId(orgId)}`;
+}
+
+async function getSalesforceConnection(secretName) {
+  try {
+    const result = await secretsClient.send(
+      new GetSecretValueCommand({
+        SecretId: secretName
+      })
+    );
+    return result?.SecretString ? JSON.parse(result.SecretString) : null;
+  } catch (error) {
+    if (error?.name === "ResourceNotFoundException") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function hasBootstrapV2SignatureHeaders(headers) {
+  return !!(
+    getHeaderValue(headers, "x-twinaforms-org-id") &&
+    getHeaderValue(headers, "x-twinaforms-bootstrap-v2-signature") &&
+    getHeaderValue(headers, "x-twinaforms-bootstrap-v2-nonce")
+  );
+}
+
+async function requireBootstrapV2Signature(authContext, orgId) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+  const connectionRecord = await getSalesforceConnection(getSalesforceConnectionSecretName(normalizedOrgId));
+  const signingSecretB64 = connectionRecord?.bootstrap_v2_signing_secret_b64;
+  if (!signingSecretB64) {
+    const error = new Error("Unauthorized: Bootstrap V2 signing secret is not available.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const verification = verifyBootstrapV2SignedPayload({
+    method: authContext.method,
+    path: authContext.path,
+    headers: authContext.headers,
+    body: authContext.body,
+    signingSecretB64
+  });
+  if (!verification.ok) {
+    const error = new Error(`Unauthorized: ${verification.error || "invalid Bootstrap V2 signature"}`);
+    error.statusCode = verification.statusCode || 401;
+    throw error;
+  }
+  if (normalizeOrgId(verification.orgId) !== normalizedOrgId) {
+    const error = new Error("Unauthorized: Bootstrap V2 signature org mismatch.");
+    error.statusCode = 401;
+    throw error;
+  }
+}
+
+async function requireTenantAuth(authContext, orgId) {
   const normalizedOrgId = normalizeOrgId(orgId);
   if (!normalizedOrgId) {
     const error = new Error("Missing required field: orgId");
@@ -338,13 +393,13 @@ async function requireTenantSecret(headers, orgId) {
     throw error;
   }
 
-  const bearerToken = getBearerToken(headers);
-  if (!bearerToken) {
-    const error = new Error("Missing Authorization bearer token");
+  if (!hasBootstrapV2SignatureHeaders(authContext.headers)) {
+    const error = new Error("Missing Bootstrap V2 signature headers");
     error.statusCode = 401;
     throw error;
   }
 
+  await requireBootstrapV2Signature(authContext, normalizedOrgId);
   const tenantRecord = await getTenantRecord(normalizedOrgId);
   if (!tenantRecord) {
     const error = new Error("Tenant not found");
@@ -352,18 +407,12 @@ async function requireTenantSecret(headers, orgId) {
     throw error;
   }
 
-  if (tenantRecord.secret !== bearerToken) {
-    const error = new Error("Unauthorized: invalid tenant secret");
-    error.statusCode = 401;
-    throw error;
-  }
-
   return tenantRecord;
 }
 
-async function getSubmissionLogConfigStatus(headers, queryStringParameters) {
+async function getSubmissionLogConfigStatus(authContext, queryStringParameters) {
   const normalizedOrgId = normalizeOrgId(queryStringParameters?.orgId);
-  const tenantRecord = await requireTenantSecret(headers, normalizedOrgId);
+  const tenantRecord = await requireTenantAuth(authContext, normalizedOrgId);
   const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
   const effectiveConfig = buildEffectiveConfig(tenantRecord, planDefinition);
 
@@ -381,9 +430,9 @@ async function getSubmissionLogConfigStatus(headers, queryStringParameters) {
   });
 }
 
-async function syncSubmissionLogConfig(headers, body) {
+async function syncSubmissionLogConfig(authContext, body) {
   const normalizedOrgId = normalizeOrgId(body?.orgId);
-  const tenantRecord = await requireTenantSecret(headers, normalizedOrgId);
+  const tenantRecord = await requireTenantAuth(authContext, normalizedOrgId);
   const publicKeyValue = String(body?.submissionLogPublicKey || "").trim();
   const keyVersion = String(body?.submissionLogKeyVersion || "v2").trim() || "v2";
 
@@ -515,9 +564,9 @@ function mapLogListItem(item) {
   };
 }
 
-async function listSubmissionLogs(headers, queryStringParameters) {
+async function listSubmissionLogs(authContext, queryStringParameters) {
   const normalizedOrgId = normalizeOrgId(queryStringParameters?.orgId);
-  const tenantRecord = await requireTenantSecret(headers, normalizedOrgId);
+  const tenantRecord = await requireTenantAuth(authContext, normalizedOrgId);
   const requestConfig = buildListQuery(tenantRecord, queryStringParameters);
   let items = [];
   let nextToken = null;
@@ -543,9 +592,9 @@ async function listSubmissionLogs(headers, queryStringParameters) {
   });
 }
 
-async function getSubmissionLogDetail(headers, pathId, queryStringParameters) {
+async function getSubmissionLogDetail(authContext, pathId, queryStringParameters) {
   const normalizedOrgId = normalizeOrgId(queryStringParameters?.orgId);
-  await requireTenantSecret(headers, normalizedOrgId);
+  await requireTenantAuth(authContext, normalizedOrgId);
   const submissionId = decodeURIComponent(String(pathId || "").trim());
   if (!submissionId) {
     const error = new Error("Missing required path parameter: submissionId");
@@ -591,29 +640,40 @@ export const handler = async (event) => {
     const routePath = event?.rawPath || event?.path || "/";
     const headers = event?.headers || {};
     const queryStringParameters = event?.queryStringParameters || {};
+    const rawBody = event?.body
+      ? (event.isBase64Encoded
+        ? Buffer.from(event.body, "base64").toString("utf8")
+        : String(event.body))
+      : "";
+    const authContext = {
+      method,
+      path: routePath,
+      headers,
+      body: rawBody
+    };
 
     if (method === "OPTIONS") {
       return jsonResponse(200, { success: true });
     }
 
     if (method === "POST" && routePath.endsWith("/submission-log-config/sync")) {
-      const body = event?.body
-        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+      const body = rawBody
+        ? JSON.parse(rawBody)
         : {};
-      return await syncSubmissionLogConfig(headers, body);
+      return await syncSubmissionLogConfig(authContext, body);
     }
 
     if (method === "GET" && routePath.endsWith("/submission-log-config/status")) {
-      return await getSubmissionLogConfigStatus(headers, queryStringParameters);
+      return await getSubmissionLogConfigStatus(authContext, queryStringParameters);
     }
 
     if (method === "GET" && /\/submission-logs\/[^/]+$/.test(routePath)) {
       const pathId = routePath.split("/").pop();
-      return await getSubmissionLogDetail(headers, pathId, queryStringParameters);
+      return await getSubmissionLogDetail(authContext, pathId, queryStringParameters);
     }
 
     if (method === "GET" && routePath.endsWith("/submission-logs")) {
-      return await listSubmissionLogs(headers, queryStringParameters);
+      return await listSubmissionLogs(authContext, queryStringParameters);
     }
 
     return jsonResponse(404, {

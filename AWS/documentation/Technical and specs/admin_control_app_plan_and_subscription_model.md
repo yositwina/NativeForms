@@ -96,6 +96,7 @@ Suggested values:
     "enableProRepeatGroups": false,
     "enableProPrefillAliasReferences": false,
     "enableProAdvancedSubmitModes": false,
+    "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
     "enableProSfSecretCodeAuth": false,
@@ -178,6 +179,7 @@ This is where Pro feature defaults live.
     "enableProRepeatGroups": false,
     "enableProPrefillAliasReferences": false,
     "enableProAdvancedSubmitModes": false,
+    "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
     "enableProSfSecretCodeAuth": false,
@@ -207,6 +209,7 @@ This is where Pro feature defaults live.
     "enableProRepeatGroups": true,
     "enableProPrefillAliasReferences": true,
     "enableProAdvancedSubmitModes": true,
+    "enableProPageLayoutClone": true,
     "enableProFormulaFields": true,
     "enableProPostSubmitAutoLink": true,
     "enableProSfSecretCodeAuth": true,
@@ -236,6 +239,7 @@ This is where Pro feature defaults live.
     "enableProRepeatGroups": false,
     "enableProPrefillAliasReferences": false,
     "enableProAdvancedSubmitModes": false,
+    "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
     "enableProSfSecretCodeAuth": false,
@@ -265,6 +269,7 @@ This is where Pro feature defaults live.
     "enableProRepeatGroups": true,
     "enableProPrefillAliasReferences": true,
     "enableProAdvancedSubmitModes": true,
+    "enableProPageLayoutClone": true,
     "enableProFormulaFields": true,
     "enableProPostSubmitAutoLink": true,
     "enableProSfSecretCodeAuth": true,
@@ -338,6 +343,7 @@ Example:
   "enableProRepeatGroups": false,
   "enableProPrefillAliasReferences": false,
   "enableProAdvancedSubmitModes": false,
+  "enableProPageLayoutClone": false,
   "enableProFormulaFields": false,
   "enableProPostSubmitAutoLink": false,
   "enableProSfSecretCodeAuth": false,
@@ -413,6 +419,7 @@ Example:
     "enableProRepeatGroups": false,
     "enableProPrefillAliasReferences": false,
     "enableProAdvancedSubmitModes": false,
+    "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
     "enableProSfSecretCodeAuth": false,
@@ -455,6 +462,7 @@ Based on the current NativeForms Admin Features page, these flags belong in the 
 - `enableProRepeatGroups`
 - `enableProPrefillAliasReferences`
 - `enableProAdvancedSubmitModes`
+- `enableProPageLayoutClone`
 - `enableProFormulaFields`
 - `enableProPostSubmitAutoLink`
 - `enableProSfSecretCodeAuth`

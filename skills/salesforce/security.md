@@ -8,6 +8,13 @@ Use for AppExchange Security Review preparation, Salesforce Code Analyzer, PMD/C
 
 ## NativeForms Rules
 - Treat `TwinaForms User` as the counted customer seat. System Admin access is setup/admin capability and is not counted unless that admin is explicitly assigned `TwinaForms User`.
+- For Salesforce Code Analyzer `Validate CRUD permission before SOQL/DML operation or enforce user mode` findings, prefer a package-wide, consistent Apex user-mode pattern:
+  - Add `WITH USER_MODE` to static SOQL that reads subscriber data.
+  - Use `insert/update/delete/upsert as user` for DML that should respect the running user's object and field access.
+  - Make the customer-facing permission set grant the object and field permissions needed by those user-mode operations. User-mode Apex will fail at runtime if the permission set does not match the data the code reads or writes.
+  - Do not update raw queried sObjects when they include required/master-detail relationship fields or fields the running user cannot update. Build a minimal update sObject with only `Id` and the fields that should change, then run `update as user`.
+  - For tests, assign the relevant permission set in test setup and run the exercised code under `System.runAs(...)` so the permission assignment is active. Keep assertions focused on durable behavior, not exact low-level platform or AWS error wording.
+  - After fixes, verify with Salesforce Code Analyzer on `force-app` and confirm `ApexCRUDViolation` is zero before packaging.
 - For AppExchange preparation, keep both SAST and DAST evidence:
   - SAST: Salesforce Code Analyzer AppExchange/security rules, PMD-style Apex checks, dependency/security scans where relevant.
   - DAST: ZAP or equivalent scan of the running AWS/public surfaces.
@@ -28,11 +35,17 @@ Use for AppExchange Security Review preparation, Salesforce Code Analyzer, PMD/C
   - file upload handling
   - rate limits and replay behavior
 - Any Apex path that calls AWS must be reviewed for:
-  - Named Credential namespace resolution
-  - tenant-secret use only from Named/External Credential setup
-  - no browser-visible tenant secret
+  - direct HTTPS endpoint is covered by a packaged Remote Site Setting
+  - Bootstrap V2 HMAC signing is applied where the endpoint changes tenant/package state or reads protected tenant data
+  - no browser-visible signing secret
   - handled/customer-safe errors
   - no package-visible DTO binding fragility at LWC-to-Apex boundaries
+- Bootstrap V2 ISV review story:
+  - Salesforce OAuth is the first trust anchor and AWS verifies the OAuth-returned org id before saving a connection.
+  - The per-org HMAC signing secret is generated in Apex and stored in protected package-managed storage.
+  - AWS retrieves that secret server-to-server during OAuth-authenticated bootstrap, then verifies future package calls by org id, timestamp, nonce, body hash, and HMAC-SHA256 signature.
+  - The intended package posture is Named-Credential-free and External-Credential-free; submission logs use a separate AWS endpoint but still authenticate with Bootstrap V2 HMAC.
+  - Use `security-reports/isv/TwinaForms_Bootstrap_V2_ISV_Security_Explanation.md` as the ISV-facing explanation.
 - For ZAP scans, save enough evidence for Security Review/support:
   - target URLs and environment
   - authenticated vs unauthenticated scan mode

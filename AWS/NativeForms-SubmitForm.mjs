@@ -100,6 +100,7 @@ import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-sec
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import crypto from "crypto";
+import PDFDocument from "pdfkit";
 
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
@@ -330,6 +331,45 @@ function generateSubmissionRef() {
 
 function getUserAgent(event) {
   return event?.headers?.["user-agent"] || event?.headers?.["User-Agent"] || null;
+}
+
+function parseBrowserForDisplay(userAgent) {
+  const value = String(userAgent || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  const browserMatchers = [
+    { name: "Microsoft Edge", pattern: /\bEdg\/([\d.]+)/i },
+    { name: "Chrome", pattern: /\bChrome\/([\d.]+)/i },
+    { name: "Firefox", pattern: /\bFirefox\/([\d.]+)/i },
+    { name: "Safari", pattern: /\bVersion\/([\d.]+).*?\bSafari\//i }
+  ];
+  const browserMatch = browserMatchers
+    .map((matcher) => {
+      const match = matcher.pattern.exec(value);
+      return match ? { name: matcher.name, version: match[1] } : null;
+    })
+    .find(Boolean);
+
+  const os = /\bWindows NT\b/i.test(value)
+    ? "Windows"
+    : /\bMac OS X\b/i.test(value)
+      ? "macOS"
+      : /\bAndroid\b/i.test(value)
+        ? "Android"
+        : /\b(iPhone|iPad|iPod)\b/i.test(value)
+          ? "iOS"
+          : /\bLinux\b/i.test(value)
+            ? "Linux"
+            : "";
+
+  if (!browserMatch) {
+    return os ? `Unknown browser on ${os}` : "Unknown browser";
+  }
+
+  const majorVersion = String(browserMatch.version || "").split(".")[0];
+  return `${browserMatch.name}${majorVersion ? ` ${majorVersion}` : ""}${os ? ` on ${os}` : ""}`;
 }
 
 function normalizePlanCode(planCode) {
@@ -579,6 +619,47 @@ function buildErrorDetail(error) {
   };
 }
 
+function sanitizeSubmittedPayloadForLog(input) {
+  const sanitized = { ...(input || {}) };
+  if (sanitized.signatures && typeof sanitized.signatures === "object" && !Array.isArray(sanitized.signatures)) {
+    sanitized.signatures = Object.fromEntries(Object.entries(sanitized.signatures).map(([fieldKey, value]) => [
+      fieldKey,
+      {
+        fileName: value?.fileName || `${fieldKey}.png`,
+        contentType: value?.contentType || "image/png",
+        signedAt: value?.signedAt || null,
+        imageStoredAsSalesforceFile: true
+      }
+    ]));
+  }
+  if (sanitized.repeatGroups && typeof sanitized.repeatGroups === "object" && !Array.isArray(sanitized.repeatGroups)) {
+    sanitized.repeatGroups = Object.fromEntries(Object.entries(sanitized.repeatGroups).map(([groupKey, groupValue]) => {
+      if (!groupValue || typeof groupValue !== "object" || !Array.isArray(groupValue.rows)) {
+        return [groupKey, groupValue];
+      }
+      return [groupKey, {
+        ...groupValue,
+        rows: groupValue.rows.map((row) => {
+          if (!row || typeof row !== "object" || Array.isArray(row) || !row._rowSignature) {
+            return row;
+          }
+          const signature = row._rowSignature;
+          return {
+            ...row,
+            _rowSignature: {
+              fileName: signature?.fileName || `${groupKey}-row-signature.png`,
+              contentType: signature?.contentType || "image/png",
+              signedAt: signature?.signedAt || null,
+              imageStoredAsSalesforceFile: signature?.imageStoredAsSalesforceFile === true
+            }
+          };
+        })
+      }];
+    }));
+  }
+  return sanitized;
+}
+
 async function writeSubmissionLog(item) {
   await dynamoClient.send(new PutItemCommand({
     TableName: SUBMISSION_LOG_TABLE,
@@ -639,7 +720,7 @@ async function writeSubmissionLogSafely({
         failureStage,
         durationMs: Math.max(Date.now() - startedAtMs, 0),
         submitterEmail: maybeGetSubmitterEmail(inputPayload),
-        submittedPayload: inputPayload?.input || {},
+        submittedPayload: sanitizeSubmittedPayloadForLog(inputPayload?.input || {}),
         prefillSnapshot: inputPayload?.prefillSnapshot || null,
         commandTrace: commandTrace || [],
         partialResults: results || [],
@@ -891,12 +972,32 @@ function verifySignedUploadToken(tenantRecord, token) {
 
 function getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition) {
   return {
+    ...defaultFeatureFlagsForPlan(tenantRecord?.planCode),
     ...(planDefinition?.featureFlags || {}),
     ...(tenantRecord?.planFeatureFlags || {}),
     ...(tenantRecord?.featureFlags || {}),
     ...(tenantRecord?.planOverrides?.featureFlags || {}),
     ...(tenantRecord?.effectiveFeatureFlags || {})
   };
+}
+
+function defaultFeatureFlagsForPlan(planCode) {
+  const normalizedPlanCode = normalizePlanCode(planCode);
+  return {
+    enableProElectronicSignature: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
+    enableProSubmissionPdf: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
+    enableProRecordsListRowSignaturePdf: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
+    enableProSurveyFields: normalizedPlanCode === "trial" || normalizedPlanCode === "pro"
+  };
+}
+
+function formUsesSurveyFields(formSecurity) {
+  const schema = Array.isArray(formSecurity?.submissionPdf?.schema) ? formSecurity.submissionPdf.schema : [];
+  return schema.some((item) => {
+    const type = String(item?.type || "");
+    const presentation = String(item?.presentation || "");
+    return type === "ranking" || ["stars", "nps", "likert", "satisfaction"].includes(presentation);
+  });
 }
 
 function getUploadFieldDefinition(formSecurity, fieldKey) {
@@ -908,11 +1009,117 @@ function getUploadFieldDefinition(formSecurity, fieldKey) {
   return uploadFields.find((item) => String(item?.fieldKey || "").trim() === normalizedFieldKey) || null;
 }
 
+function getSignatureFieldDefinition(formSecurity, fieldKey) {
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!normalizedFieldKey) {
+    return null;
+  }
+  const signatureFields = Array.isArray(formSecurity?.signatureFields) ? formSecurity.signatureFields : [];
+  return signatureFields.find((item) => String(item?.fieldKey || "").trim() === normalizedFieldKey) || null;
+}
+
+function normalizeRecordsListRowSignatureConfigs(formSecurity) {
+  const configs = Array.isArray(formSecurity?.recordsListRowSignatures)
+    ? formSecurity.recordsListRowSignatures
+    : [];
+  return configs
+    .filter((item) => item && typeof item === "object" && String(item.groupKey || "").trim())
+    .map((item) => ({
+      elementId: String(item.elementId || "").trim(),
+      groupKey: String(item.groupKey || "").trim(),
+      label: String(item.label || "Signature").trim() || "Signature",
+      required: item.required !== false,
+      attachToRowRecord: item.attachToRowRecord === true
+    }));
+}
+
+function formUsesRecordsListRowSignatures(formSecurity) {
+  return normalizeRecordsListRowSignatureConfigs(formSecurity).length > 0;
+}
+
+function submittedRepeatRows(inputPayload, groupKey) {
+  const rows = inputPayload?.input?.repeatGroups?.[groupKey]?.rows;
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function validateSubmittedRecordsListRowSignatures({
+  tenantRecord,
+  formSecurity,
+  inputPayload
+}) {
+  const configs = normalizeRecordsListRowSignatureConfigs(formSecurity);
+  if (!configs.length) {
+    return;
+  }
+
+  const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+  const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
+  if (
+    effectiveFeatureFlags.enableProRecordsListRowSignaturePdf !== true ||
+    effectiveFeatureFlags.enableProElectronicSignature !== true ||
+    effectiveFeatureFlags.enableProSubmissionPdf !== true
+  ) {
+    throw buildFailureError("Records List Row Signature + PDF is not available for this tenant.", 403, "validation");
+  }
+
+  const pdfConfig = normalizeSubmissionPdfConfig(formSecurity);
+  if (pdfConfig.enabled !== true) {
+    throw buildFailureError("Submission PDF must be enabled for Records List row signatures.", 400, "validation");
+  }
+
+  for (const config of configs) {
+    const rows = submittedRepeatRows(inputPayload, config.groupKey);
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const signature = rows[rowIndex]?._rowSignature;
+      if (config.required && !signature?.dataUrl) {
+        throw buildFailureError(
+          `Signature is required for every submitted row in '${config.groupKey}'.`,
+          400,
+          "validation"
+        );
+      }
+      if (signature?.dataUrl) {
+        decodeSignaturePng(signature.dataUrl);
+      }
+    }
+  }
+}
+
+function findUpsertManyResultForGroup(results, groupKey) {
+  return (results || []).find((result) =>
+    result?.type === "upsertMany" &&
+    String(result?.repeatGroupKey || "").trim() === String(groupKey || "").trim()
+  ) || null;
+}
+
 function normalizeSubmittedUploadMap(fileUploads) {
   if (!fileUploads || typeof fileUploads !== "object" || Array.isArray(fileUploads)) {
     return {};
   }
   return fileUploads;
+}
+
+function normalizeSubmittedSignatureMap(signatures) {
+  if (!signatures || typeof signatures !== "object" || Array.isArray(signatures)) {
+    return {};
+  }
+  return signatures;
+}
+
+function decodeSignaturePng(dataUrl) {
+  const normalized = String(dataUrl || "").trim();
+  const match = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(normalized);
+  if (!match) {
+    throw buildFailureError("One of the submitted signatures is not a valid PNG image.", 400, "validation");
+  }
+  const buffer = Buffer.from(match[1], "base64");
+  if (!buffer.length) {
+    throw buildFailureError("One of the submitted signatures is empty.", 400, "validation");
+  }
+  if (buffer.length > 1024 * 1024) {
+    throw buildFailureError("One of the submitted signatures is too large.", 400, "validation");
+  }
+  return buffer;
 }
 
 function resolveUploadTargetRecordId(targetSubmitActionKey, results) {
@@ -952,7 +1159,8 @@ function normalizeSecretCodeConfig(formSecurity) {
       enabled: false,
       expiryMinutes: 10,
       maxAttempts: 5,
-      allowResend: true
+      allowResend: true,
+      sessionMode: SECRET_SESSION_MODE_SHORT
     };
   }
 
@@ -964,6 +1172,7 @@ function normalizeSecretCodeConfig(formSecurity) {
     expiryMinutes,
     maxAttempts,
     allowResend: raw.allowResend !== false,
+    sessionMode: normalizeSecretSessionMode(raw.sessionMode),
     introText: typeof raw.introText === "string" ? raw.introText : "",
     sentMessage: typeof raw.sentMessage === "string" ? raw.sentMessage : "",
     invalidMessage: typeof raw.invalidMessage === "string" ? raw.invalidMessage : "",
@@ -975,6 +1184,14 @@ function normalizeSecretCodeAction(action) {
   const normalized = String(action || "").trim();
   return normalized === "sendCode" || normalized === "verifyCode" ? normalized : "";
 }
+
+const SECRET_CODE_APEX_REST_PATHS = [
+  "/services/apexrest/nativeforms/secret-code",
+  "/services/apexrest/twinaforms/nativeforms/secret-code"
+];
+const SECRET_SESSION_MODE_SHORT = "short";
+const SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT = "sameTabUntilMidnight";
+const SECRET_SESSION_SAME_TAB_MAX_MS = 12 * 60 * 60 * 1000;
 
 async function callSalesforceApex(instanceUrl, accessToken, path, payload) {
   const url = new URL(instanceUrl);
@@ -1006,7 +1223,9 @@ async function callSalesforceApex(instanceUrl, accessToken, path, payload) {
       response.statusCode >= 500 ? 502 : 400,
       "salesforce",
       {
-        responseBody: response.body
+        responseBody: response.body,
+        responseStatusCode: response.statusCode,
+        responsePath: path
       }
     );
   }
@@ -1014,17 +1233,64 @@ async function callSalesforceApex(instanceUrl, accessToken, path, payload) {
   return data;
 }
 
+function isSalesforceApexNotFound(error) {
+  return Number(error?.responseStatusCode) === 404
+    || /Apex request failed\. Status:\s*404/i.test(String(error?.message || ""));
+}
+
+async function callSalesforceApexWithFallback(instanceUrl, accessToken, paths, payload) {
+  let lastError = null;
+  for (const path of paths) {
+    try {
+      return await callSalesforceApex(instanceUrl, accessToken, path, payload);
+    } catch (error) {
+      lastError = error;
+      if (!isSalesforceApexNotFound(error)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
 function buildSecretVerificationSigningSecret(secret, tenantRecord) {
   return String(secret?.secretVerificationSigningSecret || tenantRecord?.secret || "");
 }
 
-function createSecretVerificationToken(formSecurity, email, sessionId, secret, tenantRecord) {
+function normalizeSecretSessionMode(value) {
+  return String(value || "").trim() === SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT
+    ? SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT
+    : SECRET_SESSION_MODE_SHORT;
+}
+
+function parseSessionExpiresAt(value) {
+  const parsed = new Date(String(value || ""));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
+function secretVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt) {
+  const nowMs = Date.now();
+  const config = normalizeSecretCodeConfig(formSecurity);
+  const normalizedMode = normalizeSecretSessionMode(sessionMode || config.sessionMode);
+  if (normalizedMode === SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT) {
+    const requestedMs = parseSessionExpiresAt(requestedExpiresAt);
+    const cappedMs = Math.min(
+      requestedMs && requestedMs > nowMs ? requestedMs : nowMs + SECRET_SESSION_SAME_TAB_MAX_MS,
+      nowMs + SECRET_SESSION_SAME_TAB_MAX_MS
+    );
+    return Math.max(cappedMs, nowMs + 60000);
+  }
+  const expiryMinutes = Math.max(5, config.expiryMinutes);
+  return nowMs + (expiryMinutes * 60 * 1000);
+}
+
+function createSecretVerificationToken(formSecurity, email, sessionId, secret, tenantRecord, sessionMode, requestedExpiresAt) {
   const signingSecret = buildSecretVerificationSigningSecret(secret, tenantRecord);
   if (!signingSecret) {
     throw buildFailureError("Secret verification signing secret is missing", 500, "system");
   }
 
-  const expiryMinutes = Math.max(5, normalizeSecretCodeConfig(formSecurity).expiryMinutes);
+  const expiresAtMs = secretVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt);
   const payload = {
     kind: "secretVerification",
     orgId: formSecurity.orgId,
@@ -1032,7 +1298,8 @@ function createSecretVerificationToken(formSecurity, email, sessionId, secret, t
     publishedVersionId: formSecurity.publishedVersionId || null,
     email: String(email || "").trim().toLowerCase(),
     sessionId: String(sessionId || "").trim(),
-    exp: Math.floor(Date.now() / 1000) + (expiryMinutes * 60)
+    exp: Math.floor(expiresAtMs / 1000),
+    sessionMode: normalizeSecretSessionMode(sessionMode || normalizeSecretCodeConfig(formSecurity).sessionMode)
   };
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signature = crypto
@@ -1042,7 +1309,10 @@ function createSecretVerificationToken(formSecurity, email, sessionId, secret, t
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
-  return `${encodedPayload}.${signature}`;
+  return {
+    token: `${encodedPayload}.${signature}`,
+    expiresAt: new Date(expiresAtMs).toISOString()
+  };
 }
 
 function verifySecretVerificationToken(formSecurity, token, sessionId, secret, tenantRecord, email) {
@@ -1706,6 +1976,791 @@ async function finalizeUploadedFiles({
   return finalizedFiles;
 }
 
+async function finalizeSubmittedSignatures({
+  tenantRecord,
+  formSecurity,
+  inputPayload,
+  results,
+  sf
+}) {
+  const submittedSignatureMap = normalizeSubmittedSignatureMap(inputPayload?.input?.signatures);
+  const fieldKeys = Object.keys(submittedSignatureMap);
+  const signatureFields = Array.isArray(formSecurity?.signatureFields) ? formSecurity.signatureFields : [];
+  const missingRequired = signatureFields.find((item) =>
+    String(item?.targetSubmitActionKey || "").trim() &&
+    item?.required === true &&
+    !submittedSignatureMap[String(item?.fieldKey || "").trim()]?.dataUrl
+  );
+  if (missingRequired) {
+    throw buildFailureError(`Signature is required for field '${missingRequired.fieldKey}'.`, 400, "validation");
+  }
+  if (!fieldKeys.length) {
+    return [];
+  }
+
+  const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+  const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
+  if (effectiveFeatureFlags.enableProElectronicSignature !== true) {
+    throw buildFailureError("Electronic Signature is not available for this tenant.", 403, "validation");
+  }
+
+  const finalizedSignatures = [];
+  for (const fieldKey of fieldKeys) {
+    const signatureField = getSignatureFieldDefinition(formSecurity, fieldKey);
+    if (!signatureField) {
+      throw buildFailureError(`Signature is not configured for field '${fieldKey}'.`, 400, "mapping");
+    }
+
+    if (!String(signatureField.targetSubmitActionKey || "").trim()) {
+      continue;
+    }
+
+    const targetRecordId = resolveUploadTargetRecordId(signatureField.targetSubmitActionKey, results);
+    if (!targetRecordId) {
+      throw buildFailureError(
+        `No saved record was available for signature field '${fieldKey}'.`,
+        400,
+        "mapping"
+      );
+    }
+
+    const submittedSignature = submittedSignatureMap[fieldKey] || {};
+    const imageBuffer = decodeSignaturePng(submittedSignature.dataUrl);
+    const safeFileName = String(submittedSignature.fileName || `${fieldKey}-signature.png`)
+      .replace(/[\\/:*?"<>|]+/g, "-")
+      .slice(0, 120) || `${fieldKey}-signature.png`;
+    const fileName = safeFileName.toLowerCase().endsWith(".png") ? safeFileName : `${safeFileName}.png`;
+    const title = fileName.replace(/\.png$/i, "");
+    const signedAt = typeof submittedSignature.signedAt === "string" ? submittedSignature.signedAt : new Date().toISOString();
+    const sha256 = crypto.createHash("sha256").update(imageBuffer).digest("hex");
+    const versionResult = await createSalesforceFileVersion(
+      sf.instanceUrl,
+      sf.accessToken,
+      {
+        Title: title,
+        PathOnClient: fileName,
+        VersionData: imageBuffer.toString("base64"),
+        FirstPublishLocationId: targetRecordId
+      }
+    );
+
+    finalizedSignatures.push({
+      fieldKey,
+      label: signatureField.label || "",
+      fileName,
+      targetRecordId,
+      contentVersionId: versionResult.id,
+      signedAt,
+      sha256
+    });
+  }
+
+  return finalizedSignatures;
+}
+
+async function finalizeRecordsListRowSignatures({
+  formSecurity,
+  inputPayload,
+  results,
+  sf
+}) {
+  const configs = normalizeRecordsListRowSignatureConfigs(formSecurity);
+  const finalizedRowSignatures = [];
+  if (!configs.length) {
+    return finalizedRowSignatures;
+  }
+
+  for (const config of configs) {
+    const rows = submittedRepeatRows(inputPayload, config.groupKey);
+    const upsertResult = findUpsertManyResultForGroup(results, config.groupKey);
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const submittedSignature = rows[rowIndex]?._rowSignature || {};
+      if (!submittedSignature.dataUrl) {
+        continue;
+      }
+
+      const imageBuffer = decodeSignaturePng(submittedSignature.dataUrl);
+      const rowResult = Array.isArray(upsertResult?.rowResults)
+        ? upsertResult.rowResults.find((item) => Number(item?.rowIndex) === rowIndex)
+        : null;
+      const rowRecordId = rowResult?.id || null;
+      if (config.attachToRowRecord && !rowRecordId) {
+        throw buildFailureError(
+          `No saved row record was available for row signature '${config.groupKey}' row ${rowIndex + 1}.`,
+          400,
+          "mapping"
+        );
+      }
+
+      const safeFileName = String(submittedSignature.fileName || `${config.groupKey}-row-${rowIndex + 1}-signature.png`)
+        .replace(/[\\/:*?"<>|]+/g, "-")
+        .slice(0, 120) || `${config.groupKey}-row-${rowIndex + 1}-signature.png`;
+      const fileName = safeFileName.toLowerCase().endsWith(".png") ? safeFileName : `${safeFileName}.png`;
+      const signedAt = typeof submittedSignature.signedAt === "string" ? submittedSignature.signedAt : new Date().toISOString();
+      const sha256 = crypto.createHash("sha256").update(imageBuffer).digest("hex");
+      let contentVersionId = null;
+
+      if (config.attachToRowRecord) {
+        const versionResult = await createSalesforceFileVersion(
+          sf.instanceUrl,
+          sf.accessToken,
+          {
+            Title: fileName.replace(/\.png$/i, ""),
+            PathOnClient: fileName,
+            VersionData: imageBuffer.toString("base64"),
+            FirstPublishLocationId: rowRecordId
+          }
+        );
+        contentVersionId = versionResult.id;
+      }
+
+      finalizedRowSignatures.push({
+        groupKey: config.groupKey,
+        rowIndex,
+        label: config.label,
+        fileName,
+        rowRecordId,
+        contentVersionId,
+        signedAt,
+        sha256
+      });
+    }
+  }
+
+  return finalizedRowSignatures;
+}
+
+function normalizeSubmissionPdfConfig(formSecurity) {
+  const raw = formSecurity?.submissionPdf;
+  if (!raw || typeof raw !== "object") {
+    return {
+      enabled: false,
+      attachToRecord: true,
+      targetSubmitActionKey: "",
+      title: "Submitted Response",
+      includeEmptyFields: true,
+      schema: []
+    };
+  }
+
+  return {
+    enabled: raw.enabled === true,
+    attachToRecord: raw.attachToRecord !== false,
+    targetSubmitActionKey: String(raw.targetSubmitActionKey || "").trim(),
+    title: String(raw.title || "Submitted Response").trim() || "Submitted Response",
+    includeEmptyFields: raw.includeEmptyFields !== false,
+    schema: Array.isArray(raw.schema) ? raw.schema.filter((item) => item && typeof item === "object") : []
+  };
+}
+
+function stripHtmlForPdf(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p\s*>/gi, "\n")
+    .replace(/<\/div\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t\v\f\r]+/g, " ")
+    .replace(/\n\s+/g, "\n")
+    .trim();
+}
+
+function decodeImageDataUrl(dataUrl, allowedTypes = ["image/png", "image/jpeg", "image/jpg"]) {
+  const normalized = String(dataUrl || "").trim();
+  const match = /^data:([^;]+);base64,([A-Za-z0-9+/=]+)$/i.exec(normalized);
+  if (!match) {
+    return null;
+  }
+  const contentType = match[1].toLowerCase();
+  if (!allowedTypes.includes(contentType)) {
+    return null;
+  }
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > 2 * 1024 * 1024) {
+    return null;
+  }
+  return { contentType, buffer };
+}
+
+function pdfValueIsEmpty(value) {
+  if (value == null) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return value.trim() === "";
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value).length === 0;
+  }
+  return false;
+}
+
+function optionLabelForPdf(schemaItem, value) {
+  const options = Array.isArray(schemaItem?.options) ? schemaItem.options : [];
+  const match = options.find((option) => String(option?.value ?? "") === String(value ?? ""));
+  return match?.label || value;
+}
+
+function formatPdfValue(schemaItem, value, inputPayload, finalizedFiles = [], finalizedSignatures = []) {
+  if (schemaItem?.type === "checkbox") {
+    return value === true || String(value).toLowerCase() === "true" || value === "on"
+      ? (schemaItem.checkedLabel || "Yes")
+      : (schemaItem.uncheckedLabel || "No");
+  }
+  if (schemaItem?.type === "select" || schemaItem?.type === "radio") {
+    return optionLabelForPdf(schemaItem, value);
+  }
+  if (schemaItem?.type === "ranking") {
+    let values = value;
+    if (typeof values === "string") {
+      try {
+        values = JSON.parse(values);
+      } catch {
+        values = values.split(",").map((item) => item.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(values)) {
+      return "";
+    }
+    return values
+      .map((item, index) => `${index + 1}. ${optionLabelForPdf(schemaItem, item)}`)
+      .join("\n");
+  }
+  if (schemaItem?.type === "signature") {
+    const signature = finalizedSignatures.find((item) => String(item?.fieldKey || "") === String(schemaItem.fieldKey || ""));
+    if (signature?.fileName) {
+      return `Signature saved as ${signature.fileName}`;
+    }
+    const submitted = inputPayload?.input?.signatures?.[schemaItem.fieldKey];
+    return submitted?.dataUrl ? "Signature captured" : "";
+  }
+  if (schemaItem?.type === "fileUpload") {
+    const files = finalizedFiles.filter((item) => String(item?.fieldKey || "") === String(schemaItem.fieldKey || ""));
+    if (files.length) {
+      return files.map((item) => item.fileName).join(", ");
+    }
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "object" ? JSON.stringify(item) : String(item))).join(", ");
+  }
+  if (typeof value === "object" && value != null) {
+    return JSON.stringify(value);
+  }
+  return value == null ? "" : String(value);
+}
+
+function formatPdfRowValue(schemaItem, value) {
+  if (schemaItem?.type === "checkbox") {
+    return value === true || String(value).toLowerCase() === "true" || value === "on"
+      ? (schemaItem.checkedLabel || "Yes")
+      : (schemaItem.uncheckedLabel || "No");
+  }
+  if (schemaItem?.type === "select" || schemaItem?.type === "radio") {
+    return optionLabelForPdf(schemaItem, value);
+  }
+  if (schemaItem?.type === "ranking") {
+    let values = value;
+    if (typeof values === "string") {
+      try {
+        values = JSON.parse(values);
+      } catch {
+        values = values.split(",").map((item) => item.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(values)) {
+      return "";
+    }
+    return values.map((item, index) => `${index + 1}. ${optionLabelForPdf(schemaItem, item)}`).join("\n");
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "object" ? JSON.stringify(item) : String(item))).join(", ");
+  }
+  if (typeof value === "object" && value != null) {
+    return JSON.stringify(value);
+  }
+  return value == null ? "" : String(value);
+}
+
+async function pdfDocumentToBuffer(doc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    doc.on("error", reject);
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.end();
+  });
+}
+
+function pdfContentBottom(doc) {
+  return doc.page.height - doc.page.margins.bottom;
+}
+
+function ensurePdfSpace(doc, requiredHeight = 72) {
+  if (doc.y + requiredHeight > pdfContentBottom(doc)) {
+    doc.addPage();
+  }
+}
+
+function clampPdfColumn(value, maxColumns) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+  return Math.min(Math.max(1, parsed), Math.max(1, maxColumns || 1));
+}
+
+function isPdfContainer(schemaItem) {
+  return ["section", "sectionBreak", "group", "repeatGroup"].includes(String(schemaItem?.type || ""));
+}
+
+function isPdfDisplayText(schemaItem) {
+  return ["heading", "paragraph", "richText"].includes(String(schemaItem?.type || ""));
+}
+
+function buildPdfSchemaTree(schema) {
+  const byParent = new Map();
+  const byElementId = new Map();
+  for (const item of Array.isArray(schema) ? schema : []) {
+    const elementId = String(item?.elementId || "").trim();
+    if (elementId) {
+      byElementId.set(elementId, item);
+    }
+    const parent = String(item?.parentElementId || "").trim();
+    if (!byParent.has(parent)) {
+      byParent.set(parent, []);
+    }
+    byParent.get(parent).push(item);
+  }
+
+  for (const items of byParent.values()) {
+    items.sort((left, right) => Number(left?.order || 0) - Number(right?.order || 0));
+  }
+
+  return { byParent, byElementId };
+}
+
+function addPdfFieldAt(doc, label, value, x, y, width) {
+  const safeLabel = String(label || "Field");
+  const safeValue = String(value || "");
+  doc.fontSize(9).fillColor("#486581");
+  const labelHeight = doc.heightOfString(safeLabel, { width });
+  doc.text(safeLabel, x, y, { width });
+  doc.fontSize(11).fillColor("#102a43");
+  const valueY = y + labelHeight + 2;
+  const valueHeight = Math.max(14, doc.heightOfString(safeValue || " ", { width }));
+  doc.text(safeValue, x, valueY, { width });
+  return valueY + valueHeight + 9;
+}
+
+function addPdfDisplayTextAt(doc, text, x, y, width) {
+  const safeText = stripHtmlForPdf(text);
+  if (!safeText) {
+    return y;
+  }
+  doc.fontSize(11).fillColor("#102a43");
+  const textHeight = doc.heightOfString(safeText, { width });
+  doc.text(safeText, x, y, { width });
+  return y + textHeight + 10;
+}
+
+function addPdfImageAt(doc, imageDataUrl, altText, x, y, width, maxHeight = 150) {
+  const image = decodeImageDataUrl(imageDataUrl);
+  if (!image) {
+    return altText ? addPdfFieldAt(doc, "Image", altText, x, y, width) : y;
+  }
+  try {
+    doc.image(image.buffer, x, y, {
+      fit: [Math.min(width, 280), maxHeight],
+      align: "left"
+    });
+    return y + maxHeight + 10;
+  } catch (error) {
+    return addPdfFieldAt(doc, "Image", altText || "Image could not be rendered in PDF.", x, y, width);
+  }
+}
+
+function renderPdfSchemaItemAt({
+  doc,
+  schemaItem,
+  x,
+  y,
+  width,
+  inputPayload,
+  finalizedFiles,
+  finalizedSignatures,
+  includeEmptyFields
+}) {
+  const type = String(schemaItem?.type || "text");
+  if (isPdfDisplayText(schemaItem)) {
+    return addPdfDisplayTextAt(doc, schemaItem.text || schemaItem.html || schemaItem.label || "", x, y, width);
+  }
+  if (type === "image") {
+    return addPdfImageAt(
+      doc,
+      schemaItem.imageUrl,
+      schemaItem.altText || schemaItem.label || "Image",
+      x,
+      y,
+      Math.min(width, Math.max(160, Math.round((Number(schemaItem.imageWidthPercent) || 100) * width / 100))),
+      150
+    );
+  }
+
+  const fieldKey = String(schemaItem?.fieldKey || "").trim();
+  if (!fieldKey) {
+    return y;
+  }
+  const rawValue = inputPayload?.input?.[fieldKey];
+  if (!includeEmptyFields && pdfValueIsEmpty(rawValue) && type !== "signature") {
+    return y;
+  }
+  const value = formatPdfValue(schemaItem, rawValue, inputPayload, finalizedFiles, finalizedSignatures);
+  if (!includeEmptyFields && !value) {
+    return y;
+  }
+
+  let nextY = addPdfFieldAt(doc, schemaItem.label || fieldKey, value, x, y, width);
+  if (type === "signature") {
+    const submitted = inputPayload?.input?.signatures?.[fieldKey];
+    if (submitted?.dataUrl) {
+      nextY = addPdfImageAt(doc, submitted.dataUrl, "", x, nextY, Math.min(width, 280), 120);
+    }
+  }
+  return nextY;
+}
+
+function renderPdfRepeatGroup({
+  doc,
+  container,
+  children,
+  inputPayload,
+  includeEmptyFields
+}) {
+  const groupKey = String(container?.fieldKey || "").trim();
+  const rows = submittedRepeatRows(inputPayload, groupKey);
+  const pageLeft = doc.page.margins.left;
+  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const title = container?.showTitle === false ? "" : String(container?.label || groupKey || "Records").trim();
+  const rowSignature = container?.rowSignature && typeof container.rowSignature === "object"
+    ? container.rowSignature
+    : null;
+  const rowSignatureLabel = String(rowSignature?.label || "Signature").trim() || "Signature";
+  const columns = Math.min(Math.max(Number.parseInt(String(container?.columns || 2), 10) || 2, 1), 10);
+  const columnGap = 14;
+  const columnWidth = (pageWidth - columnGap * (columns - 1)) / columns;
+
+  ensurePdfSpace(doc, 120);
+  if (title) {
+    doc.moveDown(0.4);
+    doc.fontSize(13).fillColor("#102a43").text(title, pageLeft, doc.y, { width: pageWidth });
+    doc.moveDown(0.25);
+  }
+  if (!rows.length) {
+    doc.fontSize(10).fillColor("#627d98").text("No rows submitted.", pageLeft, doc.y, { width: pageWidth });
+    doc.moveDown(0.5);
+    return;
+  }
+
+  rows.forEach((row, rowIndex) => {
+    ensurePdfSpace(doc, rowSignature ? 210 : 130);
+    const rowTop = doc.y + 8;
+    const padding = 12;
+    let cursorY = rowTop + padding;
+    doc.fontSize(10).fillColor("#102a43").text(`Row ${rowIndex + 1}`, pageLeft + padding, cursorY, { width: pageWidth - padding * 2 });
+    cursorY += 18;
+
+    const columnY = Array.from({ length: columns }, () => cursorY);
+    for (const child of children || []) {
+      if (isPdfContainer(child) || isPdfDisplayText(child) || String(child?.type || "") === "fileUpload") {
+        continue;
+      }
+      const fieldKey = String(child?.fieldKey || "").trim();
+      if (!fieldKey) {
+        continue;
+      }
+      const rawValue = row?.[fieldKey];
+      if (!includeEmptyFields && pdfValueIsEmpty(rawValue)) {
+        continue;
+      }
+      const value = formatPdfRowValue(child, rawValue);
+      if (!includeEmptyFields && !value) {
+        continue;
+      }
+      const columnIndex = clampPdfColumn(child?.sectionColumn, columns) - 1;
+      const x = pageLeft + padding + columnIndex * (columnWidth + columnGap);
+      columnY[columnIndex] = addPdfFieldAt(
+        doc,
+        child.label || fieldKey,
+        value,
+        x,
+        columnY[columnIndex],
+        columnWidth - padding
+      );
+    }
+
+    let rowBottom = Math.max(...columnY, cursorY);
+    const submittedSignature = row?._rowSignature;
+    if (rowSignature && submittedSignature?.dataUrl) {
+      rowBottom = addPdfFieldAt(doc, rowSignatureLabel, submittedSignature.signedAt ? `Signed at ${submittedSignature.signedAt}` : "Signature captured", pageLeft + padding, rowBottom + 4, pageWidth - padding * 2);
+      rowBottom = addPdfImageAt(doc, submittedSignature.dataUrl, "", pageLeft + padding, rowBottom, Math.min(pageWidth - padding * 2, 280), 110);
+    }
+
+    const cardBottom = rowBottom + padding;
+    doc.save();
+    doc.roundedRect(pageLeft, rowTop, pageWidth, cardBottom - rowTop, 8)
+      .strokeColor("#d5e3f4")
+      .lineWidth(0.6)
+      .stroke();
+    doc.restore();
+    doc.y = cardBottom + 8;
+  });
+}
+
+function renderPdfSection({
+  doc,
+  container,
+  children,
+  tree,
+  inputPayload,
+  finalizedFiles,
+  finalizedSignatures,
+  finalizedRowSignatures,
+  includeEmptyFields
+}) {
+  if (String(container?.type || "") === "repeatGroup") {
+    renderPdfRepeatGroup({
+      doc,
+      container,
+      children,
+      inputPayload,
+      finalizedRowSignatures,
+      includeEmptyFields
+    });
+    return;
+  }
+
+  ensurePdfSpace(doc, 120);
+
+  const pageLeft = doc.page.margins.left;
+  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const sectionX = pageLeft;
+  const sectionTop = doc.y + 8;
+  const sectionWidth = pageWidth;
+  const padding = 14;
+  const title = container?.showTitle === false ? "" : String(container?.label || "").trim();
+  let cursorY = sectionTop + padding;
+
+  if (title) {
+    doc.fontSize(11).fillColor("#102a43").text(title, sectionX + padding, cursorY, { width: sectionWidth - padding * 2 });
+    cursorY += 20;
+  }
+  if (container?.text && String(container.text).trim() && String(container.text).trim() !== "Section description") {
+    cursorY = addPdfDisplayTextAt(doc, container.text, sectionX + padding, cursorY, sectionWidth - padding * 2);
+  }
+
+  const columns = Math.min(Math.max(Number.parseInt(String(container?.columns || 2), 10) || 2, 1), 10);
+  const columnGap = 14;
+  const columnWidth = (sectionWidth - padding * 2 - columnGap * (columns - 1)) / columns;
+  const columnY = Array.from({ length: columns }, () => cursorY);
+
+  for (const child of children || []) {
+    if (isPdfContainer(child)) {
+      doc.y = Math.max(...columnY) + 8;
+      renderPdfSection({
+        doc,
+        container: child,
+        children: tree.byParent.get(String(child.elementId || "")) || [],
+        tree,
+        inputPayload,
+        finalizedFiles,
+        finalizedSignatures,
+        finalizedRowSignatures,
+        includeEmptyFields
+      });
+      const next = doc.y;
+      for (let index = 0; index < columnY.length; index += 1) {
+        columnY[index] = next;
+      }
+      continue;
+    }
+
+    const columnIndex = clampPdfColumn(child?.sectionColumn, columns) - 1;
+    const x = sectionX + padding + columnIndex * (columnWidth + columnGap);
+    columnY[columnIndex] = renderPdfSchemaItemAt({
+      doc,
+      schemaItem: child,
+      x,
+      y: columnY[columnIndex],
+      width: columnWidth,
+      inputPayload,
+      finalizedFiles,
+      finalizedSignatures,
+      includeEmptyFields
+    });
+  }
+
+  const sectionBottom = Math.max(...columnY, cursorY) + padding;
+  if (container?.boxed !== false) {
+    doc.save();
+    doc.roundedRect(sectionX, sectionTop, sectionWidth, sectionBottom - sectionTop, 8)
+      .strokeColor("#c9d8ea")
+      .lineWidth(0.8)
+      .stroke();
+    doc.restore();
+  }
+  doc.y = sectionBottom + 10;
+}
+
+async function buildSubmissionPdfBuffer({
+  formSecurity,
+  inputPayload,
+  finalizedFiles,
+  finalizedSignatures,
+  finalizedRowSignatures,
+  submittedAt,
+  event
+}) {
+  const config = normalizeSubmissionPdfConfig(formSecurity);
+  const doc = new PDFDocument({
+    size: "A4",
+    margin: 48,
+    info: {
+      Title: config.title,
+      Subject: "TwinaForms submitted response"
+    }
+  });
+
+  doc.fontSize(18).fillColor("#102a43").text(config.title, { width: 500 });
+  doc.moveDown(0.3);
+  doc.fontSize(9).fillColor("#627d98").text(`Submitted: ${submittedAt || new Date().toISOString()}`);
+  const clientIp = getClientIp(event);
+  const userAgent = getUserAgent(event);
+  if (clientIp) {
+    doc.fontSize(9).fillColor("#627d98").text(`IP Address: ${clientIp}`);
+  }
+  if (userAgent) {
+    doc.fontSize(9).fillColor("#627d98").text(`Browser: ${parseBrowserForDisplay(userAgent)}`);
+  }
+  doc.moveDown(0.5);
+
+  const tree = buildPdfSchemaTree(config.schema);
+  const rootItems = tree.byParent.get("") || [];
+  for (const schemaItem of rootItems) {
+    if (isPdfContainer(schemaItem)) {
+      renderPdfSection({
+        doc,
+        container: schemaItem,
+        children: tree.byParent.get(String(schemaItem.elementId || "")) || [],
+        tree,
+        inputPayload,
+        finalizedFiles,
+        finalizedSignatures,
+        finalizedRowSignatures,
+        includeEmptyFields: config.includeEmptyFields
+      });
+      continue;
+    }
+
+    ensurePdfSpace(doc, 72);
+    const pageLeft = doc.page.margins.left;
+    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const nextY = renderPdfSchemaItemAt({
+      doc,
+      schemaItem,
+      x: pageLeft,
+      y: doc.y,
+      width: pageWidth,
+      inputPayload,
+      finalizedFiles,
+      finalizedSignatures,
+      includeEmptyFields: config.includeEmptyFields
+    });
+    doc.y = nextY;
+  }
+
+  return pdfDocumentToBuffer(doc);
+}
+
+async function finalizeSubmissionPdf({
+  tenantRecord,
+  formSecurity,
+  inputPayload,
+  results,
+  finalizedFiles,
+  finalizedSignatures,
+  finalizedRowSignatures,
+  submissionRef,
+  submittedAt,
+  event,
+  sf
+}) {
+  const config = normalizeSubmissionPdfConfig(formSecurity);
+  if (!config.enabled) {
+    return null;
+  }
+
+  const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+  const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
+  if (effectiveFeatureFlags.enableProSubmissionPdf !== true) {
+    throw buildFailureError("Submission PDF is not available for this tenant.", 403, "validation");
+  }
+
+  if (!config.attachToRecord) {
+    return {
+      generated: false,
+      attached: false,
+      reason: "attachToRecordDisabled"
+    };
+  }
+
+  const targetRecordId = resolveUploadTargetRecordId(config.targetSubmitActionKey, results);
+  if (!targetRecordId) {
+    throw buildFailureError("No saved record was available for the Submission PDF.", 400, "mapping");
+  }
+
+  const pdfBuffer = await buildSubmissionPdfBuffer({
+    formSecurity,
+    inputPayload,
+    finalizedFiles,
+    finalizedSignatures,
+    finalizedRowSignatures,
+    submittedAt,
+    event
+  });
+  if (!pdfBuffer.length) {
+    throw buildFailureError("Submission PDF could not be generated.", 500, "system");
+  }
+
+  const safeTitle = String(config.title || "Submitted Response").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 120) || "Submitted Response";
+  const versionResult = await createSalesforceFileVersion(
+    sf.instanceUrl,
+    sf.accessToken,
+    {
+      Title: safeTitle,
+      PathOnClient: `${safeTitle}.pdf`,
+      VersionData: pdfBuffer.toString("base64"),
+      FirstPublishLocationId: targetRecordId
+    }
+  );
+
+  return {
+    generated: true,
+    attached: true,
+    targetRecordId,
+    contentVersionId: versionResult.id,
+    fileName: `${safeTitle}.pdf`,
+    fieldCount: normalizeSubmissionPdfConfig(formSecurity).schema.length
+  };
+}
+
 async function executeUpsertManyCommand(command, context, sf) {
   const { instanceUrl, accessToken } = sf;
 
@@ -1722,6 +2777,7 @@ async function executeUpsertManyCommand(command, context, sf) {
 
   const createdIds = [];
   const updatedIds = [];
+  const rowResults = [];
 
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex] || {};
@@ -1748,6 +2804,11 @@ async function executeUpsertManyCommand(command, context, sf) {
         resolvedFields
       );
       updatedIds.push(updateResult.id);
+      rowResults.push({
+        rowIndex,
+        id: updateResult.id,
+        action: "updated"
+      });
       continue;
     }
 
@@ -1758,6 +2819,11 @@ async function executeUpsertManyCommand(command, context, sf) {
       resolvedFields
     );
     createdIds.push(createResult.id);
+    rowResults.push({
+      rowIndex,
+      id: createResult.id,
+      action: "created"
+    });
   }
 
   const deleted = [];
@@ -1777,8 +2843,10 @@ async function executeUpsertManyCommand(command, context, sf) {
   return {
     success: true,
     type: command.type,
+    repeatGroupKey: command.repeatGroupKey || null,
     objectApiName: command.objectApiName,
     processedCount: rows.length,
+    rowResults,
     createdIds,
     updatedIds,
     deletedIds: deleted
@@ -2019,7 +3087,13 @@ export const handler = async (event) => {
         "system"
       );
     }
-
+    if (formUsesSurveyFields(formSecurity)) {
+      const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+      const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
+      if (effectiveFeatureFlags.enableProSurveyFields !== true) {
+        throw buildFailureError("Survey Fields are not available for this tenant.", 403, "validation");
+      }
+    }
     const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
     assertSecret(secret);
     const loginBaseUrl = tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com";
@@ -2035,10 +3109,10 @@ export const handler = async (event) => {
         expiryMinutes: secretCodeConfig.expiryMinutes,
         maxAttempts: secretCodeConfig.maxAttempts
       };
-      const apexResult = await callSalesforceApex(
+      const apexResult = await callSalesforceApexWithFallback(
         secret.instance_url,
         accessToken,
-        `/services/apexrest/nativeforms/secret-code`,
+        SECRET_CODE_APEX_REST_PATHS,
         apexPayload
       );
 
@@ -2053,7 +3127,9 @@ export const handler = async (event) => {
           normalizedEmail,
           sessionId,
           secret,
-          tenantRecord
+          tenantRecord,
+          secretCodeConfig.sessionMode,
+          inputPayload.sessionExpiresAt
         );
 
         return jsonResponse(200, {
@@ -2061,8 +3137,9 @@ export const handler = async (event) => {
           approved: true,
           normalizedEmail,
           message: apexResult.message || "Code verified successfully.",
-          verificationToken,
-          sessionId
+          verificationToken: verificationToken.token,
+          sessionId,
+          expiresAt: verificationToken.expiresAt
         });
       }
 
@@ -2102,6 +3179,14 @@ export const handler = async (event) => {
           "validation"
         );
       }
+    }
+
+    if (formUsesRecordsListRowSignatures(formSecurity)) {
+      await validateSubmittedRecordsListRowSignatures({
+        tenantRecord,
+        formSecurity,
+        inputPayload
+      });
     }
 
     const context = {
@@ -2169,7 +3254,9 @@ export const handler = async (event) => {
           objectApiName: result.objectApiName || null,
           id: result.id || null,
           found: result.type === "findOne" ? !!result.record : undefined,
+          repeatGroupKey: result.repeatGroupKey || null,
           processedCount: result.processedCount,
+          rowResults: result.rowResults,
           createdIds: result.createdIds,
           updatedIds: result.updatedIds,
           deletedIds: result.deletedIds,
@@ -2235,6 +3322,73 @@ export const handler = async (event) => {
         processedCount: finalizedFiles.length,
         files: finalizedFiles,
         skipped: false,
+        success: true
+      });
+    }
+
+    const finalizedSignatures = await finalizeSubmittedSignatures({
+      tenantRecord,
+      formSecurity,
+      inputPayload,
+      results,
+      sf: {
+        instanceUrl: secret.instance_url,
+        accessToken
+      }
+    });
+    if (finalizedSignatures.length) {
+      results.push({
+        commandKey: "__signatures__",
+        type: "signatureFinalize",
+        processedCount: finalizedSignatures.length,
+        signatures: finalizedSignatures,
+        skipped: false,
+        success: true
+      });
+    }
+
+    const finalizedRowSignatures = await finalizeRecordsListRowSignatures({
+      formSecurity,
+      inputPayload,
+      results,
+      sf: {
+        instanceUrl: secret.instance_url,
+        accessToken
+      }
+    });
+    if (finalizedRowSignatures.length) {
+      results.push({
+        commandKey: "__recordsListRowSignatures__",
+        type: "recordsListRowSignatureFinalize",
+        processedCount: finalizedRowSignatures.length,
+        rowSignatures: finalizedRowSignatures,
+        skipped: false,
+        success: true
+      });
+    }
+
+    const finalizedPdf = await finalizeSubmissionPdf({
+      tenantRecord,
+      formSecurity,
+      inputPayload,
+      results,
+      finalizedFiles,
+      finalizedSignatures,
+      finalizedRowSignatures,
+      submissionRef,
+      submittedAt,
+      event,
+      sf: {
+        instanceUrl: secret.instance_url,
+        accessToken
+      }
+    });
+    if (finalizedPdf) {
+      results.push({
+        commandKey: "__submissionPdf__",
+        type: "submissionPdfFinalize",
+        pdf: finalizedPdf,
+        skipped: finalizedPdf.generated !== true,
         success: true
       });
     }

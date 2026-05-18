@@ -1,0 +1,119 @@
+﻿[
+    {
+        "Name":  "Backend public plans",
+        "Method":  "GET",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/public/plans",
+        "Status":  200,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":true,\"storageMode\":\"dynamodb\",\"items\":[{\"planCode\":\"free\",\"label\":\"Free\",\"description\":\"Permanent low-volume entry plan.\",\"durationType\":\"forever\",\"durationDays\":null,\"limits\":{\"maxSfUsers\":1,\"maxForms\":1,\"maxSubmissionsPerMonth\":100,\"submissionLogRetentionDays\":30},\"limitSummary\":[{\"key\":\"maxForms\",\"label\":\"Forms\",\"value\":\"1\"},{\"key\":\"maxSubmissionsPerMonth\",\"label\":\"Monthly submissions\",\"value\":\"100\"},{\"key\":\"maxSfUsers\",\"label\":\"Active users\",\"value\":\"1\"}],\"features\":[]},{\"planCode\":\"starter\",\"label\":\"Starter\",\"description\":\"Paid production plan without Pro-only features.\",\"durationType\":\"forever\",\"durationDays\":null,\"limits\":{\"maxSfUsers\":1,\"maxForms\":5,\"maxSubmissionsPerMonth..."
+    },
+    {
+        "Name":  "Backend tenant status deleted test org",
+        "Method":  "GET",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/status?orgId=00Dg5000008sWZN",
+        "Status":  200,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":true,\"registered\":false,\"connected\":false,\"setupState\":\"not_registered\",\"connectUrl\":null,\"tenant\":null,\"hasClientCredentials\":true,\"oauthClientConfigured\":true,\"hasRefreshToken\":true,\"hasInstanceUrl\":true}"
+    },
+    {
+        "Name":  "Backend auth health without bearer",
+        "Method":  "GET",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/auth-health?orgId=00Dg5000008sWZN",
+        "Status":  401,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"authenticated\":false,\"error\":\"Missing Authorization bearer token\"}"
+    },
+    {
+        "Name":  "Backend entitlements without bearer",
+        "Method":  "GET",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/entitlements?orgId=00Dg5000008sWZN",
+        "Status":  401,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Missing Authorization bearer token\"}"
+    },
+    {
+        "Name":  "Backend connect deleted test org",
+        "Method":  "GET",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/connect?orgId=00Dg5000008sWZN",
+        "Status":  502,
+        "ContentType":  "application/json",
+        "Cors":  null,
+        "BodyPreview":  "Internal Server Error"
+    },
+    {
+        "Name":  "Backend OAuth callback invalid state/code",
+        "Method":  "GET",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/oauth/callback?state=invalid\u0026code=test",
+        "Status":  200,
+        "ContentType":  "text/html",
+        "Cors":  null,
+        "BodyPreview":  "\u003chtml\u003e \u003cbody style=\"font-family: Arial, sans-serif; padding: 20px;\"\u003e \u003ch2\u003eOAuth Callback Error\u003c/h2\u003e \u003cp\u003eMissing or invalid orgId/state.\u003c/p\u003e \u003c/body\u003e \u003c/html\u003e"
+    },
+    {
+        "Name":  "Backend forms register without bearer",
+        "Method":  "POST",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/register",
+        "Status":  400,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Expected property name or \u0027}\u0027 in JSON at position 1\"}"
+    },
+    {
+        "Name":  "Backend tenant disconnect fake org without bearer",
+        "Method":  "POST",
+        "Url":  "https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/disconnect",
+        "Status":  400,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Expected property name or \u0027}\u0027 in JSON at position 1\"}"
+    },
+    {
+        "Name":  "Prefill GET no payload",
+        "Method":  "GET",
+        "Url":  "https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws",
+        "Status":  200,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":true,\"message\":\"NativeForms prefill endpoint is alive\"}"
+    },
+    {
+        "Name":  "Submit GET no payload",
+        "Method":  "GET",
+        "Url":  "https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws",
+        "Status":  200,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":true,\"message\":\"NativeForms endpoint is alive\"}"
+    },
+    {
+        "Name":  "Submission logs status without bearer",
+        "Method":  "GET",
+        "Url":  "https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-log-config/status?orgId=00Dg5000008sWZN",
+        "Status":  401,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Missing Authorization bearer token\"}"
+    },
+    {
+        "Name":  "Submission logs list without bearer",
+        "Method":  "GET",
+        "Url":  "https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-logs?orgId=00Dg5000008sWZN",
+        "Status":  401,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Missing Authorization bearer token\"}"
+    },
+    {
+        "Name":  "Submission logs sync without bearer",
+        "Method":  "POST",
+        "Url":  "https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-log-config/sync",
+        "Status":  500,
+        "ContentType":  "application/json",
+        "Cors":  "*",
+        "BodyPreview":  "{\"success\":false,\"error\":\"Expected property name or \u0027}\u0027 in JSON at position 1\"}"
+    }
+]

@@ -88,12 +88,14 @@ private class NativeFormsPublisherTest {
             'enableProRepeatGroups' => true,
             'enableProPrefillAliasReferences' => true,
             'enableProAdvancedSubmitModes' => true,
+            'enableProPageLayoutClone' => true,
             'enableProFormulaFields' => true,
             'enableProPostSubmitAutoLink' => true,
             'enableProSfSecretCodeAuth' => true,
             'enableProLoadFile' => true,
             'enableProElectronicSignature' => true,
             'enableProSubmissionPdf' => true,
+            'enableProRecordsListRowSignaturePdf' => true,
             'enableProSurveyFields' => true,
             'enableProCustomJs' => true
         };
@@ -188,6 +190,10 @@ private class NativeFormsPublisherTest {
         System.assert(String.isNotBlank(mock.uploadedHtml), 'Successful publish should upload generated HTML.');
         System.assert(mock.uploadedHtml.contains('nf-secret-verify'), 'Generated HTML should include the secret-code verification section when enabled.');
         System.assert(mock.uploadedHtml.contains('data-formula-target="true"'), 'Generated HTML should include formula metadata for formula fields.');
+        System.assert(mock.uploadedHtml.contains('postSubmitUrlMode'), 'Generated HTML should include the post-submit redirect URL mode.');
+        System.assert(mock.uploadedHtml.contains('postSubmitUrlFormula'), 'Generated HTML should include the post-submit redirect formula setting.');
+        System.assert(mock.uploadedHtml.contains('resolveFormulaPostSubmitUrl'), 'Generated HTML should include formula redirect resolution.');
+        System.assert(mock.uploadedHtml.contains('URLENCODE:function'), 'Generated HTML should expose URLENCODE in the shared formula runtime.');
         System.assert(mock.uploadedHtml.contains('data-nativeforms-time="true"'), 'Generated HTML should render Time fields as TwinaForms-controlled text inputs.');
         System.assert(mock.uploadedHtml.contains('data-time-format="24h"'), 'Generated HTML should include the configured Time display format.');
         System.assert(mock.uploadedHtml.contains('value="09:30"'), 'Generated HTML should keep plain HH:mm default values for Time fields.');
@@ -200,6 +206,12 @@ private class NativeFormsPublisherTest {
         System.assert(mock.uploadedHtml.contains('runGuardedCustomJs();'), 'Generated HTML should execute custom JavaScript through the guarded helper.');
         System.assert(mock.uploadedHtml.contains('data-nativeforms-signature="true"'), 'Generated HTML should render signature pads.');
         System.assert(mock.uploadedHtml.contains('collectSignatures()'), 'Generated HTML should collect signature payloads before submit.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-row-signature="true"'), 'Generated HTML should render records-list row signature pads.');
+        System.assert(mock.uploadedHtml.contains('validateRepeatRowSignatures()'), 'Generated HTML should validate required row signatures before submit.');
+        System.assert(mock.uploadedHtml.contains('_rowSignature'), 'Generated HTML should collect row signature payloads per records-list row.');
+        System.assert(mock.uploadedHtml.contains('.nf-section__grid--10{grid-template-columns:repeat(10,minmax(0,1fr));}'), 'Generated HTML should support section grids up to 10 columns.');
+        System.assert(mock.uploadedHtml.contains('nf-repeat--has-header'), 'Records List should support table-header label mode on desktop.');
+        System.assert(mock.uploadedHtml.contains('nf-repeat-mobile-label'), 'Records List header mode should keep row labels available for mobile.');
         System.assertEquals(false, mock.uploadedHtml.contains('</script><script>TwinaForms.on('), 'Custom JavaScript should no longer be appended as a raw trailing script tag.');
 
         Map<String, Object> registerPayload = (Map<String, Object>) JSON.deserializeUntyped(mock.registerBody);
@@ -216,11 +228,18 @@ private class NativeFormsPublisherTest {
         Map<String, Object> secretCodeConfig = (Map<String, Object>) registerPayload.get('secretCodeConfig');
         System.assertEquals(true, secretCodeConfig.get('enabled'), 'Register payload should include secret-code settings when enabled.');
         System.assertEquals('Email', String.valueOf(secretCodeConfig.get('matchField')), 'Register payload should preserve the configured secret-code match field.');
+        System.assertEquals('short', String.valueOf(secretCodeConfig.get('sessionMode')), 'Secret-code sessions should default to short mode.');
 
         List<Object> uploadFields = (List<Object>) registerPayload.get('uploadFields');
         System.assertEquals(1, uploadFields.size(), 'Register payload should expose upload field metadata for file-upload controls.');
         List<Object> signatureFields = (List<Object>) registerPayload.get('signatureFields');
         System.assertEquals(1, signatureFields.size(), 'Register payload should expose signature field metadata for signature controls.');
+        List<Object> rowSignatureConfigs = (List<Object>) registerPayload.get('recordsListRowSignatures');
+        System.assertEquals(1, rowSignatureConfigs.size(), 'Register payload should expose records-list row signature metadata.');
+        Map<String, Object> rowSignatureConfig = (Map<String, Object>) rowSignatureConfigs[0];
+        System.assertEquals('recordsList', String.valueOf(rowSignatureConfig.get('groupKey')), 'Row signature config should identify the records-list group key.');
+        System.assertEquals(true, rowSignatureConfig.get('required'), 'Row signature config should preserve required mode.');
+        System.assertEquals(true, rowSignatureConfig.get('attachToRowRecord'), 'Row signature config should preserve child-row file attachment mode.');
 
         Map<String, Object> prefillDefinition = (Map<String, Object>) registerPayload.get('prefillDefinition');
         System.assertEquals(1, ((List<Object>) prefillDefinition.get('commands')).size(), 'Prefill definition should include the configured prefill command.');
@@ -385,6 +404,9 @@ private class NativeFormsPublisherTest {
             'languageCode' => 'en',
             'submitLabel' => 'Send',
             'submitSuccessMessage' => 'Published successfully.',
+            'postSubmitAutoLinkEnabled' => true,
+            'postSubmitUrlMode' => 'formula',
+            'postSubmitUrlFormula' => 'IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")',
             'secretCodeVerificationEnabled' => true,
             'secretCodeMatchField' => 'Email',
             'secretCodeIntroText' => 'Enter your email to continue.',
@@ -393,7 +415,12 @@ private class NativeFormsPublisherTest {
             'secretCodeVerifiedMessage' => 'Code verified.',
             'secretCodeSendButtonLabel' => 'Send Code',
             'secretCodeVerifyButtonLabel' => 'Verify Code',
-            'secretCodeResendButtonLabel' => 'Resend Code'
+            'secretCodeResendButtonLabel' => 'Resend Code',
+            'submissionPdfEnabled' => true,
+            'submissionPdfAttachToRecord' => true,
+            'submissionPdfTargetSubmitActionKey' => 'submitAction1',
+            'submissionPdfTitle' => 'Submitted Response',
+            'submissionPdfIncludeEmptyFields' => true
         };
         NF_Form_Version__c versionRecord = createBaseVersion(
             'Rich Publish Form',
@@ -494,7 +521,7 @@ private class NativeFormsPublisherTest {
             1,
             10,
             json(new Map<String, Object>{
-                'columns' => 2,
+                'columns' => 10,
                 'showTitle' => true,
                 'boxed' => true,
                 'text' => 'Section intro'
@@ -541,7 +568,12 @@ private class NativeFormsPublisherTest {
                 'columns' => 2,
                 'repeatSourceAlias' => 'PrefilCase',
                 'allowAddRows' => true,
-                'allowDeleteRows' => true
+                'allowDeleteRows' => true,
+                'showLabelsOnEachRow' => false,
+                'rowSignatureEnabled' => true,
+                'rowSignatureRequired' => true,
+                'rowSignatureLabel' => 'Row Signature',
+                'rowSignatureAttachToRowRecord' => true
             }),
             null
         );

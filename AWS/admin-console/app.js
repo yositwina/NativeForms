@@ -15,6 +15,10 @@ const FEATURE_FLAG_METADATA = {
     label: "Advanced Submit Actions",
     description: "Use richer submit flows like find-and-update or update-by-id for more advanced Salesforce writeback behavior."
   },
+  enableProPageLayoutClone: {
+    label: "Page Layout Clone",
+    description: "Create a draft TwinaForms form from supported Salesforce page-layout fields."
+  },
   enableProFormulaFields: {
     label: "Calculated Fields",
     description: "Generate values automatically inside the form instead of asking users to enter them manually."
@@ -30,6 +34,22 @@ const FEATURE_FLAG_METADATA = {
   enableProLoadFile: {
     label: "File Uploads",
     description: "Allow Pro forms to upload files as part of the form experience and submission flow."
+  },
+  enableProElectronicSignature: {
+    label: "Electronic Signature",
+    description: "Capture drawn signatures and attach them to submitted Salesforce records."
+  },
+  enableProSubmissionPdf: {
+    label: "Submission PDF",
+    description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
+  },
+  enableProRecordsListRowSignaturePdf: {
+    label: "Records List Row Signature + PDF",
+    description: "Require signatures on repeated rows and include them in the submitted PDF."
+  },
+  enableProSurveyFields: {
+    label: "Survey Fields",
+    description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
   },
   enableProCustomJs: {
     label: "Custom JavaScript",
@@ -216,6 +236,15 @@ const state = {
 
 const config = window.NativeFormsAdminConfig || {};
 const apiBaseUrl = String(config.apiBaseUrl || "").replace(/\/+$/, "");
+const authConfig = config.auth || {};
+
+const authState = {
+  enabled: authConfig.enabled === true,
+  accessToken: "",
+  idToken: "",
+  claims: null,
+  email: ""
+};
 
 const refs = {
   tenantTableBody: document.getElementById("tenantTableBody"),
@@ -257,7 +286,9 @@ const refs = {
   settingsRecomputeTime: document.getElementById("settingsRecomputeTime"),
   settingsSource: document.getElementById("settingsSource"),
   settingsFeatureMetadata: document.getElementById("settingsFeatureMetadata"),
-  refreshDataButton: document.getElementById("refreshDataButton")
+  refreshDataButton: document.getElementById("refreshDataButton"),
+  signedInUser: document.getElementById("signedInUser"),
+  logoutButton: document.getElementById("logoutButton")
 };
 
 function getSavedSplitWidth() {
@@ -276,6 +307,184 @@ function saveSplitWidth(value) {
   } catch (error) {
     // Best effort only.
   }
+}
+
+function encodeBase64Url(bytes) {
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function decodeJwtClaims(token) {
+  try {
+    const payload = String(token || "").split(".")[1];
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(atob(padded));
+  } catch (error) {
+    return null;
+  }
+}
+
+async function sha256Base64Url(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return encodeBase64Url(new Uint8Array(digest));
+}
+
+function randomBase64Url(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return encodeBase64Url(bytes);
+}
+
+function authStorageKey(name) {
+  return `twinaforms-admin-auth-${name}`;
+}
+
+function getAuthDomain() {
+  return String(authConfig.domain || "").replace(/\/+$/, "");
+}
+
+function getRedirectUri() {
+  return authConfig.redirectUri || window.location.origin + window.location.pathname;
+}
+
+function getLogoutUri() {
+  return authConfig.logoutUri || getRedirectUri();
+}
+
+function getAuthScopes() {
+  return Array.isArray(authConfig.scopes) && authConfig.scopes.length
+    ? authConfig.scopes
+    : ["openid", "email", "profile"];
+}
+
+function clearAuthTokens() {
+  window.localStorage.removeItem(authStorageKey("access-token"));
+  window.localStorage.removeItem(authStorageKey("id-token"));
+  window.sessionStorage.removeItem(authStorageKey("code-verifier"));
+  window.sessionStorage.removeItem(authStorageKey("state"));
+}
+
+async function redirectToLogin() {
+  const domain = getAuthDomain();
+  if (!domain || !authConfig.clientId) {
+    state.errorMessage = "Admin login is enabled but Cognito is not configured.";
+    render();
+    return;
+  }
+
+  const verifier = randomBase64Url(48);
+  const challenge = await sha256Base64Url(verifier);
+  const stateValue = randomBase64Url(24);
+  window.sessionStorage.setItem(authStorageKey("code-verifier"), verifier);
+  window.sessionStorage.setItem(authStorageKey("state"), stateValue);
+
+  const params = new URLSearchParams({
+    client_id: authConfig.clientId,
+    response_type: "code",
+    scope: getAuthScopes().join(" "),
+    redirect_uri: getRedirectUri(),
+    code_challenge_method: "S256",
+    code_challenge: challenge,
+    state: stateValue
+  });
+
+  window.location.assign(`${domain}/oauth2/authorize?${params.toString()}`);
+}
+
+async function exchangeAuthCode(code) {
+  const verifier = window.sessionStorage.getItem(authStorageKey("code-verifier"));
+  if (!verifier) {
+    throw new Error("The login session expired. Please sign in again.");
+  }
+
+  const response = await fetch(`${getAuthDomain()}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: authConfig.clientId,
+      redirect_uri: getRedirectUri(),
+      code,
+      code_verifier: verifier
+    })
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.access_token) {
+    throw new Error(payload.error_description || payload.error || "Cognito login did not return an access token.");
+  }
+
+  window.localStorage.setItem(authStorageKey("access-token"), payload.access_token);
+  if (payload.id_token) {
+    window.localStorage.setItem(authStorageKey("id-token"), payload.id_token);
+  }
+  window.sessionStorage.removeItem(authStorageKey("code-verifier"));
+  window.sessionStorage.removeItem(authStorageKey("state"));
+}
+
+async function initializeAuth() {
+  if (!authState.enabled) {
+    return true;
+  }
+
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("code");
+  const incomingState = url.searchParams.get("state");
+  const expectedState = window.sessionStorage.getItem(authStorageKey("state"));
+  const error = url.searchParams.get("error");
+
+  if (error) {
+    clearAuthTokens();
+    state.errorMessage = `Admin login failed. ${url.searchParams.get("error_description") || error}`;
+    window.history.replaceState({}, document.title, getRedirectUri());
+    return false;
+  }
+
+  if (code) {
+    if (!expectedState || incomingState !== expectedState) {
+      clearAuthTokens();
+      state.errorMessage = "Admin login could not be verified. Please sign in again.";
+      window.history.replaceState({}, document.title, getRedirectUri());
+      return false;
+    }
+
+    await exchangeAuthCode(code);
+    window.history.replaceState({}, document.title, getRedirectUri());
+  }
+
+  authState.accessToken = window.localStorage.getItem(authStorageKey("access-token")) || "";
+  authState.idToken = window.localStorage.getItem(authStorageKey("id-token")) || "";
+  authState.claims = decodeJwtClaims(authState.idToken) || decodeJwtClaims(authState.accessToken);
+  authState.email = authState.claims?.email || authState.claims?.username || authState.claims?.sub || "";
+
+  if (!authState.accessToken) {
+    await redirectToLogin();
+    return false;
+  }
+
+  return true;
+}
+
+function logoutAdmin() {
+  clearAuthTokens();
+  const domain = getAuthDomain();
+  if (!authState.enabled || !domain || !authConfig.clientId) {
+    window.location.assign(getLogoutUri());
+    return;
+  }
+
+  const params = new URLSearchParams({
+    client_id: authConfig.clientId,
+    logout_uri: getLogoutUri()
+  });
+  window.location.assign(`${domain}/logout?${params.toString()}`);
 }
 
 function escapeHtml(value) {
@@ -410,20 +619,30 @@ async function parseApiResponse(response, path) {
 }
 
 async function fetchJson(path) {
+  const headers = {
+    "Content-Type": "application/json"
+  };
+  if (authState.accessToken) {
+    headers.Authorization = `Bearer ${authState.accessToken}`;
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
-    headers: {
-      "Content-Type": "application/json"
-    }
+    headers
   });
   return parseApiResponse(response, path);
 }
 
 async function postJson(path, body) {
+  const headers = {
+    "Content-Type": "application/json"
+  };
+  if (authState.accessToken) {
+    headers.Authorization = `Bearer ${authState.accessToken}`;
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers,
     body: JSON.stringify(body)
   });
   return parseApiResponse(response, path);
@@ -635,6 +854,14 @@ function prependSupportEntries(orgId, entries) {
   state.supportByOrgId.set(orgId, [...entries, ...existing]);
 }
 
+function removeTenantFromState(orgId) {
+  state.tenants = state.tenants.filter((tenant) => tenant.orgId !== orgId);
+  state.tenantDetailsById.delete(orgId);
+  state.supportByOrgId.delete(orgId);
+  state.auditByOrgId.delete(orgId);
+  state.selectedOrgId = state.tenants[0]?.orgId || null;
+}
+
 async function saveTenantProfile(form) {
   const formData = new FormData(form);
   const payload = {
@@ -741,6 +968,57 @@ async function runTenantAction(orgId, action, body) {
     await Promise.all([ensureOverview(), ensureAuditLog()]);
   } catch (error) {
     state.errorMessage = `${labelize(action)} failed. ${error.message}`;
+  } finally {
+    state.busyActionKey = "";
+  }
+
+  render();
+}
+
+async function deleteTenantRecord(selectedTenant) {
+  const orgId = selectedTenant?.orgId;
+  if (!orgId) {
+    return;
+  }
+
+  const firstConfirm = window.confirm(
+    `Delete ${selectedTenant.companyName || orgId} from the tenant DynamoDB table?\n\nThis does not delete Secrets Manager.`
+  );
+  if (!firstConfirm) {
+    return;
+  }
+
+  const typedOrgId = window.prompt(
+    `This is destructive. Type the org id to delete this tenant record:\n${orgId}`
+  );
+  if (typedOrgId !== orgId) {
+    state.errorMessage = "Delete canceled. The typed org id did not match.";
+    state.successMessage = "";
+    render();
+    return;
+  }
+
+  state.busyActionKey = `${orgId}:delete-tenant`;
+  state.successMessage = "";
+  state.errorMessage = "";
+  render();
+
+  try {
+    const data = await postJson(`/admin/tenants/${encodeURIComponent(orgId)}/delete-tenant`, {
+      actorEmail: "admin@nativeforms.internal",
+      reason: "Deleted tenant DynamoDB record from the Admin Console after double confirmation."
+    });
+    removeTenantFromState(orgId);
+    prependAuditEntries(orgId, data.auditEntries || []);
+    state.successMessage = data.message || "Tenant DynamoDB record deleted. Secrets Manager was not changed.";
+    state.overview = null;
+    await Promise.all([
+      ensureOverview(),
+      ensureAuditLog(),
+      state.selectedOrgId ? ensureTenantData(state.selectedOrgId) : Promise.resolve()
+    ]);
+  } catch (error) {
+    state.errorMessage = `Delete tenant failed. ${error.message}`;
   } finally {
     state.busyActionKey = "";
   }
@@ -1291,6 +1569,17 @@ function renderDetail(items) {
       </div>
     </section>
 
+    <section class="detail-section detail-section--danger">
+      <h5>Danger Zone</h5>
+      <div class="danger-panel">
+        <div>
+          <strong>Delete tenant DynamoDB record</strong>
+          <p>This removes only the customer record from DynamoDB. Secrets Manager is intentionally left untouched.</p>
+        </div>
+        <button class="action-button action-button--danger" type="button" id="deleteTenantButton" ${isBusy("delete-tenant") ? "disabled" : ""}>${isBusy("delete-tenant") ? "Deleting..." : "Delete Tenant"}</button>
+      </div>
+    </section>
+
     <section class="detail-section">
       <h5>Audit Trail</h5>
       <div class="activity-stream">
@@ -1327,6 +1616,10 @@ function renderDetail(items) {
         actorEmail: "admin@nativeforms.internal"
       });
     });
+  });
+
+  document.getElementById("deleteTenantButton")?.addEventListener("click", async () => {
+    await deleteTenantRecord(selectedTenant);
   });
 }
 
@@ -1545,6 +1838,14 @@ function renderView() {
 
 function render() {
   const filteredTenants = getFilteredTenants();
+  if (refs.signedInUser) {
+    refs.signedInUser.textContent = authState.enabled
+      ? (authState.email || "Authenticated")
+      : "Local Preview";
+  }
+  if (refs.logoutButton) {
+    refs.logoutButton.hidden = !authState.enabled || !authState.accessToken;
+  }
   renderBanner();
   renderModePanel();
   renderView();
@@ -1639,4 +1940,20 @@ window.addEventListener("resize", () => {
   applySplitLayout();
 });
 
-loadInitialData().then(() => ensureTenantData(state.selectedOrgId || state.tenants[0]?.orgId || null));
+refs.logoutButton?.addEventListener("click", () => {
+  logoutAdmin();
+});
+
+initializeAuth()
+  .then((ready) => {
+    if (!ready) {
+      render();
+      return null;
+    }
+    return loadInitialData().then(() => ensureTenantData(state.selectedOrgId || state.tenants[0]?.orgId || null));
+  })
+  .catch((error) => {
+    state.errorMessage = `Admin login could not start. ${error.message}`;
+    state.isLoading = false;
+    render();
+  });

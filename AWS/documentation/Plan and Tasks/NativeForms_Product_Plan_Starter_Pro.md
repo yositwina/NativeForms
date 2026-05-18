@@ -111,6 +111,11 @@ Starter should include these product capabilities at launch:
 - clean left/center/right layout
 - add basic field and display elements
 - sections
+- Salesforce lookup input field:
+  - single-select lookup
+  - live Salesforce search after the visitor types
+  - no default/preloaded record list in the public form
+  - selected record `Id` submits into a mapped Salesforce reference field
 - image element
 - display text element
 - conditional view with one condition
@@ -123,7 +128,16 @@ Starter should include these product capabilities at launch:
 - prefill mapping to Salesforce
 - submit mapping to Salesforce
 - prefill and submit actions working in runtime
+- lookup fields can resolve a prefilled Salesforce Id into a display label
 - one-condition logic only
+- secure Salesforce update links:
+  - public form link can be tied to an existing Salesforce record
+  - secret-code verification protects the visitor flow before sensitive prefill/update behavior
+  - submit updates the intended Salesforce record without requiring the visitor to log in
+- ready-to-use Salesforce registration form:
+  - Starter template should support common event/webinar registration
+  - default flow creates or updates Contact and creates/updates Campaign Member when Campaigns are used
+  - demonstrates related Salesforce record creation without requiring custom development
 
 ### Published runtime
 - clean public hosted form
@@ -137,9 +151,14 @@ Starter should include these product capabilities at launch:
 
 ### Security / trust
 - tenant isolation by `orgId`
-- tenant secret for admin/server calls
+- Bootstrap V2 HMAC for package-to-AWS admin/server calls
 - publish token for runtime
 - server-side enforcement of object/field/command allowlists
+- secret-code verification for secure public record-update flows
+- secret-code verification session duration is configurable per form version:
+  - default is the current short session behavior, based on the code expiry window
+  - optional same-tab session stores the signed verification token in browser `sessionStorage`, survives refresh in that tab, expires at the visitor's local midnight, and is capped by AWS at 12 hours
+  - closing the browser tab clears the session because V1 intentionally does not use `localStorage`
 
 ### Support
 - standard support process defined
@@ -170,6 +189,37 @@ Pro should build on Starter and add:
 - richer branding controls
 - custom logo
 - more advanced submission logs and filters
+- create form from Salesforce page layout:
+  - feature flag: `enableProPageLayoutClone`
+  - admin chooses an object and page layout
+  - V1 reads Salesforce layout metadata through the org's stored AWS OAuth connection using Salesforce UI API; the imported source is the assigned Salesforce page layout for the connected admin/profile and record type
+  - TwinaForms creates a draft form from supported fields in the returned layout sections, preserving section grouping where possible
+  - prefill can load an existing record by `recordId`
+  - submit updates the intended record or creates a new record when configured and no existing record is found
+  - V1 secure update must always use the existing Salesforce Contact/email secret-code verification model, regardless of the target form object
+  - if the visitor email is not found as a Salesforce Contact, the visitor cannot edit the form through secret-code mode
+  - V1 does not attempt generic arbitrary-object identity verification; create-only flows remain available when Contact/email verification is not appropriate
+  - V1 does not retrieve arbitrary unassigned layout files by Metadata API; that remains an explicit expansion option if customers need to select a layout that is not assigned to the connected admin/profile
+
+### Competitor-parity Pro backlog
+This is the current corrected list of competitor-driven Pro features that are not yet treated as complete product scope:
+
+Ordered from easiest to most complex:
+
+| Order | Feature | Complexity | Notes |
+|---:|---|---|---|
+| 1 | Clone field / clone section | Low | Designer-only productivity improvement. Reuse existing element/config copy behavior and generate fresh element keys. |
+| 2 | Clone form | Implemented as Pro productivity foundation | Copy form, latest draft/version, elements, prefill actions, submit actions, and settings into a new draft form. |
+| 3 | Salesforce-focused template library | Medium | Seed polished starter templates such as Lead Capture, Contact Update, Case Request, Campaign Event Registration, Volunteer Signup, Donation/Pledge, Consent, File Request, and Feedback Survey. |
+| 4 | Survey field styles | Implemented as Pro V1 foundation | `enableProSurveyFields` gates survey-focused presentations that still save simple values: 1-5 star rating, NPS 0-10, Likert scale, ranking, and satisfaction scale. Rating and NPS map cleanly to Salesforce Number fields, Likert/satisfaction map to Picklist or Text, and ranking maps to Long Text Area as an ordered value list. |
+| 5 | Multi-page forms with progress | Medium-high | Add page/step containers, runtime navigation, validation per page, and progress display. |
+| 6 | Registration kit | Medium-high | Pro expansion of the registration template with optional TwinaForms Event / Registration objects, capacity, waitlist, cancellation/update link, and attendance status. |
+| 7 | Create form from Salesforce page layout | Medium-high | Admin selects an object and TwinaForms reads the assigned Salesforce page layout through AWS/UI API, then creates a draft form from supported layout sections/fields, adds prefill by `recordId`, and configures submit to update-or-create the same object. V1 should skip read-only/unsupported fields and always use Salesforce Contact/email secret-code verification for secure update links; visitors without a matching Contact cannot edit. |
+| 8 | Submission PDF | Implemented as Pro V1 foundation | `enableProSubmissionPdf` gates Form Settings for a readable submitted-response PDF. V1 copies fields, display text, images, and signatures in published form order and can attach the PDF to the chosen Salesforce submit target record. |
+| 9 | Save and resume | High | Store draft responses securely, issue resume link/code, reload draft state, and handle expiry/cleanup. |
+| 10 | Electronic signature | Implemented as Pro V1 foundation | `enableProElectronicSignature` gates a Signature field in Designer. Published forms capture a drawn PNG and AWS attaches it as a Salesforce File attached to that submit target record. Future Submission PDF work should reuse the saved signature artifact metadata. |
+
+File uploads are already in Pro scope, and uploaded files already attach to the submit target object in Salesforce. Do not track "attach uploads to Salesforce Files" as a missing competitor-parity item unless that behavior regresses or the target-object attachment model changes.
 
 ### Support
 - priority support

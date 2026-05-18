@@ -91,7 +91,7 @@ Every form submission (success, failure, validation error) writes a log record t
 | `nextToken` | For next page |
 | `totalEstimate` | Approximate count (DynamoDB scan estimate) |
 
-**Security:** Same tenant secret validation as existing Lambdas. Apex passes the stored tenant secret. Logs are always scoped to the calling org — cross-tenant access is impossible by design.
+**Security:** Salesforce Apex calls the Submission Logs Lambda directly over HTTPS and signs each protected request with Bootstrap V2 HMAC headers. Logs are always scoped to the calling org, and AWS rejects requests whose signature org id does not match the requested org.
 
 ---
 
@@ -131,8 +131,8 @@ Every form submission (success, failure, validation error) writes a log record t
 
 **Class:** `NativeFormsSubmissionLogsController`
 
-- Calls `NativeForms-GetSubmissionLogs` via `Http` callout
-- Same pattern as existing controllers (named credential or stored endpoint)
+- Calls the Submission Logs AWS endpoint via direct `Http` callout
+- Uses packaged Remote Site Settings plus Bootstrap V2 HMAC signatures
 - Handles pagination token
 - Caches form list for the filter dropdown
 

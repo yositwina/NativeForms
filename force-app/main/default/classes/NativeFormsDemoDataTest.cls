@@ -139,6 +139,38 @@ private class NativeFormsDemoDataTest {
     }
 
     @IsTest
+    static void installStillCreatesPackageDemoWhenStandardSeedsAreBlocked() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        NativeFormsDemoDataService.forceStandardObjectSeedFailureForTest = true;
+        try {
+            Test.startTest();
+            NativeFormsDemoDataService.InstallSummary summary = NativeFormsDemoDataService.installDemoData();
+            Test.stopTest();
+
+            System.assertEquals(true, summary.success, 'Install should still report success when subscriber automation blocks sample standard records.');
+            System.assertEquals(4, summary.themeCount, 'Package-owned themes should still be installed.');
+            System.assertEquals(0, summary.contactCount, 'Blocked Contact seeds should be skipped.');
+            System.assertEquals(0, summary.caseCount, 'Case seeds should be skipped when Contact seeds are blocked.');
+            System.assertEquals(2, summary.formCount, 'Package-owned demo forms should still be installed.');
+            System.assertEquals('Demo forms installed. Sample Contacts/Cases were skipped because Salesforce automation blocked them.', summary.message, 'Install should explain the partial standard-object seed result.');
+
+            NativeForms_Config__c config = NativeForms_Config__c.getOrgDefaults();
+            System.assertEquals(true, config.Demo_Data_Installed__c, 'Org config should still mark the package demo as installed.');
+            System.assertEquals(summary.message, config.Demo_Data_Last_Message__c, 'Org config should preserve the warning message.');
+
+            NativeFormsDemoDataService.HomeSnapshot snapshot = NativeFormsDemoDataService.getHomeSnapshot();
+            System.assertEquals(true, snapshot.demoDataInstalled, 'Home should treat package-owned demo forms as installed.');
+            System.assertEquals(4, snapshot.installedThemeCount, 'Home should count installed themes.');
+            System.assertEquals(0, snapshot.installedContactCount, 'Home should show that sample Contacts were skipped.');
+            System.assertEquals(0, snapshot.installedCaseCount, 'Home should show that sample Cases were skipped.');
+            System.assertEquals(2, snapshot.installedFormCount, 'Home should count installed demo forms.');
+        } finally {
+            NativeFormsDemoDataService.forceStandardObjectSeedFailureForTest = false;
+        }
+        }
+    }
+
+    @IsTest
     static void reinstallRepairsArtifactsWhenVersionDrifts() {
         System.runAs(new User(Id = UserInfo.getUserId())) {
         NativeFormsDemoDataService.installDemoData();

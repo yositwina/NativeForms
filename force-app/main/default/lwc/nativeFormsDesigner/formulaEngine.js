@@ -53,6 +53,50 @@ function isoLocalDate(dateValue) {
     return `${dateValue.getFullYear()}-${pad2(dateValue.getMonth() + 1)}-${pad2(dateValue.getDate())}`;
 }
 
+function isIsoDateValue(value) {
+    return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) && parseIsoDateLike(value) !== null;
+}
+
+function addDays(dateValue, days) {
+    const parsed = parseIsoDateLike(dateValue);
+    const numericDays = Number(days);
+    if (!parsed || !Number.isFinite(numericDays)) {
+        return NaN;
+    }
+    parsed.setDate(parsed.getDate() + numericDays);
+    return isoLocalDate(parsed);
+}
+
+function diffDays(leftDateValue, rightDateValue) {
+    const leftDate = parseIsoDateLike(leftDateValue);
+    const rightDate = parseIsoDateLike(rightDateValue);
+    if (!leftDate || !rightDate) {
+        return NaN;
+    }
+    const msPerDay = 24 * 60 * 60 * 1000;
+    return Math.round((leftDate.getTime() - rightDate.getTime()) / msPerDay);
+}
+
+function addFormulaValues(left, right) {
+    if (isIsoDateValue(left) && Number.isFinite(Number(right))) {
+        return addDays(left, right);
+    }
+    if (Number.isFinite(Number(left)) && isIsoDateValue(right)) {
+        return addDays(right, left);
+    }
+    return Number(left) + Number(right);
+}
+
+function subtractFormulaValues(left, right) {
+    if (isIsoDateValue(left) && Number.isFinite(Number(right))) {
+        return addDays(left, -Number(right));
+    }
+    if (isIsoDateValue(left) && isIsoDateValue(right)) {
+        return diffDays(left, right);
+    }
+    return Number(left) - Number(right);
+}
+
 function isoLocalDateTime(dateValue) {
     return `${isoLocalDate(dateValue)}T${pad2(dateValue.getHours())}:${pad2(dateValue.getMinutes())}:${pad2(dateValue.getSeconds())}`;
 }
@@ -60,6 +104,7 @@ function isoLocalDateTime(dateValue) {
 function runtimeFunctions() {
     return {
         CONCAT: (...args) => args.map((item) => toText(item)).join(''),
+        URLENCODE: (value) => encodeURIComponent(toText(value)),
         IF: (conditionValue, trueValue, falseValue) => (conditionValue ? trueValue : falseValue),
         COALESCE: (...args) => {
             for (let index = 0; index < args.length; index += 1) {
@@ -137,8 +182,8 @@ function buildParser() {
         not: (value) => !value
     };
     parser.binaryOps = {
-        '+': (left, right) => Number(left) + Number(right),
-        '-': (left, right) => Number(left) - Number(right),
+        '+': addFormulaValues,
+        '-': subtractFormulaValues,
         '*': (left, right) => Number(left) * Number(right),
         '/': (left, right) => Number(left) / Number(right),
         '==': (left, right) => normalizeComparable(left) === normalizeComparable(right),
@@ -216,7 +261,10 @@ export function evaluateFormulaExpression(expression, sourceValues = {}, targetT
     const compiled = compileFormula(expression);
     const parserValues = {};
     compiled.references.forEach((fieldKey) => {
-        parserValues[compiled.variableMap[fieldKey]] = sourceValues[fieldKey];
+        const rawValue = Object.prototype.hasOwnProperty.call(sourceValues || {}, fieldKey)
+            ? sourceValues[fieldKey]
+            : '';
+        parserValues[compiled.variableMap[fieldKey]] = rawValue === null || rawValue === undefined ? '' : rawValue;
     });
     const rawValue = compiled.compiled.evaluate(parserValues);
     return {
@@ -230,7 +278,8 @@ export function validateFormulaConfig({
     fieldKey,
     targetType,
     elements = [],
-    insideRepeatGroup = false
+    insideRepeatGroup = false,
+    allowFormulaReferences = false
 }) {
     const normalizedExpression = normalizeExpression(expression);
     if (insideRepeatGroup) {
@@ -266,7 +315,7 @@ export function validateFormulaConfig({
             return { valid: false, message: `Unknown field reference: ${referenceKey}.`, references: compiled.references };
         }
         const config = referencedElement.configJson ? JSON.parse(referencedElement.configJson) : {};
-        if (config?.isFormula === true) {
+        if (config?.isFormula === true && !allowFormulaReferences) {
             return { valid: false, message: `Formula fields cannot reference another formula field: ${referenceKey}.`, references: compiled.references };
         }
     }
@@ -280,14 +329,16 @@ export function previewFormulaValue({
     targetType,
     elements = [],
     insideRepeatGroup = false,
-    sourceValues = {}
+    sourceValues = {},
+    allowFormulaReferences = false
 }) {
     const validation = validateFormulaConfig({
         expression,
         fieldKey,
         targetType,
         elements,
-        insideRepeatGroup
+        insideRepeatGroup,
+        allowFormulaReferences
     });
     if (!validation.valid) {
         return {

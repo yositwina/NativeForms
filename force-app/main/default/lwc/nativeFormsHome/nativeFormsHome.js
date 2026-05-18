@@ -4,6 +4,8 @@ import getHomeView from '@salesforce/apex/NativeFormsHomeController.getHomeView'
 import installDemoData from '@salesforce/apex/NativeFormsDemoDataController.installDemoData';
 
 const TEMP_UPGRADE_URL = 'https://twinaforms.com/upgrade/';
+const HOME_REFRESH_EVENT = 'nativeforms:home-refresh-requested';
+const HOME_REFRESH_SESSION_KEY = 'nativeforms:home-refresh-pending';
 
 export default class NativeFormsHome extends NavigationMixin(LightningElement) {
     homeView;
@@ -11,9 +13,23 @@ export default class NativeFormsHome extends NavigationMixin(LightningElement) {
     isInstalling = false;
     errorMessage = '';
     successMessage = '';
+    boundHomeRefreshHandler;
+    refreshFlagConsumed = false;
 
     connectedCallback() {
+        this.boundHomeRefreshHandler = () => {
+            this.loadHome();
+        };
+        window.addEventListener(HOME_REFRESH_EVENT, this.boundHomeRefreshHandler);
         this.loadHome();
+        this.consumePendingRefreshFlag();
+    }
+
+    disconnectedCallback() {
+        if (this.boundHomeRefreshHandler) {
+            window.removeEventListener(HOME_REFRESH_EVENT, this.boundHomeRefreshHandler);
+            this.boundHomeRefreshHandler = null;
+        }
     }
 
     async loadHome() {
@@ -28,6 +44,27 @@ export default class NativeFormsHome extends NavigationMixin(LightningElement) {
             this.homeView = null;
         } finally {
             this.isLoading = false;
+        }
+    }
+
+    renderedCallback() {
+        this.consumePendingRefreshFlag();
+    }
+
+    consumePendingRefreshFlag() {
+        if (this.refreshFlagConsumed) {
+            return;
+        }
+        try {
+            const pendingRefresh = window.sessionStorage?.getItem(HOME_REFRESH_SESSION_KEY);
+            if (pendingRefresh !== 'true') {
+                return;
+            }
+            this.refreshFlagConsumed = true;
+            window.sessionStorage.removeItem(HOME_REFRESH_SESSION_KEY);
+            this.loadHome();
+        } catch (error) {
+            // Home still loads normally if session storage is unavailable.
         }
     }
 

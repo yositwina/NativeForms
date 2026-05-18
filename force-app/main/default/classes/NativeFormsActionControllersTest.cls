@@ -21,6 +21,7 @@ private class NativeFormsActionControllersTest {
             'enableProRepeatGroups' => enableRepeatGroups == true,
             'enableProPrefillAliasReferences' => enablePrefillAliasReferences == true,
             'enableProAdvancedSubmitModes' => enableAdvancedSubmitModes == true,
+            'enableProPageLayoutClone' => true,
             'enableProFormulaFields' => true,
             'enableProPostSubmitAutoLink' => true,
             'enableProSfSecretCodeAuth' => true,

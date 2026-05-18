@@ -42,14 +42,15 @@ AWS stores a tenant DynamoDB record with:
 Current tenant bootstrap endpoint:
 - `POST /tenant/register`
 
-Current bootstrap behavior:
-- creates or updates the tenant record
-- generates a per-org secret if one does not exist
-- returns that tenant secret in the response for setup
+Current Bootstrap V2 behavior:
+- creates or updates the tenant record through the AWS `/connect` OAuth start path
+- uses Salesforce OAuth as the first trust anchor
+- retrieves a per-org signing secret from protected package storage after OAuth succeeds
+- signs protected package-to-AWS calls with Bootstrap V2 HMAC headers
 
-Admin/server calls such as form registration must send:
-- `Authorization: Bearer <tenant-secret>`
-- `orgId` in the request body
+Admin/server package calls such as form registration must send:
+- Bootstrap V2 HMAC headers
+- `orgId` in the request body when required by the endpoint
 
 Tenant records can also be used to control subscription access per org by setting:
 - `subscriptionState`

@@ -111,6 +111,25 @@ public with sharing class NativeFormsAwsClient {
         return (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
     }
 
+    public static Map<String, Object> getSalesforceLayouts(Map<String, Object> requestBody) {
+        String path = '/salesforce/layouts';
+        String body = JSON.serialize(requestBody);
+        HttpRequest request = new HttpRequest();
+        request.setMethod('POST');
+        request.setEndpoint(backendEndpoint(path));
+        request.setHeader('Content-Type', 'application/json');
+        applyBootstrapV2Signature(request, 'POST', path, body);
+        request.setTimeout(TIMEOUT_MS);
+        request.setBody(body);
+
+        HttpResponse response = new Http().send(request);
+        if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+            throw new CalloutException('Salesforce Layout API error: ' + response.getStatusCode() + ' ' + response.getStatus() + ' ' + response.getBody());
+        }
+
+        return (Map<String, Object>) JSON.deserializeUntyped(response.getBody());
+    }
+
     public static void applyBootstrapV2Signature(HttpRequest request, String method, String path, String body) {
         Map<String, String> headers = NativeFormsBootstrapV2Signer.buildSignedHeaders(method, path, body);
         for (String headerName : headers.keySet()) {

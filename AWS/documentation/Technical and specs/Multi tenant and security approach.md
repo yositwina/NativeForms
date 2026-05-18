@@ -73,17 +73,17 @@ This avoids assuming:
 - or one fixed My Domain pattern
 
 ### Step 2: AWS creates the tenant record
-AWS stores a tenant record and generates a per-org secret.
+AWS stores a tenant record for the Salesforce org.
 
-### Step 3: Secret is delivered to the admin
-For the current prototype, AWS returns the tenant secret in the `/tenant/register` response so setup can be completed quickly.
+### Step 3: OAuth creates the Salesforce connection
+The packaged Connect page sends the admin to the TwinaForms AWS OAuth start URL.
 
-Later product versions may email or rotate the secret through a fuller admin flow.
+AWS exchanges the Salesforce OAuth code server-to-server, validates the returned org id, and stores the per-org Salesforce refresh token and instance URL in AWS Secrets Manager.
 
-### Step 4: Admin stores the secret in Salesforce
-The admin pastes the secret into the package External Credential / Named Credential setup.
+### Step 4: Bootstrap V2 creates service trust
+After OAuth succeeds, AWS calls the packaged Apex Bootstrap V2 endpoint in the authenticated Salesforce org.
 
-After that, Salesforce can authenticate server-to-server requests to AWS for that org.
+Salesforce returns a per-org signing secret generated and stored in protected package storage. Future package-to-AWS calls are signed with HMAC, so the subscriber admin does not create Salesforce Named Credentials or External Credentials.
 
 ## Tenant record storage
 Use a DynamoDB tenant table.
@@ -158,6 +158,23 @@ Before storing the form:
 2. validate tenant status
 3. validate `orgId`
 4. then write/update the form record
+
+## Salesforce admin metadata assist
+
+### Endpoint
+- `POST /salesforce/layouts`
+
+### Purpose
+Salesforce Designer calls this signed tenant route when Page Layout Clone needs Salesforce layout metadata. AWS uses the tenant's stored Salesforce OAuth refresh token to call Salesforce UI API and returns the assigned page layout sections/fields for the requested object.
+
+### Security
+- Requires Bootstrap V2 signed tenant auth, the same trust path used by publish/admin assist calls.
+- Requires an active tenant.
+- Does not expose the Salesforce OAuth token to Apex or the browser.
+- V1 returns the layout assigned to the connected Salesforce admin/profile and record type; arbitrary unassigned Metadata API layout retrieval is not part of V1.
+
+### Runtime note
+`NativeFormsBackend` uses a 15-second Lambda timeout because OAuth refresh plus Salesforce UI API metadata reads can exceed 3 seconds.
 
 ## Form record storage
 Use a separate DynamoDB form table.

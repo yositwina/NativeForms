@@ -2,7 +2,8 @@ import {
   SecretsManagerClient,
   CreateSecretCommand,
   PutSecretValueCommand,
-  GetSecretValueCommand
+  GetSecretValueCommand,
+  RestoreSecretCommand
 } from "@aws-sdk/client-secrets-manager";
 import {
   DynamoDBClient,
@@ -15,6 +16,14 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
+import https from "https";
+import querystring from "querystring";
+import { verifyBootstrapV2SignedPayload } from "./bootstrap-v2-hmac.mjs";
+import {
+  buildBootstrapV2ConnectionFields,
+  buildBootstrapV2UnavailableConnectionFields,
+  fetchBootstrapV2SigningSecret
+} from "./bootstrap-v2-salesforce.mjs";
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
@@ -25,15 +34,19 @@ const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
+const BOOTSTRAP_V2_NONCE_TABLE = process.env.BOOTSTRAP_V2_NONCE_TABLE || "NativeFormsBootstrapV2Nonces";
+const BOOTSTRAP_V2_NONCE_KEY_ATTRIBUTE = process.env.BOOTSTRAP_V2_NONCE_KEY_ATTRIBUTE || "nonceKey";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
 const SALESFORCE_OAUTH_CLIENT_ID = process.env.SALESFORCE_OAUTH_CLIENT_ID || "";
 const SALESFORCE_OAUTH_CLIENT_SECRET = process.env.SALESFORCE_OAUTH_CLIENT_SECRET || "";
+const SALESFORCE_API_VERSION = "v60.0";
 const SES_FROM = process.env.SES_FROM || "";
 const DEV_MODE = String(process.env.DEV_MODE || "").toLowerCase() === "true";
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "";
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, "");
 const PRICING_BASE_URL = (process.env.PRICING_BASE_URL || "https://twinaforms.com").replace(/\/+$/, "");
+const BOOTSTRAP_V2_SPIKE_SECRET_B64 = process.env.BOOTSTRAP_V2_SPIKE_SECRET_B64 || "";
 const FEATURE_FLAG_METADATA = {
   enableProConditionLogic: {
     label: "Conditional Logic",
@@ -51,6 +64,10 @@ const FEATURE_FLAG_METADATA = {
     label: "Advanced Submit Actions",
     description: "Use richer submit flows like find-and-update or update-by-id for more advanced Salesforce writeback behavior."
   },
+  enableProPageLayoutClone: {
+    label: "Page Layout Clone",
+    description: "Create a draft TwinaForms form from supported Salesforce page-layout fields."
+  },
   enableProFormulaFields: {
     label: "Calculated Fields",
     description: "Generate values automatically inside the form instead of asking users to enter them manually."
@@ -66,6 +83,22 @@ const FEATURE_FLAG_METADATA = {
   enableProLoadFile: {
     label: "File Uploads",
     description: "Allow Pro forms to upload files as part of the form experience and submission flow."
+  },
+  enableProElectronicSignature: {
+    label: "Electronic Signature",
+    description: "Capture drawn signatures and attach them to submitted Salesforce records."
+  },
+  enableProSubmissionPdf: {
+    label: "Submission PDF",
+    description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
+  },
+  enableProRecordsListRowSignaturePdf: {
+    label: "Records List Row Signature + PDF",
+    description: "Require signatures on repeated rows and include them in the submitted PDF."
+  },
+  enableProSurveyFields: {
+    label: "Survey Fields",
+    description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
   },
   enableProCustomJs: {
     label: "Custom JavaScript",
@@ -97,10 +130,15 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: false,
       enableProPrefillAliasReferences: false,
       enableProAdvancedSubmitModes: false,
+      enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
       enableProLoadFile: false,
+      enableProElectronicSignature: false,
+      enableProSubmissionPdf: false,
+      enableProRecordsListRowSignaturePdf: false,
+      enableProSurveyFields: false,
       enableProCustomJs: false
     }
   },
@@ -121,10 +159,15 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: true,
       enableProPrefillAliasReferences: true,
       enableProAdvancedSubmitModes: true,
+      enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
       enableProLoadFile: true,
+      enableProElectronicSignature: true,
+      enableProSubmissionPdf: true,
+      enableProRecordsListRowSignaturePdf: true,
+      enableProSurveyFields: true,
       enableProCustomJs: true
     }
   },
@@ -145,10 +188,15 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: false,
       enableProPrefillAliasReferences: false,
       enableProAdvancedSubmitModes: false,
+      enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
       enableProSfSecretCodeAuth: false,
       enableProLoadFile: false,
+      enableProElectronicSignature: false,
+      enableProSubmissionPdf: false,
+      enableProRecordsListRowSignaturePdf: false,
+      enableProSurveyFields: false,
       enableProCustomJs: false
     }
   },
@@ -169,10 +217,15 @@ const DEFAULT_PLANS = [
       enableProRepeatGroups: true,
       enableProPrefillAliasReferences: true,
       enableProAdvancedSubmitModes: true,
+      enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
       enableProSfSecretCodeAuth: true,
       enableProLoadFile: true,
+      enableProElectronicSignature: true,
+      enableProSubmissionPdf: true,
+      enableProRecordsListRowSignaturePdf: true,
+      enableProSurveyFields: true,
       enableProCustomJs: true
     }
   }
@@ -191,7 +244,10 @@ async function saveSalesforceConnection(secretName, payload) {
 
     return { created: true, updated: false };
   } catch (e) {
-    if (e.name === "ResourceExistsException") {
+    if (e.name === "ResourceExistsException" || isSecretScheduledForDeletionError(e)) {
+      if (isSecretScheduledForDeletionError(e)) {
+        await restoreSalesforceConnectionSecret(secretName);
+      }
       await secretsClient.send(
         new PutSecretValueCommand({
           SecretId: secretName,
@@ -203,6 +259,21 @@ async function saveSalesforceConnection(secretName, payload) {
     }
 
     throw e;
+  }
+}
+
+function isSecretScheduledForDeletionError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return error?.name === "InvalidRequestException" && message.includes("scheduled for deletion");
+}
+
+async function restoreSalesforceConnectionSecret(secretName) {
+  try {
+    await secretsClient.send(new RestoreSecretCommand({ SecretId: secretName }));
+  } catch (error) {
+    if (error?.name !== "ResourceNotFoundException" && !isSecretScheduledForDeletionError(error)) {
+      throw error;
+    }
   }
 }
 
@@ -218,6 +289,15 @@ async function getSalesforceConnection(secretName) {
   } catch (error) {
     if (error.name === "ResourceNotFoundException") {
       return null;
+    }
+    if (isSecretScheduledForDeletionError(error)) {
+      await restoreSalesforceConnectionSecret(secretName);
+      const restoredResult = await secretsClient.send(
+        new GetSecretValueCommand({
+          SecretId: secretName
+        })
+      );
+      return restoredResult?.SecretString ? JSON.parse(restoredResult.SecretString) : null;
     }
     throw error;
   }
@@ -282,6 +362,16 @@ function jsonResponse(statusCode, payload) {
     },
     body: JSON.stringify(payload)
   };
+}
+
+function parseRawEventBody(event) {
+  if (!event || event.body == null) {
+    return "";
+  }
+  if (event.isBase64Encoded) {
+    return Buffer.from(String(event.body), "base64").toString("utf8");
+  }
+  return typeof event.body === "string" ? event.body : JSON.stringify(event.body);
 }
 
 function hashToken(token) {
@@ -472,6 +562,29 @@ function getFileExtension(fileName) {
 
 function normalizeUploadFieldList(uploadFields) {
   return Array.isArray(uploadFields) ? uploadFields.filter((item) => item && typeof item === "object") : [];
+}
+
+function normalizeLookupDefinition(formSecurity) {
+  const definition = formSecurity?.lookupDefinition;
+  if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+    return { fields: {} };
+  }
+  return {
+    ...definition,
+    fields: definition.fields && typeof definition.fields === "object" && !Array.isArray(definition.fields)
+      ? definition.fields
+      : {}
+  };
+}
+
+function findLookupFieldDefinition(formSecurity, fieldKey) {
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!normalizedFieldKey) {
+    return null;
+  }
+  const fields = normalizeLookupDefinition(formSecurity).fields;
+  const definition = fields[normalizedFieldKey];
+  return definition && typeof definition === "object" && !Array.isArray(definition) ? definition : null;
 }
 
 function findUploadFieldDefinition(formSecurity, fieldKey) {
@@ -726,10 +839,15 @@ function hasAdvancedProFeatures(featureFlags) {
     "enableProRepeatGroups",
     "enableProPrefillAliasReferences",
     "enableProAdvancedSubmitModes",
+    "enableProPageLayoutClone",
     "enableProFormulaFields",
     "enableProPostSubmitAutoLink",
     "enableProSfSecretCodeAuth",
     "enableProLoadFile",
+    "enableProElectronicSignature",
+    "enableProSubmissionPdf",
+    "enableProRecordsListRowSignaturePdf",
+    "enableProSurveyFields",
     "enableProCustomJs"
   ].some((key) => featureFlags?.[key] === true);
 }
@@ -1111,6 +1229,110 @@ function getBearerToken(headers) {
   return match ? match[1].trim() : null;
 }
 
+function getRequestAuthContext(eventOrHeaders) {
+  const looksLikeEvent = eventOrHeaders && (
+    eventOrHeaders.headers ||
+    eventOrHeaders.requestContext ||
+    Object.prototype.hasOwnProperty.call(eventOrHeaders, "body")
+  );
+  if (!looksLikeEvent) {
+    return {
+      headers: eventOrHeaders || {},
+      method: null,
+      path: null,
+      body: ""
+    };
+  }
+
+  return {
+    headers: eventOrHeaders?.headers || {},
+    method: eventOrHeaders?.requestContext?.http?.method || eventOrHeaders?.httpMethod || null,
+    path: eventOrHeaders?.requestContext?.http?.path || eventOrHeaders?.rawPath || null,
+    body: parseRawEventBody(eventOrHeaders)
+  };
+}
+
+function hasBootstrapV2SignatureHeaders(headers) {
+  return !!(
+    getHeaderValue(headers, "x-twinaforms-bootstrap-v2-signature") ||
+    getHeaderValue(headers, "x-twinaforms-bootstrap-v2-algorithm")
+  );
+}
+
+async function recordBootstrapV2Nonce(orgId, nonce, timestamp) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+  const normalizedNonce = String(nonce || "").trim();
+  if (!normalizedOrgId || !normalizedNonce) {
+    const error = new Error("Bootstrap V2 signature nonce is missing.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const parsedTimestamp = Date.parse(timestamp);
+  const ttlSeconds = Math.floor(
+    (Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now()) / 1000
+  ) + (10 * 60);
+
+  try {
+    const item = {
+      [BOOTSTRAP_V2_NONCE_KEY_ATTRIBUTE]: { S: `${normalizedOrgId}#${normalizedNonce}` },
+      orgId: { S: normalizedOrgId },
+      nonce: { S: normalizedNonce },
+      timestamp: { S: String(timestamp || "") },
+      expiresAt: { N: String(ttlSeconds) },
+      createdAt: { S: new Date().toISOString() },
+      recordType: { S: "bootstrap-v2-nonce" }
+    };
+
+    await dynamoClient.send(new PutItemCommand({
+      TableName: BOOTSTRAP_V2_NONCE_TABLE,
+      Item: item,
+      ConditionExpression: `attribute_not_exists(${BOOTSTRAP_V2_NONCE_KEY_ATTRIBUTE})`
+    }));
+  } catch (error) {
+    if (error?.name === "ConditionalCheckFailedException") {
+      const replayError = new Error("Unauthorized: Bootstrap V2 signature nonce was already used.");
+      replayError.statusCode = 401;
+      throw replayError;
+    }
+    throw error;
+  }
+}
+
+async function verifyBootstrapV2TenantAuth(eventOrHeaders, orgId) {
+  const authContext = getRequestAuthContext(eventOrHeaders);
+  const connectionRecord = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
+  const signingSecretB64 = connectionRecord?.bootstrap_v2_signing_secret_b64;
+  if (!signingSecretB64) {
+    const error = new Error("Unauthorized: Bootstrap V2 signing secret is not available.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const verification = verifyBootstrapV2SignedPayload({
+    method: authContext.method,
+    path: authContext.path,
+    headers: authContext.headers,
+    body: authContext.body,
+    signingSecretB64
+  });
+
+  if (!verification.ok) {
+    const error = new Error(`Unauthorized: ${verification.error || "invalid Bootstrap V2 signature"}`);
+    error.statusCode = verification.statusCode || 401;
+    throw error;
+  }
+
+  if (verification.orgId !== normalizeOrgId(orgId)) {
+    const error = new Error("Unauthorized: Bootstrap V2 signature org mismatch.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  await recordBootstrapV2Nonce(verification.orgId, verification.nonce, verification.timestamp);
+  return true;
+}
+
 function assertTenantIsActive(tenantRecord) {
   const tenantError = getTenantRuntimeAccessError(tenantRecord);
   if (tenantError) {
@@ -1121,39 +1343,46 @@ function assertTenantIsActive(tenantRecord) {
 }
 
 async function sendTenantSecretEmail(toAddress, orgId, secret) {
-  if (!SES_FROM) {
-    console.log("SES_FROM not configured; tenant secret email skipped");
-    return false;
-  }
+  // SES production access is not available for the launch account. Keep tenant
+  // secret delivery on the Connect page only until a new transactional email
+  // provider is approved.
+  console.log("Tenant secret email disabled for launch; secret is returned on the Connect page only");
+  return false;
 
-  await sesClient.send(new SendEmailCommand({
-    Source: SES_FROM,
-    Destination: {
-      ToAddresses: [toAddress]
-    },
-    Message: {
-      Subject: {
-        Data: "Your NativeForms tenant secret"
-      },
-      Body: {
-        Text: {
-          Data: `Hello,
-
-Your NativeForms tenant secret for Salesforce org ${orgId} is:
-
-${secret}
-
-Paste this value into Salesforce External Credential setup.
-
-If you did not request this, you can safely ignore this email.
-
-NativeForms`
-        }
-      }
-    }
-  }));
-
-  return true;
+  // Email delivery disabled for now:
+  // if (!SES_FROM) {
+  //   console.log("SES_FROM not configured; tenant secret email skipped");
+  //   return false;
+  // }
+  //
+  // await sesClient.send(new SendEmailCommand({
+  //   Source: SES_FROM,
+  //   Destination: {
+  //     ToAddresses: [toAddress]
+  //   },
+  //   Message: {
+  //     Subject: {
+  //       Data: "Your TwinaForms tenant secret"
+  //     },
+  //     Body: {
+  //       Text: {
+  //         Data: `Hello,
+  //
+  // Your TwinaForms tenant secret for Salesforce org ${orgId} is:
+  //
+  // ${secret}
+  //
+  // Paste this value into Salesforce External Credential setup.
+  //
+  // If you did not request this, you can safely ignore this email.
+  //
+  // TwinaForms`
+  //       }
+  //     }
+  //   }
+  // }));
+  //
+  // return true;
 }
 
 async function sendNewTrialAdminEmail(recipient, tenantRecord) {
@@ -1242,8 +1471,9 @@ async function sendNewTrialAdminEmail(recipient, tenantRecord) {
   return true;
 }
 
-async function requireTenantAuth(headers, orgId) {
+async function requireTenantAuth(eventOrHeaders, orgId) {
   const normalizedOrgId = normalizeOrgId(orgId);
+  const authContext = getRequestAuthContext(eventOrHeaders);
 
   if (!orgId) {
     const error = new Error("Missing required field: orgId");
@@ -1257,17 +1487,28 @@ async function requireTenantAuth(headers, orgId) {
     throw error;
   }
 
-  const bearerToken = getBearerToken(headers);
-  if (!bearerToken) {
-    const error = new Error("Missing Authorization bearer token");
-    error.statusCode = 401;
-    throw error;
-  }
-
   const tenantRecord = await getTenantRecord(normalizedOrgId);
   if (!tenantRecord) {
     const error = new Error("Tenant not found");
     error.statusCode = 404;
+    throw error;
+  }
+
+  const bearerToken = getBearerToken(authContext.headers);
+  if (bearerToken && tenantRecord.secret === bearerToken) {
+    assertTenantIsActive(tenantRecord);
+    return tenantRecord;
+  }
+
+  if (hasBootstrapV2SignatureHeaders(authContext.headers)) {
+    await verifyBootstrapV2TenantAuth(eventOrHeaders, normalizedOrgId);
+    assertTenantIsActive(tenantRecord);
+    return tenantRecord;
+  }
+
+  if (!bearerToken) {
+    const error = new Error("Missing Authorization bearer token");
+    error.statusCode = 401;
     throw error;
   }
 
@@ -1331,6 +1572,18 @@ function validateFormSecurityPayload(payload) {
   if (payload.uploadFields != null && !Array.isArray(payload.uploadFields)) {
     throw new Error("uploadFields must be an array when provided");
   }
+  if (payload.signatureFields != null && !Array.isArray(payload.signatureFields)) {
+    throw new Error("signatureFields must be an array when provided");
+  }
+  if (payload.recordsListRowSignatures != null && !Array.isArray(payload.recordsListRowSignatures)) {
+    throw new Error("recordsListRowSignatures must be an array when provided");
+  }
+  if (payload.lookupDefinition != null && (typeof payload.lookupDefinition !== "object" || Array.isArray(payload.lookupDefinition))) {
+    throw new Error("lookupDefinition must be an object when provided");
+  }
+  if (payload.submissionPdf != null && (typeof payload.submissionPdf !== "object" || Array.isArray(payload.submissionPdf))) {
+    throw new Error("submissionPdf must be an object when provided");
+  }
 }
 
 function validatePublishPresignPayload(payload) {
@@ -1353,6 +1606,447 @@ function validateUploadInitPayload(payload) {
   if (!payload?.fieldKey) throw new Error("Missing required field: fieldKey");
   if (!payload?.fileName) throw new Error("Missing required field: fileName");
   if (!payload?.sessionId) throw new Error("Missing required field: sessionId");
+}
+
+function validateLookupPayload(payload) {
+  if (!payload?.formId) throw new Error("Missing required field: formId");
+  if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
+  if (!payload?.fieldKey) throw new Error("Missing required field: fieldKey");
+  if (!payload?.search && !payload?.recordId) throw new Error("Missing required field: search or recordId");
+}
+
+function validateSalesforceLayoutPayload(payload) {
+  if (!payload?.orgId) throw new Error("Missing required field: orgId");
+  if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
+  if (!payload?.objectApiName) throw new Error("Missing required field: objectApiName");
+  if (!isSafeSalesforceIdentifier(payload.objectApiName)) throw new Error("Invalid objectApiName");
+  if (payload?.recordTypeId && !/^[A-Za-z0-9]{15,18}$/.test(String(payload.recordTypeId))) {
+    throw new Error("Invalid recordTypeId");
+  }
+}
+
+function httpsRequest(options, body = null) {
+  return new Promise((resolve, reject) => {
+    const request = https.request(options, (response) => {
+      let data = "";
+      response.on("data", (chunk) => {
+        data += chunk;
+      });
+      response.on("end", () => {
+        resolve({
+          statusCode: response.statusCode,
+          headers: response.headers,
+          body: data
+        });
+      });
+    });
+
+    request.on("error", reject);
+    if (body) {
+      request.write(body);
+    }
+    request.end();
+  });
+}
+
+async function refreshAccessToken(secret, loginUrl) {
+  const credentials = await getSalesforceOAuthClientCredentials();
+  const normalizedLoginUrl = String(loginUrl || "https://login.salesforce.com").replace(/\/+$/, "");
+  const tokenBody = querystring.stringify({
+    grant_type: "refresh_token",
+    client_id: credentials.clientId,
+    client_secret: credentials.clientSecret,
+    refresh_token: secret.refresh_token
+  });
+  let tokenUrl = new URL("/services/oauth2/token", `${normalizedLoginUrl}/`);
+  let response = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = await httpsRequest(
+      {
+        hostname: tokenUrl.hostname,
+        path: `${tokenUrl.pathname}${tokenUrl.search || ""}`,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(tokenBody)
+        }
+      },
+      tokenBody
+    );
+    if (![301, 302, 303, 307, 308].includes(response.statusCode) || !response.headers?.location) {
+      break;
+    }
+    tokenUrl = new URL(response.headers.location, tokenUrl);
+  }
+
+  if (response.statusCode !== 200) {
+    throw new Error(`Salesforce token refresh failed. Status: ${response.statusCode}. Body: ${response.body}`);
+  }
+
+  const tokenData = JSON.parse(response.body);
+  if (tokenData.instance_url) {
+    secret.instance_url = tokenData.instance_url;
+  }
+  return tokenData.access_token;
+}
+
+function isSafeSalesforceIdentifier(value) {
+  return /^[A-Za-z][A-Za-z0-9_]*(?:__c)?$/.test(String(value || ""));
+}
+
+function escapeSoqlValue(value) {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function normalizeLookupFields(fields) {
+  const seen = new Set();
+  return (Array.isArray(fields) ? fields : [])
+    .map((value) => String(value || "").trim())
+    .filter((value) => isSafeSalesforceIdentifier(value))
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function normalizeLookupConfig(definition) {
+  const targetObject = String(definition?.targetObject || "").trim();
+  const searchFields = normalizeLookupFields(definition?.searchFields);
+  let displayFields = normalizeLookupFields(definition?.displayFields);
+  if (!targetObject || !isSafeSalesforceIdentifier(targetObject) || searchFields.length === 0) {
+    const error = new Error("Lookup field is not configured correctly.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!displayFields.length) {
+    displayFields = [...searchFields];
+  }
+  if (!displayFields.some((field) => field.toLowerCase() === "id")) {
+    displayFields.push("Id");
+  }
+  return {
+    targetObject,
+    searchFields,
+    displayFields,
+    minSearchLength: Math.max(1, Math.min(Number(definition?.minSearchLength) || 2, 10)),
+    limit: Math.max(1, Math.min(Number(definition?.limit) || 10, 25))
+  };
+}
+
+async function querySalesforce(instanceUrl, accessToken, soql) {
+  const url = new URL(instanceUrl);
+  const response = await httpsRequest({
+    hostname: url.hostname,
+    path: `/services/data/${SALESFORCE_API_VERSION}/query?q=${encodeURIComponent(soql)}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (response.statusCode !== 200) {
+    throw new Error(`Lookup query failed. Status: ${response.statusCode}. Body: ${response.body}`);
+  }
+
+  return JSON.parse(response.body);
+}
+
+async function salesforceGetJson(instanceUrl, accessToken, path, failureLabel) {
+  const url = new URL(instanceUrl);
+  const response = await httpsRequest({
+    hostname: url.hostname,
+    path,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`${failureLabel} failed. Status: ${response.statusCode}. Body: ${response.body}`);
+  }
+
+  return JSON.parse(response.body);
+}
+
+function pickLayoutNode(layoutResponse, objectApiName) {
+  if (Array.isArray(layoutResponse?.sections)) {
+    return layoutResponse;
+  }
+
+  const layouts = layoutResponse?.layouts;
+  if (layouts && typeof layouts === "object") {
+    const objectLayout =
+      layouts[objectApiName] ||
+      layouts[String(objectApiName || "").toLowerCase()] ||
+      Object.values(layouts).find((value) => value && typeof value === "object");
+    const fullLayout = objectLayout?.Full || objectLayout?.FULL || objectLayout?.full;
+    const editLayout = fullLayout?.Edit || fullLayout?.EDIT || fullLayout?.edit;
+    if (Array.isArray(editLayout?.sections)) {
+      return editLayout;
+    }
+  }
+
+  const queue = [layoutResponse];
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+    if (Array.isArray(candidate.sections)) {
+      return candidate;
+    }
+    Object.values(candidate).forEach((value) => {
+      if (value && typeof value === "object") {
+        queue.push(value);
+      }
+    });
+  }
+
+  return null;
+}
+
+function collectLayoutItemFields(layoutItem) {
+  const components = Array.isArray(layoutItem?.layoutComponents) ? layoutItem.layoutComponents : [];
+  return components
+    .filter((component) => {
+      const type = String(component?.componentType || component?.type || "").toLowerCase();
+      return !type || type === "field";
+    })
+    .map((component) => String(component?.apiName || component?.value || "").trim())
+    .filter((apiName) => isSafeSalesforceIdentifier(apiName));
+}
+
+function normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordTypeId) {
+  const layoutNode = pickLayoutNode(layoutResponse, objectApiName);
+  if (!layoutNode) {
+    throw new Error("Salesforce layout metadata response did not include sections.");
+  }
+
+  const fieldsInfo = objectInfo?.fields || {};
+  const seenFields = new Set();
+  const sections = [];
+  let skippedLayoutItems = 0;
+
+  (Array.isArray(layoutNode.sections) ? layoutNode.sections : []).forEach((section, sectionIndex) => {
+    const fields = [];
+    const rows = Array.isArray(section?.layoutRows) ? section.layoutRows : [];
+    rows.forEach((row) => {
+      const items = Array.isArray(row?.layoutItems) ? row.layoutItems : [];
+      items.forEach((item) => {
+        const apiNames = collectLayoutItemFields(item);
+        if (!apiNames.length) {
+          skippedLayoutItems += 1;
+          return;
+        }
+        apiNames.forEach((apiName) => {
+          const normalizedKey = apiName.toLowerCase();
+          if (seenFields.has(normalizedKey)) {
+            return;
+          }
+          seenFields.add(normalizedKey);
+          const fieldInfo = fieldsInfo[apiName] || fieldsInfo[Object.keys(fieldsInfo).find((key) => key.toLowerCase() === normalizedKey)] || {};
+          fields.push({
+            apiName,
+            label: item?.label || fieldInfo?.label || apiName,
+            required: item?.required === true || fieldInfo?.required === true,
+            editableForNew: item?.editableForNew !== false,
+            editableForUpdate: item?.editableForUpdate !== false
+          });
+        });
+      });
+    });
+
+    if (fields.length) {
+      sections.push({
+        heading: String(section?.heading || section?.label || `Section ${sectionIndex + 1}`).trim() || `Section ${sectionIndex + 1}`,
+        fields
+      });
+    }
+  });
+
+  const objectLabel = objectInfo?.label || objectInfo?.labelPlural || objectApiName;
+  const layoutKey = `assigned:${recordTypeId || objectInfo?.defaultRecordTypeId || "default"}`;
+  const layoutLabel = `${objectLabel} assigned layout`;
+  const warnings = [];
+  if (skippedLayoutItems > 0) {
+    warnings.push(`${skippedLayoutItems} non-field layout items were skipped.`);
+  }
+
+  return {
+    layoutKey,
+    layoutLabel,
+    objectApiName,
+    objectLabel,
+    recordTypeId: recordTypeId || objectInfo?.defaultRecordTypeId || null,
+    sections,
+    warnings
+  };
+}
+
+async function getSalesforceAssignedLayout(instanceUrl, accessToken, objectApiName, requestedRecordTypeId) {
+  const objectInfo = await salesforceGetJson(
+    instanceUrl,
+    accessToken,
+    `/services/data/${SALESFORCE_API_VERSION}/ui-api/object-info/${encodeURIComponent(objectApiName)}`,
+    "Salesforce object metadata"
+  );
+  const recordTypeId = String(requestedRecordTypeId || objectInfo?.defaultRecordTypeId || "").trim();
+  const params = new URLSearchParams({
+    layoutType: "Full",
+    mode: "Edit",
+    formFactor: "Large"
+  });
+  if (recordTypeId) {
+    params.set("recordTypeId", recordTypeId);
+  }
+  const layoutResponse = await salesforceGetJson(
+    instanceUrl,
+    accessToken,
+    `/services/data/${SALESFORCE_API_VERSION}/ui-api/layout/${encodeURIComponent(objectApiName)}?${params.toString()}`,
+    "Salesforce page layout metadata"
+  );
+  return normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordTypeId);
+}
+
+async function runSalesforceLayoutMetadata(payload, tenantRecord) {
+  const orgId = normalizeOrgId(payload.orgId);
+  const connection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
+  if (!connection?.refresh_token || !connection?.instance_url) {
+    const error = new Error("Salesforce connection is not ready for page-layout metadata.");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const accessToken = await refreshAccessToken(connection, connection.loginBaseUrl || tenantRecord?.loginBaseUrl);
+  const layout = await getSalesforceAssignedLayout(
+    connection.instance_url,
+    accessToken,
+    String(payload.objectApiName).trim(),
+    payload.recordTypeId
+  );
+
+  return {
+    success: true,
+    orgId,
+    objectApiName: layout.objectApiName,
+    objectLabel: layout.objectLabel,
+    defaultLayoutKey: layout.layoutKey,
+    layouts: [
+      {
+        label: layout.layoutLabel,
+        value: layout.layoutKey
+      }
+    ],
+    layout,
+    warnings: layout.warnings || []
+  };
+}
+
+async function getSalesforceRecordById(instanceUrl, accessToken, objectApiName, recordId, fields) {
+  const url = new URL(instanceUrl);
+  const response = await httpsRequest({
+    hostname: url.hostname,
+    path: `/services/data/${SALESFORCE_API_VERSION}/sobjects/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?fields=${encodeURIComponent(fields.join(","))}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (response.statusCode === 404) {
+    return null;
+  }
+  if (response.statusCode !== 200) {
+    throw new Error(`Lookup resolve failed. Status: ${response.statusCode}. Body: ${response.body}`);
+  }
+  return JSON.parse(response.body);
+}
+
+function readSalesforceRecordField(record, fieldName) {
+  if (!record || !fieldName) {
+    return undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(record, fieldName)) {
+    return record[fieldName];
+  }
+  const requested = String(fieldName).toLowerCase();
+  const actualKey = Object.keys(record).find((key) => String(key).toLowerCase() === requested);
+  return actualKey ? record[actualKey] : undefined;
+}
+
+function buildLookupLabel(record, displayFields) {
+  const parts = displayFields
+    .filter((field) => String(field).toLowerCase() !== "id")
+    .map((field) => readSalesforceRecordField(record, field))
+    .filter((value) => value !== null && value !== undefined && String(value).trim() !== "")
+    .map((value) => String(value));
+  return parts.length ? parts.join(" - ") : String(record?.Id || "");
+}
+
+function formatLookupRecord(record, displayFields) {
+  if (!record?.Id) {
+    return null;
+  }
+  return {
+    id: record.Id,
+    label: buildLookupLabel(record, displayFields),
+    fields: Object.fromEntries(displayFields.filter((field) => field !== "attributes").map((field) => [field, readSalesforceRecordField(record, field) ?? null]))
+  };
+}
+
+async function runLookup(payload, formSecurity) {
+  const lookupDefinition = findLookupFieldDefinition(formSecurity, payload.fieldKey);
+  if (!lookupDefinition) {
+    const error = new Error("Lookup is not configured for this field.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const config = normalizeLookupConfig(lookupDefinition);
+  const tenantRecord = await getTenantRecord(formSecurity.orgId);
+  assertTenantIsActive(tenantRecord);
+  const secret = await getSalesforceConnection(getSalesforceConnectionSecretName(formSecurity.orgId));
+  if (!secret?.refresh_token || !secret?.instance_url) {
+    const error = new Error("Salesforce connection is not ready for lookup.");
+    error.statusCode = 409;
+    throw error;
+  }
+  const accessToken = await refreshAccessToken(secret, tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com");
+
+  if (payload.recordId) {
+    const record = await getSalesforceRecordById(secret.instance_url, accessToken, config.targetObject, String(payload.recordId), config.displayFields);
+    return {
+      success: true,
+      mode: "resolve",
+      record: formatLookupRecord(record, config.displayFields)
+    };
+  }
+
+  const search = String(payload.search || "").trim();
+  if (search.length < config.minSearchLength) {
+    return {
+      success: true,
+      mode: "search",
+      records: []
+    };
+  }
+
+  const fieldsToSelect = Array.from(new Set(["Id", ...config.displayFields]));
+  const searchTerm = `%${escapeSoqlValue(search)}%`;
+  const whereClause = config.searchFields.map((field) => `${field} LIKE '${searchTerm}'`).join(" OR ");
+  const soql = `SELECT ${fieldsToSelect.join(", ")} FROM ${config.targetObject} WHERE ${whereClause} ORDER BY LastModifiedDate DESC LIMIT ${config.limit}`;
+  const result = await querySalesforce(secret.instance_url, accessToken, soql);
+  const records = Array.isArray(result.records)
+    ? result.records.map((record) => formatLookupRecord(record, config.displayFields)).filter(Boolean)
+    : [];
+  return {
+    success: true,
+    mode: "search",
+    records
+  };
 }
 
 function buildTenantSetupState(tenantRecord, connectionRecord) {
@@ -1504,6 +2198,42 @@ export const handler = async (event) => {
     return jsonResponse(200, { success: true });
   }
 
+  if (path === "/tenant/bootstrap-v2/verify-signed-call" && method === "POST") {
+    try {
+      const rawBody = parseRawEventBody(event);
+      const verification = verifyBootstrapV2SignedPayload({
+        method,
+        path,
+        headers: event?.headers || {},
+        body: rawBody,
+        signingSecretB64: BOOTSTRAP_V2_SPIKE_SECRET_B64
+      });
+
+      if (!verification.ok) {
+        return jsonResponse(verification.statusCode || 401, {
+          success: false,
+          experimental: true,
+          error: verification.error
+        });
+      }
+
+      return jsonResponse(200, {
+        success: true,
+        experimental: true,
+        verified: true,
+        orgId: verification.orgId,
+        bodyHash: verification.bodyHash,
+        timestamp: verification.timestamp
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 500, {
+        success: false,
+        experimental: true,
+        error: e.message
+      });
+    }
+  }
+
   if (path === "/connect") {
     const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
     if (!orgId || !validateOrgId(orgId)) {
@@ -1521,7 +2251,64 @@ export const handler = async (event) => {
       };
     }
 
-    const tenantRecord = await getTenantRecord(orgId);
+    const query = event?.queryStringParameters || {};
+    let tenantRecord = await getTenantRecord(orgId);
+    if (!tenantRecord) {
+      if (!query.loginBaseUrl) {
+        return {
+          statusCode: 400,
+          headers: { "Content-Type": "text/html" },
+          body: `
+            <html>
+              <body style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2>Missing Login Base URL</h2>
+                <p>Call /connect with loginBaseUrl the first time this org connects.</p>
+              </body>
+            </html>
+          `
+        };
+      }
+
+      const now = new Date().toISOString();
+      const trialLifecycle = buildTrialLifecycleDates();
+      tenantRecord = {
+        orgId,
+        adminEmail: normalizeOptionalString(query.adminEmail) || "",
+        companyName: normalizeOptionalString(query.companyName) || "TwinaForms Tenant",
+        loginBaseUrl: query.loginBaseUrl,
+        country: normalizeOptionalString(query.country),
+        state: normalizeOptionalString(query.state),
+        city: normalizeOptionalString(query.city),
+        secret: generateSecret(),
+        planCode: trialLifecycle.planCode,
+        status: "active",
+        subscriptionState: trialLifecycle.subscriptionState,
+        subscriptionStartDate: trialLifecycle.subscriptionStartDate,
+        subscriptionEndDate: trialLifecycle.subscriptionEndDate,
+        trialStartedAt: trialLifecycle.trialStartedAt,
+        trialEndsAt: trialLifecycle.trialEndsAt,
+        isActive: true,
+        salesforceConnectionStatus: "not-connected",
+        salesforceConnectionUpdatedAt: null,
+        connectedUsername: null,
+        createdAt: now,
+        updatedAt: now
+      };
+      await saveItem(TENANT_TABLE, tenantRecord);
+    } else if (query.loginBaseUrl || query.adminEmail || query.companyName) {
+      tenantRecord = {
+        ...tenantRecord,
+        adminEmail: normalizeOptionalString(query.adminEmail) || tenantRecord.adminEmail,
+        companyName: normalizeOptionalString(query.companyName) || tenantRecord.companyName,
+        loginBaseUrl: query.loginBaseUrl || tenantRecord.loginBaseUrl,
+        country: normalizeOptionalString(query.country) ?? tenantRecord.country,
+        state: normalizeOptionalString(query.state) ?? tenantRecord.state,
+        city: normalizeOptionalString(query.city) ?? tenantRecord.city,
+        updatedAt: new Date().toISOString()
+      };
+      await saveItem(TENANT_TABLE, tenantRecord);
+    }
+
     assertTenantIsActive(tenantRecord);
     if (!tenantRecord.loginBaseUrl) {
       return {
@@ -1586,7 +2373,9 @@ export const handler = async (event) => {
       }
 
       const tenantRecord = await getTenantRecord(orgId);
-      const connectionRecord = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
+      const connectionRecord = tenantRecord
+        ? await getSalesforceConnection(getSalesforceConnectionSecretName(orgId))
+        : null;
       const setupState = buildTenantSetupState(tenantRecord, connectionRecord);
       const oauthClientConfigured = await hasSalesforceOAuthClientCredentials();
 
@@ -1708,7 +2497,7 @@ export const handler = async (event) => {
   if (path === "/tenant/auth-health" && method === "GET") {
     try {
       const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
-      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
+      const tenantRecord = await requireTenantAuth(event, orgId);
 
       return jsonResponse(200, {
         success: true,
@@ -1734,7 +2523,7 @@ export const handler = async (event) => {
         throw new Error("Invalid orgId");
       }
 
-      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
+      const tenantRecord = await requireTenantAuth(event, orgId);
       const planResult = await loadPlanDefinitions();
 
       return jsonResponse(200, buildTenantEntitlementsPayload(orgId, tenantRecord, planResult));
@@ -1760,10 +2549,7 @@ export const handler = async (event) => {
         throw new Error("Invalid orgId");
       }
 
-      const tenantRecord = await getTenantRecord(orgId);
-      if (!tenantRecord) {
-        throw new Error("Tenant not found");
-      }
+      const tenantRecord = await requireTenantAuth(event, orgId);
 
       const now = new Date().toISOString();
       const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
@@ -1796,7 +2582,7 @@ export const handler = async (event) => {
         tenant: sanitizeTenantRecord(updatedTenantRecord)
       });
     } catch (e) {
-      return jsonResponse(400, {
+      return jsonResponse(e.statusCode || 400, {
         success: false,
         error: e.message
       });
@@ -1932,6 +2718,41 @@ export const handler = async (event) => {
         };
       }
 
+      const tokenOrgId = normalizeOrgId(String(tokenData.id || "").split("/id/")[1]?.split("/")[0] || "");
+      if (!tokenOrgId || tokenOrgId !== orgId) {
+        return {
+          statusCode: 403,
+          headers: { "Content-Type": "text/html" },
+          body: `
+            <html>
+              <body style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2>OAuth Org Mismatch</h2>
+                <p>The Salesforce org returned by OAuth does not match the requested TwinaForms org.</p>
+              </body>
+            </html>
+          `
+        };
+      }
+
+      let bootstrapV2ConnectionFields = {};
+      if (tokenData.access_token && tokenData.instance_url) {
+        try {
+          const bootstrapV2Result = await fetchBootstrapV2SigningSecret({
+            instanceUrl: tokenData.instance_url,
+            accessToken: tokenData.access_token,
+            orgId
+          });
+          bootstrapV2ConnectionFields = buildBootstrapV2ConnectionFields(bootstrapV2Result);
+        } catch (bootstrapV2Error) {
+          console.warn("Bootstrap V2 experimental secret retrieval failed:", bootstrapV2Error.message);
+          bootstrapV2ConnectionFields = buildBootstrapV2UnavailableConnectionFields(bootstrapV2Error);
+        }
+      } else {
+        bootstrapV2ConnectionFields = buildBootstrapV2UnavailableConnectionFields(
+          new Error("OAuth token response did not include an access token and instance URL for Bootstrap V2.")
+        );
+      }
+
       const secretName = getSalesforceConnectionSecretName(orgId);
       const saveResult = await saveSalesforceConnection(secretName, {
         ...stripLegacySalesforceClientCredentials(existingConnection),
@@ -1943,7 +2764,8 @@ export const handler = async (event) => {
         instance_url: tokenData.instance_url || null,
         id_url: tokenData.id || null,
         token_issued_at: tokenData.issued_at || null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...bootstrapV2ConnectionFields
       });
 
       const updatedTenantRecord = {
@@ -2149,7 +2971,7 @@ export const handler = async (event) => {
 
       validateFormSecurityPayload(payload);
       const orgId = normalizeOrgId(payload.orgId);
-      await requireTenantAuth(event?.headers, orgId);
+      await requireTenantAuth(event, orgId);
 
       const now = new Date().toISOString();
       const existing = await getFormSecurityRecord(payload.formId);
@@ -2167,6 +2989,10 @@ export const handler = async (event) => {
         publicUrl: payload.publicUrl || null,
         captcha: payload.captcha || null,
         uploadFields: Array.isArray(payload.uploadFields) ? payload.uploadFields : [],
+        signatureFields: Array.isArray(payload.signatureFields) ? payload.signatureFields : [],
+        recordsListRowSignatures: Array.isArray(payload.recordsListRowSignatures) ? payload.recordsListRowSignatures : [],
+        lookupDefinition: payload.lookupDefinition && typeof payload.lookupDefinition === "object" ? payload.lookupDefinition : { fields: {} },
+        submissionPdf: payload.submissionPdf && typeof payload.submissionPdf === "object" ? payload.submissionPdf : null,
         secretCodeConfig: payload.secretCodeConfig || null,
         prefillPolicy: payload.prefillPolicy,
         submitPolicy: payload.submitPolicy,
@@ -2201,7 +3027,7 @@ export const handler = async (event) => {
 
       validateFormUnpublishPayload(payload);
       const orgId = normalizeOrgId(payload.orgId);
-      await requireTenantAuth(event?.headers, orgId);
+      await requireTenantAuth(event, orgId);
 
       const existing = await getFormSecurityRecord(payload.formId);
       if (!existing) {
@@ -2252,7 +3078,7 @@ export const handler = async (event) => {
 
       validatePublishPresignPayload(payload);
       const orgId = normalizeOrgId(payload.orgId);
-      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
+      const tenantRecord = await requireTenantAuth(event, orgId);
 
       if (!PUBLISH_BUCKET || !PUBLIC_BASE_URL) {
         throw new Error("Server misconfigured: PUBLISH_BUCKET and PUBLIC_BASE_URL are required");
@@ -2280,6 +3106,44 @@ export const handler = async (event) => {
         formSlug,
         expiresAt: Date.now() + expiresIn * 1000
       });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/salesforce/layouts" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateSalesforceLayoutPayload(payload);
+      const orgId = normalizeOrgId(payload.orgId);
+      const tenantRecord = await requireTenantAuth(event, orgId);
+      const result = await runSalesforceLayoutMetadata(payload, tenantRecord);
+      return jsonResponse(200, result);
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/forms/lookup" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateLookupPayload(payload);
+      const formSecurity = await getFormSecurityRecord(payload.formId);
+      ensurePublishedFormToken(formSecurity, payload.publishToken);
+      const result = await runLookup(payload, formSecurity);
+      return jsonResponse(200, result);
     } catch (e) {
       return jsonResponse(e.statusCode || 400, {
         success: false,
@@ -2373,7 +3237,7 @@ export const handler = async (event) => {
       }
 
       const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
-      const tenantRecord = await requireTenantAuth(event?.headers, orgId);
+      const tenantRecord = await requireTenantAuth(event, orgId);
       const record = await getFormSecurityRecord(formId);
       if (!record) {
         const error = new Error("Form security record not found");
