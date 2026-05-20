@@ -71,48 +71,80 @@ private class NativeFormsDesignerBuilderTest {
         NativeFormsDesignerController.pageLayoutImportMetadataMock = new Map<String, Object>{
             'success' => true,
             'objectApiName' => 'Contact',
-            'objectLabel' => 'Contact',
+            'objectLabel' => '\u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8',
             'defaultLayoutKey' => 'assigned:012000000000000AAA',
             'layouts' => new List<Object>{
                 new Map<String, Object>{
-                    'label' => 'Contact assigned layout',
+                    'label' => '\u05E4\u05E8\u05D9\u05E1\u05EA \u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8',
                     'value' => 'assigned:012000000000000AAA'
                 }
             },
             'layout' => new Map<String, Object>{
                 'layoutKey' => 'assigned:012000000000000AAA',
-                'layoutLabel' => 'Contact assigned layout',
+                'layoutLabel' => '\u05E4\u05E8\u05D9\u05E1\u05EA \u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8',
                 'objectApiName' => 'Contact',
-                'objectLabel' => 'Contact',
+                'objectLabel' => '\u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8',
                 'sections' => new List<Object>{
                     new Map<String, Object>{
-                        'heading' => 'Contact Information',
+                        'heading' => '\u05E4\u05E8\u05D8\u05D9 \u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8',
                         'fields' => new List<Object>{
                             new Map<String, Object>{
                                 'apiName' => 'FirstName',
-                                'label' => 'First Name',
+                                'label' => '\u05E9\u05DD \u05E4\u05E8\u05D8\u05D9',
                                 'required' => false,
                                 'editableForNew' => true,
                                 'editableForUpdate' => true
                             },
                             new Map<String, Object>{
                                 'apiName' => 'Email',
-                                'label' => 'Email',
+                                'label' => '\u05D0\u05D9\u05DE\u05D9\u05D9\u05DC',
                                 'required' => false,
                                 'editableForNew' => true,
                                 'editableForUpdate' => true
+                            },
+                            new Map<String, Object>{
+                                'apiName' => 'AccountId',
+                                'label' => '\u05D7\u05E9\u05D1\u05D5\u05DF',
+                                'required' => false,
+                                'editableForNew' => true,
+                                'editableForUpdate' => false
+                            },
+                            new Map<String, Object>{
+                                'apiName' => 'Salutation',
+                                'label' => '\u05E4\u05E0\u05D9\u05D9\u05D4',
+                                'required' => false,
+                                'editableForNew' => true,
+                                'editableForUpdate' => true,
+                                'picklistValues' => new List<Object>{
+                                    new Map<String, Object>{ 'label' => '\u05DE\u05E8', 'value' => 'Mr.' },
+                                    new Map<String, Object>{ 'label' => '\u05D2\u05D1\u05E8\u05EA', 'value' => 'Ms.' }
+                                }
                             }
                         }
                     },
                     new Map<String, Object>{
-                        'heading' => 'Description Information',
+                        'heading' => '\u05DE\u05D9\u05D3\u05E2 \u05E0\u05D5\u05E1\u05E3',
                         'fields' => new List<Object>{
                             new Map<String, Object>{
                                 'apiName' => 'Description',
-                                'label' => 'Description',
+                                'label' => '\u05EA\u05D9\u05D0\u05D5\u05E8',
                                 'required' => false,
                                 'editableForNew' => true,
                                 'editableForUpdate' => true
+                            },
+                            new Map<String, Object>{
+                                'apiName' => 'OwnerId',
+                                'label' => '\u05D1\u05E2\u05DC\u05D9\u05DD',
+                                'required' => false,
+                                'editableForNew' => true,
+                                'editableForUpdate' => true
+                            },
+                            new Map<String, Object>{
+                                'apiName' => 'CreatedById',
+                                'label' => '\u05E0\u05D5\u05E6\u05E8 \u05E2\u05DC \u05D9\u05D3\u05D9',
+                                'required' => false,
+                                'editableForNew' => false,
+                                'editableForUpdate' => false
                             }
                         }
                     }
@@ -169,12 +201,14 @@ private class NativeFormsDesignerBuilderTest {
         setAllProFlagsEnabled();
 
         List<NativeFormsDesignerController.SelectOption> objectOptions = NativeFormsDesignerController.getObjectOptions();
-        List<NativeFormsDesignerController.SelectOption> picklistFieldOptions = NativeFormsDesignerController.getPicklistFieldOptions('Case');
+        List<NativeFormsDesignerController.SelectOption> picklistFieldOptions = NativeFormsDesignerController.getPicklistFieldOptions('Case', 'Picklist');
+        List<NativeFormsDesignerController.SelectOption> multiPicklistFieldOptions = NativeFormsDesignerController.getPicklistFieldOptions('Case', 'MultiPicklist');
         List<NativeFormsDesignerController.SelectOption> picklistValueOptions = NativeFormsDesignerController.getPicklistValueOptions('Case', 'Origin');
 
         System.assert(containsDesignerOptionValue(objectOptions, 'Case'));
-        System.assertEquals(0, NativeFormsDesignerController.getPicklistFieldOptions(null).size());
+        System.assertEquals(0, NativeFormsDesignerController.getPicklistFieldOptions(null, 'Picklist').size());
         System.assert(containsDesignerOptionValue(picklistFieldOptions, 'Origin'));
+        System.assertEquals(false, containsDesignerOptionValue(multiPicklistFieldOptions, 'Origin'), 'Multi Checkbox field picker should not show normal picklist fields.');
         System.assert(picklistValueOptions.size() > 0);
         System.assertEquals(0, NativeFormsDesignerController.getPicklistValueOptions('Case', null).size());
         }
@@ -441,17 +475,21 @@ private class NativeFormsDesignerBuilderTest {
         setAllProFlagsEnabled();
         setPageLayoutMock();
 
-        List<NativeFormsDesignerController.SelectOption> layoutOptions = NativeFormsDesignerController.getPageLayoutImportOptions('Contact');
+        List<NativeFormsDesignerController.SelectOption> layoutOptions = NativeFormsDesignerController.getPageLayoutImportOptions('Contact', 'he');
         System.assertEquals(1, layoutOptions.size());
         System.assertEquals('assigned:012000000000000AAA', layoutOptions[0].value);
+        System.assertEquals('\u05E4\u05E8\u05D9\u05E1\u05EA \u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8', layoutOptions[0].label);
 
         NativeFormsDesignerController.PageLayoutImportPreview preview = NativeFormsDesignerController.previewPageLayoutImport(
             'Contact',
             layoutOptions[0].value,
-            'secureUpdateOrCreate'
+            'secureUpdateOrCreate',
+            'he'
         );
         System.assertEquals('Contact', preview.objectApiName);
-        System.assertEquals(3, preview.supportedFieldCount);
+        System.assertEquals('\u05D0\u05D9\u05E9 \u05E7\u05E9\u05E8', preview.objectLabel);
+        System.assertEquals(5, preview.supportedFieldCount);
+        System.assertEquals(1, preview.createOnlyFieldCount);
         System.assert(preview.warnings.size() > 0);
 
         NativeFormsDesignerController.NewFormResult result = NativeFormsDesignerController.createFormFromPageLayout(
@@ -461,7 +499,8 @@ private class NativeFormsDesignerBuilderTest {
             null,
             'Contact',
             layoutOptions[0].value,
-            'secureUpdateOrCreate'
+            'secureUpdateOrCreate',
+            'he'
         );
 
         NF_Form_Version__c versionRecord = [
@@ -470,6 +509,8 @@ private class NativeFormsDesignerBuilderTest {
             WHERE Id = :result.versionId
         ];
         Map<String, Object> uiSettings = jsonMap(versionRecord.UI_Settings_JSON__c);
+        System.assertEquals('he', String.valueOf(uiSettings.get('languageCode')));
+        System.assertEquals(true, uiSettings.get('rtlEnabled'));
         System.assertEquals(true, uiSettings.get('secretCodeVerificationEnabled'));
         System.assertEquals('Email', String.valueOf(uiSettings.get('secretCodeMatchField')));
         System.assert(versionRecord.Prefill_Params_JSON__c.contains('recordId'));
@@ -508,19 +549,45 @@ private class NativeFormsDesignerBuilderTest {
             SELECT Config_JSON__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :result.versionId
-              AND Label__c = 'First Name'
+              AND Label__c = '\u05E9\u05DD \u05E4\u05E8\u05D8\u05D9'
             LIMIT 1
         ];
         NF_Form_Element__c emailElement = [
             SELECT Config_JSON__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :result.versionId
-              AND Label__c = 'Email'
+              AND Label__c = '\u05D0\u05D9\u05DE\u05D9\u05D9\u05DC'
+            LIMIT 1
+        ];
+        NF_Form_Element__c accountElement = [
+            SELECT Element_Type__c, Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+              AND Label__c = '\u05D7\u05E9\u05D1\u05D5\u05DF'
+            LIMIT 1
+        ];
+        NF_Form_Element__c salutationElement = [
+            SELECT Element_Type__c, Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+              AND Label__c = '\u05E4\u05E0\u05D9\u05D9\u05D4'
             LIMIT 1
         ];
         System.assertEquals(2, (Integer) jsonMap(firstNameElement.Config_JSON__c).get('sectionColumn'));
         System.assertEquals(1, (Integer) jsonMap(emailElement.Config_JSON__c).get('sectionColumn'));
-        System.assertEquals(3, result.importedFieldCount);
+        Map<String, Object> accountConfig = jsonMap(accountElement.Config_JSON__c);
+        System.assertEquals('lookup', accountElement.Element_Type__c);
+        System.assertEquals('Account', String.valueOf(accountConfig.get('lookupTargetObject')));
+        System.assertEquals('readonlyWhenPrefilled', String.valueOf(accountConfig.get('fieldBehavior')));
+        System.assertEquals('create', String.valueOf(accountConfig.get('submitWhen')));
+        System.assertEquals(false, accountConfig.get('required'));
+        Map<String, Object> salutationConfig = jsonMap(salutationElement.Config_JSON__c);
+        List<Object> salutationOptions = (List<Object>) salutationConfig.get('options');
+        System.assertEquals('select', salutationElement.Element_Type__c);
+        System.assertEquals('\u05DE\u05E8', String.valueOf(((Map<String, Object>) salutationOptions[0]).get('label')));
+        System.assertEquals('Mr.', String.valueOf(((Map<String, Object>) salutationOptions[0]).get('value')));
+        System.assertEquals(5, result.importedFieldCount);
+        System.assert(result.importDiagnosticsJson.contains('"createOnlyFieldCount"'));
         }
     }
 
@@ -716,6 +783,11 @@ private class NativeFormsDesignerBuilderTest {
             '\u05E8\u05E9\u05D9\u05DE\u05EA \u05D1\u05D7\u05D9\u05E8\u05D4',
             NativeFormsDesignerController.addElement(hebrewVersion.Id, 'select').label
         );
+        NativeFormsDesignerController.ElementRecord multiCheckboxRecord = NativeFormsDesignerController.addElement(hebrewVersion.Id, 'multiCheckbox');
+        System.assertEquals('\u05D1\u05D7\u05D9\u05E8\u05D4 \u05DE\u05E8\u05D5\u05D1\u05D4', multiCheckboxRecord.label);
+        System.assertEquals('multiCheckbox', multiCheckboxRecord.elementType);
+        System.assert(multiCheckboxRecord.fieldKey.startsWith('multiPicklist'));
+        System.assert(jsonMap(multiCheckboxRecord.configJson).containsKey('options'), 'Multi Checkbox should start with option config for canvas preview.');
 
         Map<String, String> expectedDateLabels = new Map<String, String>{
             'en' => 'Date',
@@ -751,8 +823,14 @@ private class NativeFormsDesignerBuilderTest {
         NativeFormsDesignerController.ElementRecord timeRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'time');
         NativeFormsDesignerController.ElementRecord emailRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'email');
         NativeFormsDesignerController.ElementRecord imageRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'image');
+        NativeFormsDesignerController.ElementRecord numberRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'number');
+        NativeFormsDesignerController.ElementRecord dateRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'date');
 
         NativeFormsDesignerController.placeElementInSection(textRecord.id, sectionRecord.id, 10);
+        NativeFormsDesignerController.moveElement(versionRecord.Id, numberRecord.id, sectionRecord.id, 1, 0);
+        NativeFormsDesignerController.moveElement(versionRecord.Id, dateRecord.id, sectionRecord.id, 1, 1);
+        NativeFormsDesignerController.moveElement(versionRecord.Id, dateRecord.id, sectionRecord.id, 1, 0);
+        NativeFormsDesignerController.moveElement(versionRecord.Id, numberRecord.id, sectionRecord.id, 2, 0);
         NativeFormsDesignerController.insertElementAfter(emailRecord.id, textRecord.id);
         NativeFormsDesignerController.reorderElement(versionRecord.Id, emailRecord.id, 0);
         NativeFormsDesignerController.ElementRecord updatedSection = NativeFormsDesignerController.updateSectionColumns(sectionRecord.id, 10);
@@ -776,6 +854,16 @@ private class NativeFormsDesignerBuilderTest {
             FROM NF_Form_Element__c
             WHERE Id = :emailRecord.id
         ];
+        NF_Form_Element__c movedNumber = [
+            SELECT Id, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :numberRecord.id
+        ];
+        NF_Form_Element__c movedDate = [
+            SELECT Id, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :dateRecord.id
+        ];
         NF_Form_Element__c updatedImage = [
             SELECT Id, Config_JSON__c
             FROM NF_Form_Element__c
@@ -784,6 +872,9 @@ private class NativeFormsDesignerBuilderTest {
 
         System.assertEquals(sectionRecord.elementId, placedText.Parent_Element_Id__c);
         System.assertEquals(10, (Integer) jsonMap(placedText.Config_JSON__c).get('sectionColumn'));
+        System.assertEquals(sectionRecord.elementId, movedDate.Parent_Element_Id__c);
+        System.assertEquals(1, (Integer) jsonMap(movedDate.Config_JSON__c).get('sectionColumn'));
+        System.assertEquals(2, (Integer) jsonMap(movedNumber.Config_JSON__c).get('sectionColumn'));
         System.assertEquals('Time', timeRecord.label);
         System.assertEquals('time', timeRecord.elementType);
         System.assert(String.valueOf(timeRecord.fieldKey).startsWith('time'));

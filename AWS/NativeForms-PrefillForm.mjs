@@ -412,7 +412,12 @@ function getByPath(obj, path) {
   const normalized = String(path).replace(/\[(\d+)\]/g, ".$1");
   return normalized.split(".").reduce((acc, key) => {
     if (acc == null) return undefined;
-    return acc[key];
+    if (Object.prototype.hasOwnProperty.call(acc, key)) {
+      return acc[key];
+    }
+    const foldedKey = String(key).toLowerCase();
+    const matchingKey = Object.keys(acc).find((candidate) => String(candidate).toLowerCase() === foldedKey);
+    return matchingKey ? acc[matchingKey] : undefined;
   }, obj);
 }
 
@@ -601,6 +606,18 @@ function applyResponseMapping(responseMapping, context) {
 }
 
 function collectParamReferences(value, out) {
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    String(value.valueSource || "").trim().toLowerCase() === "param"
+  ) {
+    const paramName = String(value.valueText || value.paramName || "").trim().toLowerCase();
+    if (paramName) {
+      out.add(paramName);
+    }
+  }
+
   if (typeof value === "string") {
     const regex = /\{?\bparams\.([A-Za-z0-9_.]+)\}?/g;
     let match;
@@ -629,6 +646,8 @@ function allowedPrefillParams(formSecurity) {
       .map((item) => String(item || "").trim().toLowerCase())
       .filter(Boolean)
   );
+
+  allowed.add("email");
 
   const definition = formSecurity?.prefillDefinition || {};
   collectParamReferences(definition.commands || [], allowed);

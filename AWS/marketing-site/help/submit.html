@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit actions &mdash; TwinaForms Help</title>
+  <meta name="description" content="How submit actions work in TwinaForms: write form submissions back to Salesforce. Configure create, update, find-and-update, and upsertMany commands, with field mappings and multi-step sequences.">
+  <link rel="stylesheet" href="/help/styles.css?v=20260519-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <a class="back-link" href="/help/index.html">&larr; All help topics</a>
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Submit actions &mdash; write form data back to Salesforce.</h1>
+      <p class="hero-copy">A submit action defines what TwinaForms does in Salesforce when a user submits the form: create a new record, update an existing one, find-and-update a match, or save many rows from a repeat group. A single form can run several actions in sequence, with each one feeding into the next.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#concept">How it works</a>
+        <a href="#build">Build a submit action</a>
+        <a href="#alias">The alias</a>
+        <a href="#mapping">Map fields to Salesforce</a>
+        <a href="#chain">Chain actions with the alias</a>
+        <a href="#test">Test before publishing</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+
+    <section class="section" id="concept">
+      <h2>How it works</h2>
+      <p>When a user clicks Submit, TwinaForms runs your submit actions <strong>server-side</strong> in the order you set. Each action chooses a Salesforce object and a command (create, update, find-and-update, save records list), then writes the form values into the Salesforce fields you've mapped.</p>
+      <p>A typical example: a customer fills in a "Contact us" form. A submit action takes those values and creates a new Case in Salesforce with the Subject, Description, and SuppliedEmail populated &mdash; ready for your support team to triage.</p>
+    </section>
+
+    <section class="section" id="build">
+      <h2>Build a submit action</h2>
+      <p>Open the <strong>Submit Actions</strong> tab inside the Designer and click <strong>+ Add submit action</strong>. You'll choose three things:</p>
+      <ol>
+        <li><strong>Command</strong> &mdash; what TwinaForms should do in Salesforce.</li>
+        <li><strong>Salesforce Object</strong> &mdash; the target object (Case, Contact, Opportunity, etc.).</li>
+        <li><strong>Field mappings</strong> &mdash; which form values write to which Salesforce fields.</li>
+      </ol>
+
+      <h3>Command types</h3>
+      <ul>
+        <li><strong>Create record</strong> (<span class="inline">create</span>) &mdash; insert a new record. Map form fields to the new record's fields.</li>
+        <li><strong>Update by Id</strong> (<span class="inline">updateById</span>) &mdash; update an existing record. You provide the record Id, usually from a hidden field, a URL parameter, or a prefill alias.</li>
+        <li><strong>Find and update</strong> (<span class="inline">findAndUpdate</span>, Pro) &mdash; query Salesforce with match conditions, then update the first matching record. Optionally fall back to <em>create</em> if no record is found.</li>
+        <li><strong>Save records list</strong> (<span class="inline">upsertMany</span>, Pro) &mdash; save multiple rows from a Records List (repeat group) element. Each row becomes a child record under a parent.</li>
+      </ul>
+
+      <h3>Match conditions (for find-and-update)</h3>
+      <p>If you chose <em>Find and update</em>, you also set match conditions &mdash; they work exactly like prefill conditions. A condition compares a Salesforce field to a value source:</p>
+      <ul>
+        <li><strong>URL Parameter</strong> &mdash; from the form URL's query string.</li>
+        <li><strong>Form Field</strong> &mdash; the current value of a field on the form.</li>
+        <li><strong>Literal Value</strong> &mdash; a fixed string or number.</li>
+        <li><strong>Alias Reference</strong> &mdash; a field from an earlier prefill or submit action.</li>
+      </ul>
+      <p>If multiple records match, TwinaForms updates the first one. Set "If no match found" to either <em>fail with error</em> or <em>create instead</em>, depending on the behavior you want.</p>
+    </section>
+
+    <section class="section" id="alias">
+      <h2>The alias &mdash; "Store result as"</h2>
+      <p>Every submit action can store its result under a name you choose &mdash; the <strong>alias</strong>. The alias is how you reference the produced record later, either from a follow-up submit action or from a prefill action in a multi-step flow.</p>
+      <p>For example, a submit action that creates an Opportunity might use <span class="inline">newOpp</span> as its alias. A later action can then reference <span class="inline">newOpp.Id</span> as the parent for Opportunity Line Items, or <span class="inline">newOpp.AccountId</span> to update the related Account.</p>
+      <div class="callout">
+        <strong>Naming tip:</strong> use clear, intentional aliases like <span class="inline">newCase</span>, <span class="inline">updatedContact</span>, or <span class="inline">opp</span>. They'll appear in dropdowns when you configure the next action, so a useful name saves time later.
+      </div>
+    </section>
+
+    <section class="section" id="mapping">
+      <h2>Map fields to Salesforce</h2>
+      <p>Mapping happens inside the action's configuration panel. For each form field you want to write to Salesforce, add a row pairing it with a Salesforce field on the target object:</p>
+      <ol>
+        <li>Open the submit action in the <strong>Submit Actions</strong> tab.</li>
+        <li>Scroll to the <strong>Field Mappings</strong> section.</li>
+        <li>Click <strong>+ Add mapping</strong>.</li>
+        <li>Choose the <strong>Form field</strong> from the dropdown (e.g. <span class="inline">email2</span>).</li>
+        <li>Choose the <strong>Salesforce field</strong> on the target object (e.g. <span class="inline">Case.SuppliedEmail</span>).</li>
+      </ol>
+      <p>Only mapped fields are sent to Salesforce &mdash; everything else on the form is ignored by this action. Form fields that aren't mapped to anything are still useful: they may participate in formulas, conditional logic, or other submit actions.</p>
+      <div class="callout">
+        <strong>See all mappings at a glance:</strong> the <strong>Submit Actions</strong> tab's right panel shows a summary of every form-to-Salesforce mapping for the current action. Useful for reviewing or auditing all mappings at once without scrolling through each one.
+      </div>
+    </section>
+
+    <section class="section" id="chain">
+      <h2>Chain actions with the alias</h2>
+      <p>A form can run several submit actions, in the order you set. Each action stores its result under an alias, and later actions can reference that alias to pick up the produced record's Id or any of its fields.</p>
+      <p>A common pattern is creating an Opportunity, then creating its line items:</p>
+      <ol>
+        <li>Action&nbsp;1 &mdash; <strong>Create</strong> an Opportunity. Store result as <span class="inline">newOpp</span>.</li>
+        <li>Action&nbsp;2 &mdash; <strong>Save records list</strong> on Opportunity Line Item, mapping the Records List rows to OLI fields. Set the parent relationship to <span class="inline">OpportunityId = {newOpp.Id}</span>.</li>
+      </ol>
+      <p>If an earlier action fails, the later ones don't run. Use this to your advantage &mdash; put validation-sensitive work first so the rest only runs after the parent record is safely created.</p>
+    </section>
+
+    <section class="section" id="test">
+      <h2>Test before publishing</h2>
+      <p>The fastest way to validate a submit action is to publish to a sandbox or scratch org, submit the form once with sample data, and inspect the result in Salesforce. Then check the form's <strong>Submission Logs</strong> in the Designer &mdash; the log records every action that ran, the Salesforce Ids produced, and any errors with messages from the Salesforce API.</p>
+      <p>Common errors:</p>
+      <ul>
+        <li>Mapping to a Salesforce field that doesn't exist (typo or deleted field).</li>
+        <li>Missing a required Salesforce field that wasn't in your mappings.</li>
+        <li>Trying to update a record the running user doesn't have access to.</li>
+        <li>Using an alias reference that didn't get a result &mdash; for example, the prior action failed or returned nothing.</li>
+      </ul>
+      <div class="callout">
+        <strong>Heads up:</strong> field mappings are validated at publish time, not while you edit. A typo in a Salesforce API field name won't be caught until the form goes live and a submission fails. Always test once before sharing a form publicly.
+      </div>
+    </section>
+
+    </div>
+    </div>
+  </main>
+</body>
+</html>

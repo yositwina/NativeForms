@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Designer basics &mdash; TwinaForms Help</title>
+  <meta name="description" content="A step-by-step walkthrough of the TwinaForms Designer: add fields to the canvas, configure look and behavior, organize with sections, and publish your first form.">
+  <link rel="stylesheet" href="/help/styles.css?v=20260519-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <a class="back-link" href="/help/index.html">&larr; All help topics</a>
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Designer basics &mdash; build your first form.</h1>
+      <p class="hero-copy">A walkthrough of the TwinaForms Designer: the three-pane workspace, adding fields to the canvas, configuring how each field looks and behaves, and getting a form ready to publish. If this is your first time, follow the sections in order &mdash; each one builds on the last.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#open">Open the Designer</a>
+        <a href="#workspace">The workspace</a>
+        <a href="#add">Add a field</a>
+        <a href="#configure">Configure look &amp; behavior</a>
+        <a href="#organize">Organize with sections</a>
+        <a href="#reorder">Reorder &amp; delete</a>
+        <a href="#settings">Form settings</a>
+        <a href="#publish">Save &amp; publish</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+
+    <section class="section" id="open">
+      <h2>Open the Designer</h2>
+      <p>The Designer is part of the TwinaForms managed package. After installing the package, open the <strong>TwinaForms</strong> Lightning app from the App Launcher in Salesforce.</p>
+      <p>From the <strong>Desginer</strong> tab, click an existing form to open it &mdash; or click <em>+ New Form</em> to create one. The current Draft version opens in the Designer.</p>
+      <figure class="help-image">
+        <img src="/assets/image-2.png" alt="The TwinaForms Designer tab in Salesforce, showing the list of existing forms with the New Form button at the top right.">
+        <figcaption>The Designer tab inside Salesforce, listing existing forms.</figcaption>
+      </figure>
+      <div class="callout">
+        <strong>Draft vs Published:</strong> every form has exactly one Draft version (what you edit) and zero or more Published versions (read-only snapshots). You always edit the Draft &mdash; publishing creates an immutable snapshot and a fresh Draft.
+      </div>
+    </section>
+
+    <section class="section" id="workspace">
+      <h2>The workspace</h2>
+      <p>The Designer has three panes:</p>
+      <figure class="help-image">
+        <img src="/assets/image-3.png" alt="The full TwinaForms Designer workspace with three panes: Building Blocks on the left, the form Canvas in the centre, and the Element Properties / Form Settings panel on the right.">
+        <figcaption>The three-pane Designer workspace.</figcaption>
+      </figure>
+      <ul>
+        <li><strong>Building Blocks</strong> (left) &mdash; the palette of fields and elements you can add.</li>
+        <li><strong>Canvas</strong> (centre) &mdash; a live preview of the form, exactly as the end user will see it.</li>
+        <li><strong>Properties panel</strong> (right) &mdash; configures whatever is currently selected on the canvas. When nothing is selected, it shows <strong>Form Settings</strong>.</li>
+      </ul>
+      <p>Along the top there's a toolbar with <strong>Project</strong>, <strong>Form</strong>, and <strong>Form Version</strong> selectors, plus a <em>Publish Form</em> button.</p>
+    </section>
+
+    <section class="section" id="add">
+      <h2>Add a field to the canvas</h2>
+      <p>Fields are grouped in the Building Blocks panel into three categories:</p>
+      <ul>
+        <li><strong>Input Fields</strong> &mdash; Text, Number, Date, Time, Email, Phone, URL, Text Area, Picklist, Checkbox, Radio groups, Multi Checkbox, Lookup, File Upload, Signature.</li>
+        <li><strong>Display Elements</strong> &mdash; Section, Group, Records List (repeat group), Display Text, Image.</li>
+        <li><strong>Survey Fields</strong> (Pro) &mdash; Star rating, NPS, Likert, Ranking.</li>
+      </ul>
+      <p>To add a field, click its <strong>+ Add</strong> button. The element appears at the bottom of the canvas &mdash; or inside the section you currently have selected &mdash; and is automatically focused so you can configure it right away.</p>
+    </section>
+
+    <section class="section" id="configure">
+      <h2>Configure look &amp; behavior</h2>
+      <p>When a field is selected, the right-hand <strong>Element Properties</strong> panel opens. Most fields share the same common controls, with a few type-specific extras.</p>
+
+      <h3>Common controls (every input)</h3>
+      <ul>
+        <li><strong>Label</strong> &mdash; the text the user sees above (or beside) the input.</li>
+        <li><strong>Placeholder</strong> &mdash; hint text shown when the field is empty.</li>
+        <li><strong>Help Text</strong> &mdash; smaller text under the field, used for guidance.</li>
+        <li><strong>Required</strong> &mdash; submission fails if the user leaves the field empty.</li>
+        <li><strong>Default Value</strong> &mdash; the value the field starts with when the form loads.</li>
+        <li><strong>Field Behavior</strong> &mdash; <em>Editable</em> (normal), <em>Locked</em> (read-only when prefilled), or <em>Hidden</em>.</li>
+        <li><strong>Conditional Show/Hide</strong> &mdash; toggle visibility based on the value of another field. Multi-condition AND/OR logic is a Pro capability.</li>
+        <li><strong>Internal Name (ID)</strong> &mdash; auto-generated identifier like <span class="inline">text2</span> or <span class="inline">email5</span>. Used in formulas, prefill, and submit mappings.</li>
+      </ul>
+
+      <h3>Look controls</h3>
+      <ul>
+        <li><strong>Label Position</strong> &mdash; Above, Left, Right, or None.</li>
+        <li><strong>Label Formatting</strong> &mdash; Bold, Italic, Underline.</li>
+        <li><strong>Width</strong> &mdash; not set directly. Field width is controlled by the column count of its parent Section. A 2-column section makes each child take half the row.</li>
+      </ul>
+
+      <h3>Type-specific controls</h3>
+      <p>Some field types have a few extra controls:</p>
+      <ul>
+        <li><strong>Text, Email, Phone, URL, Number</strong> &mdash; Min/Max value, Text Rule (numbers only, letters only, alphanumeric).</li>
+        <li><strong>Date, Time</strong> &mdash; Display format (US / EU), 12 or 24 hour, GMT offset for datetime fields.</li>
+        <li><strong>Picklist, Radio, Checkbox</strong> &mdash; Option list (value/label pairs), or fetch options from a Salesforce picklist field.</li>
+        <li><strong>Lookup</strong> &mdash; Target Salesforce object, search fields, display fields, minimum search length, result limit.</li>
+        <li><strong>File Upload</strong> &mdash; allowed file types, max size, and the Submit Action that owns the attachments.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="organize">
+      <h2>Organize with sections and columns</h2>
+      <p>Add a <strong>Section</strong> from the Display Elements group when you want to group related fields and lay them out side by side.</p>
+      <p>Section settings include:</p>
+      <ul>
+        <li><strong>Columns</strong> (1&ndash;10) &mdash; how many columns the section's children are laid out in.</li>
+        <li><strong>Show Title</strong> &mdash; whether the section's title is visible.</li>
+        <li><strong>Boxed</strong> &mdash; whether to draw a border around the section.</li>
+      </ul>
+      <div class="callout">
+        <strong>Tip:</strong> a 2-column section is the easiest way to get a clean "First Name &mdash; Last Name" row, or to put a small dropdown next to a larger text input.
+      </div>
+    </section>
+
+    <section class="section" id="reorder">
+      <h2>Reorder and delete</h2>
+      <ul>
+        <li><strong>Reorder</strong> &mdash; drag an element to a new position on the canvas. A target line shows where it will drop.</li>
+        <li><strong>Delete</strong> &mdash; select the element. In the right-hand <strong>Element Properties</strong> panel, scroll to the bottom &mdash; you'll find the <em>Delete</em> button there.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="settings">
+      <h2>Form settings</h2>
+      <p>Click anywhere outside an element on the canvas (or click the <strong>Form Settings</strong> button) to switch the right panel to form-level settings.</p>
+      <ul>
+        <li><strong>Name / Description</strong> &mdash; identifies the form internally.</li>
+        <li><strong>Language</strong> &mdash; the default form language. Affects element default labels and built-in runtime text.</li>
+        <li><strong>RTL Mode</strong> &mdash; right-to-left direction for Hebrew, Arabic, and similar languages.</li>
+        <li><strong>Theme</strong> &mdash; the visual theme (colors, fonts, logo, width). See <a href="/help/themes.html">Form themes</a>.</li>
+        <li><strong>Submit Button Label</strong> and <strong>Success Message</strong>.</li>
+        <li><strong>Post-Submit Redirect</strong> (Pro) &mdash; URL or formula that decides where to send the user after submission.</li>
+        <li><strong>Contact Verification on Form</strong> &mdash; require a one-time code before the user can fill the form.</li>
+        <li><strong>Submission PDF</strong> (Pro) &mdash; attach a PDF of the submission to the created Salesforce record.</li>
+        <li><strong>Custom JavaScript</strong> (Pro) &mdash; see <a href="/help/custom-javascript.html">Custom JavaScript</a>.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="publish">
+      <h2>Save and publish</h2>
+      <p>You won't see a Save button anywhere &mdash; the Designer auto-saves continuously in the background. When you're ready for users to actually fill out the form:</p>
+      <ol class="steps">
+        <li>Click <strong>Publish Form</strong> in the top toolbar.</li>
+        <li>TwinaForms takes a snapshot of the current Draft and generates a public form URL.</li>
+        <li>A new empty Draft is created so you can keep editing without affecting the published version.</li>
+      </ol>
+      <div class="callout">
+        <strong>Heads up:</strong> the public URL stays the same when you republish &mdash; any links you've already shared continue to work. The new version replaces the old one transparently.
+      </div>
+    </section>
+
+    </div>
+    </div>
+  </main>
+</body>
+</html>

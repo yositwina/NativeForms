@@ -865,6 +865,7 @@ function validateSubmitCommandAgainstPolicy(command, formSecurity) {
 
   if (command.type === "create" || command.type === "update") {
     validateFieldsForObject(command.objectApiName, command.fields, allowedWriteFields);
+    validateFieldsForObject(command.objectApiName, command.createOnlyFields, allowedWriteFields);
   }
 
   if (command.type === "upsertMany") {
@@ -2209,6 +2210,16 @@ function optionLabelForPdf(schemaItem, value) {
   return match?.label || value;
 }
 
+function multiOptionLabelsForPdf(schemaItem, value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value ?? "")
+      .split(";")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  return values.map((item) => optionLabelForPdf(schemaItem, item)).join(", ");
+}
+
 function formatPdfValue(schemaItem, value, inputPayload, finalizedFiles = [], finalizedSignatures = []) {
   if (schemaItem?.type === "checkbox") {
     return value === true || String(value).toLowerCase() === "true" || value === "on"
@@ -2217,6 +2228,9 @@ function formatPdfValue(schemaItem, value, inputPayload, finalizedFiles = [], fi
   }
   if (schemaItem?.type === "select" || schemaItem?.type === "radio") {
     return optionLabelForPdf(schemaItem, value);
+  }
+  if (schemaItem?.type === "multiCheckbox") {
+    return multiOptionLabelsForPdf(schemaItem, value);
   }
   if (schemaItem?.type === "ranking") {
     let values = value;
@@ -2265,6 +2279,9 @@ function formatPdfRowValue(schemaItem, value) {
   }
   if (schemaItem?.type === "select" || schemaItem?.type === "radio") {
     return optionLabelForPdf(schemaItem, value);
+  }
+  if (schemaItem?.type === "multiCheckbox") {
+    return multiOptionLabelsForPdf(schemaItem, value);
   }
   if (schemaItem?.type === "ranking") {
     let values = value;
@@ -2919,7 +2936,7 @@ async function executeCommand(command, context, sf) {
   }
 
   if (type === "update") {
-    if (!command.objectApiName || !command.fields) {
+    if (!command.objectApiName || (!command.fields && !command.createOnlyFields)) {
       throw new Error(`update command '${command.commandKey || "unknown"}' is missing objectApiName or fields`);
     }
 
@@ -2927,14 +2944,30 @@ async function executeCommand(command, context, sf) {
       instanceUrl,
       accessToken,
       command.objectApiName,
-      resolveValue(command.fields, context)
+      resolveValue(command.fields || {}, context)
     );
+    const resolvedCreateOnlyFields = command.createOnlyFields
+      ? await coerceFieldsForSalesforce(
+        instanceUrl,
+        accessToken,
+        command.objectApiName,
+        resolveValue(command.createOnlyFields, context)
+      )
+      : {};
     const id = command.id ? resolveValue(command.id, context) : resolvedFields.Id;
     const shouldCreateOnMissing = command.onNotFound === "create";
 
     if (!id) {
       if (shouldCreateOnMissing) {
-        const createResult = await createSalesforceRecord(instanceUrl, accessToken, command.objectApiName, resolvedFields);
+        const createResult = await createSalesforceRecord(
+          instanceUrl,
+          accessToken,
+          command.objectApiName,
+          {
+            ...resolvedFields,
+            ...resolvedCreateOnlyFields
+          }
+        );
         return {
           success: true,
           type: "create",
@@ -2947,13 +2980,24 @@ async function executeCommand(command, context, sf) {
 
     const fieldsToUpdate = { ...resolvedFields };
     delete fieldsToUpdate.Id;
+    for (const fieldName of Object.keys(resolvedCreateOnlyFields || {})) {
+      delete fieldsToUpdate[fieldName];
+    }
 
     let updateResult;
     try {
       updateResult = await updateSalesforceRecord(instanceUrl, accessToken, command.objectApiName, id, fieldsToUpdate);
     } catch (error) {
       if (shouldCreateOnMissing && String(error?.message || "").includes("Status: 404")) {
-        const createResult = await createSalesforceRecord(instanceUrl, accessToken, command.objectApiName, resolvedFields);
+        const createResult = await createSalesforceRecord(
+          instanceUrl,
+          accessToken,
+          command.objectApiName,
+          {
+            ...resolvedFields,
+            ...resolvedCreateOnlyFields
+          }
+        );
         return {
           success: true,
           type: "create",

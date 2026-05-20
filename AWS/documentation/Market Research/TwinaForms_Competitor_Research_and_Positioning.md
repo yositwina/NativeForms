@@ -82,6 +82,8 @@ FormAssembly is a mature Salesforce-focused form and data collection platform. I
 - Heavier and more expensive than a simple Salesforce-native form app.
 - Broader enterprise platform, not necessarily the simplest experience for small Salesforce teams.
 - May feel like adopting another full product ecosystem.
+- Its Salesforce form creation flow appears to be field-selection based: admins choose a Salesforce object and then pick fields for the form. In observed behavior, it does not reuse the admin's existing Salesforce page layout as the form blueprint.
+- The observed Salesforce-generated form path is limited for TwinaForms' target use case: it creates a Salesforce submit/link workflow, but does not preserve existing layout sections/columns, does not use the Salesforce page layout as source, and does not provide the same multilingual layout import story.
 
 ### TwinaForms Position Against FormAssembly
 
@@ -90,6 +92,12 @@ Do not compete directly on enterprise compliance or feature breadth at launch.
 Compete as:
 
 > A simpler, lower-cost Salesforce-native form app for teams that do not need a heavy enterprise form platform.
+
+For the Create From Salesforce Layout feature, use a sharper message:
+
+> TwinaForms turns an existing Salesforce page layout into a secure multilingual external form.
+
+This is stronger than generic Salesforce field mapping. The value is that the Salesforce admin's existing object layout becomes the starting point: sections, field order, columns, translated Salesforce field labels, translated picklist and multi-picklist option labels, and Salesforce API values for submit are preserved where Salesforce provides the metadata. This reduces setup time and avoids the common admin mistake of rebuilding a public form manually from object fields.
 
 ### Competitive Risk
 
@@ -477,6 +485,7 @@ Recommended website emphasis:
 
 - Native Salesforce app.
 - Public forms without Experience Cloud.
+- Create secure multilingual external forms from existing Salesforce page layouts.
 - Secure Salesforce update links protected by secret-code verification.
 - Ready-to-use Salesforce registration forms.
 - Salesforce remains the source of truth.

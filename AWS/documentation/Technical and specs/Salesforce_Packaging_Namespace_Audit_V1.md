@@ -1,16 +1,25 @@
 # Salesforce Packaging Namespace Audit V1
 
-Last updated: 2026-05-17
+Last updated: 2026-05-19
 
 ## Current TwinaForms Managed 2GP Package
 
 - package name: `TwinaForms`
 - package id: `0HogL0000002CUvSAM`
-- latest beta package version create request id: `08cgL0000009KU9QAM`
-- latest package2 version id: `05igL0000003Fs9QAE`
-- latest subscriber package version id: `04tgL000000FmynQAC`
-- latest version number: `0.4.0.1`
-- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000FmynQAC`
+- latest released package version create request id: `08cgL0000009NobQAE`
+- latest package2 version id: `05igL0000003HifQAE`
+- latest subscriber package version id: `04tgL000000FtXFQA0`
+- latest version number: `0.8.0.1`
+- latest package code coverage: `84%`
+- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000FtXFQA0`
+- latest released note: changes `NF_Form_Element__c.Element_Type__c` to unrestricted so subscriber orgs cannot reject `multiCheckbox` or future internal element values after upgrade
+- latest beta package version create request id: `08cgL0000009NobQAE`
+- latest beta package2 version id: `05igL0000003HifQAE`
+- latest beta subscriber package version id: `04tgL000000FtXFQA0`
+- latest beta version number: `0.8.0.1`
+- latest beta package code coverage: `84%`
+- latest beta sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000FtXFQA0`
+- latest beta note: changes `NF_Form_Element__c.Element_Type__c` to unrestricted so subscriber orgs cannot reject `multiCheckbox` or future internal element values after upgrade
 - target namespace: `twinaforms`
 
 ## Packaging Note

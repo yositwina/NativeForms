@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Form themes &mdash; TwinaForms Help</title>
+  <meta name="description" content="How to create and apply a theme in TwinaForms: colors, fonts, logo, form width. Reusable across forms.">
+  <link rel="stylesheet" href="/help/styles.css?v=20260519-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <a class="back-link" href="/help/index.html">&larr; All help topics</a>
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Form themes &mdash; one place to control the look.</h1>
+      <p class="hero-copy">A theme is a reusable set of visual properties (colors, fonts, logo, form width). Define a theme once, then assign it to as many forms as you like &mdash; editing the theme updates every form that uses it.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#concept">What a theme is</a>
+        <a href="#create">Create or clone</a>
+        <a href="#assign">Assign to a form</a>
+        <a href="#properties">Property reference</a>
+        <a href="#defaults">Defaults and inheritance</a>
+        <a href="#rtl">RTL forms</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+
+    <section class="section" id="concept">
+      <h2>What a theme is</h2>
+      <p>A theme controls how a published form looks: page background, form background, fonts and text colors for the title, sections, and body text, the appearance of input fields, the submit button, and the logo. Around 30 properties in total.</p>
+      <p>Themes are configured in the <strong>Themes</strong> tab inside the Designer. Each theme is reusable &mdash; a single theme can drive the look of many forms, which is helpful when you want consistent branding across all the forms your team publishes.</p>
+    </section>
+
+    <section class="section" id="create">
+      <h2>Create, clone, or delete a theme</h2>
+      <p>Open the Themes tab. The left side lists every theme that exists in the org. The right side is the editor and live preview.</p>
+      <ul>
+        <li><strong>Create new theme</strong> &mdash; click the <em>+ New theme</em> button. A theme with sensible defaults is created and selected.</li>
+        <li><strong>Clone</strong> &mdash; select a theme you like and click <em>Clone</em>. A copy is created so you can vary just the parts you want to change.</li>
+        <li><strong>Edit</strong> &mdash; change any property on the right; the preview updates immediately. Changes auto-save.</li>
+        <li><strong>Delete</strong> &mdash; available when a theme isn't currently assigned to any form. If it is in use, you'll be prompted to reassign first.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="assign">
+      <h2>Assign a theme to a form</h2>
+      <ol>
+        <li>Open the form in the Designer.</li>
+        <li>Make sure nothing is selected on the canvas, so the right panel shows <strong>Form Settings</strong>.</li>
+        <li>Find the <strong>Theme</strong> dropdown and choose one.</li>
+      </ol>
+      <p>The form's preview updates immediately. The assignment auto-saves and applies as soon as you republish the form.</p>
+      <div class="callout">
+        <strong>Tip:</strong> changes you make to an already-assigned theme will affect every form using it &mdash; including ones already published. Republish each affected form to push the new look live.
+      </div>
+    </section>
+
+    <section class="section" id="properties">
+      <h2>Property reference</h2>
+      <p>Themes group around 30 properties into a few categories:</p>
+
+      <h3>Logo and width</h3>
+      <table class="prop-table">
+        <thead><tr><th>Property</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Logo URL</td><td>Image shown at the top of the form. Uploaded image or external URL.</td></tr>
+          <tr><td>Logo Size</td><td>Height and max width in pixels.</td></tr>
+          <tr><td>Logo Position</td><td>Left, Center, or Right.</td></tr>
+          <tr><td>Form Width</td><td>Narrow, Standard, Wide, or Full.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Page background</h3>
+      <table class="prop-table">
+        <thead><tr><th>Property</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Background Color</td><td>Page background outside the form container.</td></tr>
+          <tr><td>Form Background Color</td><td>Background of the form container itself.</td></tr>
+          <tr><td>Form Border Color</td><td>Border around the form and dividers between sections.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Typography</h3>
+      <table class="prop-table">
+        <thead><tr><th>Property</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Title Font / Size / Color</td><td>The form title at the top.</td></tr>
+          <tr><td>Section Title Font / Size / Color</td><td>Section headings inside the form.</td></tr>
+          <tr><td>Main Font / Size / Color</td><td>Body text and field labels.</td></tr>
+          <tr><td>Hint Text Color</td><td>Help text and placeholder colors.</td></tr>
+          <tr><td>Link Text Color</td><td>Hyperlinks in body text.</td></tr>
+          <tr><td>Error Color</td><td>Validation error messages.</td></tr>
+        </tbody>
+      </table>
+      <p>Font choices include Roboto Slab, Inter, Georgia, or Custom. Custom requires a font name that's web-safe or provided through your hosting.</p>
+
+      <h3>Inputs and buttons</h3>
+      <table class="prop-table">
+        <thead><tr><th>Property</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Input Background / Border / Border Radius</td><td>How input fields look. Border radius controls rounded corners.</td></tr>
+          <tr><td>Button Font / Size / Text Color</td><td>The submit button's text.</td></tr>
+          <tr><td>Button Background / Hover Background</td><td>The submit button's fill colors.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="defaults">
+      <h2>Defaults and inheritance</h2>
+      <p>If a form has no theme assigned, TwinaForms uses a built-in default look (Roboto Slab title, Inter body, light blue page background). The default is usable for testing or quick demos.</p>
+      <p>Themes are <strong>not</strong> tied to a single form &mdash; they live at the workspace level and can be assigned to any form in the org. Editing a shared theme changes the look of every form pointing at it.</p>
+    </section>
+
+    <section class="section" id="rtl">
+      <h2>RTL forms</h2>
+      <p>RTL (right-to-left) direction is <strong>not a theme property</strong>. It's set per form, under <em>Form Settings &rarr; RTL Mode</em>. Once enabled, the form mirrors automatically &mdash; labels move to the right, alignments flip, and the submit button moves to the right side. The theme's colors, fonts, and logo apply identically to LTR and RTL forms.</p>
+    </section>
+
+    </div>
+    </div>
+  </main>
+</body>
+</html>

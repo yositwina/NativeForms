@@ -45,6 +45,7 @@ Supported element types in the current runtime:
 - input
 - textarea
 - select
+- multiCheckbox
 - checkbox
 - radio
 - lookup
@@ -68,6 +69,23 @@ Supported element types in the current runtime:
 - AWS submit does not normalize Time fields or add GMT/UTC suffixes in V1.
 - The field can be mapped directly to Salesforce Time or Text fields when the customer expects `HH:mm`.
 - Custom JavaScript and formulas read the field as a text value, for example `TwinaForms.getValue("time1")`.
+
+### Salesforce Multi Checkbox Field V1
+`multiCheckbox` is a Starter/basic input field for Salesforce Multi-Select Picklist fields.
+
+- The customer-facing Designer label is `Multi Checkbox`.
+- V1 maps only to Salesforce fields with `Schema.DisplayType.MultiPicklist`.
+- The field renders as a checkbox group, not as a multi-select dropdown.
+- Stored, prefilled, and submitted values use Salesforce's native semicolon string format, for example `A;B;C`.
+- Prefill converts a semicolon string into checked boxes.
+- Submit converts checked boxes back into a semicolon string.
+- Required means at least one option is checked.
+- `TwinaForms.getValue(fieldKey)` returns the semicolon string.
+- `TwinaForms.setValue(fieldKey, "A;B")` checks matching option values.
+- Records List rows support `multiCheckbox` using the same semicolon value format per row.
+- Submission PDF displays selected option labels joined by comma, not raw API values.
+- Create From Layout maps Salesforce `MultiPicklist` fields to `multiCheckbox` and uses translated Salesforce picklist labels when available.
+- Deferred: manual free-text option editing for Text fields, option-column layout settings, dependent multi-picklists.
 
 ### Salesforce Lookup Field V1
 `lookup` is a Starter/basic input field for selecting one Salesforce record and submitting that record Id into a Salesforce reference field.

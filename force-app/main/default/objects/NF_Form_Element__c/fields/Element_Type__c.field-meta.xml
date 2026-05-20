@@ -8,7 +8,7 @@
     <trackHistory>false</trackHistory>
     <type>Picklist</type>
     <valueSet>
-        <restricted>true</restricted>
+        <restricted>false</restricted>
         <valueSetDefinition>
             <sorted>false</sorted>
             <value><fullName>heading</fullName><default>true</default><label>Heading</label></value>
@@ -22,6 +22,7 @@
             <value><fullName>tel</fullName><default>false</default><label>Phone</label></value>
             <value><fullName>url</fullName><default>false</default><label>URL</label></value>
             <value><fullName>select</fullName><default>false</default><label>Select</label></value>
+            <value><fullName>multiCheckbox</fullName><default>false</default><label>Multi Checkbox</label></value>
             <value><fullName>lookup</fullName><default>false</default><label>Lookup</label></value>
             <value><fullName>checkbox</fullName><default>false</default><label>Checkbox</label></value>
             <value><fullName>radio</fullName><default>false</default><label>Radio</label></value>

@@ -159,6 +159,8 @@ Starter should include these product capabilities at launch:
   - default is the current short session behavior, based on the code expiry window
   - optional same-tab session stores the signed verification token in browser `sessionStorage`, survives refresh in that tab, expires at the visitor's local midnight, and is capped by AWS at 12 hours
   - closing the browser tab clears the session because V1 intentionally does not use `localStorage`
+- Designer UX keeps the form-level enable/disable checkbox in Form Settings, but the visible Secret Code block on the canvas is selectable; its message, button, rule, and session controls live in the right-side properties panel as a system block, not a normal submitted field.
+- Designer drag/drop reordering should be optimistic and narrow: update the canvas locally, preserve the selected right-panel state, save a parent/column/index move to Salesforce in the background, and reload the workspace only on failure. This applies to top-level moves and moves within section/group/records-list columns.
 
 ### Support
 - standard support process defined
@@ -194,6 +196,9 @@ Pro should build on Starter and add:
   - admin chooses an object and page layout
   - V1 reads Salesforce layout metadata through the org's stored AWS OAuth connection using Salesforce UI API; the imported source is the assigned Salesforce page layout for the connected admin/profile and record type
   - TwinaForms creates a draft form from supported fields in the returned layout sections, preserving section grouping where possible
+  - Salesforce ownership/audit/system fields such as Owner, Created By, Created Date, Last Modified By, Last Modified Date, and System Modstamp are ignored instead of shown as skipped import problems
+  - create-only fields returned by the layout, including reference/lookup fields, can be imported for secure update-or-create mode with locked-when-prefilled behavior; publish emits them as create-only submit mappings so updates omit them but fallback creates include them
+  - after creation, the Designer opens a required acknowledgement modal that summarizes imported fields, create-only behavior, skipped fields, and how the admin can change the outcome in Salesforce or by choosing a different submit mode
   - prefill can load an existing record by `recordId`
   - submit updates the intended record or creates a new record when configured and no existing record is found
   - V1 secure update must always use the existing Salesforce Contact/email secret-code verification model, regardless of the target form object
@@ -214,7 +219,7 @@ Ordered from easiest to most complex:
 | 4 | Survey field styles | Implemented as Pro V1 foundation | `enableProSurveyFields` gates survey-focused presentations that still save simple values: 1-5 star rating, NPS 0-10, Likert scale, ranking, and satisfaction scale. Rating and NPS map cleanly to Salesforce Number fields, Likert/satisfaction map to Picklist or Text, and ranking maps to Long Text Area as an ordered value list. |
 | 5 | Multi-page forms with progress | Medium-high | Add page/step containers, runtime navigation, validation per page, and progress display. |
 | 6 | Registration kit | Medium-high | Pro expansion of the registration template with optional TwinaForms Event / Registration objects, capacity, waitlist, cancellation/update link, and attendance status. |
-| 7 | Create form from Salesforce page layout | Medium-high | Admin selects an object and TwinaForms reads the assigned Salesforce page layout through AWS/UI API, then creates a draft form from supported layout sections/fields, adds prefill by `recordId`, and configures submit to update-or-create the same object. V1 should skip read-only/unsupported fields and always use Salesforce Contact/email secret-code verification for secure update links; visitors without a matching Contact cannot edit. |
+| 7 | Create form from Salesforce page layout | Medium-high | Admin selects an object and TwinaForms reads the assigned Salesforce page layout through AWS/UI API, then creates a draft form from supported layout sections/fields, adds prefill by `recordId`, and configures submit to update-or-create the same object. V1 ignores Salesforce ownership/audit/system fields, imports create-only lookup fields as create-only mappings where possible, shows an acknowledgement modal for import effects, skips unsupported fields, and always uses Salesforce Contact/email secret-code verification for secure update links; visitors without a matching Contact cannot edit. |
 | 8 | Submission PDF | Implemented as Pro V1 foundation | `enableProSubmissionPdf` gates Form Settings for a readable submitted-response PDF. V1 copies fields, display text, images, and signatures in published form order and can attach the PDF to the chosen Salesforce submit target record. |
 | 9 | Save and resume | High | Store draft responses securely, issue resume link/code, reload draft state, and handle expiry/cleanup. |
 | 10 | Electronic signature | Implemented as Pro V1 foundation | `enableProElectronicSignature` gates a Signature field in Designer. Published forms capture a drawn PNG and AWS attaches it as a Salesforce File attached to that submit target record. Future Submission PDF work should reuse the saved signature artifact metadata. |

@@ -203,6 +203,8 @@ const state = {
   planCode: "",
   setupState: "",
   healthStatus: "",
+  sortKey: "",
+  sortDirection: "asc",
   selectedOrgId: null,
   selectedPlanCode: "free",
   tenants: [],
@@ -569,7 +571,7 @@ function formatAlertType(value) {
 }
 
 function getFilteredTenants() {
-  return state.tenants.filter((tenant) => {
+  const filtered = state.tenants.filter((tenant) => {
     const matchesSearch = !state.search || [
       tenant.companyName,
       tenant.adminEmail,
@@ -581,6 +583,66 @@ function getFilteredTenants() {
       && (!state.planCode || tenant.planCode === state.planCode)
       && (!state.setupState || tenant.setupState === state.setupState)
       && (!state.healthStatus || tenant.healthStatus === state.healthStatus);
+  });
+
+  return sortTenants(filtered);
+}
+
+function sortTenants(items) {
+  if (!state.sortKey) {
+    return items;
+  }
+
+  const direction = state.sortDirection === "desc" ? -1 : 1;
+  const compare = (a, b) => {
+    if (state.sortKey === "companyName") {
+      const va = String(a.companyName || "").toLowerCase();
+      const vb = String(b.companyName || "").toLowerCase();
+      if (va === vb) return 0;
+      return va < vb ? -1 * direction : 1 * direction;
+    }
+    if (state.sortKey === "lastActivityAt") {
+      const ta = a.lastActivityAt ? Date.parse(a.lastActivityAt) : 0;
+      const tb = b.lastActivityAt ? Date.parse(b.lastActivityAt) : 0;
+      if (ta === tb) return 0;
+      return ta < tb ? -1 * direction : 1 * direction;
+    }
+    if (state.sortKey === "startedAt") {
+      const sa = a.planStartedAt || a.trialStartedAt;
+      const sb = b.planStartedAt || b.trialStartedAt;
+      const ta = sa ? Date.parse(sa) : 0;
+      const tb = sb ? Date.parse(sb) : 0;
+      if (ta === tb) return 0;
+      return ta < tb ? -1 * direction : 1 * direction;
+    }
+    return 0;
+  };
+
+  return [...items].sort(compare);
+}
+
+function handleSortClick(sortKey) {
+  if (state.sortKey === sortKey) {
+    state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
+  } else {
+    state.sortKey = sortKey;
+    state.sortDirection = (sortKey === "lastActivityAt" || sortKey === "startedAt") ? "desc" : "asc";
+  }
+  render();
+}
+
+function updateSortIndicators() {
+  const headers = document.querySelectorAll(".tenant-table th[data-sort-key]");
+  headers.forEach((th) => {
+    const key = th.dataset.sortKey;
+    const indicator = th.querySelector(".sort-indicator");
+    const isActive = state.sortKey === key;
+    th.classList.toggle("is-sorted-active", isActive);
+    if (indicator) {
+      indicator.textContent = isActive
+        ? (state.sortDirection === "desc" ? "▾" : "▴")
+        : "▴▾";
+    }
   });
 }
 
@@ -1315,6 +1377,7 @@ function applySplitLayout() {
 }
 
 function renderTable(items) {
+  updateSortIndicators();
   refs.tenantTableBody.innerHTML = "";
 
   items.forEach((tenant) => {
@@ -1330,6 +1393,21 @@ function renderTable(items) {
           <span>${escapeHtml(tenant.adminEmail)}</span>
           <span>${escapeHtml(tenant.orgId)}</span>
         </div>
+      </td>
+      <td>
+        ${(() => {
+          const planDate = tenant.planStartedAt;
+          const trialDate = tenant.trialStartedAt;
+          const startedAt = planDate || trialDate;
+          const sourceLabel = planDate ? "Plan" : (trialDate ? "Trial" : "");
+          if (!startedAt) {
+            return '<div class="metric-strong">—</div><div class="metric-soft">Not started</div>';
+          }
+          return `
+            <div class="metric-strong">${escapeHtml(formatDate(startedAt))}</div>
+            <div class="metric-soft">${escapeHtml(sourceLabel)}</div>
+          `;
+        })()}
       </td>
       <td><span class="${getStatusChipClass(tenant.planCode)}">${escapeHtml(tenant.planLabel || labelize(tenant.planCode))}</span></td>
       <td><span class="${getStatusChipClass(tenant.status)}">${escapeHtml(labelize(tenant.status))}</span></td>
@@ -1556,17 +1634,23 @@ function renderDetail(items) {
           <button class="${isBusy("support-note") ? "action-button action-button--busy" : "action-button"}" type="submit" ${isBusy("support-note") ? "disabled" : ""}>${isBusy("support-note") ? "Saving Note..." : "Save Support Note"}</button>
         </div>
       </form>
-      <div class="activity-stream">
-        ${tenantSupport.length ? tenantSupport.map((item) => `
-          <article class="timeline-item">
-            <div class="timeline-item__row">
-              <strong>${escapeHtml(labelize(item.severity || item.eventType || "support"))}</strong>
-              <span class="timeline-item__meta">${escapeHtml(item.createdBy || "Unknown")} / ${escapeHtml(formatRelative(item.createdAt))}</span>
-            </div>
-            <p>${escapeHtml(item.message || "")}</p>
-          </article>
-        `).join("") : '<div class="timeline-empty"><strong>No support notes yet</strong><span>Add the first note from this customer panel.</span></div>'}
-      </div>
+      <details class="collapsible">
+        <summary>
+          <span class="collapsible__title">Past notes</span>
+          <span class="collapsible__count">${tenantSupport.length}</span>
+        </summary>
+        <div class="activity-stream">
+          ${tenantSupport.length ? tenantSupport.map((item) => `
+            <article class="timeline-item">
+              <div class="timeline-item__row">
+                <strong>${escapeHtml(labelize(item.severity || item.eventType || "support"))}</strong>
+                <span class="timeline-item__meta">${escapeHtml(item.createdBy || "Unknown")} / ${escapeHtml(formatRelative(item.createdAt))}</span>
+              </div>
+              <p>${escapeHtml(item.message || "")}</p>
+            </article>
+          `).join("") : '<div class="timeline-empty"><strong>No support notes yet</strong><span>Add the first note from this customer panel.</span></div>'}
+        </div>
+      </details>
     </section>
 
     <section class="detail-section detail-section--danger">
@@ -1580,19 +1664,24 @@ function renderDetail(items) {
       </div>
     </section>
 
-    <section class="detail-section">
-      <h5>Audit Trail</h5>
-      <div class="activity-stream">
-        ${tenantAudit.length ? tenantAudit.map((item) => `
-          <article class="timeline-item">
-            <div class="timeline-item__row">
-              <strong>${escapeHtml(item.actionLabel || labelize(item.actionType || "action"))}</strong>
-              <span class="timeline-item__meta">${escapeHtml(item.actorEmail || "Unknown")} / ${escapeHtml(formatRelative(item.createdAt))}</span>
-            </div>
-            <p>${escapeHtml(item.reason || item.summary || "Administrative action")}</p>
-          </article>
-        `).join("") : '<div class="timeline-empty"><strong>No audit entries yet</strong><span>Administrative changes for this customer will appear here.</span></div>'}
-      </div>
+    <section class="detail-section detail-section--collapsible">
+      <details class="collapsible">
+        <summary>
+          <h5>Audit Trail</h5>
+          <span class="collapsible__count">${tenantAudit.length}</span>
+        </summary>
+        <div class="activity-stream">
+          ${tenantAudit.length ? tenantAudit.map((item) => `
+            <article class="timeline-item">
+              <div class="timeline-item__row">
+                <strong>${escapeHtml(item.actionLabel || labelize(item.actionType || "action"))}</strong>
+                <span class="timeline-item__meta">${escapeHtml(item.actorEmail || "Unknown")} / ${escapeHtml(formatRelative(item.createdAt))}</span>
+              </div>
+              <p>${escapeHtml(item.reason || item.summary || "Administrative action")}</p>
+            </article>
+          `).join("") : '<div class="timeline-empty"><strong>No audit entries yet</strong><span>Administrative changes for this customer will appear here.</span></div>'}
+        </div>
+      </details>
     </section>
   `;
 
@@ -1884,6 +1973,12 @@ document.getElementById("setupFilter").addEventListener("change", (event) => {
 document.getElementById("healthFilter").addEventListener("change", (event) => {
   state.healthStatus = event.target.value;
   render();
+});
+
+document.querySelectorAll(".tenant-table th[data-sort-key]").forEach((th) => {
+  th.addEventListener("click", () => {
+    handleSortClick(th.dataset.sortKey);
+  });
 });
 
 state.requestedDataMode = "live";

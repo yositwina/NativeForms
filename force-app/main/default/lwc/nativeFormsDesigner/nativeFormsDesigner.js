@@ -17,8 +17,7 @@ import getPicklistValueOptions from '@salesforce/apex/NativeFormsDesignerControl
 import uploadImageFile from '@salesforce/apex/NativeFormsDesignerController.uploadImageFile';
 import addElement from '@salesforce/apex/NativeFormsDesignerController.addElement';
 import deleteDesignerElement from '@salesforce/apex/NativeFormsDesignerController.deleteElement';
-import reorderElement from '@salesforce/apex/NativeFormsDesignerController.reorderElement';
-import placeElementInSection from '@salesforce/apex/NativeFormsDesignerController.placeElementInSection';
+import moveElement from '@salesforce/apex/NativeFormsDesignerController.moveElement';
 import insertElementAfter from '@salesforce/apex/NativeFormsDesignerController.insertElementAfter';
 import updateSectionColumns from '@salesforce/apex/NativeFormsDesignerController.updateSectionColumns';
 import updateElement from '@salesforce/apex/NativeFormsBuilderController.updateElement';
@@ -30,6 +29,7 @@ const DESIGNER_PROJECT_KEY = 'nativeforms:selectedProjectId';
 const DESIGNER_FORM_KEY = 'nativeforms:selectedFormId';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
+const SECRET_CODE_ELEMENT_ID = '__secretCode__';
 
 export default class NativeFormsDesigner extends LightningElement {
     isLoading = true;
@@ -130,6 +130,7 @@ export default class NativeFormsDesigner extends LightningElement {
     publishResult = null;
     showNewFormModal = false;
     showLayoutImportModal = false;
+    showLayoutImportResultModal = false;
     showCloneFormModal = false;
     showDisplayTextModal = false;
     showCustomJsModal = false;
@@ -146,8 +147,10 @@ export default class NativeFormsDesigner extends LightningElement {
     layoutImportObjectApiName = '';
     layoutImportLayoutKey = '';
     layoutImportMode = 'secureUpdateOrCreate';
+    layoutImportLanguageCode = '';
     isImportingLayout = false;
     layoutImportPreview = null;
+    layoutImportResult = null;
     isLoadingLayoutMetadata = false;
     cloneFormDescription = '';
     cloneFormProjectId = '';
@@ -279,6 +282,7 @@ export default class NativeFormsDesigner extends LightningElement {
         { label: 'Email', value: 'email', iconName: 'utility:email' },
         { label: 'Phone', value: 'tel', iconName: 'utility:call' },
         { label: 'Picklist', value: 'select', iconName: 'utility:picklist_type' },
+        { label: 'Multi Checkbox', value: 'multiCheckbox', iconName: 'utility:check' },
         { label: 'Lookup', value: 'lookup', iconName: 'utility:search' },
         { label: 'Radio groups', value: 'radio', iconName: 'utility:radio_button' },
         { label: 'Checkbox', value: 'checkbox', iconName: 'utility:check' },
@@ -423,6 +427,9 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElement() {
+        if (this.selectedElementId === SECRET_CODE_ELEMENT_ID) {
+            return this.buildSecretCodeCanvasElement();
+        }
         if (this.selectedElementId === SUBMIT_BUTTON_ELEMENT_ID) {
             return this.buildSubmitButtonCanvasElement();
         }
@@ -430,7 +437,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementFieldKey() {
-        if (this.selectedElementIsSubmitButton) {
+        if (this.selectedElementIsSubmitButton || this.selectedElementIsSecretCode) {
             return '';
         }
         return this.selectedElement?.fieldKey || '';
@@ -453,6 +460,9 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get rightPaneTitle() {
+        if (this.selectedElementIsSecretCode) {
+            return 'Secret Code Verification';
+        }
         return this.showFormSettingsPanel ? 'Form Settings' : 'Element Properties';
     }
 
@@ -598,6 +608,7 @@ export default class NativeFormsDesigner extends LightningElement {
             || this.formLimitReached
             || !this.enableProPageLayoutClone
             || !String(this.layoutImportDescription || '').trim()
+            || !String(this.layoutImportLanguageCode || '').trim()
             || !String(this.layoutImportObjectApiName || '').trim()
             || !String(this.layoutImportLayoutKey || '').trim()
             || !this.layoutImportPreview
@@ -608,6 +619,7 @@ export default class NativeFormsDesigner extends LightningElement {
     get layoutImportLayoutSourceDisabled() {
         return this.formLimitReached
             || this.isLoadingLayoutMetadata
+            || !String(this.layoutImportLanguageCode || '').trim()
             || !String(this.layoutImportObjectApiName || '').trim()
             || !this.layoutImportLayoutOptions?.length;
     }
@@ -634,11 +646,50 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         const supported = this.layoutImportPreview.supportedFieldCount || 0;
         const skipped = this.layoutImportPreview.skippedFieldCount || 0;
-        return `${supported} fields will be imported. ${skipped} fields will be skipped.`;
+        const createOnly = this.layoutImportPreview.createOnlyFieldCount || 0;
+        const createOnlyText = createOnly ? ` ${createOnly} fields are create-only.` : '';
+        return `${supported} fields will be imported. ${skipped} fields will be skipped.${createOnlyText}`;
     }
 
     get layoutImportWarnings() {
         return this.layoutImportPreview?.warnings || [];
+    }
+
+    get layoutImportResultTitle() {
+        const objectLabel = this.layoutImportResult?.objectLabel || this.layoutImportResult?.objectApiName || 'Salesforce Object';
+        return `Form Created From ${objectLabel} Layout`;
+    }
+
+    get layoutImportResultSummary() {
+        const summary = this.layoutImportResult?.summary || {};
+        const imported = summary.importedFieldCount || 0;
+        const skipped = summary.skippedFieldCount || 0;
+        const createOnly = summary.createOnlyFieldCount || 0;
+        return `${imported} fields imported. ${createOnly} create-only. ${skipped} skipped.`;
+    }
+
+    get layoutImportResultIncludedNotes() {
+        return this.layoutImportResult?.includedNotes || [];
+    }
+
+    get layoutImportResultSkippedFields() {
+        return this.layoutImportResult?.skippedFields || [];
+    }
+
+    get layoutImportResultWarnings() {
+        return this.layoutImportResult?.warnings || [];
+    }
+
+    get hasLayoutImportResultIncludedNotes() {
+        return this.layoutImportResultIncludedNotes.length > 0;
+    }
+
+    get hasLayoutImportResultSkippedFields() {
+        return this.layoutImportResultSkippedFields.length > 0;
+    }
+
+    get hasLayoutImportResultWarnings() {
+        return this.layoutImportResultWarnings.length > 0;
     }
 
     get showFormLimitWarning() {
@@ -713,6 +764,10 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.selectedElement?.elementType === 'submitButton';
     }
 
+    get selectedElementIsSecretCode() {
+        return this.selectedElement?.elementType === 'secretCode';
+    }
+
     get selectedElementIsGroup() {
         return this.selectedElement?.elementType === 'group';
     }
@@ -778,11 +833,11 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsLabelPosition() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDefaultValue() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'radio'].includes(this.editorElementType)
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'radio'].includes(this.editorElementType)
             && !this.editorUseFormula;
     }
 
@@ -791,15 +846,15 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsBoldLabel() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsRequired() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsFieldBehavior() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'group'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'group'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDisplayFieldBehavior() {
@@ -828,6 +883,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get selectedElementIsPicklist() {
         return this.editorElementType === 'select';
+    }
+
+    get selectedElementIsMultiCheckbox() {
+        return this.editorElementType === 'multiCheckbox';
     }
 
     get selectedElementIsLookup() {
@@ -877,7 +936,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementUsesSalesforcePicklistSource() {
-        return this.selectedElementIsPicklist || (this.selectedElementIsRadio && !this.selectedElementIsSurveyRadio);
+        return this.selectedElementIsPicklist || this.selectedElementIsMultiCheckbox || (this.selectedElementIsRadio && !this.selectedElementIsSurveyRadio);
     }
 
     get checkboxDefaultValueOptions() {
@@ -888,7 +947,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementUsesDefaultValueHelp() {
-        return this.editorElementType === 'checkbox' || this.editorElementType === 'radio';
+        return this.editorElementType === 'checkbox' || this.editorElementType === 'radio' || this.editorElementType === 'multiCheckbox';
     }
 
     get defaultValueHelpText() {
@@ -897,6 +956,9 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         if (this.editorElementType === 'radio') {
             return 'Use the exact Salesforce picklist value to preselect a radio choice.';
+        }
+        if (this.editorElementType === 'multiCheckbox') {
+            return 'Use Salesforce values separated by semicolons, for example A;B;C.';
         }
         return '';
     }
@@ -911,7 +973,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsSalesforceMapping() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking'].includes(this.editorElementType);
     }
 
     get selectedRepeatGroupParent() {
@@ -1061,7 +1123,7 @@ export default class NativeFormsDesigner extends LightningElement {
                     if (!item?.fieldKey || item.id === this.selectedElementId) {
                         return false;
                     }
-                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)) {
+                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)) {
                         return false;
                     }
                     if (item.parentElementId && this.isElementInsideRepeatGroup(item)) {
@@ -1599,12 +1661,22 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.draftSecretCodeVerificationEnabled;
     }
 
+    get secretCodePreviewClass() {
+        return `designer-secret-preview${this.selectedElementIsSecretCode ? ' designer-secret-preview--selected' : ''}`;
+    }
+
+    get secretCodeSettingsHint() {
+        return this.draftSecretCodeVerificationEnabled
+            ? 'Select the Secret Code block on the canvas to configure messages, buttons, and rules.'
+            : 'Enable this to add a Secret Code block to the canvas.';
+    }
+
     get postSubmitFormFieldTokenOptions() {
         return [{ label: 'Insert form field', value: '' }].concat(
             this.elements
                 .filter((item) =>
                     item.fieldKey &&
-                    ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking'].includes(item.elementType)
+                    ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking'].includes(item.elementType)
                 )
                 .map((item) => ({
                     label: `${item.label} (${item.fieldKey})`,
@@ -1620,7 +1692,7 @@ export default class NativeFormsDesigner extends LightningElement {
                     if (!item?.fieldKey) {
                         return false;
                     }
-                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)) {
+                    if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)) {
                         return false;
                     }
                     return !(item.parentElementId && this.isElementInsideRepeatGroup(item));
@@ -1652,7 +1724,7 @@ export default class NativeFormsDesigner extends LightningElement {
             .filter((item) =>
                 item.id !== this.selectedElementId &&
                 item.fieldKey &&
-                ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking'].includes(item.elementType)
+                ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking'].includes(item.elementType)
             )
             .map((item) => ({
                 label: `${item.label} (${item.fieldKey})`,
@@ -2065,7 +2137,10 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
         try {
-            const options = await getPicklistFieldOptions({ objectApiName });
+            const options = await getPicklistFieldOptions({
+                objectApiName,
+                fieldType: this.selectedElementIsMultiCheckbox ? 'MultiPicklist' : 'Picklist'
+            });
             this.picklistFieldOptions = (options || []).map((option) => ({
                 label: option.label,
                 value: option.value
@@ -2191,6 +2266,20 @@ export default class NativeFormsDesigner extends LightningElement {
         };
     }
 
+    buildSecretCodeCanvasElement() {
+        const selected = this.selectedElementId === SECRET_CODE_ELEMENT_ID;
+        return {
+            id: SECRET_CODE_ELEMENT_ID,
+            elementId: SECRET_CODE_ELEMENT_ID,
+            label: 'Secret Code Verification',
+            elementType: 'secretCode',
+            fieldKey: '',
+            configJson: JSON.stringify({ systemElement: true }),
+            isSystemElement: true,
+            cardClass: `designer-secret-preview${selected ? ' designer-secret-preview--selected' : ''}`
+        };
+    }
+
     decorateRenderableElement(item, isChild) {
         const effectiveType = item.elementType === 'hidden' ? 'text' : item.elementType;
         const config = this.parseConfig(item.configJson);
@@ -2214,6 +2303,7 @@ export default class NativeFormsDesigner extends LightningElement {
             isPhone: effectiveType === 'tel',
             isUrl: effectiveType === 'url',
             isSelect: effectiveType === 'select',
+            isMultiCheckbox: effectiveType === 'multiCheckbox',
             isRadio: effectiveType === 'radio',
             isSurveyRadio,
             isRanking: effectiveType === 'ranking',
@@ -2254,7 +2344,7 @@ export default class NativeFormsDesigner extends LightningElement {
             isTopLevelDraggable: !isChild,
             isChildDraggable: isChild,
             showHiddenBadge: normalized.isHidden || normalized.fieldBehavior === 'hidden',
-            showExpandedPicklist: normalized.isSelect && selected,
+            showExpandedPicklist: (normalized.isSelect || normalized.isMultiCheckbox) && selected,
             showLabel: normalized.labelPosition !== 'hidden',
             showConditionalBadge: !!normalized.conditionalSummary,
             displayLabel: this.previewLabel(item),
@@ -2286,7 +2376,11 @@ export default class NativeFormsDesigner extends LightningElement {
             const targetKey = `${base.id}:${columnValue}`;
             const childItems = sectionChildren
                 .filter((child) => Number(child.sectionColumn || 1) === columnValue)
-                .map((child) => this.decorateRenderableElement(child, true));
+                .map((child) => this.decorateRenderableElement(child, true))
+                .map((child, childIndex) => ({
+                    ...child,
+                    sectionIndex: childIndex
+                }));
 
             return {
                 key: `slot-${base.id}-${columnValue}`,
@@ -2294,6 +2388,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 emptyLabel: String(columnValue),
                 columnValue,
                 sectionId: base.id,
+                childCount: childItems.length,
                 dropClass: `preview-column-slot${!base.showSectionBox ? ' preview-column-slot--unboxed' : ''}${this.dragSectionTarget === targetKey ? ' preview-column-slot--active' : ''}`,
                 childItems,
                 hasChildren: childItems.length > 0
@@ -2369,7 +2464,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     supportsRequiredMarker(item) {
         const effectiveType = item?.elementType === 'hidden' ? 'text' : item?.elementType;
-        if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(effectiveType)) {
+        if (!['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(effectiveType)) {
             return false;
         }
         const config = this.parseConfig(item?.configJson);
@@ -2438,9 +2533,13 @@ export default class NativeFormsDesigner extends LightningElement {
     previewOptions(item) {
         const config = this.parseConfig(item.configJson);
         const defaultValue = config.defaultValue;
+        const multiValues = item.elementType === 'multiCheckbox'
+            ? new Set(String(defaultValue || '').split(';').map((value) => value.trim()).filter(Boolean))
+            : null;
         const presentation = config.presentation || '';
+        const optionKeyPrefix = item.id || item.elementId || item.fieldKey || item.elementType || 'option';
         return Array.isArray(config.options)
-            ? config.options.map((option) => {
+            ? config.options.map((option, index) => {
                 const value = option?.value;
                 let label = option?.label || '';
                 if (presentation === 'stars') {
@@ -2449,8 +2548,9 @@ export default class NativeFormsDesigner extends LightningElement {
                 }
                 return {
                     ...option,
+                    key: `${optionKeyPrefix}-${index}-${String(value || label || 'blank')}`,
                     label,
-                    checked: value === defaultValue
+                    checked: multiValues ? multiValues.has(String(value)) : value === defaultValue
                 };
             })
             : [];
@@ -2806,12 +2906,14 @@ export default class NativeFormsDesigner extends LightningElement {
             this.showToast('Pro feature', 'Page Layout Clone is available on Pro plans only.', 'warning');
             return;
         }
+        this.errorMessage = '';
         this.layoutImportDescription = '';
         this.layoutImportProjectId = this.selectedProjectId || '';
         this.layoutImportProjectName = '';
         this.layoutImportObjectApiName = '';
         this.layoutImportLayoutKey = '';
         this.layoutImportMode = 'secureUpdateOrCreate';
+        this.layoutImportLanguageCode = '';
         this.layoutImportPreview = null;
         this.isLoadingLayoutMetadata = false;
         this.layoutImportLayoutOptions = [];
@@ -2863,7 +2965,7 @@ export default class NativeFormsDesigner extends LightningElement {
     defaultPostSubmitFormulaExample() {
         const fields = (this.elements || []).filter((item) =>
             item?.fieldKey
-            && ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)
+            && ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)
             && !(item.parentElementId && this.isElementInsideRepeatGroup(item))
         );
         const byKeyOrLabel = (pattern) => fields.find((item) =>
@@ -2970,9 +3072,47 @@ export default class NativeFormsDesigner extends LightningElement {
         this.layoutImportProjectName = '';
         this.layoutImportObjectApiName = '';
         this.layoutImportLayoutKey = '';
+        this.layoutImportLanguageCode = '';
         this.layoutImportPreview = null;
         this.isLoadingLayoutMetadata = false;
         this.layoutImportLayoutOptions = [];
+    }
+
+    handleAcceptLayoutImportResult() {
+        this.showLayoutImportResultModal = false;
+        this.layoutImportResult = null;
+    }
+
+    parseLayoutImportDiagnostics(rawDiagnostics, result) {
+        if (rawDiagnostics) {
+            try {
+                const parsed = JSON.parse(rawDiagnostics);
+                if (parsed && typeof parsed === 'object') {
+                    return parsed;
+                }
+            } catch (error) {
+                // Diagnostics are helpful but not required for the created form.
+            }
+        }
+        return {
+            objectApiName: this.layoutImportObjectApiName,
+            objectLabel: this.layoutImportObjectApiName,
+            layoutLabel: this.layoutImportLayoutKey,
+            mode: this.layoutImportMode,
+            summary: {
+                importedFieldCount: result?.importedFieldCount || 0,
+                createOnlyFieldCount: 0,
+                skippedFieldCount: result?.skippedFieldCount || 0
+            },
+            includedNotes: [],
+            skippedFields: [],
+            warnings: result?.warnings || []
+        };
+    }
+
+    shouldShowLayoutImportDiagnostics(diagnostics) {
+        return (diagnostics?.skippedFields || []).length > 0
+            || (diagnostics?.includedNotes || []).length > 0;
     }
 
     handleCloseCloneFormModal() {
@@ -3015,18 +3155,34 @@ export default class NativeFormsDesigner extends LightningElement {
         this.layoutImportProjectName = event.detail.value || '';
     }
 
+    async handleLayoutImportLanguageChange(event) {
+        this.layoutImportLanguageCode = event.detail.value || '';
+        this.layoutImportLayoutKey = '';
+        this.layoutImportPreview = null;
+        this.layoutImportLayoutOptions = [];
+        if (!this.layoutImportObjectApiName || !this.layoutImportLanguageCode) {
+            return;
+        }
+        await this.loadLayoutImportOptionsAndPreview();
+    }
+
     async handleLayoutImportObjectChange(event) {
         this.layoutImportObjectApiName = event.detail.value || '';
         this.layoutImportLayoutKey = '';
         this.layoutImportPreview = null;
         this.layoutImportLayoutOptions = [];
-        if (!this.layoutImportObjectApiName) {
+        if (!this.layoutImportObjectApiName || !this.layoutImportLanguageCode) {
             return;
         }
+        await this.loadLayoutImportOptionsAndPreview();
+    }
+
+    async loadLayoutImportOptionsAndPreview() {
         this.isLoadingLayoutMetadata = true;
         try {
             this.layoutImportLayoutOptions = await getPageLayoutImportOptions({
-                objectApiName: this.layoutImportObjectApiName
+                objectApiName: this.layoutImportObjectApiName,
+                languageCode: this.layoutImportLanguageCode
             });
             this.layoutImportLayoutKey = this.layoutImportLayoutOptions?.[0]?.value || '';
             await this.refreshLayoutImportPreview({ keepLoading: true });
@@ -3060,7 +3216,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.layoutImportPreview = await previewPageLayoutImport({
                 objectApiName: this.layoutImportObjectApiName,
                 layoutKey: this.layoutImportLayoutKey,
-                mode: this.layoutImportMode
+                mode: this.layoutImportMode,
+                languageCode: this.layoutImportLanguageCode
             });
         } catch (error) {
             this.layoutImportPreview = null;
@@ -3137,7 +3294,8 @@ export default class NativeFormsDesigner extends LightningElement {
                 themeId: this.selectedThemeId || null,
                 objectApiName: this.layoutImportObjectApiName,
                 layoutKey: this.layoutImportLayoutKey,
-                mode: this.layoutImportMode
+                mode: this.layoutImportMode,
+                languageCode: this.layoutImportLanguageCode
             });
             this.selectedProjectId = result.projectId;
             this.selectedFormId = result.formId;
@@ -3147,15 +3305,21 @@ export default class NativeFormsDesigner extends LightningElement {
             this.storeSelectedProject(result.projectId);
             this.storeSelectedForm(result.formId);
             this.storeSelectedVersion(result.versionId);
+            this.layoutImportResult = this.parseLayoutImportDiagnostics(result.importDiagnosticsJson, result);
             this.showLayoutImportModal = false;
+            this.showLayoutImportResultModal = this.shouldShowLayoutImportDiagnostics(this.layoutImportResult);
             this.layoutImportDescription = '';
             this.layoutImportProjectId = '';
             this.layoutImportProjectName = '';
             this.layoutImportObjectApiName = '';
+            this.layoutImportLanguageCode = '';
             this.layoutImportPreview = null;
             await this.loadWorkspace(result.projectId, result.formId, result.versionId);
             const importedCount = result.importedFieldCount || 0;
             this.showToast('Form created', `${result.formName} imported ${importedCount} Salesforce fields.`, 'success');
+            if (result.warnings?.length) {
+                this.showToast('Review import warnings', result.warnings[0], 'warning');
+            }
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -3511,6 +3675,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleSecretCodeVerificationEnabledChange(event) {
         this.draftSecretCodeVerificationEnabled = event.target.checked;
+        if (!this.draftSecretCodeVerificationEnabled && this.selectedElementIsSecretCode) {
+            this.selectedElementId = null;
+            this.syncSelectedState();
+        }
     }
 
     async handleSecretCodeVerificationEnabledCommit() {
@@ -3518,6 +3686,10 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
+        if (this.draftSecretCodeVerificationEnabled) {
+            this.selectedElementId = SECRET_CODE_ELEMENT_ID;
+            this.syncSelectedState();
+        }
     }
 
     handleSecretCodeIntroTextInput(event) {
@@ -4157,6 +4329,16 @@ export default class NativeFormsDesigner extends LightningElement {
     handleSelectElement(event) {
         event.stopPropagation();
         this.selectedElementId = event.currentTarget.dataset.id;
+        this.syncSelectedState();
+    }
+
+    handleSecretCodePreviewKeydown(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        this.selectedElementId = SECRET_CODE_ELEMENT_ID;
         this.syncSelectedState();
     }
 
@@ -4890,10 +5072,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleSectionDragOver(event) {
         event.preventDefault();
-        const sectionId = event.currentTarget.dataset.sectionId;
-        const column = event.currentTarget.dataset.column;
+        event.stopPropagation();
+        const target = this.sectionDropTargetFromEvent(event);
         this.dragTargetIndex = null;
-        this.dragSectionTarget = `${sectionId}:${column}`;
+        this.dragSectionTarget = target ? `${target.sectionId}:${target.columnNumber}` : null;
         event.dataTransfer.dropEffect = 'move';
     }
 
@@ -4911,6 +5093,30 @@ export default class NativeFormsDesigner extends LightningElement {
         }
     }
 
+    sectionDropTargetFromEvent(event) {
+        const sectionId = event.currentTarget.dataset.sectionId;
+        const columnNumber = Number(event.currentTarget.dataset.column);
+        let targetIndex = Number(event.currentTarget.dataset.index);
+        if (!sectionId || !Number.isFinite(columnNumber)) {
+            return null;
+        }
+        if (!Number.isFinite(targetIndex)) {
+            targetIndex = 0;
+        }
+        if (event.currentTarget.dataset.itemDrop === 'true') {
+            const bounds = event.currentTarget.getBoundingClientRect();
+            const dropAfter = event.clientY > bounds.top + (bounds.height / 2);
+            if (dropAfter) {
+                targetIndex += 1;
+            }
+        }
+        return {
+            sectionId,
+            columnNumber,
+            targetIndex
+        };
+    }
+
     async handleDrop(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -4925,16 +5131,16 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
 
-        this.isLoading = true;
         try {
             this.selectedElementId = elementId;
             this.optimisticMoveToTopLevel(elementId, targetIndex);
-            await reorderElement({
+            await moveElement({
                 versionId: this.selectedVersionId,
                 elementId,
+                targetParentId: null,
+                columnNumber: null,
                 targetIndex
             });
-            await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId, true);
         } catch (error) {
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
             this.errorMessage = this.normalizeError(error);
@@ -4942,7 +5148,6 @@ export default class NativeFormsDesigner extends LightningElement {
             this.draggedElementId = null;
             this.dragTargetIndex = null;
             this.dragSectionTarget = null;
-            this.isLoading = false;
         }
     }
 
@@ -4952,28 +5157,34 @@ export default class NativeFormsDesigner extends LightningElement {
         if (this.isSelectedVersionReadOnly) {
             return;
         }
-        const sectionId = event.currentTarget.dataset.sectionId;
-        const columnNumber = Number(event.currentTarget.dataset.column);
+        event.stopPropagation();
+        const target = this.sectionDropTargetFromEvent(event);
+        const sectionId = target?.sectionId;
+        const columnNumber = target?.columnNumber;
+        const targetIndex = target?.targetIndex;
         const elementId = this.draggedElementId || event.dataTransfer.getData('text/plain');
         this.dragSectionTarget = null;
-        if (!elementId || !sectionId || !Number.isFinite(columnNumber)) {
+        if (!elementId || !sectionId || !Number.isFinite(columnNumber) || !Number.isFinite(targetIndex) || !this.selectedVersionId) {
             this.draggedElementId = null;
             return;
         }
 
-        this.isLoading = true;
         try {
             this.selectedElementId = elementId;
-            this.optimisticPlaceInSection(elementId, sectionId, columnNumber);
-            await placeElementInSection({ elementId, sectionId, columnNumber });
-            await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId, true);
+            this.optimisticPlaceInSection(elementId, sectionId, columnNumber, targetIndex);
+            await moveElement({
+                versionId: this.selectedVersionId,
+                elementId,
+                targetParentId: sectionId,
+                columnNumber,
+                targetIndex
+            });
         } catch (error) {
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
             this.errorMessage = this.normalizeError(error);
         } finally {
             this.draggedElementId = null;
             this.dragSectionTarget = null;
-            this.isLoading = false;
         }
     }
 
@@ -4999,7 +5210,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async handleDeleteSelected() {
-        if (!this.selectedElementId || this.isSelectedVersionReadOnly || this.selectedElementIsSubmitButton) {
+        if (!this.selectedElementId || this.isSelectedVersionReadOnly || this.selectedElementIsSubmitButton || this.selectedElementIsSecretCode) {
             return;
         }
 
@@ -5097,6 +5308,14 @@ export default class NativeFormsDesigner extends LightningElement {
         }
 
         if (this.selectedElementIsSubmitButton) {
+            this.editorLabel = '';
+            this.editorElementType = '';
+            this.picklistFieldOptions = [];
+            this.editorSurveyOptions = [];
+            return;
+        }
+
+        if (this.selectedElementIsSecretCode) {
             this.editorLabel = '';
             this.editorElementType = '';
             this.picklistFieldOptions = [];
@@ -5594,7 +5813,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     applyEditorDraft(shouldAutoSave = true, preserveConditionalDraft = false) {
-        if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.isSelectedVersionReadOnly) {
             return;
         }
 
@@ -5612,7 +5831,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 return item;
             }
 
-            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'repeatGroup', 'fileUpload', 'signature'].includes(this.editorElementType)
+            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'repeatGroup', 'fileUpload', 'signature'].includes(this.editorElementType)
                 ? (item.fieldKey || this.generatedFieldKey(this.editorElementType))
                 : null;
 
@@ -5646,7 +5865,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     scheduleAutoSave() {
-        if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.isSelectedVersionReadOnly) {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
@@ -5654,7 +5873,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     flushEditorDraftSave() {
-        if (!this.selectedElementId || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.isSelectedVersionReadOnly) {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
@@ -5662,7 +5881,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async persistVisualSettings(showToast) {
-        if (!this.selectedElement) {
+        if (!this.selectedElement || this.selectedElementIsSecretCode) {
             return;
         }
         try {
@@ -5836,6 +6055,7 @@ export default class NativeFormsDesigner extends LightningElement {
             return this.decorateBaseElement({
                 ...item,
                 parentElementId: null,
+                sectionColumn: null,
                 configJson: JSON.stringify(config)
             });
         });
@@ -5869,29 +6089,88 @@ export default class NativeFormsDesigner extends LightningElement {
         this.syncSelectedState();
     }
 
-    optimisticPlaceInSection(elementId, sectionId, columnNumber) {
+    optimisticPlaceInSection(elementId, sectionId, columnNumber, targetIndex) {
         const section = this.elements.find((item) => item.id === sectionId);
         if (!section) {
             return;
         }
 
-        const existingChildren = this.elements.filter((item) => item.parentElementId === section.elementId);
-        const nextOrder = existingChildren.length
-            ? Math.max(...existingChildren.map((item) => item.orderValue || 0)) + 10
-            : 10;
+        const dragged = this.elements.find((item) => item.id === elementId);
+        if (!dragged) {
+            return;
+        }
 
-        this.elements = this.elements.map((item) => {
-            if (item.id !== elementId) {
-                return item;
-            }
-            const config = this.parseConfig(item.configJson);
+        const updatedDragged = (() => {
+            const config = this.parseConfig(dragged.configJson);
             config.sectionColumn = columnNumber;
             return this.decorateBaseElement({
-                ...item,
+                ...dragged,
                 parentElementId: section.elementId,
-                orderValue: nextOrder,
+                sectionColumn: columnNumber,
                 configJson: JSON.stringify(config)
             });
+        })();
+
+        const siblings = this.elements
+            .filter((item) => item.parentElementId === section.elementId && item.id !== elementId)
+            .sort((a, b) => (a.orderValue || 0) - (b.orderValue || 0));
+        const byColumn = new Map();
+        siblings.forEach((item) => {
+            const column = Number(item.sectionColumn || 1);
+            if (!byColumn.has(column)) {
+                byColumn.set(column, []);
+            }
+            byColumn.get(column).push(item);
+        });
+        if (!byColumn.has(columnNumber)) {
+            byColumn.set(columnNumber, []);
+        }
+        const targetColumnItems = byColumn.get(columnNumber);
+        const originalSameGroup = dragged.parentElementId === section.elementId
+            && Number(dragged.sectionColumn || 1) === columnNumber;
+        let normalizedTargetIndex = Number.isFinite(targetIndex) ? targetIndex : targetColumnItems.length;
+        if (originalSameGroup) {
+            const currentIndex = this.elements
+                .filter((item) => item.parentElementId === section.elementId && Number(item.sectionColumn || 1) === columnNumber)
+                .sort((a, b) => (a.orderValue || 0) - (b.orderValue || 0))
+                .findIndex((item) => item.id === elementId);
+            if (currentIndex >= 0 && normalizedTargetIndex > currentIndex) {
+                normalizedTargetIndex -= 1;
+            }
+        }
+        if (normalizedTargetIndex < 0) {
+            normalizedTargetIndex = 0;
+        }
+        if (normalizedTargetIndex > targetColumnItems.length) {
+            normalizedTargetIndex = targetColumnItems.length;
+        }
+        targetColumnItems.splice(normalizedTargetIndex, 0, updatedDragged);
+
+        const reorderedChildren = [];
+        for (let column = 1; column <= 10; column += 1) {
+            if (byColumn.has(column)) {
+                reorderedChildren.push(...byColumn.get(column));
+            }
+        }
+        const orderById = new Map();
+        reorderedChildren.forEach((item, index) => {
+            orderById.set(item.id, (index + 1) * 10);
+        });
+
+        this.elements = this.elements.map((item) => {
+            if (item.id === elementId) {
+                return this.decorateBaseElement({
+                    ...updatedDragged,
+                    orderValue: orderById.get(elementId) || updatedDragged.orderValue || 10
+                });
+            }
+            if (orderById.has(item.id)) {
+                return this.decorateBaseElement({
+                    ...item,
+                    orderValue: orderById.get(item.id)
+                });
+            }
+            return item;
         });
         this.syncSelectedState();
     }
@@ -6048,6 +6327,10 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         if (error?.message) {
             return error.message;
+        }
+        const fallbackDetails = this.stringifyDebugValue(error?.body || error);
+        if (fallbackDetails && fallbackDetails !== '{}') {
+            return fallbackDetails.length > 500 ? fallbackDetails.substring(0, 500) : fallbackDetails;
         }
         return 'Something went wrong while loading the designer.';
     }

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Groups &amp; tables &mdash; TwinaForms Help</title>
+  <meta name="description" content="How to use Section and Group elements in TwinaForms. Sections lay out fields side by side; Groups handle related records that can be prefilled, updated, created, and shown as a table.">
+  <link rel="stylesheet" href="/help/styles.css?v=20260519-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <a class="back-link" href="/help/index.html">&larr; All help topics</a>
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Groups &amp; tables &mdash; related records inside a form.</h1>
+      <p class="hero-copy">A <strong>Group</strong> is the TwinaForms element for handling multiple related Salesforce records inside a single form &mdash; line items on an order, household members on an application, work hours on a timesheet. Each entry in the Group is a related record that can be loaded by prefill and updated or created on submit.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#section-vs-group">Section vs Group</a>
+        <a href="#section">Section</a>
+        <a href="#group">Group</a>
+        <a href="#table-view">Table view</a>
+        <a href="#labels">Row labels</a>
+        <a href="#prefill-submit">Prefill, update, create</a>
+        <a href="#properties">More in element properties</a>
+        <a href="#gotchas">Limits &amp; gotchas</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+
+    <section class="section" id="section-vs-group">
+      <h2>Section vs Group</h2>
+      <p>Both Section and Group are containers &mdash; you drop other fields inside them &mdash; but they serve different purposes:</p>
+      <ul>
+        <li><strong>Section</strong> &mdash; a visual container with a title, optional border, and a column count (1&ndash;10). Use it to group related fields and lay them out side by side.</li>
+        <li><strong>Group</strong> (Pro) &mdash; a container that represents multiple <em>related Salesforce records</em>. The visitor can add several entries; each entry is one related record that gets prefilled, updated, or created.</li>
+      </ul>
+      <p>Both elements sit next to each other in the Building Blocks panel under Display Elements.</p>
+    </section>
+
+    <section class="section" id="section">
+      <h2>Section</h2>
+      <p>Add a Section, then drop fields inside. The Section's settings live in the right-hand <strong>Element Properties</strong> panel when you select it. The key ones:</p>
+      <ul>
+        <li><strong>Title</strong> &mdash; the heading shown at the top of the section.</li>
+        <li><strong>Show Title</strong> &mdash; toggle whether the title is visible.</li>
+        <li><strong>Boxed</strong> &mdash; whether to draw a border around the section.</li>
+        <li><strong>Columns</strong> (1&ndash;10) &mdash; how many columns the section's children are laid out in.</li>
+      </ul>
+      <div class="callout">
+        <strong>Tip:</strong> the easiest way to get a clean "First Name | Last Name" row is a 2-column section with those two fields inside.
+      </div>
+    </section>
+
+    <section class="section" id="group">
+      <h2>Group</h2>
+      <p>Add a Group when the visitor needs to enter <em>multiple of the same kind of related record</em> on one form. Drop input fields inside the Group &mdash; each field becomes a column for every entry the visitor adds. At runtime, the visitor can add or remove entries within the limits you set.</p>
+      <p>The Group element is wired to Salesforce records on a child object. Combined with prefill and submit, this lets the form show existing related records, let the visitor edit them, add new ones, and have the changes saved back to Salesforce in one submit.</p>
+    </section>
+
+    <section class="section" id="table-view">
+      <h2>Table view</h2>
+      <p>A Group can render its entries two ways:</p>
+      <ul>
+        <li><strong>Stacked cards</strong> (default) &mdash; each entry is a vertical card with its child fields. Best for forms with longer fields or many fields per entry.</li>
+        <li><strong>Table</strong> &mdash; each visible field becomes a table column, and each entry is a table row. Best for short, tabular data like timesheets or line items.</li>
+      </ul>
+      <p>You pick the view in the Group's element properties. On mobile, table layouts collapse so the form remains readable on small screens.</p>
+    </section>
+
+    <section class="section" id="labels">
+      <h2>Row labels</h2>
+      <p>In table view, you can choose whether to repeat the field labels on every row, or show them only once as a single table-style header on desktop. Both options are available in the Group's element properties:</p>
+      <ul>
+        <li><strong>Show labels on each row</strong> &mdash; visible on every entry. Reads more like a stack of cards even when rendered as a table.</li>
+        <li><strong>Single header row</strong> &mdash; labels appear once at the top, like a spreadsheet. Tighter on desktop.</li>
+      </ul>
+      <p>On mobile, labels are always shown per entry regardless of the desktop choice, so each entry stays readable on a narrow screen.</p>
+    </section>
+
+    <section class="section" id="prefill-submit">
+      <h2>Prefill, update, create</h2>
+      <p>A Group works hand-in-hand with prefill and submit actions:</p>
+      <ul>
+        <li><strong>Prefill</strong> &mdash; use a <em>Find multiple records</em> (<span class="inline">findMany</span>) prefill action to look up existing related records. Bind the result's alias to the Group, and each returned record becomes one pre-populated entry on the form.</li>
+        <li><strong>Update / create</strong> &mdash; use a <em>Save records list</em> (<span class="inline">upsertMany</span>) submit action. Pick the Group as the source of entries, the target child object, the parent relationship (which lookup links the child to the parent record, and where the parent Id comes from), and map each entry's fields to the child object's fields.</li>
+      </ul>
+      <p>Each entry's hidden Id field decides whether that row is updated (Id present) or created (no Id) on submit. Visitor-deleted entries can also be deleted from Salesforce when the submit action is configured to allow it.</p>
+      <p>See <a href="/help/prefill.html">Prefill</a> and <a href="/help/submit.html">Submit actions</a> for the full patterns.</p>
+    </section>
+
+    <section class="section" id="properties">
+      <h2>More in element properties</h2>
+      <p>The Group element has additional settings beyond what's covered here &mdash; entry limits, the add-entry button label, conditional visibility, and other behavior controls. Select the Group on the canvas and review the right-hand <strong>Element Properties</strong> panel for the full set.</p>
+    </section>
+
+    <section class="section" id="gotchas">
+      <h2>Limits &amp; gotchas</h2>
+      <ul>
+        <li><strong>Group is a Pro feature</strong> &mdash; it appears in Building Blocks for everyone, but it requires a Pro license to use in published forms.</li>
+        <li><strong>File uploads inside a Group entry</strong> are not supported in V1. Use top-level File Upload elements outside the Group instead.</li>
+        <li><strong>Top-level Signature elements</strong> are blocked inside Group entries in their normal form. Per-row signatures are an opt-in advanced Pro capability that requires Electronic Signature and Submission PDF together.</li>
+        <li><strong>Lookup fields inside a Group entry</strong> are not supported in V1. Use a hidden Id field instead, or move the lookup out of the Group as a top-level field.</li>
+      </ul>
+    </section>
+
+    </div>
+    </div>
+  </main>
+</body>
+</html>

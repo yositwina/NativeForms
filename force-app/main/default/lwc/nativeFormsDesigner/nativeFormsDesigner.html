@@ -165,7 +165,7 @@
                                 <h3>Survey Fields</h3>
                                 <div class="builder-list" role="list">
                                     <template for:each={availableSurveyFieldOptions} for:item="option">
-                                        <div key={option.key} class="builder-list__row" role="listitem">
+                                        <div key={option.value} class="builder-list__row" role="listitem">
                                             <span class="builder-list__label">
                                                 <lightning-icon icon-name={option.iconName} size="x-small" alternative-text=""></lightning-icon>
                                                 <span>{option.label}</span>
@@ -205,7 +205,13 @@
                                 </template>
                                 <div class="designer-canvas" onclick={handleCanvasClick}>
                                 <template if:true={showCanvasSecretCodePreview}>
-                                    <article class="designer-secret-preview" aria-hidden="true">
+                                    <article
+                                        class={secretCodePreviewClass}
+                                        data-id="__secretCode__"
+                                        role="button"
+                                        tabindex="0"
+                                        onclick={handleSelectElement}
+                                        onkeydown={handleSecretCodePreviewKeydown}>
                                         <p class="designer-secret-preview__copy">{secretCodePreviewData.introText}</p>
                                         <div class="designer-secret-preview__row">
                                             <input type="email" disabled />
@@ -260,6 +266,7 @@
                                                             class={column.dropClass}
                                                             data-section-id={column.sectionId}
                                                             data-column={column.columnValue}
+                                                            data-index={column.childCount}
                                                             ondragover={handleSectionDragOver}
                                                             ondragleave={handleSectionDragLeave}
                                                             ondrop={handleDropIntoSection}>
@@ -268,6 +275,7 @@
                                                                     class="preview-column-slot__items"
                                                                     data-section-id={column.sectionId}
                                                                     data-column={column.columnValue}
+                                                                    data-index={column.childCount}
                                                                     ondragover={handleSectionDragOver}
                                                                     ondragleave={handleSectionDragLeave}
                                                                     ondrop={handleDropIntoSection}>
@@ -276,8 +284,14 @@
                                                                             key={child.id}
                                                                             class={child.cardClass}
                                                                             data-id={child.id}
+                                                                            data-section-id={column.sectionId}
+                                                                            data-column={column.columnValue}
+                                                                            data-index={child.sectionIndex}
+                                                                            data-item-drop="true"
                                                                             draggable={child.isChildDraggable}
                                                                             onclick={handleSelectElement}
+                                                                            ondragover={handleSectionDragOver}
+                                                                            ondrop={handleDropIntoSection}
                                                                             ondragstart={handleDragStart}
                                                                             ondragend={handleDragEnd}>
                                                                             <template if:true={child.showHiddenBadge}>
@@ -364,13 +378,13 @@
                                                                                     </template>
                                                                                     <select dir={child.previewInputDirection} disabled>
                                                                                         <template for:each={child.previewOptions} for:item="option">
-                                                                                            <option key={option.value}>{option.label}</option>
+                                                                                            <option key={option.key}>{option.label}</option>
                                                                                         </template>
                                                                                     </select>
                                                                                     <template if:true={child.showExpandedPicklist}>
                                                                                         <div class="preview-select-options">
                                                                                             <template for:each={child.previewOptions} for:item="option">
-                                                                                                <div key={option.value} class="preview-select-options__item">{option.label}</div>
+                                                                                                <div key={option.key} class="preview-select-options__item">{option.label}</div>
                                                                                             </template>
                                                                                         </div>
                                                                                     </template>
@@ -383,8 +397,23 @@
                                                                                     </template>
                                                                                     <div class={child.previewRadioGroupClass}>
                                                                                         <template for:each={child.previewOptions} for:item="option">
-                                                                                            <label key={option.value} class="preview-radio-option">
+                                                                                            <label key={option.key} class="preview-radio-option">
                                                                                                 <input type="radio" checked={option.checked} disabled />
+                                                                                                <span>{option.label}</span>
+                                                                                            </label>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isMultiCheckbox}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-radio-group">
+                                                                                        <template for:each={child.previewOptions} for:item="option">
+                                                                                            <label key={option.key} class="preview-radio-option">
+                                                                                                <input type="checkbox" checked={option.checked} disabled />
                                                                                                 <span>{option.label}</span>
                                                                                             </label>
                                                                                         </template>
@@ -446,6 +475,7 @@
                                                             class={column.dropClass}
                                                             data-section-id={column.sectionId}
                                                             data-column={column.columnValue}
+                                                            data-index={column.childCount}
                                                             ondragover={handleSectionDragOver}
                                                             ondragleave={handleSectionDragLeave}
                                                             ondrop={handleDropIntoSection}>
@@ -454,6 +484,7 @@
                                                                     class="preview-column-slot__items"
                                                                     data-section-id={column.sectionId}
                                                                     data-column={column.columnValue}
+                                                                    data-index={column.childCount}
                                                                     ondragover={handleSectionDragOver}
                                                                     ondragleave={handleSectionDragLeave}
                                                                     ondrop={handleDropIntoSection}>
@@ -462,8 +493,14 @@
                                                                             key={child.id}
                                                                             class={child.cardClass}
                                                                             data-id={child.id}
+                                                                            data-section-id={column.sectionId}
+                                                                            data-column={column.columnValue}
+                                                                            data-index={child.sectionIndex}
+                                                                            data-item-drop="true"
                                                                             draggable={child.isChildDraggable}
                                                                             onclick={handleSelectElement}
+                                                                            ondragover={handleSectionDragOver}
+                                                                            ondrop={handleDropIntoSection}
                                                                             ondragstart={handleDragStart}
                                                                             ondragend={handleDragEnd}>
                                                                             <template if:true={child.showHiddenBadge}>
@@ -531,7 +568,7 @@
                                                                                     </template>
                                                                                     <select dir={child.previewInputDirection} value={child.previewPlaceholder} disabled>
                                                                                         <template for:each={child.previewOptions} for:item="option">
-                                                                                            <option key={option.value}>{option.label}</option>
+                                                                                            <option key={option.key}>{option.label}</option>
                                                                                         </template>
                                                                                     </select>
                                                                                 </div>
@@ -543,8 +580,23 @@
                                                                                     </template>
                                                                                     <div class={child.previewRadioGroupClass}>
                                                                                         <template for:each={child.previewOptions} for:item="option">
-                                                                                            <label key={option.value} class="preview-radio-option">
+                                                                                            <label key={option.key} class="preview-radio-option">
                                                                                                 <input type="radio" checked={option.checked} disabled />
+                                                                                                <span>{option.label}</span>
+                                                                                            </label>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isMultiCheckbox}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class="preview-radio-group">
+                                                                                        <template for:each={child.previewOptions} for:item="option">
+                                                                                            <label key={option.key} class="preview-radio-option">
+                                                                                                <input type="checkbox" checked={option.checked} disabled />
                                                                                                 <span>{option.label}</span>
                                                                                             </label>
                                                                                         </template>
@@ -670,13 +722,13 @@
                                                 </template>
                                                 <select dir={row.item.previewInputDirection} value={row.item.previewPlaceholder} disabled>
                                                     <template for:each={row.item.previewOptions} for:item="option">
-                                                        <option key={option.value}>{option.label}</option>
+                                                        <option key={option.key}>{option.label}</option>
                                                     </template>
                                                 </select>
                                                 <template if:true={row.item.showExpandedPicklist}>
                                                     <div class="preview-select-options">
                                                         <template for:each={row.item.previewOptions} for:item="option">
-                                                            <div key={option.value} class="preview-select-options__item">{option.label}</div>
+                                                            <div key={option.key} class="preview-select-options__item">{option.label}</div>
                                                         </template>
                                                     </div>
                                                 </template>
@@ -690,8 +742,24 @@
                                                 </template>
                                                 <div class={row.item.previewRadioGroupClass}>
                                                     <template for:each={row.item.previewOptions} for:item="option">
-                                                        <label key={option.value} class="preview-radio-option">
+                                                        <label key={option.key} class="preview-radio-option">
                                                             <input type="radio" checked={option.checked} disabled />
+                                                            <span>{option.label}</span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isMultiCheckbox}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
+                                                </template>
+                                                <div class="preview-radio-group">
+                                                    <template for:each={row.item.previewOptions} for:item="option">
+                                                        <label key={option.key} class="preview-radio-option">
+                                                            <input type="checkbox" checked={option.checked} disabled />
                                                             <span>{option.label}</span>
                                                         </label>
                                                     </template>
@@ -748,6 +816,149 @@
                         </template>
                         <template if:true={selectedElement}>
                             <template if:false={isSelectedVersionReadOnly}>
+                            <template if:true={selectedElementIsSecretCode}>
+                            <template if:true={isSavingFormSettings}>
+                                <div class="settings-saving" role="status">
+                                    <lightning-spinner
+                                        alternative-text="Saving secret code settings"
+                                        size="xx-small">
+                                    </lightning-spinner>
+                                    <span>Saving...</span>
+                                </div>
+                            </template>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Access Settings</p>
+                                <p class="selection-hint selection-hint--compact">
+                                    This verification step protects the whole form. Enable or disable it from Form Settings.
+                                </p>
+
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Contact Match Field</p>
+                                    <lightning-helptext content={secretCodeEmailTemplateHelpText}></lightning-helptext>
+                                </div>
+                                <lightning-input
+                                    type="text"
+                                    variant="label-hidden"
+                                    label="Contact Match Field"
+                                    value={draftSecretCodeMatchField}
+                                    disabled>
+                                </lightning-input>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Messages</p>
+                                <lightning-textarea
+                                    label="Verification Intro Text"
+                                    value={draftSecretCodeIntroText}
+                                    oninput={handleSecretCodeIntroTextInput}
+                                    onblur={handleSecretCodeIntroTextBlur}>
+                                </lightning-textarea>
+
+                                <lightning-textarea
+                                    label="Code Sent Message"
+                                    value={draftSecretCodeSentMessage}
+                                    oninput={handleSecretCodeSentMessageInput}
+                                    onblur={handleSecretCodeSentMessageBlur}>
+                                </lightning-textarea>
+
+                                <lightning-textarea
+                                    label="Invalid Code Message"
+                                    value={draftSecretCodeInvalidMessage}
+                                    oninput={handleSecretCodeInvalidMessageInput}
+                                    onblur={handleSecretCodeInvalidMessageBlur}>
+                                </lightning-textarea>
+
+                                <lightning-textarea
+                                    label="Verified Message"
+                                    value={draftSecretCodeVerifiedMessage}
+                                    oninput={handleSecretCodeVerifiedMessageInput}
+                                    onblur={handleSecretCodeVerifiedMessageBlur}>
+                                </lightning-textarea>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Buttons</p>
+                                <lightning-input
+                                    type="text"
+                                    label="Send Button Label"
+                                    value={draftSecretCodeSendButtonLabel}
+                                    oninput={handleSecretCodeSendButtonLabelInput}
+                                    onblur={handleSecretCodeSendButtonLabelBlur}>
+                                </lightning-input>
+
+                                <lightning-input
+                                    type="text"
+                                    label="Verify Button Label"
+                                    value={draftSecretCodeVerifyButtonLabel}
+                                    oninput={handleSecretCodeVerifyButtonLabelInput}
+                                    onblur={handleSecretCodeVerifyButtonLabelBlur}>
+                                </lightning-input>
+
+                                <lightning-input
+                                    type="text"
+                                    label="Resend Button Label"
+                                    value={draftSecretCodeResendButtonLabel}
+                                    oninput={handleSecretCodeResendButtonLabelInput}
+                                    onblur={handleSecretCodeResendButtonLabelBlur}>
+                                </lightning-input>
+                            </div>
+
+                            <div class="selection-card">
+                                <p class="selection-label">Rules</p>
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Code Expiry Minutes</p>
+                                    <lightning-helptext content={secretCodeExpiryHelpText}></lightning-helptext>
+                                </div>
+                                <lightning-input
+                                    type="number"
+                                    variant="label-hidden"
+                                    label="Code Expiry Minutes"
+                                    value={draftSecretCodeExpiryMinutes}
+                                    min="1"
+                                    onblur={handleSecretCodeExpiryMinutesBlur}>
+                                </lightning-input>
+
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Max Attempts</p>
+                                    <lightning-helptext content={secretCodeMaxAttemptsHelpText}></lightning-helptext>
+                                </div>
+                                <lightning-input
+                                    type="number"
+                                    variant="label-hidden"
+                                    label="Max Attempts"
+                                    value={draftSecretCodeMaxAttempts}
+                                    min="1"
+                                    onblur={handleSecretCodeMaxAttemptsBlur}>
+                                </lightning-input>
+
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Allow Resend Code</p>
+                                    <lightning-helptext content={secretCodeAllowResendHelpText}></lightning-helptext>
+                                </div>
+                                <lightning-input
+                                    type="checkbox"
+                                    variant="label-hidden"
+                                    label="Allow Resend Code"
+                                    checked={draftSecretCodeAllowResend}
+                                    onchange={handleSecretCodeAllowResendChange}>
+                                </lightning-input>
+
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Keep Session Until Midnight</p>
+                                    <lightning-helptext content={secretCodeSameTabSessionHelpText}></lightning-helptext>
+                                </div>
+                                <lightning-input
+                                    type="checkbox"
+                                    variant="label-hidden"
+                                    label="Keep verified session until midnight in this browser tab"
+                                    checked={draftSecretCodeKeepSessionUntilMidnight}
+                                    onchange={handleSecretCodeSessionModeChange}>
+                                </lightning-input>
+                            </div>
+                            </template>
+
+                            <template if:false={selectedElementIsSecretCode}>
                             <template if:true={selectedElementIsSubmitButton}>
                             <div class="selection-card">
                                 <p class="selection-label">Display Settings</p>
@@ -1633,6 +1844,7 @@
                             </div>
                             </template>
                             </template>
+                            </template>
                         </template>
                         <template if:false={selectedElement}>
                             <template if:true={isSavingFormSettings}>
@@ -1911,127 +2123,10 @@
                                     </lightning-input>
 
                                     <template if:true={draftSecretCodeVerificationEnabled}>
-                                        <div class="secret-code-settings">
-                                            <div class="selection-label-row selection-label-row--flush">
-                                                <p class="settings-section-title settings-section-title--inline">Secret Code Settings</p>
-                                                <lightning-helptext content={secretCodeEmailTemplateHelpText}></lightning-helptext>
-                                            </div>
-
-                                            <lightning-input
-                                                type="text"
-                                                label="Contact Match Field"
-                                                value={draftSecretCodeMatchField}
-                                                disabled>
-                                            </lightning-input>
-
-                                            <div class="settings-divider"></div>
-                                            <p class="settings-section-title">Messages</p>
-                                            <lightning-textarea
-                                                label="Verification Intro Text"
-                                                value={draftSecretCodeIntroText}
-                                                oninput={handleSecretCodeIntroTextInput}
-                                                onblur={handleSecretCodeIntroTextBlur}>
-                                            </lightning-textarea>
-
-                                            <lightning-textarea
-                                                label="Code Sent Message"
-                                                value={draftSecretCodeSentMessage}
-                                                oninput={handleSecretCodeSentMessageInput}
-                                                onblur={handleSecretCodeSentMessageBlur}>
-                                            </lightning-textarea>
-
-                                            <lightning-textarea
-                                                label="Invalid Code Message"
-                                                value={draftSecretCodeInvalidMessage}
-                                                oninput={handleSecretCodeInvalidMessageInput}
-                                                onblur={handleSecretCodeInvalidMessageBlur}>
-                                            </lightning-textarea>
-
-                                            <lightning-textarea
-                                                label="Verified Message"
-                                                value={draftSecretCodeVerifiedMessage}
-                                                oninput={handleSecretCodeVerifiedMessageInput}
-                                                onblur={handleSecretCodeVerifiedMessageBlur}>
-                                            </lightning-textarea>
-
-                                            <div class="settings-divider"></div>
-                                            <p class="settings-section-title">Buttons</p>
-                                            <lightning-input
-                                                type="text"
-                                                label="Send Button Label"
-                                                value={draftSecretCodeSendButtonLabel}
-                                                oninput={handleSecretCodeSendButtonLabelInput}
-                                                onblur={handleSecretCodeSendButtonLabelBlur}>
-                                            </lightning-input>
-
-                                            <lightning-input
-                                                type="text"
-                                                label="Verify Button Label"
-                                                value={draftSecretCodeVerifyButtonLabel}
-                                                oninput={handleSecretCodeVerifyButtonLabelInput}
-                                                onblur={handleSecretCodeVerifyButtonLabelBlur}>
-                                            </lightning-input>
-
-                                            <lightning-input
-                                                type="text"
-                                                label="Resend Button Label"
-                                                value={draftSecretCodeResendButtonLabel}
-                                                oninput={handleSecretCodeResendButtonLabelInput}
-                                                onblur={handleSecretCodeResendButtonLabelBlur}>
-                                            </lightning-input>
-
-                                            <div class="settings-divider"></div>
-                                            <p class="settings-section-title">Rules</p>
-                                            <div class="selection-label-row selection-label-row--flush">
-                                                <p class="field-inline-label">Code Expiry Minutes</p>
-                                                <lightning-helptext content={secretCodeExpiryHelpText}></lightning-helptext>
-                                            </div>
-                                            <lightning-input
-                                                type="number"
-                                                variant="label-hidden"
-                                                label="Code Expiry Minutes"
-                                                value={draftSecretCodeExpiryMinutes}
-                                                min="1"
-                                                onblur={handleSecretCodeExpiryMinutesBlur}>
-                                            </lightning-input>
-
-                                            <div class="selection-label-row selection-label-row--flush">
-                                                <p class="field-inline-label">Max Attempts</p>
-                                                <lightning-helptext content={secretCodeMaxAttemptsHelpText}></lightning-helptext>
-                                            </div>
-                                            <lightning-input
-                                                type="number"
-                                                variant="label-hidden"
-                                                label="Max Attempts"
-                                                value={draftSecretCodeMaxAttempts}
-                                                min="1"
-                                                onblur={handleSecretCodeMaxAttemptsBlur}>
-                                            </lightning-input>
-
-                                            <div class="selection-label-row selection-label-row--flush">
-                                                <p class="field-inline-label">Allow Resend Code</p>
-                                                <lightning-helptext content={secretCodeAllowResendHelpText}></lightning-helptext>
-                                            </div>
-                                            <lightning-input
-                                                type="checkbox"
-                                                variant="label-hidden"
-                                                label="Allow Resend Code"
-                                                checked={draftSecretCodeAllowResend}
-                                                onchange={handleSecretCodeAllowResendChange}>
-                                            </lightning-input>
-
-                                            <div class="selection-label-row selection-label-row--flush">
-                                                <p class="field-inline-label">Keep Session Until Midnight</p>
-                                                <lightning-helptext content={secretCodeSameTabSessionHelpText}></lightning-helptext>
-                                            </div>
-                                            <lightning-input
-                                                type="checkbox"
-                                                variant="label-hidden"
-                                                label="Keep verified session until midnight in this browser tab"
-                                                checked={draftSecretCodeKeepSessionUntilMidnight}
-                                                onchange={handleSecretCodeSessionModeChange}>
-                                            </lightning-input>
-                                        </div>
+                                        <p class="selection-hint selection-hint--compact">{secretCodeSettingsHint}</p>
+                                    </template>
+                                    <template if:false={draftSecretCodeVerificationEnabled}>
+                                        <p class="selection-hint selection-hint--compact">{secretCodeSettingsHint}</p>
                                     </template>
                                 </template>
                             </div>
@@ -2170,6 +2265,14 @@
                                     </lightning-input>
                                 </template>
                                 <lightning-combobox
+                                    label="Language"
+                                    value={layoutImportLanguageCode}
+                                    options={languageOptions}
+                                    placeholder="Select language"
+                                    disabled={formLimitReached}
+                                    onchange={handleLayoutImportLanguageChange}>
+                                </lightning-combobox>
+                                <lightning-combobox
                                     label="Salesforce Object"
                                     value={layoutImportObjectApiName}
                                     options={salesforceObjectOptions}
@@ -2218,6 +2321,64 @@
                                     class="slds-m-left_small"
                                     disabled={layoutImportCreateDisabled}
                                     onclick={handleCreateFromLayout}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showLayoutImportResultModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="layout-import-result-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-new-form-modal designer-layout-import-result-modal">
+                            <header class="slds-modal__header designer-layout-import-modal__header">
+                                <h2 id="layout-import-result-heading" class="slds-modal__title slds-hyphenate designer-layout-import-modal__title">{layoutImportResultTitle}</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium designer-layout-import-result">
+                                <p class="designer-layout-import-result__summary">{layoutImportResultSummary}</p>
+
+                                <template if:true={hasLayoutImportResultIncludedNotes}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Included With Special Behavior</h3>
+                                        <template for:each={layoutImportResultIncludedNotes} for:item="item">
+                                            <article key={item.apiName} class="designer-layout-import-result__item">
+                                                <p><strong>{item.label}</strong> <span>{item.apiName}</span></p>
+                                                <p>{item.reason}</p>
+                                                <p>{item.impact}</p>
+                                                <p>{item.changeHint}</p>
+                                            </article>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasLayoutImportResultSkippedFields}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Skipped Fields</h3>
+                                        <template for:each={layoutImportResultSkippedFields} for:item="item">
+                                            <article key={item.apiName} class="designer-layout-import-result__item designer-layout-import-result__item--warning">
+                                                <p><strong>{item.label}</strong> <span>{item.apiName}</span></p>
+                                                <p>{item.reason}</p>
+                                                <p>{item.impact}</p>
+                                                <p>{item.changeHint}</p>
+                                            </article>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasLayoutImportResultWarnings}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Notes</h3>
+                                        <template for:each={layoutImportResultWarnings} for:item="warning">
+                                            <p key={warning} class="designer-new-form-help">{warning}</p>
+                                        </template>
+                                    </section>
+                                </template>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="brand"
+                                    label="Accept"
+                                    onclick={handleAcceptLayoutImportResult}>
                                 </lightning-button>
                             </footer>
                         </div>

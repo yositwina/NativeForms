@@ -45,6 +45,7 @@ V1 decision:
 - Designer secret-code preview text
 - Form-level language selection in Salesforce
 - New Designer element default labels in the selected form language
+- Create-from-Salesforce-page-layout language selection, using Salesforce UI API translated layout/field labels where Translation Workbench provides them
 
 ### Out of scope for V1
 - Full Salesforce admin/designer UI localization
@@ -73,6 +74,9 @@ Examples:
 Rule for V1:
 - if these fields are blank or still match a packaged default from another language, the runtime should resolve them to the current form language instead of keeping stale English text
 - new elements added in Designer should receive a default label in the selected form language (`en`, `he`, `es`, `de`, `fr`); changing the form language later must not rewrite existing/admin-edited labels
+- new forms created from a Salesforce page layout must require a language choice; Salesforce layout metadata requests must send `Accept-Language` through AWS so object, section, and field labels come from Salesforce translations when available
+- if a non-English layout import returns base labels, create the form and warn the admin that Salesforce returned untranslated labels; do not block import
+- Hebrew layout imports force `rtlEnabled=true` on the new form so Form Settings clearly shows RTL enabled
 
 ### 2. Packaged runtime dictionary
 Use Salesforce-package-owned language dictionaries for reusable generic runtime text.

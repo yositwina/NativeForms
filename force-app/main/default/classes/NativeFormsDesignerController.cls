@@ -1,6 +1,8 @@
 public with sharing class NativeFormsDesignerController {
     private static final Integer MAX_INTEGER_VALUE = 2147483647;
     private static final Integer MAX_PAGE_LAYOUT_IMPORT_FIELDS = 50;
+    private static final Integer ELEMENT_LABEL_MAX_LENGTH = 255;
+    private static final Integer ELEMENT_CONFIG_JSON_MAX_LENGTH = 131072;
     @TestVisible private static Map<String, Object> pageLayoutImportMetadataMock;
 
     public class SelectOption {
@@ -188,6 +190,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Integer importedFieldCount { get; set; }
         @AuraEnabled public Integer skippedFieldCount { get; set; }
         @AuraEnabled public List<String> warnings { get; set; }
+        @AuraEnabled public String importDiagnosticsJson { get; set; }
     }
 
     public class PageLayoutImportPreview {
@@ -198,6 +201,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String mode { get; set; }
         @AuraEnabled public Integer supportedFieldCount { get; set; }
         @AuraEnabled public Integer skippedFieldCount { get; set; }
+        @AuraEnabled public Integer createOnlyFieldCount { get; set; }
         @AuraEnabled public List<String> warnings { get; set; }
     }
 
@@ -207,8 +211,12 @@ public with sharing class NativeFormsDesignerController {
         String layoutKey;
         String layoutLabel;
         String mode;
+        String languageCode;
         Integer skippedFieldCount = 0;
+        Integer createOnlyFieldCount = 0;
         List<String> warnings = new List<String>();
+        List<Map<String, Object>> includedNotes = new List<Map<String, Object>>();
+        List<Map<String, Object>> skippedDetails = new List<Map<String, Object>>();
         List<PageLayoutImportField> fields = new List<PageLayoutImportField>();
         List<PageLayoutImportSection> sections = new List<PageLayoutImportSection>();
     }
@@ -223,6 +231,8 @@ public with sharing class NativeFormsDesignerController {
         String label;
         String elementType;
         String lookupTargetObject;
+        String submitWhen;
+        Boolean createOnly;
         Boolean required;
         List<Object> options;
     }
@@ -340,7 +350,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled(cacheable=true)
-    public static List<SelectOption> getPicklistFieldOptions(String objectApiName) {
+    public static List<SelectOption> getPicklistFieldOptions(String objectApiName, String fieldType) {
         List<SelectOption> options = new List<SelectOption>();
         if (String.isBlank(objectApiName)) {
             return options;
@@ -351,6 +361,9 @@ public with sharing class NativeFormsDesignerController {
             return options;
         }
 
+        Schema.DisplayType requiredType = String.valueOf(fieldType).equalsIgnoreCase('MultiPicklist')
+            ? Schema.DisplayType.MultiPicklist
+            : Schema.DisplayType.Picklist;
         Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObjectName).getDescribe().fields.getMap();
         List<String> fieldApiNames = new List<String>();
         for (String fieldApiName : fieldsMap.keySet()) {
@@ -358,7 +371,7 @@ public with sharing class NativeFormsDesignerController {
             if (!describeResult.isAccessible()) {
                 continue;
             }
-            if (describeResult.getType() != Schema.DisplayType.Picklist) {
+            if (describeResult.getType() != requiredType) {
                 continue;
             }
             fieldApiNames.add(fieldApiName);
@@ -374,7 +387,6 @@ public with sharing class NativeFormsDesignerController {
         sortOptionsByLabel(options);
         return options;
     }
-
     @AuraEnabled(cacheable=true)
     public static List<SelectOption> getPicklistValueOptions(String objectApiName, String fieldApiName) {
         List<SelectOption> options = new List<SelectOption>();
@@ -394,7 +406,8 @@ public with sharing class NativeFormsDesignerController {
         }
 
         Schema.DescribeFieldResult describeResult = fieldsMap.get(canonicalFieldName).getDescribe();
-        if (describeResult.getType() != Schema.DisplayType.Picklist) {
+        if (describeResult.getType() != Schema.DisplayType.Picklist
+            && describeResult.getType() != Schema.DisplayType.MultiPicklist) {
             return options;
         }
 
@@ -1033,13 +1046,14 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static List<SelectOption> getPageLayoutImportOptions(String objectApiName) {
+    public static List<SelectOption> getPageLayoutImportOptions(String objectApiName, String languageCode) {
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
         String canonicalObject = canonicalObjectName(objectApiName);
         if (String.isBlank(canonicalObject)) {
             throw new AuraHandledException('Select a valid Salesforce object.');
         }
 
-        Map<String, Object> response = fetchPageLayoutMetadata(canonicalObject, null);
+        Map<String, Object> response = fetchPageLayoutMetadata(canonicalObject, null, normalizedLanguageCode);
         List<SelectOption> options = new List<SelectOption>();
         if (response.containsKey('layouts') && response.get('layouts') instanceof List<Object>) {
             for (Object layoutValue : (List<Object>) response.get('layouts')) {
@@ -1068,8 +1082,9 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static PageLayoutImportPreview previewPageLayoutImport(String objectApiName, String layoutKey, String mode) {
-        PageLayoutImportPlan plan = buildPageLayoutImportPlan(objectApiName, layoutKey, normalizePageLayoutImportMode(mode));
+    public static PageLayoutImportPreview previewPageLayoutImport(String objectApiName, String layoutKey, String mode, String languageCode) {
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
+        PageLayoutImportPlan plan = buildPageLayoutImportPlan(objectApiName, layoutKey, normalizePageLayoutImportMode(mode), normalizedLanguageCode);
         PageLayoutImportPreview preview = new PageLayoutImportPreview();
         preview.objectApiName = plan.objectApiName;
         preview.objectLabel = plan.objectLabel;
@@ -1078,6 +1093,7 @@ public with sharing class NativeFormsDesignerController {
         preview.mode = plan.mode;
         preview.supportedFieldCount = plan.fields.size();
         preview.skippedFieldCount = plan.skippedFieldCount;
+        preview.createOnlyFieldCount = plan.createOnlyFieldCount;
         preview.warnings = plan.warnings;
         return preview;
     }
@@ -1090,12 +1106,17 @@ public with sharing class NativeFormsDesignerController {
         Id themeId,
         String objectApiName,
         String layoutKey,
-        String mode
+        String mode,
+        String languageCode
     ) {
         String normalizedDescription = String.isBlank(description) ? null : description.trim();
         if (String.isBlank(normalizedDescription)) {
             throw new AuraHandledException('Form name is required.');
         }
+        if (String.isBlank(languageCode)) {
+            throw new AuraHandledException('Select a language for the new form.');
+        }
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
         if (!NativeFormsFeatureFlags.isProPageLayoutCloneEnabled()) {
             throw new AuraHandledException('Page Layout Clone is available on Pro plans only.');
         }
@@ -1111,7 +1132,7 @@ public with sharing class NativeFormsDesignerController {
 
         normalizePageLayoutImportLayoutKey(layoutKey);
         enforceFormCreationLimit();
-        PageLayoutImportPlan plan = buildPageLayoutImportPlan(objectApiName, layoutKey, normalizedMode);
+        PageLayoutImportPlan plan = buildPageLayoutImportPlan(objectApiName, layoutKey, normalizedMode, normalizedLanguageCode);
         if (plan.fields.isEmpty()) {
             throw new AuraHandledException('No supported editable fields were found for the selected object.');
         }
@@ -1136,9 +1157,9 @@ public with sharing class NativeFormsDesignerController {
                     ? new List<String>{ 'secure-edit', 'public-find-update-create', 'public-prefill', 'public-create' }
                     : new List<String>{ 'public-create', 'public-prefill', 'secure-edit' }
             ),
-            UI_Settings_JSON__c = buildPageLayoutImportUiSettingsJson(secureMode),
+            UI_Settings_JSON__c = buildPageLayoutImportUiSettingsJson(secureMode, normalizedLanguageCode),
             Prefill_Params_JSON__c = secureMode
-                ? buildPageLayoutImportPrefillParamsJson(normalizedMode)
+                ? buildPageLayoutImportPrefillParamsJson(normalizedMode, normalizedLanguageCode)
                 : '[]'
         );
         insert as user versionRecord;
@@ -1197,9 +1218,18 @@ public with sharing class NativeFormsDesignerController {
             plan,
             secureMode,
             prefillAlias,
-            submitActionKey
+            submitActionKey,
+            normalizedLanguageCode
         );
-        insert as user elements;
+        elements = filterStorableImportedElements(elements, plan);
+        if (elements.isEmpty()) {
+            throw new AuraHandledException('No supported fields could be stored from this Salesforce layout.');
+        }
+        try {
+            insert as user elements;
+        } catch (DmlException e) {
+            throw new AuraHandledException('TwinaForms could not create the form elements from this Salesforce layout. ' + dmlMessage(e));
+        }
 
         formRecord.Current_Draft_Version__c = versionRecord.Id;
         update as user formRecord;
@@ -1212,6 +1242,7 @@ public with sharing class NativeFormsDesignerController {
         result.importedFieldCount = plan.fields.size();
         result.skippedFieldCount = plan.skippedFieldCount;
         result.warnings = plan.warnings;
+        result.importDiagnosticsJson = buildPageLayoutImportDiagnosticsJson(plan);
         return result;
     }
 
@@ -1461,7 +1492,7 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('Choose an element type first.');
         }
         String normalizedPreset = normalizeElementPreset(elementType, elementPreset);
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
@@ -1589,6 +1620,150 @@ public with sharing class NativeFormsDesignerController {
             orderValue += 10;
         }
         update as user siblingUpdates;
+    }
+
+    @AuraEnabled
+    public static void moveElement(Id versionId, Id elementId, Id targetParentId, Integer columnNumber, Integer targetIndex) {
+        if (versionId == null) {
+            throw new AuraHandledException('Version id is required.');
+        }
+        ensureVersionEditable(versionId);
+        if (elementId == null) {
+            throw new AuraHandledException('Element id is required.');
+        }
+        if (targetIndex == null) {
+            throw new AuraHandledException('Target index is required.');
+        }
+
+        NF_Form_Element__c elementRecord = [
+            SELECT Id, Form_Version__c, Element_Type__c, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Id = :elementId
+            WITH USER_MODE LIMIT 1
+        ];
+        if (elementRecord.Form_Version__c != versionId) {
+            throw new AuraHandledException('Element must belong to the selected version.');
+        }
+        String originalParentElementId = elementRecord.Parent_Element_Id__c;
+        Integer originalColumn = readSectionColumn(elementRecord.Config_JSON__c);
+
+        String targetParentElementId = null;
+        if (targetParentId != null) {
+            NF_Form_Element__c parentRecord = [
+                SELECT Id, Form_Version__c, Element_Id__c, Element_Type__c, Config_JSON__c
+                FROM NF_Form_Element__c
+                WHERE Id = :targetParentId
+                WITH USER_MODE LIMIT 1
+            ];
+            if (parentRecord.Form_Version__c != versionId) {
+                throw new AuraHandledException('Target section must belong to the selected version.');
+            }
+            if (parentRecord.Element_Type__c != 'section' && parentRecord.Element_Type__c != 'repeatGroup' && parentRecord.Element_Type__c != 'group') {
+                throw new AuraHandledException('Only sections, groups, or repeat groups can receive dropped elements.');
+            }
+            validateContainerPlacement(parentRecord, elementRecord);
+            Integer parentColumns = readColumns(parentRecord.Config_JSON__c);
+            if (columnNumber == null || columnNumber < 1 || columnNumber > parentColumns) {
+                throw new AuraHandledException('Column number must be between 1 and the container column count.');
+            }
+            targetParentElementId = parentRecord.Element_Id__c;
+        }
+
+        Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
+        Integer targetColumn = columnNumber == null ? 1 : columnNumber;
+        if (targetParentElementId == null) {
+            elementConfig.remove('sectionColumn');
+        } else {
+            elementConfig.put('sectionColumn', targetColumn);
+        }
+        elementRecord.Config_JSON__c = JSON.serializePretty(elementConfig);
+        elementRecord.Parent_Element_Id__c = targetParentElementId;
+
+        List<NF_Form_Element__c> siblings = [
+            SELECT Id, Config_JSON__c, Parent_Element_Id__c, Order__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+              AND Parent_Element_Id__c = :targetParentElementId
+              AND Id != :elementId
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
+        ];
+
+        Integer normalizedTargetIndex = Math.max(0, targetIndex);
+        Boolean sameTargetGroup = originalParentElementId == targetParentElementId
+            && (targetParentElementId == null || originalColumn == targetColumn);
+        if (sameTargetGroup) {
+            Integer currentIndex = 0;
+            for (NF_Form_Element__c sibling : siblings) {
+                if (targetParentElementId != null && readSectionColumn(sibling.Config_JSON__c) != targetColumn) {
+                    continue;
+                }
+                if ((sibling.Order__c == null ? 0 : Integer.valueOf(String.valueOf(sibling.Order__c)))
+                    < (elementRecord.Order__c == null ? 0 : Integer.valueOf(String.valueOf(elementRecord.Order__c)))) {
+                    currentIndex++;
+                }
+            }
+            if (normalizedTargetIndex > currentIndex) {
+                normalizedTargetIndex--;
+            }
+        }
+
+        List<NF_Form_Element__c> orderedSiblings = new List<NF_Form_Element__c>();
+        if (targetParentElementId == null) {
+            if (normalizedTargetIndex > siblings.size()) {
+                normalizedTargetIndex = siblings.size();
+            }
+            if (normalizedTargetIndex >= siblings.size()) {
+                siblings.add(elementRecord);
+            } else {
+                siblings.add(normalizedTargetIndex, elementRecord);
+            }
+            orderedSiblings.addAll(siblings);
+        } else {
+            Map<Integer, List<NF_Form_Element__c>> siblingsByColumn = new Map<Integer, List<NF_Form_Element__c>>();
+            for (NF_Form_Element__c sibling : siblings) {
+                Integer siblingColumn = readSectionColumn(sibling.Config_JSON__c);
+                if (siblingColumn == null || siblingColumn < 1 || siblingColumn > 10) {
+                    siblingColumn = 1;
+                }
+                if (!siblingsByColumn.containsKey(siblingColumn)) {
+                    siblingsByColumn.put(siblingColumn, new List<NF_Form_Element__c>());
+                }
+                siblingsByColumn.get(siblingColumn).add(sibling);
+            }
+            if (!siblingsByColumn.containsKey(targetColumn)) {
+                siblingsByColumn.put(targetColumn, new List<NF_Form_Element__c>());
+            }
+            List<NF_Form_Element__c> targetColumnSiblings = siblingsByColumn.get(targetColumn);
+            if (normalizedTargetIndex > targetColumnSiblings.size()) {
+                normalizedTargetIndex = targetColumnSiblings.size();
+            }
+            if (normalizedTargetIndex >= targetColumnSiblings.size()) {
+                targetColumnSiblings.add(elementRecord);
+            } else {
+                targetColumnSiblings.add(normalizedTargetIndex, elementRecord);
+            }
+            for (Integer columnIndex = 1; columnIndex <= 10; columnIndex++) {
+                if (siblingsByColumn.containsKey(columnIndex)) {
+                    orderedSiblings.addAll(siblingsByColumn.get(columnIndex));
+                }
+            }
+        }
+
+        Integer orderValue = 10;
+        List<NF_Form_Element__c> updates = new List<NF_Form_Element__c>();
+        for (NF_Form_Element__c sibling : orderedSiblings) {
+            NF_Form_Element__c updateRecord = new NF_Form_Element__c(
+                Id = sibling.Id,
+                Order__c = orderValue
+            );
+            if (sibling.Id == elementRecord.Id) {
+                updateRecord.Parent_Element_Id__c = elementRecord.Parent_Element_Id__c;
+                updateRecord.Config_JSON__c = elementRecord.Config_JSON__c;
+            }
+            updates.add(updateRecord);
+            orderValue += 10;
+        }
+        update as user updates;
     }
 
     @AuraEnabled
@@ -1925,6 +2100,7 @@ public with sharing class NativeFormsDesignerController {
                 'tel' => 'Phone',
                 'url' => 'URL',
                 'select' => 'Picklist',
+                'multiCheckbox' => 'Multi Checkbox',
                 'radio' => 'Radio Group',
                 'text' => 'Text Input'
             },
@@ -1951,6 +2127,7 @@ public with sharing class NativeFormsDesignerController {
                 'tel' => '\u05D8\u05DC\u05E4\u05D5\u05DF',
                 'url' => '\u05DB\u05EA\u05D5\u05D1\u05EA URL',
                 'select' => '\u05E8\u05E9\u05D9\u05DE\u05EA \u05D1\u05D7\u05D9\u05E8\u05D4',
+                'multiCheckbox' => '\u05D1\u05D7\u05D9\u05E8\u05D4 \u05DE\u05E8\u05D5\u05D1\u05D4',
                 'radio' => '\u05E7\u05D1\u05D5\u05E6\u05EA \u05D1\u05D7\u05D9\u05E8\u05D4',
                 'text' => '\u05D8\u05E7\u05E1\u05D8'
             },
@@ -1977,6 +2154,7 @@ public with sharing class NativeFormsDesignerController {
                 'tel' => 'Tel\u00E9fono',
                 'url' => 'URL',
                 'select' => 'Lista de selecci\u00F3n',
+                'multiCheckbox' => 'Casillas m\u00FAltiples',
                 'radio' => 'Grupo de opciones',
                 'text' => 'Entrada de texto'
             },
@@ -2003,6 +2181,7 @@ public with sharing class NativeFormsDesignerController {
                 'tel' => 'Telefon',
                 'url' => 'URL',
                 'select' => 'Auswahlliste',
+                'multiCheckbox' => 'Mehrfachauswahl',
                 'radio' => 'Optionsgruppe',
                 'text' => 'Texteingabe'
             },
@@ -2029,6 +2208,7 @@ public with sharing class NativeFormsDesignerController {
                 'tel' => 'T\u00E9l\u00E9phone',
                 'url' => 'URL',
                 'select' => 'Liste de s\u00E9lection',
+                'multiCheckbox' => 'Choix multiples',
                 'radio' => 'Groupe options',
                 'text' => 'Saisie de texte'
             }
@@ -2040,7 +2220,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex, String elementPreset) {
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature', 'repeatGroup' }.contains(elementType)) {
             return null;
         }
         String prefix = 'field';
@@ -2053,6 +2233,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'tel') prefix = 'phone';
         if (elementType == 'url') prefix = 'url';
         if (elementType == 'select') prefix = 'picklist';
+        if (elementType == 'multiCheckbox') prefix = 'multiPicklist';
         if (elementType == 'lookup') prefix = 'lookup';
         if (elementType == 'radio') prefix = 'radio';
         if (elementType == 'radio' && elementPreset == 'stars') prefix = 'rating';
@@ -2144,10 +2325,12 @@ public with sharing class NativeFormsDesignerController {
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
         }
-        if (elementType == 'select' || elementType == 'radio') {
+        if (elementType == 'select' || elementType == 'radio' || elementType == 'multiCheckbox') {
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
-            config.put('defaultValue', String.isNotBlank(elementPreset) ? '' : 'option1');
+            config.put('defaultValue', elementType == 'multiCheckbox'
+                ? ''
+                : (String.isNotBlank(elementPreset) ? '' : 'option1'));
             config.put('required', false);
             config.put('options', defaultOptionsForPreset(elementPreset));
             if (String.isNotBlank(elementPreset)) {
@@ -2275,13 +2458,15 @@ public with sharing class NativeFormsDesignerController {
         };
     }
 
-    private static Map<String, Object> fetchPageLayoutMetadata(String objectApiName, String layoutKey) {
+    private static Map<String, Object> fetchPageLayoutMetadata(String objectApiName, String layoutKey, String languageCode) {
         if (Test.isRunningTest() && pageLayoutImportMetadataMock != null) {
             return pageLayoutImportMetadataMock;
         }
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
         Map<String, Object> requestBody = new Map<String, Object>{
             'orgId' => UserInfo.getOrganizationId().substring(0, 15),
-            'objectApiName' => objectApiName
+            'objectApiName' => objectApiName,
+            'languageCode' => normalizedLanguageCode
         };
         if (String.isNotBlank(layoutKey)) {
             requestBody.put('layoutKey', layoutKey);
@@ -2304,7 +2489,8 @@ public with sharing class NativeFormsDesignerController {
         }
     }
 
-    private static PageLayoutImportPlan buildPageLayoutImportPlan(String objectApiName, String layoutKey, String mode) {
+    private static PageLayoutImportPlan buildPageLayoutImportPlan(String objectApiName, String layoutKey, String mode, String languageCode) {
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
         String canonicalObject = canonicalObjectName(objectApiName);
         if (String.isBlank(canonicalObject)) {
             throw new AuraHandledException('Select a valid Salesforce object.');
@@ -2319,16 +2505,23 @@ public with sharing class NativeFormsDesignerController {
         plan.objectApiName = objectDescribe.getName();
         plan.objectLabel = objectDescribe.getLabel();
         plan.mode = normalizePageLayoutImportMode(mode);
+        plan.languageCode = normalizedLanguageCode;
         if (plan.mode != 'create') {
             plan.warnings.add('Secure edit uses Salesforce Contact email verification only. Visitors without a matching Contact cannot edit.');
         }
 
-        Map<String, Object> response = fetchPageLayoutMetadata(plan.objectApiName, layoutKey);
+        Map<String, Object> response = fetchPageLayoutMetadata(plan.objectApiName, layoutKey, normalizedLanguageCode);
         Map<String, Object> layoutMap = response.get('layout') instanceof Map<String, Object>
             ? (Map<String, Object>) response.get('layout')
             : null;
         if (layoutMap == null) {
             throw new AuraHandledException('Salesforce layout metadata response did not include a layout.');
+        }
+        String translatedObjectLabel = String.isBlank(stringValue(response.get('objectLabel')))
+            ? stringValue(layoutMap.get('objectLabel'))
+            : stringValue(response.get('objectLabel'));
+        if (String.isNotBlank(translatedObjectLabel)) {
+            plan.objectLabel = translatedObjectLabel;
         }
         plan.layoutKey = String.isBlank(stringValue(layoutMap.get('layoutKey')))
             ? normalizePageLayoutImportLayoutKey(layoutKey)
@@ -2371,24 +2564,88 @@ public with sharing class NativeFormsDesignerController {
                 }
                 Map<String, Object> rawField = (Map<String, Object>) rawFieldValue;
                 String canonicalField = canonicalFieldName(fieldsMap, stringValue(rawField.get('apiName')));
+                if (isIgnoredPageLayoutSystemField(canonicalField)) {
+                    continue;
+                }
                 if (String.isBlank(canonicalField) || importedFieldNames.contains(canonicalField.toLowerCase())) {
                     plan.skippedFieldCount++;
+                    addPageLayoutSkippedDetail(
+                        plan,
+                        stringValue(rawField.get('apiName')),
+                        layoutFieldLabel(rawField, stringValue(rawField.get('apiName'))),
+                        'Unknown or duplicate field',
+                        'The field was not found on the selected object or already appeared earlier in the layout.',
+                        'Check the Salesforce page layout and object metadata.'
+                    );
                     continue;
                 }
-                if (!isLayoutFieldEditableForMode(rawField, plan.mode)) {
-                    plan.skippedFieldCount++;
-                    continue;
-                }
-                PageLayoutImportField fieldSpec = toPageLayoutImportField(fieldsMap.get(canonicalField).getDescribe(), plan.mode);
+                Schema.DescribeFieldResult fieldDescribe = fieldsMap.get(canonicalField).getDescribe();
+                PageLayoutImportField fieldSpec = toPageLayoutImportField(fieldDescribe);
                 if (fieldSpec == null) {
                     plan.skippedFieldCount++;
+                    addPageLayoutSkippedDetail(
+                        plan,
+                        canonicalField,
+                        layoutFieldLabel(rawField, canonicalField),
+                        'Unsupported or read-only field',
+                        'TwinaForms cannot import this Salesforce field type, or the field is not accessible.',
+                        'Use a supported editable field type, or adjust field-level security.'
+                    );
                     continue;
+                }
+
+                String inclusionMode = pageLayoutFieldInclusionMode(rawField, fieldDescribe, plan.mode);
+                if (String.isBlank(inclusionMode)) {
+                    plan.skippedFieldCount++;
+                    addPageLayoutSkippedDetail(
+                        plan,
+                        canonicalField,
+                        layoutFieldLabel(rawField, canonicalField),
+                        'Not writable for selected mode',
+                        pageLayoutFieldSkipMessage(rawField, fieldDescribe, plan.mode),
+                        pageLayoutFieldSkipChangeHint(plan.mode)
+                    );
+                    continue;
+                }
+                String translatedLabel = stringValue(rawField.get('label'));
+                if (String.isNotBlank(translatedLabel)) {
+                    fieldSpec.label = translatedLabel;
+                }
+                if (fieldSpec.elementType == 'select' || fieldSpec.elementType == 'multiCheckbox') {
+                    List<Object> translatedOptions = picklistOptionsFromLayoutField(rawField);
+                    if (!translatedOptions.isEmpty()) {
+                        fieldSpec.options = translatedOptions;
+                    }
                 }
                 if (booleanValue(rawField.get('required'))) {
                     fieldSpec.required = true;
                 }
+                if (inclusionMode == 'createOnly') {
+                    fieldSpec.createOnly = true;
+                    fieldSpec.submitWhen = 'create';
+                    plan.createOnlyFieldCount++;
+                    addPageLayoutIncludedNote(
+                        plan,
+                        fieldSpec.apiName,
+                        fieldSpec.label,
+                        'Create-only field',
+                        'This field is included for the create path only. Existing records will show the prefilled value as locked, and new records must provide a value.',
+                        'If it should be editable on existing records, make the Salesforce field updateable on the page layout and field security.'
+                    );
+                } else {
+                    fieldSpec.createOnly = false;
+                    fieldSpec.submitWhen = 'always';
+                }
                 if (plan.fields.size() >= MAX_PAGE_LAYOUT_IMPORT_FIELDS) {
                     plan.skippedFieldCount++;
+                    addPageLayoutSkippedDetail(
+                        plan,
+                        fieldSpec.apiName,
+                        fieldSpec.label,
+                        'Import limit reached',
+                        'Only the first ' + String.valueOf(MAX_PAGE_LAYOUT_IMPORT_FIELDS) + ' supported fields are imported in V1.',
+                        'Remove less important fields from the Salesforce layout or create another form.'
+                    );
                     continue;
                 }
                 importedFieldNames.add(canonicalField.toLowerCase());
@@ -2403,25 +2660,229 @@ public with sharing class NativeFormsDesignerController {
         if (plan.skippedFieldCount > 0) {
             plan.warnings.add(String.valueOf(plan.skippedFieldCount) + ' read-only or unsupported fields will be skipped.');
         }
+        if (plan.createOnlyFieldCount > 0) {
+            plan.warnings.add(String.valueOf(plan.createOnlyFieldCount) + ' create-only fields will be included only when TwinaForms creates a missing record.');
+        }
         if (plan.fields.size() >= MAX_PAGE_LAYOUT_IMPORT_FIELDS) {
             plan.warnings.add('Only the first ' + String.valueOf(MAX_PAGE_LAYOUT_IMPORT_FIELDS) + ' supported fields are imported in V1.');
         }
+        addMissingTranslationWarning(plan, objectDescribe, layoutKey);
         return plan;
     }
 
-    private static Boolean isLayoutFieldEditableForMode(Map<String, Object> rawField, String mode) {
+    private static void addMissingTranslationWarning(PageLayoutImportPlan plan, Schema.DescribeSObjectResult objectDescribe, String layoutKey) {
+        if (plan == null || plan.languageCode == 'en' || Test.isRunningTest()) {
+            return;
+        }
+        try {
+            Map<String, Object> englishResponse = fetchPageLayoutMetadata(plan.objectApiName, layoutKey, 'en');
+            Map<String, String> englishLabelsByField = labelsByFieldFromLayoutResponse(englishResponse, objectDescribe);
+            Integer unchangedFieldCount = 0;
+            for (PageLayoutImportField fieldSpec : plan.fields) {
+                String englishLabel = englishLabelsByField.get(String.valueOf(fieldSpec.apiName).toLowerCase());
+                if (String.isNotBlank(englishLabel) && englishLabel == fieldSpec.label) {
+                    unchangedFieldCount++;
+                }
+            }
+            if (unchangedFieldCount > 0) {
+                plan.warnings.add(
+                    'Salesforce returned base labels for ' +
+                    String.valueOf(unchangedFieldCount) +
+                    ' imported fields. Check Translation Workbench for missing translations.'
+                );
+            }
+        } catch (Exception ignored) {
+            // Translation diagnostics should not block layout import.
+        }
+    }
+
+    private static Map<String, String> labelsByFieldFromLayoutResponse(Map<String, Object> response, Schema.DescribeSObjectResult objectDescribe) {
+        Map<String, String> labelsByField = new Map<String, String>();
+        if (response == null || objectDescribe == null) {
+            return labelsByField;
+        }
+        Map<String, Object> layoutMap = response.get('layout') instanceof Map<String, Object>
+            ? (Map<String, Object>) response.get('layout')
+            : null;
+        if (layoutMap == null) {
+            return labelsByField;
+        }
+        Map<String, Schema.SObjectField> fieldsMap = objectDescribe.fields.getMap();
+        List<Object> rawSections = layoutMap.get('sections') instanceof List<Object>
+            ? (List<Object>) layoutMap.get('sections')
+            : new List<Object>();
+        for (Object rawSectionValue : rawSections) {
+            if (!(rawSectionValue instanceof Map<String, Object>)) {
+                continue;
+            }
+            Map<String, Object> rawSection = (Map<String, Object>) rawSectionValue;
+            List<Object> rawFields = rawSection.get('fields') instanceof List<Object>
+                ? (List<Object>) rawSection.get('fields')
+                : new List<Object>();
+            for (Object rawFieldValue : rawFields) {
+                if (!(rawFieldValue instanceof Map<String, Object>)) {
+                    continue;
+                }
+                Map<String, Object> rawField = (Map<String, Object>) rawFieldValue;
+                String canonicalField = canonicalFieldName(fieldsMap, stringValue(rawField.get('apiName')));
+                String label = stringValue(rawField.get('label'));
+                if (String.isNotBlank(canonicalField) && String.isNotBlank(label)) {
+                    labelsByField.put(canonicalField.toLowerCase(), label);
+                }
+            }
+        }
+        return labelsByField;
+    }
+
+    private static Boolean layoutFieldEditableForNew(Map<String, Object> rawField) {
+        if (rawField == null) {
+            return false;
+        }
+        return !rawField.containsKey('editableForNew') || booleanValue(rawField.get('editableForNew'));
+    }
+
+    private static Boolean isIgnoredPageLayoutSystemField(String fieldApiName) {
+        if (String.isBlank(fieldApiName)) {
+            return false;
+        }
+        return new Set<String>{
+            'OwnerId',
+            'CreatedById',
+            'CreatedDate',
+            'LastModifiedById',
+            'LastModifiedDate',
+            'SystemModstamp',
+            'LastActivityDate',
+            'LastViewedDate',
+            'LastReferencedDate',
+            'IsDeleted'
+        }.contains(fieldApiName);
+    }
+
+    private static Boolean layoutFieldEditableForUpdate(Map<String, Object> rawField) {
+        if (rawField == null) {
+            return false;
+        }
+        return !rawField.containsKey('editableForUpdate') || booleanValue(rawField.get('editableForUpdate'));
+    }
+
+    private static String layoutFieldLabel(Map<String, Object> rawField, String fallback) {
+        if (rawField != null && String.isNotBlank(stringValue(rawField.get('label')))) {
+            return stringValue(rawField.get('label'));
+        }
+        return String.isBlank(fallback) ? 'Unknown field' : fallback;
+    }
+
+    private static String pageLayoutFieldInclusionMode(Map<String, Object> rawField, Schema.DescribeFieldResult fieldDescribe, String mode) {
+        if (fieldDescribe == null) {
+            return null;
+        }
         Boolean editableForNew = !rawField.containsKey('editableForNew') || booleanValue(rawField.get('editableForNew'));
         Boolean editableForUpdate = !rawField.containsKey('editableForUpdate') || booleanValue(rawField.get('editableForUpdate'));
         if (mode == 'create') {
-            return editableForNew;
+            return editableForNew && fieldDescribe.isCreateable() ? 'always' : null;
         }
         if (mode == 'secureUpdateOrCreate') {
-            return editableForNew && editableForUpdate;
+            if (editableForNew && fieldDescribe.isCreateable() && editableForUpdate && fieldDescribe.isUpdateable()) {
+                return 'always';
+            }
+            if (editableForNew && fieldDescribe.isCreateable()) {
+                return 'createOnly';
+            }
+            return null;
         }
-        return editableForUpdate;
+        return editableForUpdate && fieldDescribe.isUpdateable() ? 'always' : null;
     }
 
-    private static PageLayoutImportField toPageLayoutImportField(Schema.DescribeFieldResult fieldDescribe, String mode) {
+    private static String pageLayoutFieldSkipMessage(Map<String, Object> rawField, Schema.DescribeFieldResult fieldDescribe, String mode) {
+        Boolean editableForNew = layoutFieldEditableForNew(rawField);
+        Boolean editableForUpdate = layoutFieldEditableForUpdate(rawField);
+        Boolean createable = fieldDescribe != null && fieldDescribe.isCreateable();
+        Boolean updateable = fieldDescribe != null && fieldDescribe.isUpdateable();
+        if (mode == 'create') {
+            return 'The selected create mode needs fields that are createable in Salesforce and editable for new records on the layout. This field does not meet that requirement.';
+        }
+        if (mode == 'secureUpdate') {
+            return 'The selected secure edit mode needs fields that are updateable in Salesforce and editable for existing records on the layout. This field does not meet that requirement.';
+        }
+        if (editableForUpdate && updateable && (!editableForNew || !createable)) {
+            return 'This field can be updated but cannot be sent when TwinaForms creates a missing record, so it was skipped for secure edit-or-create mode.';
+        }
+        return 'This field is not writable for the create or update path required by the selected submit mode.';
+    }
+
+    private static String pageLayoutFieldSkipChangeHint(String mode) {
+        if (mode == 'create') {
+            return 'Choose a createable field, or adjust Salesforce field-level security and page layout editability.';
+        }
+        if (mode == 'secureUpdate') {
+            return 'Choose an updateable field, or adjust Salesforce field-level security and page layout editability.';
+        }
+        return 'Use Create only mode if you only need creation, or make the field writable for the path where it should be submitted.';
+    }
+
+    private static void addPageLayoutIncludedNote(
+        PageLayoutImportPlan plan,
+        String apiName,
+        String label,
+        String reason,
+        String impact,
+        String changeHint
+    ) {
+        if (plan == null) {
+            return;
+        }
+        plan.includedNotes.add(new Map<String, Object>{
+            'apiName' => apiName,
+            'label' => label,
+            'reason' => reason,
+            'impact' => impact,
+            'changeHint' => changeHint
+        });
+    }
+
+    private static void addPageLayoutSkippedDetail(
+        PageLayoutImportPlan plan,
+        String apiName,
+        String label,
+        String reason,
+        String impact,
+        String changeHint
+    ) {
+        if (plan == null) {
+            return;
+        }
+        plan.skippedDetails.add(new Map<String, Object>{
+            'apiName' => apiName,
+            'label' => label,
+            'reason' => reason,
+            'impact' => impact,
+            'changeHint' => changeHint
+        });
+    }
+
+    private static String buildPageLayoutImportDiagnosticsJson(PageLayoutImportPlan plan) {
+        if (plan == null) {
+            return '{}';
+        }
+        Map<String, Object> diagnostics = new Map<String, Object>{
+            'objectApiName' => plan.objectApiName,
+            'objectLabel' => plan.objectLabel,
+            'layoutLabel' => plan.layoutLabel,
+            'mode' => plan.mode,
+            'summary' => new Map<String, Object>{
+                'importedFieldCount' => plan.fields == null ? 0 : plan.fields.size(),
+                'createOnlyFieldCount' => plan.createOnlyFieldCount,
+                'skippedFieldCount' => plan.skippedFieldCount
+            },
+            'includedNotes' => plan.includedNotes,
+            'skippedFields' => plan.skippedDetails,
+            'warnings' => plan.warnings
+        };
+        return JSON.serializePretty(diagnostics);
+    }
+
+    private static PageLayoutImportField toPageLayoutImportField(Schema.DescribeFieldResult fieldDescribe) {
         if (fieldDescribe == null || !fieldDescribe.isAccessible()) {
             return null;
         }
@@ -2430,22 +2891,12 @@ public with sharing class NativeFormsDesignerController {
             return null;
         }
 
-        if (mode == 'create') {
-            if (!fieldDescribe.isCreateable()) {
-                return null;
-            }
-        } else if (mode == 'secureUpdateOrCreate') {
-            if (!fieldDescribe.isCreateable() || !fieldDescribe.isUpdateable()) {
-                return null;
-            }
-        } else if (!fieldDescribe.isUpdateable()) {
-            return null;
-        }
-
         PageLayoutImportField fieldSpec = new PageLayoutImportField();
         fieldSpec.apiName = fieldName;
         fieldSpec.label = fieldDescribe.getLabel();
         fieldSpec.required = !fieldDescribe.isNillable() && !fieldDescribe.isDefaultedOnCreate();
+        fieldSpec.createOnly = false;
+        fieldSpec.submitWhen = 'always';
         Schema.DisplayType fieldType = fieldDescribe.getType();
 
         if (fieldType == Schema.DisplayType.Boolean) {
@@ -2489,6 +2940,11 @@ public with sharing class NativeFormsDesignerController {
             fieldSpec.options = picklistOptionsForImport(fieldDescribe);
             return fieldSpec.options.isEmpty() ? null : fieldSpec;
         }
+        if (fieldType == Schema.DisplayType.MultiPicklist) {
+            fieldSpec.elementType = 'multiCheckbox';
+            fieldSpec.options = picklistOptionsForImport(fieldDescribe);
+            return fieldSpec.options.isEmpty() ? null : fieldSpec;
+        }
         if (fieldType == Schema.DisplayType.Reference) {
             List<Schema.SObjectType> targets = fieldDescribe.getReferenceTo();
             if (targets == null || targets.size() != 1) {
@@ -2523,12 +2979,42 @@ public with sharing class NativeFormsDesignerController {
         return options;
     }
 
+    private static List<Object> picklistOptionsFromLayoutField(Map<String, Object> rawField) {
+        List<Object> options = new List<Object>();
+        Object rawOptions = rawField == null ? null : rawField.get('picklistValues');
+        if (!(rawOptions instanceof List<Object>)) {
+            rawOptions = rawField == null ? null : rawField.get('options');
+        }
+        if (!(rawOptions instanceof List<Object>)) {
+            return options;
+        }
+        Set<String> seenValues = new Set<String>();
+        for (Object rawOption : (List<Object>) rawOptions) {
+            if (!(rawOption instanceof Map<String, Object>)) {
+                continue;
+            }
+            Map<String, Object> optionMap = (Map<String, Object>) rawOption;
+            String optionValue = stringValue(optionMap.get('value'));
+            if (String.isBlank(optionValue) || seenValues.contains(optionValue)) {
+                continue;
+            }
+            String optionLabel = stringValue(optionMap.get('label'));
+            options.add(new Map<String, Object>{
+                'label' => String.isBlank(optionLabel) ? optionValue : optionLabel,
+                'value' => optionValue
+            });
+            seenValues.add(optionValue);
+        }
+        return options;
+    }
+
     private static List<NF_Form_Element__c> buildPageLayoutImportElements(
         Id versionId,
         PageLayoutImportPlan plan,
         Boolean secureMode,
         String prefillAlias,
-        String submitActionKey
+        String submitActionKey,
+        String languageCode
     ) {
         List<NF_Form_Element__c> elements = new List<NF_Form_Element__c>();
         Integer orderValue = 10;
@@ -2580,7 +3066,7 @@ public with sharing class NativeFormsDesignerController {
             Integer column = 2;
             for (PageLayoutImportField fieldSpec : sectionSpec.fields) {
                 String fieldKey = uniqueImportedFieldKey(fieldSpec.apiName, usedFieldKeys);
-                Map<String, Object> config = configForImportedField(fieldSpec, secureMode, prefillAlias, submitActionKey);
+                Map<String, Object> config = configForImportedField(fieldSpec, secureMode, prefillAlias, submitActionKey, languageCode);
                 config.put('sectionColumn', column);
                 elements.add(new NF_Form_Element__c(
                     Form_Version__c = versionId,
@@ -2601,20 +3087,70 @@ public with sharing class NativeFormsDesignerController {
         return elements;
     }
 
+    private static List<NF_Form_Element__c> filterStorableImportedElements(List<NF_Form_Element__c> elements, PageLayoutImportPlan plan) {
+        List<NF_Form_Element__c> storable = new List<NF_Form_Element__c>();
+        if (elements == null) {
+            return storable;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            elementRecord.Label__c = truncateText(elementRecord.Label__c, ELEMENT_LABEL_MAX_LENGTH);
+            Integer configLength = String.isBlank(elementRecord.Config_JSON__c) ? 0 : elementRecord.Config_JSON__c.length();
+            if (configLength > ELEMENT_CONFIG_JSON_MAX_LENGTH) {
+                if (plan != null) {
+                    plan.skippedFieldCount++;
+                    addPageLayoutSkippedDetail(
+                        plan,
+                        elementRecord.Field_Key__c,
+                        elementRecord.Label__c,
+                        'Too many choices to store',
+                        'This field generated more option/configuration data than Salesforce can store in the TwinaForms element record.',
+                        'Reduce the number of active Salesforce picklist values for this field, or add the field manually later with a smaller choice set.'
+                    );
+                    plan.warnings.add('One field was skipped because its generated options were too large to store.');
+                }
+                continue;
+            }
+            storable.add(elementRecord);
+        }
+        return storable;
+    }
+
+    private static String truncateText(String value, Integer maxLength) {
+        if (String.isBlank(value) || maxLength == null || maxLength <= 0 || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
+    private static String dmlMessage(DmlException e) {
+        if (e == null) {
+            return 'Salesforce did not return more details.';
+        }
+        try {
+            if (e.getNumDml() > 0 && String.isNotBlank(e.getDmlMessage(0))) {
+                return e.getDmlMessage(0);
+            }
+        } catch (Exception ignored) {
+        }
+        return String.isBlank(e.getMessage()) ? 'Salesforce did not return more details.' : e.getMessage();
+    }
+
     private static Map<String, Object> configForImportedField(
         PageLayoutImportField fieldSpec,
         Boolean secureMode,
         String prefillAlias,
-        String submitActionKey
+        String submitActionKey,
+        String languageCode
     ) {
         Map<String, Object> config = new Map<String, Object>{
             'labelPosition' => fieldSpec.elementType == 'checkbox' ? 'inline' : 'above',
-            'fieldBehavior' => 'editable',
+            'fieldBehavior' => fieldSpec.createOnly == true ? 'readonlyWhenPrefilled' : 'editable',
             'required' => fieldSpec.required == true,
             'defaultValue' => '',
             'submitEnabled' => true,
             'submitActionKey' => submitActionKey,
-            'submitFieldPath' => fieldSpec.apiName
+            'submitFieldPath' => fieldSpec.apiName,
+            'submitWhen' => String.isBlank(fieldSpec.submitWhen) ? 'always' : fieldSpec.submitWhen
         };
         if (secureMode) {
             config.put('prefillEnabled', true);
@@ -2623,23 +3159,23 @@ public with sharing class NativeFormsDesignerController {
         }
         if (fieldSpec.elementType == 'textarea') {
             config.put('rows', 4);
-            config.put('placeholder', 'Enter longer text');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderTextarea', 'Enter longer text'));
         } else if (fieldSpec.elementType == 'number') {
-            config.put('placeholder', 'Enter number');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderNumber', 'Enter number'));
             config.put('isFormula', false);
             config.put('formulaExpression', '');
         } else if (fieldSpec.elementType == 'email') {
-            config.put('placeholder', 'name@example.com');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderEmail', 'name@example.com'));
         } else if (fieldSpec.elementType == 'tel') {
-            config.put('placeholder', 'Phone number');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderPhone', 'Phone number'));
         } else if (fieldSpec.elementType == 'url') {
-            config.put('placeholder', 'https://example.com');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderUrl', 'https://example.com'));
         } else if (fieldSpec.elementType == 'checkbox') {
             config.put('checked', false);
-        } else if (fieldSpec.elementType == 'select') {
+        } else if (fieldSpec.elementType == 'select' || fieldSpec.elementType == 'multiCheckbox') {
             config.put('options', fieldSpec.options == null ? new List<Object>() : fieldSpec.options);
         } else if (fieldSpec.elementType == 'lookup') {
-            config.put('placeholder', 'Search records');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'lookupSearchPlaceholder', 'Search records'));
             config.put('lookupTargetObject', fieldSpec.lookupTargetObject);
             config.put('lookupSearchFields', new List<Object>{ 'Name' });
             config.put('lookupDisplayFields', new List<Object>{ 'Name' });
@@ -2652,7 +3188,7 @@ public with sharing class NativeFormsDesignerController {
             config.put('placeholder', '19:00');
             config.put('timeFormat', '24h');
         } else {
-            config.put('placeholder', 'Enter text');
+            config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderText', 'Enter text'));
             config.put('isFormula', false);
             config.put('formulaExpression', '');
         }
@@ -2707,21 +3243,22 @@ public with sharing class NativeFormsDesignerController {
         throw new AuraHandledException('Select a supported Salesforce page layout source.');
     }
 
-    private static String buildPageLayoutImportUiSettingsJson(Boolean secureMode) {
+    private static String buildPageLayoutImportUiSettingsJson(Boolean secureMode, String languageCode) {
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
         Map<String, Object> uiSettings = new Map<String, Object>{
-            'languageCode' => 'en',
-            'submitSuccessMessage' => 'Your form was submitted successfully.',
-            'submitLabel' => 'Submit',
-            'rtlEnabled' => false,
+            'languageCode' => normalizedLanguageCode,
+            'submitSuccessMessage' => localizedFormSettingDefault('submitSuccessMessage', normalizedLanguageCode, 'Your form was submitted successfully.'),
+            'submitLabel' => localizedFormSettingDefault('submitLabel', normalizedLanguageCode, 'Submit'),
+            'rtlEnabled' => normalizedLanguageCode == 'he',
             'secretCodeVerificationEnabled' => secureMode == true,
             'secretCodeMatchField' => 'Email',
-            'secretCodeIntroText' => '',
-            'secretCodeSentMessage' => '',
-            'secretCodeInvalidMessage' => '',
-            'secretCodeVerifiedMessage' => '',
-            'secretCodeSendButtonLabel' => '',
-            'secretCodeVerifyButtonLabel' => '',
-            'secretCodeResendButtonLabel' => '',
+            'secretCodeIntroText' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeIntroText', ''),
+            'secretCodeSentMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeSentMessage', ''),
+            'secretCodeInvalidMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeInvalidMessage', ''),
+            'secretCodeVerifiedMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeVerifiedMessage', ''),
+            'secretCodeSendButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeSendButtonLabel', ''),
+            'secretCodeVerifyButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeVerifyButtonLabel', ''),
+            'secretCodeResendButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeResendButtonLabel', ''),
             'secretCodeExpiryMinutes' => 10,
             'secretCodeMaxAttempts' => 5,
             'secretCodeAllowResend' => true,
@@ -2730,12 +3267,21 @@ public with sharing class NativeFormsDesignerController {
         return JSON.serializePretty(uiSettings);
     }
 
-    private static String buildPageLayoutImportPrefillParamsJson(String mode) {
+    private static String buildPageLayoutImportPrefillParamsJson(String mode, String languageCode) {
         Boolean recordIdRequired = normalizePageLayoutImportMode(mode) == 'secureUpdate';
         return JSON.serializePretty(new List<Object>{
-            new Map<String, Object>{ 'key' => 'recordId', 'label' => 'Record Id', 'required' => recordIdRequired },
-            new Map<String, Object>{ 'key' => 'email', 'label' => 'Email', 'required' => false }
+            new Map<String, Object>{ 'key' => 'recordId', 'label' => localizedRecordIdLabel(languageCode), 'required' => recordIdRequired },
+            new Map<String, Object>{ 'key' => 'email', 'label' => defaultLabelForType('email', null, languageCode), 'required' => false }
         });
+    }
+
+    private static String localizedRecordIdLabel(String languageCode) {
+        String normalizedLanguageCode = defaultLanguageCode(languageCode);
+        if (normalizedLanguageCode == 'he') return '\u05DE\u05D6\u05D4\u05D4 \u05E8\u05E9\u05D5\u05DE\u05D4';
+        if (normalizedLanguageCode == 'es') return 'Id. de registro';
+        if (normalizedLanguageCode == 'de') return 'Datensatz-ID';
+        if (normalizedLanguageCode == 'fr') return 'ID enregistrement';
+        return 'Record Id';
     }
 
     private static String titleFromFileName(String fileName) {
@@ -3077,6 +3623,14 @@ public with sharing class NativeFormsDesignerController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static Integer readColumns(String rawJson) {
+        Integer parsed = integerValue(parseJsonMap(rawJson).get('columns'));
+        if (parsed == null || parsed < 1) {
+            return 1;
+        }
+        return Math.min(10, parsed);
     }
 
     private static void validateContainerPlacement(NF_Form_Element__c sectionRecord, NF_Form_Element__c elementRecord) {

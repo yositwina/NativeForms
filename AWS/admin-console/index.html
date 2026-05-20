@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260423-1">
+  <link rel="stylesheet" href="./styles.css?v=20260520-2">
 </head>
 <body>
   <div class="admin-app">
@@ -196,12 +196,13 @@
               <table class="tenant-table">
                 <thead>
                   <tr>
-                    <th>Customer</th>
+                    <th class="is-sortable" data-sort-key="companyName"><button type="button" class="th-sort"><span>Customer</span><span class="sort-indicator">▴▾</span></button></th>
+                    <th class="is-sortable" data-sort-key="startedAt"><button type="button" class="th-sort"><span>Started</span><span class="sort-indicator">▴▾</span></button></th>
                     <th>Plan</th>
                     <th>Status</th>
                     <th>Setup</th>
                     <th>Health</th>
-                    <th>Activity</th>
+                    <th class="is-sortable" data-sort-key="lastActivityAt"><button type="button" class="th-sort"><span>Activity</span><span class="sort-indicator">▴▾</span></button></th>
                     <th>Month</th>
                   </tr>
                 </thead>
@@ -366,7 +367,7 @@
     </main>
   </div>
 
-  <script src="./config.js?v=20260423-1"></script>
-  <script type="module" src="./app.js?v=20260423-1"></script>
+  <script src="./config.js?v=20260520-2"></script>
+  <script type="module" src="./app.js?v=20260520-2"></script>
 </body>
 </html>

@@ -197,6 +197,9 @@ private class NativeFormsPublisherTest {
         System.assert(mock.uploadedHtml.contains('data-nativeforms-time="true"'), 'Generated HTML should render Time fields as TwinaForms-controlled text inputs.');
         System.assert(mock.uploadedHtml.contains('data-time-format="24h"'), 'Generated HTML should include the configured Time display format.');
         System.assert(mock.uploadedHtml.contains('value="09:30"'), 'Generated HTML should keep plain HH:mm default values for Time fields.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-multi-checkbox="true"'), 'Generated HTML should render Multi Checkbox options as checkbox controls.');
+        System.assert(mock.uploadedHtml.contains('readMultiCheckboxValue'), 'Generated HTML should collect Multi Checkbox values as semicolon strings.');
+        System.assert(mock.uploadedHtml.contains('validateMultiCheckboxGroups()'), 'Generated HTML should validate required Multi Checkbox groups before submit.');
         System.assert(mock.uploadedHtml.contains('https://example.com/theme-logo.png'), 'Generated HTML should include the theme logo URL.');
         System.assert(mock.uploadedHtml.contains('https://twinaforms.com/help/formulas'), 'Generated HTML should preserve rich text links.');
         System.assert(mock.uploadedHtml.contains('data:image/png;base64,'), 'Generated HTML should inline image assets when contentVersionId is present.');
@@ -229,6 +232,18 @@ private class NativeFormsPublisherTest {
         System.assertEquals(true, secretCodeConfig.get('enabled'), 'Register payload should include secret-code settings when enabled.');
         System.assertEquals('Email', String.valueOf(secretCodeConfig.get('matchField')), 'Register payload should preserve the configured secret-code match field.');
         System.assertEquals('short', String.valueOf(secretCodeConfig.get('sessionMode')), 'Secret-code sessions should default to short mode.');
+        Map<String, Object> submissionPdfConfig = (Map<String, Object>) registerPayload.get('submissionPdf');
+        List<Object> submissionPdfSchema = (List<Object>) submissionPdfConfig.get('schema');
+        Boolean foundMultiCheckboxSchema = false;
+        for (Object schemaValue : submissionPdfSchema) {
+            Map<String, Object> schemaItem = (Map<String, Object>) schemaValue;
+            if (String.valueOf(schemaItem.get('fieldKey')) == 'needs1') {
+                foundMultiCheckboxSchema = true;
+                System.assertEquals('multiCheckbox', String.valueOf(schemaItem.get('type')), 'Submission PDF schema should preserve Multi Checkbox type.');
+                System.assertEquals(2, ((List<Object>) schemaItem.get('options')).size(), 'Submission PDF schema should include Multi Checkbox option labels.');
+            }
+        }
+        System.assertEquals(true, foundMultiCheckboxSchema, 'Submission PDF schema should include top-level Multi Checkbox fields.');
 
         List<Object> uploadFields = (List<Object>) registerPayload.get('uploadFields');
         System.assertEquals(1, uploadFields.size(), 'Register payload should expose upload field metadata for file-upload controls.');
@@ -245,7 +260,25 @@ private class NativeFormsPublisherTest {
         System.assertEquals(1, ((List<Object>) prefillDefinition.get('commands')).size(), 'Prefill definition should include the configured prefill command.');
 
         Map<String, Object> submitDefinition = (Map<String, Object>) registerPayload.get('submitDefinition');
-        System.assertEquals(4, ((List<Object>) submitDefinition.get('commands')).size(), 'Submit definition should expand find-and-update and records-list commands.');
+        List<Object> submitCommands = (List<Object>) submitDefinition.get('commands');
+        System.assertEquals(4, submitCommands.size(), 'Submit definition should expand find-and-update and records-list commands.');
+        Map<String, Object> updateContactCommand;
+        Map<String, Object> createContactCommand;
+        for (Object commandValue : submitCommands) {
+            Map<String, Object> command = (Map<String, Object>) commandValue;
+            if (String.valueOf(command.get('commandKey')) == 'submitAction1') {
+                updateContactCommand = command;
+            }
+            if (String.valueOf(command.get('commandKey')) == 'submitAction1_create') {
+                createContactCommand = command;
+            }
+        }
+        Map<String, Object> updateFields = (Map<String, Object>) updateContactCommand.get('fields');
+        Map<String, Object> updateCreateOnlyFields = (Map<String, Object>) updateContactCommand.get('createOnlyFields');
+        Map<String, Object> createFields = (Map<String, Object>) createContactCommand.get('fields');
+        System.assertEquals(false, updateFields.containsKey('AccountId'), 'Create-only mapped fields should not be sent to update.');
+        System.assertEquals('{input.accountId}', String.valueOf(updateCreateOnlyFields.get('AccountId')), 'Update commands should carry create-only fields for fallback create.');
+        System.assertEquals('{input.accountId}', String.valueOf(createFields.get('AccountId')), 'Create commands should submit create-only fields normally.');
 
         NF_Form_Version__c publishedVersion = [
             SELECT Version_Status__c, Publish_Status__c, Publish_Token__c, Form_Id__c, Last_Published_At__c, Last_Publish_Error__c
@@ -299,7 +332,7 @@ private class NativeFormsPublisherTest {
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :successorDraft.Id
         ];
-        System.assertEquals(20, successorElementCount, 'Successor draft should clone all publishable elements.');
+        System.assertEquals(23, successorElementCount, 'Successor draft should clone all publishable elements.');
         System.assertEquals(3, successorActionCount, 'Successor draft should clone all configured actions.');
         }
     }
@@ -545,6 +578,17 @@ private class NativeFormsPublisherTest {
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'image', 'Hero Image', 'image1', 4, 40, withSectionColumn(json(new Map<String, Object>{ 'contentVersionId' => String.valueOf(imageVersion.Id), 'altText' => 'Hero image', 'imageFit' => 'center', 'imageWidthPercent' => 50 }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'email', 'Email', 'email1', 5, 50, withSectionColumn(fieldConfig('above', false, true, 'PrefilContact', 'Email', true, 'submitAction1', 'Email'), 1), groupElement.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'tel', 'Phone', 'phone1', 6, 60, withSectionColumn(fieldConfig('above', false, false, null, null, true, 'submitAction1', 'Phone'), 1), groupElement.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'lookup', 'Account', 'accountId', 22, 65, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'fieldBehavior' => 'readonlyWhenPrefilled',
+            'lookupTargetObject' => 'Account',
+            'lookupDisplayFields' => new List<Object>{ 'Name' },
+            'lookupSearchFields' => new List<Object>{ 'Name' },
+            'submitEnabled' => true,
+            'submitActionKey' => 'submitAction1',
+            'submitFieldPath' => 'AccountId',
+            'submitWhen' => 'create'
+        }), 1), groupElement.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'date', 'Start Date', 'date1', 7, 70, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'dateFormat' => 'us', 'minDate' => '2026-01-01', 'maxDate' => '2026-12-31' }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'time', 'Start Time', 'time1', 19, 75, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'defaultValue' => '09:30', 'placeholder' => '19:00', 'timeFormat' => '24h' }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'checkbox', 'Accept Terms', 'checkbox1', 8, 80, withSectionColumn(NativeFormsTestConfigFactory.checkboxConfigJson(false), 1), section.Element_Id__c);
@@ -552,6 +596,19 @@ private class NativeFormsPublisherTest {
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'textarea', 'Notes', 'notes1', 10, 100, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'rows' => 4 }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'url', 'Website', 'website1', 11, 110, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'placeholderText' => 'https://example.com' }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'select', 'Priority', 'priority1', 12, 120, withSectionColumn(optionFieldConfig('above', selectOptions()), 1), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'multiCheckbox', 'Needs', 'needs1', 23, 125, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'fieldBehavior' => 'editable',
+            'defaultValue' => 'low;high',
+            'required' => true,
+            'options' => selectOptions(),
+            'prefillEnabled' => true,
+            'prefillAlias' => 'PrefilContact',
+            'prefillFieldPath' => 'Needs__c',
+            'submitEnabled' => true,
+            'submitActionKey' => 'submitAction1',
+            'submitFieldPath' => 'Needs__c'
+        }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'radio', 'Title', 'title1', 13, 130, withSectionColumn(optionFieldConfig('above', radioOptions()), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'fileUpload', 'Attachment', 'file1', 14, 140, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'allowMultiple' => true, 'allowedExtensions' => 'pdf,png', 'maxFileSizeMb' => 10, 'targetSubmitActionKey' => 'submitAction1' }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'signature', 'Signature', 'signature1', 21, 145, withSectionColumn(NativeFormsTestConfigFactory.signatureConfigJson('submitAction1'), 2), section.Element_Id__c);
@@ -588,6 +645,16 @@ private class NativeFormsPublisherTest {
             'submitEnabled' => true,
             'submitActionKey' => 'submitAction2',
             'submitFieldPath' => 'Priority'
+        }), 2), repeatGroup.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'multiCheckbox', 'Case Needs', 'caseNeeds', 24, 175, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'options' => selectOptions(),
+            'prefillEnabled' => true,
+            'prefillAlias' => 'PrefilCase',
+            'prefillFieldPath' => 'Needs__c',
+            'submitEnabled' => true,
+            'submitActionKey' => 'submitAction2',
+            'submitFieldPath' => 'Needs__c'
         }), 2), repeatGroup.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'text', 'Case Id', 'caseId', 18, 180, withSectionColumn(json(new Map<String, Object>{
             'labelPosition' => 'above',

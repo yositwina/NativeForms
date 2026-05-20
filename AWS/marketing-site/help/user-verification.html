@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User verification &mdash; TwinaForms Help</title>
+  <meta name="description" content="How TwinaForms Secret Code verification works: gate sensitive forms behind a one-time email-code step tied to the visitor's Salesforce Contact record.">
+  <link rel="stylesheet" href="/help/styles.css?v=20260519-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <a class="back-link" href="/help/index.html">&larr; All help topics</a>
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>User verification &mdash; Secret Code access to sensitive forms.</h1>
+      <p class="hero-copy">Secret Code verification gates a form behind a one-time code that's sent to the visitor's email. The visitor's email must match an existing Salesforce <strong>Contact</strong> &mdash; that's how TwinaForms knows it's safe to show or update the right record. Verification happens on the Salesforce side, so the gate is enforced inside your org's own trust boundary.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#concept">How it works</a>
+        <a href="#enable">Enable Secret Code</a>
+        <a href="#block">Configure the block</a>
+        <a href="#session">Session duration</a>
+        <a href="#gotchas">Limits &amp; gotchas</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+
+    <section class="section" id="concept">
+      <h2>How it works</h2>
+      <p>When Secret Code is on, opening the published form does not immediately show the form. The visitor first sees the Secret Code block: a panel asking for their email, followed by a code input. The visitor enters their email; TwinaForms looks it up against Salesforce Contacts; if a Contact is found, a one-time code is sent to that email; the visitor enters the code; and only then does the form render.</p>
+      <p>The Contact match is the security gate. Visitors whose email is not on any Contact in your Salesforce org cannot pass verification and never see the form, even though the URL itself is public.</p>
+    </section>
+
+    <section class="section" id="enable">
+      <h2>Enable Secret Code</h2>
+      <p>Secret Code is a per-form setting:</p>
+      <ol class="steps">
+        <li>Open the form in the Designer.</li>
+        <li>Click outside any element so the right panel shows <strong>Form Settings</strong>.</li>
+        <li>Tick the <strong>Secret Code</strong> checkbox.</li>
+        <li>Republish the form &mdash; the gate is enforced at the published-form layer, not in the Draft preview.</li>
+      </ol>
+      <p>When you enable Secret Code, a <strong>Secret Code block</strong> is added to the canvas. The block represents the verification UI the visitor will see; it is not a normal submitted field, so nothing the visitor types inside the block is sent into your form's submit actions.</p>
+    </section>
+
+    <section class="section" id="block">
+      <h2>Configure the block</h2>
+      <p>The Secret Code block on the canvas is selectable. Click it, and its configuration appears in the right-side <strong>Element Properties</strong> panel &mdash; just like any other element. The properties panel is the source of truth for everything you can customize about this block: messages, button labels, the Contact-matching rule, and the session duration. Open it to see the full set for your form.</p>
+      <div class="callout">
+        <strong>Reorder note:</strong> the Secret Code block can be moved on the canvas using normal drag-and-drop, but most forms leave it at the top so verification is the first thing the visitor sees.
+      </div>
+    </section>
+
+    <section class="section" id="session">
+      <h2>Session duration</h2>
+      <p>Two session modes are supported per form version:</p>
+      <ul>
+        <li><strong>Short session (default)</strong> &mdash; the visitor stays verified for the duration of the code's expiry window. Refresh the tab and they re-enter their email.</li>
+        <li><strong>Same-tab session</strong> &mdash; the verified token is stored in the browser's <span class="inline">sessionStorage</span>, so the visitor survives a tab refresh without re-verifying. Closing the tab clears the session. The session also expires at the visitor's local midnight, and is capped at <strong>12 hours</strong>.</li>
+      </ul>
+      <p>V1 intentionally does not use <span class="inline">localStorage</span>, so a fresh browser tab always starts a fresh verification.</p>
+    </section>
+
+    <section class="section" id="gotchas">
+      <h2>Limits &amp; gotchas</h2>
+      <ul>
+        <li>Verification is enforced on the <strong>published</strong> form only. The Draft preview does not run the Secret Code step.</li>
+        <li>V1 always uses Salesforce <strong>Contact</strong> matched by email. Arbitrary-object identity verification (e.g., matching an Account or a custom object) is not supported in V1.</li>
+        <li>If the visitor's email isn't on any Salesforce Contact, the visitor cannot edit the form through Secret Code mode. For situations where Contact/email matching isn't appropriate, leave Secret Code off and use a create-only flow.</li>
+        <li>Email deliverability depends on your Salesforce email setup since verification runs on the Salesforce side. If visitors say they aren't receiving codes, check spam folders and outbound email configuration in Salesforce.</li>
+        <li>Combine Secret Code with the <strong>Locked</strong> field behavior so prefilled Contact data is read-only on the form &mdash; useful when you want the visitor to confirm or update only specific fields.</li>
+      </ul>
+    </section>
+
+    </div>
+    </div>
+  </main>
+</body>
+</html>

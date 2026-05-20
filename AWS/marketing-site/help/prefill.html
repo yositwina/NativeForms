@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prefill &mdash; TwinaForms Help</title>
+  <meta name="description" content="How prefill works in TwinaForms: load Salesforce data into the form before the user sees it. Build prefill actions, map results to fields, and test with URL parameters.">
+  <link rel="stylesheet" href="/help/styles.css?v=20260519-1">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <a class="back-link" href="/help/index.html">&larr; All help topics</a>
+      <p class="eyebrow">TwinaForms Help</p>
+      <h1>Prefill &mdash; load Salesforce data into the form.</h1>
+      <p class="hero-copy">Prefill runs queries against Salesforce <em>before</em> the user sees the form, then maps the results into fields. You drive it from URL parameters (like an email address), from values already in the form, or from the result of an earlier prefill query.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#concept">How it works</a>
+        <a href="#build">Build a prefill action</a>
+        <a href="#alias">The alias</a>
+        <a href="#mapping">Map results to fields</a>
+        <a href="#test">Test with URL parameters</a>
+        <a href="#advanced">orderBy, limit, onNotFound</a>
+      </nav>
+    </section>
+
+    <div class="layout">
+    <div class="layout__main">
+
+    <section class="section" id="concept">
+      <h2>How it works</h2>
+      <p>When a user opens a published form URL, TwinaForms runs all prefill actions <strong>server-side</strong> before rendering the form. Each action queries Salesforce based on a condition you define, stores the result under a name you choose (the <strong>alias</strong>), and then maps fields from that result into form elements.</p>
+      <p>A typical example: you email a customer a link like <span class="inline">https://your-form.twinaforms.com/case-update?caseId=500XX0000000ABC</span>. A prefill action reads <span class="inline">{params.caseId}</span>, queries the Case, and populates the form's Subject and Description so the customer just needs to add their reply.</p>
+    </section>
+
+    <section class="section" id="build">
+      <h2>Build a prefill action</h2>
+      <p>Open the <strong>Prefill Actions</strong> tab inside the Designer and click <strong>+ Add prefill action</strong>. You'll choose three things:</p>
+      <ol>
+        <li><strong>Command</strong> &mdash; how Salesforce should be queried.</li>
+        <li><strong>Salesforce Object</strong> &mdash; what to query.</li>
+        <li><strong>Match conditions</strong> &mdash; how to find the right record(s).</li>
+      </ol>
+
+      <h3>Command types</h3>
+      <ul>
+        <li><strong>Find one record</strong> (<span class="inline">findOne</span>) &mdash; query for a single record matching your conditions. Returns the first match, or nothing if there's no match.</li>
+        <li><strong>Get by Id</strong> (<span class="inline">getById</span>) &mdash; read a single record directly by its Salesforce Id. Use this when you have the Id in a URL parameter.</li>
+        <li><strong>Find multiple records</strong> (<span class="inline">findMany</span>) &mdash; query for a list. Used to populate a Records List (repeat group), or a picklist's options.</li>
+      </ul>
+
+      <h3>Match conditions</h3>
+      <p>A condition compares a <strong>Salesforce field</strong> on the queried object to a <strong>value source</strong>. Each value source comes from somewhere:</p>
+      <ul>
+        <li><strong>URL Parameter</strong> &mdash; from the form URL's query string, e.g. <span class="inline">?email=user@example.com</span> becomes <span class="inline">{params.email}</span>.</li>
+        <li><strong>Form Field</strong> &mdash; the current value of another field on the form.</li>
+        <li><strong>Literal Value</strong> &mdash; a fixed string or number you type in.</li>
+        <li><strong>Alias Reference</strong> (Pro) &mdash; a field from a previous prefill action's result. Lets you chain queries together.</li>
+      </ul>
+      <p>Operators include <span class="inline">equals</span>, <span class="inline">not equals</span>, <span class="inline">contains</span>, <span class="inline">starts with</span>, <span class="inline">greater than</span>, <span class="inline">less than</span>, <span class="inline">is blank</span>, and <span class="inline">is not blank</span>. Multiple conditions can be combined with AND / OR (multi-condition logic is a Pro capability).</p>
+    </section>
+
+    <section class="section" id="alias">
+      <h2>The alias &mdash; "Store result as"</h2>
+      <p>Every prefill action stores its result under a name you choose &mdash; the <strong>alias</strong>. The alias is how you reference the result later when you map it to form fields, or when you reference it from another prefill action.</p>
+      <p>For example, a prefill action that finds a Contact by email might use <span class="inline">foundContact</span> as its alias. Then on any form field, you can map a value from <span class="inline">foundContact.FirstName</span>, <span class="inline">foundContact.Email</span>, and so on.</p>
+      <div class="callout">
+        <strong>Naming tip:</strong> use clear, intentional aliases like <span class="inline">foundContact</span>, <span class="inline">caseRecord</span>, or <span class="inline">recentOrders</span>. They'll appear in dropdowns when you set up field mapping, so a useful name saves time later.
+      </div>
+    </section>
+
+    <section class="section" id="mapping">
+      <h2>Map prefill results to fields</h2>
+      <p>Mapping happens on the field itself, not in the Prefill Actions tab. Select an input element on the canvas, then in the right-panel properties:</p>
+      <ol>
+        <li>Toggle <strong>Enable Prefill</strong> on.</li>
+        <li>Choose the <strong>Prefill Alias</strong> from the dropdown (e.g. <span class="inline">foundContact</span>).</li>
+        <li>Choose the <strong>Field Path</strong> on that result (e.g. <span class="inline">Email</span> or <span class="inline">Account.Name</span>).</li>
+      </ol>
+      <p>The form will populate that field automatically when it loads. If you also turn on <strong>Locked</strong> field behavior, the field will be displayed as read-only when prefilled &mdash; useful for showing the user data you don't want them to edit.</p>
+      <div class="callout">
+        <strong>See all mappings at a glance:</strong> the <strong>Prefill Actions</strong> tab's right panel shows a summary of every field that has prefill enabled, grouped by the action they reference. Useful for reviewing or cleaning up mappings without opening each field one by one.
+      </div>
+    </section>
+
+    <section class="section" id="test">
+      <h2>Test with URL parameters</h2>
+      <p>You can only test prefill on a <strong>published</strong> form &mdash; Draft versions don't run prefill. After publishing:</p>
+      <ol>
+        <li>Open the form's public URL.</li>
+        <li>Append the parameters that your prefill actions need, e.g. <span class="inline">?email=test@example.com&amp;source=newsletter</span>.</li>
+        <li>Open the URL in a browser. The form should render with values already filled in.</li>
+      </ol>
+      <p>If something doesn't populate as expected, open the form's <strong>Submission Logs</strong> after a test submission. The log records which prefill matches happened, which were skipped, and any errors from Salesforce.</p>
+    </section>
+
+    <section class="section" id="advanced">
+      <h2>orderBy, limit, and "If no record found"</h2>
+      <p>Three additional settings shape how a prefill behaves:</p>
+      <ul>
+        <li><strong>Order By</strong> (findMany only) &mdash; sort results by a field. Common choices are <span class="inline">CreatedDate DESC</span> for "most recent first" or <span class="inline">Name ASC</span> alphabetical.</li>
+        <li><strong>Limit</strong> (findMany only) &mdash; the maximum number of records to return. Useful when you only want, say, the 10 most recent cases.</li>
+        <li><strong>If no record found</strong> (findOne and getById) &mdash; <em>Continue without prefill</em> renders the form blank for that field, while <em>Show error</em> prevents the form from rendering and shows an error to the user. Default is "Continue without prefill".</li>
+      </ul>
+    </section>
+
+    </div>
+    </div>
+  </main>
+</body>
+</html>

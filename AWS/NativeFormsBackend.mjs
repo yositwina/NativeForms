@@ -1620,6 +1620,12 @@ function validateSalesforceLayoutPayload(payload) {
   if (!validateOrgId(normalizeOrgId(payload.orgId))) throw new Error("Invalid orgId");
   if (!payload?.objectApiName) throw new Error("Missing required field: objectApiName");
   if (!isSafeSalesforceIdentifier(payload.objectApiName)) throw new Error("Invalid objectApiName");
+  if (payload?.languageCode) {
+    const requestedLanguageCode = String(payload.languageCode || "").trim().toLowerCase();
+    if (!["en", "he", "es", "de", "fr"].includes(requestedLanguageCode)) {
+      throw new Error("Invalid languageCode");
+    }
+  }
   if (payload?.recordTypeId && !/^[A-Za-z0-9]{15,18}$/.test(String(payload.recordTypeId))) {
     throw new Error("Invalid recordTypeId");
   }
@@ -1690,6 +1696,11 @@ async function refreshAccessToken(secret, loginUrl) {
   return tokenData.access_token;
 }
 
+function normalizeSalesforceLanguageCode(value) {
+  const normalized = String(value || "en").trim().toLowerCase();
+  return ["en", "he", "es", "de", "fr"].includes(normalized) ? normalized : "en";
+}
+
 function isSafeSalesforceIdentifier(value) {
   return /^[A-Za-z][A-Za-z0-9_]*(?:__c)?$/.test(String(value || ""));
 }
@@ -1753,14 +1764,15 @@ async function querySalesforce(instanceUrl, accessToken, soql) {
   return JSON.parse(response.body);
 }
 
-async function salesforceGetJson(instanceUrl, accessToken, path, failureLabel) {
+async function salesforceGetJson(instanceUrl, accessToken, path, failureLabel, extraHeaders = {}) {
   const url = new URL(instanceUrl);
   const response = await httpsRequest({
     hostname: url.hostname,
     path,
     method: "GET",
     headers: {
-      Authorization: `Bearer ${accessToken}`
+      Authorization: `Bearer ${accessToken}`,
+      ...extraHeaders
     }
   });
 
@@ -1819,6 +1831,36 @@ function collectLayoutItemFields(layoutItem) {
     .filter((apiName) => isSafeSalesforceIdentifier(apiName));
 }
 
+function objectFieldInfo(fieldsInfo, apiName) {
+  const normalizedKey = String(apiName || "").toLowerCase();
+  return fieldsInfo?.[apiName] ||
+    fieldsInfo?.[Object.keys(fieldsInfo || {}).find((key) => key.toLowerCase() === normalizedKey)] ||
+    {};
+}
+
+function normalizePicklistValues(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values
+    .filter((entry) => entry && typeof entry === "object")
+    .filter((entry) => entry.active !== false)
+    .map((entry) => ({
+      label: String(entry.label ?? entry.value ?? "").trim(),
+      value: String(entry.value ?? "").trim()
+    }))
+    .filter((entry) => entry.value);
+}
+
+function fieldInfoIsPicklist(fieldInfo) {
+  const dataType = String(fieldInfo?.dataType || fieldInfo?.type || "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+  return dataType === "picklist" ||
+    dataType === "multipicklist" ||
+    dataType === "multiselectpicklist";
+}
+
 function normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordTypeId) {
   const layoutNode = pickLayoutNode(layoutResponse, objectApiName);
   if (!layoutNode) {
@@ -1847,14 +1889,22 @@ function normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordT
             return;
           }
           seenFields.add(normalizedKey);
-          const fieldInfo = fieldsInfo[apiName] || fieldsInfo[Object.keys(fieldsInfo).find((key) => key.toLowerCase() === normalizedKey)] || {};
-          fields.push({
+          const fieldInfo = objectFieldInfo(fieldsInfo, apiName);
+          const normalizedField = {
             apiName,
             label: item?.label || fieldInfo?.label || apiName,
             required: item?.required === true || fieldInfo?.required === true,
             editableForNew: item?.editableForNew !== false,
             editableForUpdate: item?.editableForUpdate !== false
-          });
+          };
+          if (fieldInfoIsPicklist(fieldInfo)) {
+            normalizedField.dataType = fieldInfo.dataType || fieldInfo.type || "";
+            const inlineValues = normalizePicklistValues(fieldInfo.picklistValues || fieldInfo.values);
+            if (inlineValues.length) {
+              normalizedField.picklistValues = inlineValues;
+            }
+          }
+          fields.push(normalizedField);
         });
       });
     });
@@ -1886,12 +1936,56 @@ function normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordT
   };
 }
 
-async function getSalesforceAssignedLayout(instanceUrl, accessToken, objectApiName, requestedRecordTypeId) {
+async function enrichLayoutPicklistValues(layout, objectInfo, instanceUrl, accessToken, objectApiName, recordTypeId, languageHeaders) {
+  const fieldsInfo = objectInfo?.fields || {};
+  const effectiveRecordTypeId = String(recordTypeId || objectInfo?.defaultRecordTypeId || layout?.recordTypeId || "").trim();
+  if (!layout || !effectiveRecordTypeId) {
+    return layout;
+  }
+
+  const picklistFields = [];
+  (layout.sections || []).forEach((section) => {
+    (section.fields || []).forEach((field) => {
+      const fieldInfo = objectFieldInfo(fieldsInfo, field.apiName);
+      if (fieldInfoIsPicklist(fieldInfo)) {
+        picklistFields.push(field);
+      }
+    });
+  });
+
+  const warnings = layout.warnings || [];
+  await Promise.all(picklistFields.map(async (field) => {
+    try {
+      const picklistResponse = await salesforceGetJson(
+        instanceUrl,
+        accessToken,
+        `/services/data/${SALESFORCE_API_VERSION}/ui-api/object-info/${encodeURIComponent(objectApiName)}/picklist-values/${encodeURIComponent(effectiveRecordTypeId)}/${encodeURIComponent(field.apiName)}`,
+        `Salesforce picklist values for ${field.apiName}`,
+        languageHeaders
+      );
+      const values = normalizePicklistValues(picklistResponse?.values);
+      if (values.length) {
+        field.picklistValues = values;
+      }
+    } catch (error) {
+      warnings.push(`Translated picklist values could not be loaded for ${field.apiName}.`);
+    }
+  }));
+  layout.warnings = warnings;
+  return layout;
+}
+
+async function getSalesforceAssignedLayout(instanceUrl, accessToken, objectApiName, requestedRecordTypeId, languageCode = "en") {
+  const normalizedLanguageCode = normalizeSalesforceLanguageCode(languageCode);
+  const languageHeaders = {
+    "Accept-Language": normalizedLanguageCode
+  };
   const objectInfo = await salesforceGetJson(
     instanceUrl,
     accessToken,
     `/services/data/${SALESFORCE_API_VERSION}/ui-api/object-info/${encodeURIComponent(objectApiName)}`,
-    "Salesforce object metadata"
+    "Salesforce object metadata",
+    languageHeaders
   );
   const recordTypeId = String(requestedRecordTypeId || objectInfo?.defaultRecordTypeId || "").trim();
   const params = new URLSearchParams({
@@ -1906,9 +2000,13 @@ async function getSalesforceAssignedLayout(instanceUrl, accessToken, objectApiNa
     instanceUrl,
     accessToken,
     `/services/data/${SALESFORCE_API_VERSION}/ui-api/layout/${encodeURIComponent(objectApiName)}?${params.toString()}`,
-    "Salesforce page layout metadata"
+    "Salesforce page layout metadata",
+    languageHeaders
   );
-  return normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordTypeId);
+  const layout = normalizeUiApiLayout(layoutResponse, objectInfo, objectApiName, recordTypeId);
+  await enrichLayoutPicklistValues(layout, objectInfo, instanceUrl, accessToken, objectApiName, recordTypeId, languageHeaders);
+  layout.languageCode = normalizedLanguageCode;
+  return layout;
 }
 
 async function runSalesforceLayoutMetadata(payload, tenantRecord) {
@@ -1925,7 +2023,8 @@ async function runSalesforceLayoutMetadata(payload, tenantRecord) {
     connection.instance_url,
     accessToken,
     String(payload.objectApiName).trim(),
-    payload.recordTypeId
+    payload.recordTypeId,
+    payload.languageCode
   );
 
   return {
@@ -1933,6 +2032,7 @@ async function runSalesforceLayoutMetadata(payload, tenantRecord) {
     orgId,
     objectApiName: layout.objectApiName,
     objectLabel: layout.objectLabel,
+    languageCode: layout.languageCode,
     defaultLayoutKey: layout.layoutKey,
     layouts: [
       {

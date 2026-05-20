@@ -730,6 +730,114 @@ button:focus-visible {
   letter-spacing: 0.04em;
 }
 
+.tenant-table thead th.is-sortable {
+  padding: 0;
+}
+
+.tenant-table thead th.is-sortable .th-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tenant-table thead th.is-sortable .th-sort:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-strong, #17345d);
+}
+
+.tenant-table thead th .sort-indicator {
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  letter-spacing: 0;
+}
+
+.tenant-table thead th.is-sorted-active .sort-indicator {
+  color: var(--accent, #0b67d1);
+  font-size: 0.8rem;
+}
+
+.tenant-table thead th.is-sorted-active .th-sort {
+  color: var(--text-strong, #17345d);
+}
+
+.collapsible {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 10px;
+  background: rgba(248, 251, 255, 0.6);
+}
+
+.collapsible[open] {
+  background: #ffffff;
+}
+
+.collapsible > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: 10px;
+}
+
+.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible > summary:hover {
+  background: rgba(15, 108, 189, 0.05);
+}
+
+.collapsible > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 14px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  transition: transform 120ms ease;
+}
+
+.collapsible[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.collapsible > summary h5 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-strong, #17345d);
+}
+
+.collapsible__title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-strong, #17345d);
+}
+
+.collapsible__count {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft, #e4f0ff);
+  color: var(--accent, #0b67d1);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.collapsible[open] > .activity-stream {
+  padding: 0 1rem 1rem;
+}
+
 .tenant-table tbody tr {
   cursor: pointer;
   transition: background 140ms ease, transform 140ms ease;
