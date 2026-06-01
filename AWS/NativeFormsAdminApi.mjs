@@ -77,9 +77,17 @@ const FEATURE_FLAG_METADATA = {
     label: "Survey Fields",
     description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
   },
+  enableProLocationFields: {
+    label: "Country / State / City",
+    description: "Add AWS-backed country, state/region, and city autocomplete fields to Pro forms."
+  },
   enableProCustomJs: {
     label: "Custom JavaScript",
     description: "Run supported TwinaForms custom JavaScript in published forms for advanced behavior."
+  },
+  enableProButtonElements: {
+    label: "Portal Buttons",
+    description: "Add navigation buttons that link published forms or external portal destinations."
   },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
@@ -121,7 +129,9 @@ const DEFAULT_PLANS = [
       enableProElectronicSignature: false,
       enableProSubmissionPdf: false,
       enableProSurveyFields: false,
+      enableProLocationFields: false,
       enableProCustomJs: false,
+      enableProButtonElements: false,
       enableDetailedSubmissionLogs: false
     }
   },
@@ -152,7 +162,9 @@ const DEFAULT_PLANS = [
       enableProElectronicSignature: true,
       enableProSubmissionPdf: true,
       enableProSurveyFields: true,
+      enableProLocationFields: true,
       enableProCustomJs: true,
+      enableProButtonElements: true,
       enableDetailedSubmissionLogs: true
     }
   },
@@ -183,7 +195,9 @@ const DEFAULT_PLANS = [
       enableProElectronicSignature: false,
       enableProSubmissionPdf: false,
       enableProSurveyFields: false,
+      enableProLocationFields: false,
       enableProCustomJs: false,
+      enableProButtonElements: false,
       enableDetailedSubmissionLogs: true
     }
   },
@@ -214,7 +228,9 @@ const DEFAULT_PLANS = [
       enableProElectronicSignature: true,
       enableProSubmissionPdf: true,
       enableProSurveyFields: true,
+      enableProLocationFields: true,
       enableProCustomJs: true,
+      enableProButtonElements: true,
       enableDetailedSubmissionLogs: true
     }
   }
@@ -773,17 +789,19 @@ function normalizePlanDefinition(plan, existingPlan = {}) {
     submissionLogRetentionDays: plan?.limits?.submissionLogRetentionDays ?? existingPlan?.limits?.submissionLogRetentionDays ?? defaultPlan?.limits?.submissionLogRetentionDays ?? null
   };
 
-  const featureFlags = {
-    ...(defaultPlan?.featureFlags || {}),
-    ...existingPlan?.featureFlags,
-    ...plan?.featureFlags
-  };
-  const featureLabels = {
-    ...getFeatureFlagLabelsFromMetadata(FEATURE_FLAG_METADATA),
-    ...(defaultPlan?.featureLabels || {}),
-    ...(existingPlan?.featureLabels || {}),
-    ...(plan?.featureLabels || {})
-  };
+  const featureFlags = Object.fromEntries(
+    Object.keys(FEATURE_FLAG_METADATA).map((key) => [
+      key,
+      plan?.featureFlags?.[key] ?? existingPlan?.featureFlags?.[key] ?? defaultPlan?.featureFlags?.[key] ?? false
+    ])
+  );
+  const defaultFeatureLabels = getFeatureFlagLabelsFromMetadata(FEATURE_FLAG_METADATA);
+  const featureLabels = Object.fromEntries(
+    Object.keys(FEATURE_FLAG_METADATA).map((key) => [
+      key,
+      plan?.featureLabels?.[key] || existingPlan?.featureLabels?.[key] || defaultPlan?.featureLabels?.[key] || defaultFeatureLabels[key]
+    ])
+  );
 
   return {
     planCode,
@@ -873,6 +891,27 @@ function parseDateEnd(value) {
 
   const parsed = new Date(`${normalized}T23:59:59.999Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeLockedPricing(input, existing) {
+  const source = (input && typeof input === "object")
+    ? input
+    : (existing && typeof existing === "object" ? existing : null);
+  if (!source) {
+    return null;
+  }
+
+  const amount = String(source.amount ?? "").trim();
+  const currency = String(source.currency ?? "").trim();
+  const period = String(source.period ?? "").trim();
+  const notes = String(source.notes ?? "").trim();
+  const lockedAt = normalizeOptionalDate(source.lockedAt) || null;
+
+  if (!amount && !currency && !period && !notes && !lockedAt) {
+    return null;
+  }
+
+  return { amount, currency, period, notes, lockedAt };
 }
 
 function isSameValue(left, right) {
@@ -1157,6 +1196,7 @@ function buildTenantDetail(tenant, plansByCode) {
     healthStatus: deriveHealthStatus(normalizedTenant),
     supportStatus: normalizedTenant.supportStatus || "normal",
     internalNotes: normalizedTenant.internalNotes || normalizedTenant.notes || "",
+    lockedPricing: normalizeLockedPricing(normalizedTenant.lockedPricing, null),
     activeFormsCount: normalizedTenant.activeFormsCount ?? 0,
     submissionsToday: normalizedTenant.submissionsToday ?? 0,
     submissionsMonth: normalizedTenant.submissionsMonth ?? 0,
@@ -1182,7 +1222,9 @@ function buildTenantSummary(tenantDetail) {
     healthStatus: tenantDetail.healthStatus,
     supportStatus: tenantDetail.supportStatus,
     alertType: tenantDetail.alertType,
+    planStartedAt: tenantDetail.planStartedAt,
     planEndsAt: tenantDetail.planEndsAt,
+    trialStartedAt: tenantDetail.trialStartedAt,
     trialEndsAt: tenantDetail.trialEndsAt,
     lastActivityAt: tenantDetail.lastActivityAt,
     submissionsMonth: tenantDetail.submissionsMonth,
@@ -1752,6 +1794,7 @@ export const handler = async (event) => {
         },
         internalNotes: body.internalNotes != null ? String(body.internalNotes) : (tenant.internalNotes || tenant.notes || ""),
         notes: body.internalNotes != null ? String(body.internalNotes) : (tenant.notes || tenant.internalNotes || ""),
+        lockedPricing: normalizeLockedPricing(body.lockedPricing, tenant.lockedPricing),
         updatedAt: new Date().toISOString(),
         effectiveLimits: mergeLimits(selectedPlan.limits, tenant?.planOverrides?.limits || {}),
         effectiveFeatureFlags: mergeFlags(selectedPlan.featureFlags, tenant?.planOverrides?.featureFlags || {})

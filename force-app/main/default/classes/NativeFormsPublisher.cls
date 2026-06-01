@@ -4,7 +4,10 @@ public with sharing class NativeFormsPublisher {
     private static final String TEMP_PREFILL_URL = 'https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_SUBMIT_URL = 'https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/';
     private static final String TEMP_UPLOAD_INIT_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/upload/init';
+    private static final String TEMP_UPLOAD_STATUS_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/upload/status';
     private static final String TEMP_LOOKUP_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/lookup';
+    private static final String TEMP_LOCATION_URL = 'https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/location/search';
+    private static final Integer MAX_EMBEDDED_IMAGE_BYTES = 70656;
     private static final Pattern FRIENDLY_FORM_SLUG_PATTERN = Pattern.compile('^[a-z0-9]+(?:-[a-z0-9]+)*$');
 
     public class PublishResult {
@@ -16,6 +19,8 @@ public with sharing class NativeFormsPublisher {
         @AuraEnabled public Id newDraftVersionId { get; set; }
         @AuraEnabled public String newDraftVersionName { get; set; }
     }
+
+    private class PublishValidationException extends Exception {}
 
     @AuraEnabled
     public static PublishResult publishVersion(Id versionId) {
@@ -144,21 +149,59 @@ public with sharing class NativeFormsPublisher {
             result.message = 'Survey Fields are not available on your current TwinaForms plan.';
             return result;
         }
+        if (containsLocationField(publishElements) && !NativeFormsFeatureFlags.isProLocationFieldsEnabled()) {
+            result.success = false;
+            result.message = 'Country / State / City is not available on your current TwinaForms plan.';
+            return result;
+        }
+        String locationPlacementError = validateLocationFieldPlacement(publishElements);
+        if (String.isNotBlank(locationPlacementError)) {
+            result.success = false;
+            result.message = locationPlacementError;
+            return result;
+        }
+        if (containsButtonElement(publishElements)) {
+            if (!NativeFormsFeatureFlags.isProButtonElementsEnabled()) {
+                result.success = false;
+                result.message = 'Portal Buttons are not available on your current TwinaForms plan.';
+                return result;
+            }
+            try {
+                publishElements = prepareButtonDestinationsForPublish(publishElements);
+            } catch (PublishValidationException buttonError) {
+                result.success = false;
+                result.message = buttonError.getMessage();
+                return result;
+            }
+        }
         Map<String, Object> versionUiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        String recordsListSignatureError = validateRecordsListSignatures(publishElements);
+        if (String.isNotBlank(recordsListSignatureError)) {
+            result.success = false;
+            result.message = recordsListSignatureError;
+            return result;
+        }
+        String recordsListSubmitError = validateRecordsListSubmitActions(publishElements, actions);
+        if (String.isNotBlank(recordsListSubmitError)) {
+            result.success = false;
+            result.message = recordsListSubmitError;
+            return result;
+        }
         if (containsRecordsListRowSignature(publishElements)) {
-            if (!NativeFormsFeatureFlags.isProRecordsListRowSignaturePdfEnabled()
-                || !NativeFormsFeatureFlags.isProElectronicSignatureEnabled()
+            if (!NativeFormsFeatureFlags.isProElectronicSignatureEnabled()
                 || !NativeFormsFeatureFlags.isProSubmissionPdfEnabled()) {
                 result.success = false;
-                result.message = 'Records List Row Signature + PDF is not available on your current TwinaForms plan.';
+                result.message = 'A Signature inside a Records List requires Electronic Signature and Submission PDF on your Pro plan.';
                 return result;
             }
             if (!booleanValue(versionUiSettings.get('submissionPdfEnabled'))) {
                 result.success = false;
-                result.message = 'Enable Submission PDF before publishing a Records List with row signatures.';
+                result.message = 'Enable Submission PDF before publishing a Records List that contains a Signature.';
                 return result;
             }
         }
+        List<NF_Form_Action__c> referencedPrefillActions = filterReferencedActions(actions, 'Prefill', publishElements);
+        List<NF_Form_Action__c> referencedSubmitActions = filterReferencedActions(actions, 'Submit', publishElements, versionUiSettings);
         String html = buildHtml(versionRecord, publishElements, formId, publishToken, captchaConfig);
         String fileName = 'index.html';
 
@@ -182,7 +225,7 @@ public with sharing class NativeFormsPublisher {
                 'publishedVersionId' => (String) versionRecord.Id,
                 'publishToken' => publishToken,
                 'status' => 'published',
-                'securityMode' => determineSecurityMode(versionRecord.Security_Mode__c, actions, publishElements),
+                'securityMode' => determineSecurityMode(versionRecord.Security_Mode__c, referencedSubmitActions),
                 'rateLimitProfile' => String.isNotBlank(versionRecord.Rate_Limit_Profile__c) ? versionRecord.Rate_Limit_Profile__c : 'standard',
                 'generatedHtmlRef' => presignResponse.key,
                 'publicUrl' => publishedPublicUrl,
@@ -193,6 +236,7 @@ public with sharing class NativeFormsPublisher {
                 'signatureFields' => buildPublishedSignatureFields(publishElements),
                 'recordsListRowSignatures' => buildPublishedRecordsListRowSignatures(publishElements),
                 'lookupDefinition' => buildPublishedLookupDefinition(publishElements),
+                'locationDefinition' => buildPublishedLocationDefinition(publishElements),
                 'submissionPdf' => buildPublishedSubmissionPdfConfig(versionUiSettings, publishElements),
                 'secretCodeConfig' => buildPublishedSecretCodeConfig(
                     versionUiSettings,
@@ -200,10 +244,10 @@ public with sharing class NativeFormsPublisher {
                         stringValue(versionUiSettings.get('languageCode'))
                     )
                 ),
-                'prefillPolicy' => buildPolicy(filterReferencedActions(actions, 'Prefill', publishElements), publishElements, true),
-                'submitPolicy' => buildPolicy(filterReferencedActions(actions, 'Submit', publishElements), publishElements, false),
-                'prefillDefinition' => buildDefinition(filterReferencedActions(actions, 'Prefill', publishElements), true, publishElements),
-                'submitDefinition' => buildDefinition(filterReferencedActions(actions, 'Submit', publishElements), false, publishElements)
+                'prefillPolicy' => buildPolicy(referencedPrefillActions, publishElements, true),
+                'submitPolicy' => buildPolicy(referencedSubmitActions, publishElements, false),
+                'prefillDefinition' => buildDefinition(referencedPrefillActions, true, publishElements),
+                'submitDefinition' => buildDefinition(referencedSubmitActions, false, publishElements)
             };
 
             Map<String, Object> registerResponse = NativeFormsAwsClient.registerForm(registerPayload);
@@ -303,6 +347,10 @@ public with sharing class NativeFormsPublisher {
     }
 
     private static List<NF_Form_Action__c> filterReferencedActions(List<NF_Form_Action__c> actions, String scope, List<NF_Form_Element__c> elements) {
+        return filterReferencedActions(actions, scope, elements, null);
+    }
+
+    private static List<NF_Form_Action__c> filterReferencedActions(List<NF_Form_Action__c> actions, String scope, List<NF_Form_Element__c> elements, Map<String, Object> versionUiSettings) {
         List<NF_Form_Action__c> scoped = filterActions(actions, scope);
         if (scoped.isEmpty()) {
             return scoped;
@@ -330,6 +378,13 @@ public with sharing class NativeFormsPublisher {
                         referencedAliases.add(aliasValue);
                     }
                 }
+            }
+        }
+
+        if (scope == 'Submit' && versionUiSettings != null && booleanValue(versionUiSettings.get('submissionPdfEnabled'))) {
+            String pdfTargetActionKey = stringValue(versionUiSettings.get('submissionPdfTargetSubmitActionKey'));
+            if (String.isNotBlank(pdfTargetActionKey)) {
+                referencedKeys.add(pdfTargetActionKey);
             }
         }
 
@@ -496,6 +551,137 @@ public with sharing class NativeFormsPublisher {
         return filtered;
     }
 
+    private static Boolean containsButtonElement(List<NF_Form_Element__c> elements) {
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null && elementRecord.Element_Type__c == 'button') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Boolean containsLocationField(List<NF_Form_Element__c> elements) {
+        if (elements == null) {
+            return false;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null && elementRecord.Element_Type__c == 'location') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String validateLocationFieldPlacement(List<NF_Form_Element__c> elements) {
+        Map<String, NF_Form_Element__c> recordsByElementId = elementsByElementId(elements);
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null
+                && elementRecord.Element_Type__c == 'location'
+                && repeatGroupParentForElement(elementRecord, recordsByElementId) != null) {
+                return 'Country / State / City inside Records List is not supported in Pro V1.';
+            }
+        }
+        return null;
+    }
+
+    private static List<NF_Form_Element__c> prepareButtonDestinationsForPublish(List<NF_Form_Element__c> elements) {
+        Set<Id> targetFormIds = new Set<Id>();
+        Map<String, String> containerTypes = new Map<String, String>();
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null && String.isNotBlank(elementRecord.Element_Id__c)) {
+                containerTypes.put(elementRecord.Element_Id__c, elementRecord.Element_Type__c);
+            }
+            if (elementRecord == null || elementRecord.Element_Type__c != 'button') {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            if (stringValue(config.get('destinationType')) == 'form') {
+                String targetId = stringValue(config.get('targetFormId'));
+                if (String.isBlank(targetId)) {
+                    if (isPublishedFormsUrl(stringValue(config.get('destinationUrl')))) {
+                        continue;
+                    }
+                    throw new PublishValidationException('Choose a published destination form for Button "' + elementRecord.Label__c + '" before publishing.');
+                }
+                try {
+                    targetFormIds.add((Id) targetId);
+                } catch (Exception ignored) {
+                    throw new PublishValidationException('Choose a valid published destination form for Button "' + elementRecord.Label__c + '" before publishing.');
+                }
+            }
+        }
+
+        Map<Id, Id> currentVersionsByForm = new Map<Id, Id>();
+        for (NF_Form__c targetForm : [
+            SELECT Id, Current_Published_Version__c
+            FROM NF_Form__c
+            WHERE Id IN :targetFormIds
+            WITH USER_MODE
+        ]) {
+            if (targetForm.Current_Published_Version__c != null) {
+                currentVersionsByForm.put(targetForm.Id, targetForm.Current_Published_Version__c);
+            }
+        }
+        Map<Id, String> urlsByVersion = new Map<Id, String>();
+        if (!currentVersionsByForm.isEmpty()) {
+            Set<Id> currentVersionIds = new Set<Id>();
+            currentVersionIds.addAll(currentVersionsByForm.values());
+            for (NF_Form_Publication__c publication : [
+                SELECT Form_Version__c, Generated_HTML_Ref__c
+                FROM NF_Form_Publication__c
+                WHERE Form_Version__c IN :currentVersionIds
+                  AND Publication_Status__c = 'Success'
+                WITH USER_MODE ORDER BY Published_At__c DESC
+            ]) {
+                if (!urlsByVersion.containsKey(publication.Form_Version__c) && String.isNotBlank(publication.Generated_HTML_Ref__c)) {
+                    urlsByVersion.put(publication.Form_Version__c, publication.Generated_HTML_Ref__c);
+                }
+            }
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'button') {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            String destinationType = stringValue(config.get('destinationType')) == 'form' ? 'form' : 'external';
+            if (destinationType == 'form') {
+                String targetId = stringValue(config.get('targetFormId'));
+                String targetUrl = null;
+                if (String.isNotBlank(targetId)) {
+                    targetUrl = urlsByVersion.get(currentVersionsByForm.get((Id) targetId));
+                }
+                if (String.isBlank(targetUrl) && isPublishedFormsUrl(stringValue(config.get('destinationUrl')))) {
+                    targetUrl = stringValue(config.get('destinationUrl'));
+                }
+                if (String.isBlank(targetUrl)) {
+                    throw new PublishValidationException('Button "' + elementRecord.Label__c + '" must target a currently published TwinaForms form.');
+                }
+                config.put('destinationUrl', targetUrl);
+                config.remove('targetFormId');
+            } else {
+                String mode = stringValue(config.get('externalUrlMode')) == 'formula' ? 'formula' : 'template';
+                String source = mode == 'formula' ? stringValue(config.get('externalUrlFormula')) : stringValue(config.get('externalUrlTemplate'));
+                if (String.isBlank(source)) {
+                    throw new PublishValidationException('Enter an external URL for Button "' + elementRecord.Label__c + '" before publishing.');
+                }
+                if (mode == 'template' && !source.contains('{{') && !source.toLowerCase().startsWith('http://') && !source.toLowerCase().startsWith('https://')) {
+                    throw new PublishValidationException('External Button destinations must start with http:// or https://.');
+                }
+            }
+            if (containerTypes.get(elementRecord.Parent_Element_Id__c) == 'repeatGroup' && booleanValue(config.get('submitBeforeNavigation'))) {
+                throw new PublishValidationException('Buttons inside Records Lists cannot submit the form in Pro V1.');
+            }
+            elementRecord.Config_JSON__c = JSON.serialize(config);
+        }
+        return elements;
+    }
+
+    private static Boolean isPublishedFormsUrl(String value) {
+        String normalized = stringValue(value).toLowerCase();
+        return normalized.startsWith(PUBLISHED_FORMS_BASE_URL.toLowerCase() + '/');
+    }
+
     private static Map<String, String> buildPublishedImageUrls(Set<String> contentVersionIds) {
         Map<String, String> urlsByVersionId = new Map<String, String>();
         if (contentVersionIds == null || contentVersionIds.isEmpty()) {
@@ -510,6 +696,9 @@ public with sharing class NativeFormsPublisher {
             String mimeType = mimeTypeFromFileName(versionRecord.PathOnClient);
             if (String.isBlank(mimeType) || versionRecord.VersionData == null) {
                 continue;
+            }
+            if (versionRecord.VersionData.size() > MAX_EMBEDDED_IMAGE_BYTES) {
+                throw new AuraHandledException('Image "' + versionRecord.PathOnClient + '" is too large to publish. Please upload an optimized image under 69 KB.');
             }
             urlsByVersionId.put(
                 String.valueOf(versionRecord.Id),
@@ -545,6 +734,9 @@ public with sharing class NativeFormsPublisher {
         String mimeType = mimeTypeFromFileName(versionData.PathOnClient);
         if (String.isBlank(mimeType) || versionData.VersionData == null) {
             return versionRecord.Form__r.Theme__r.Logo_URL__c;
+        }
+        if (versionData.VersionData.size() > MAX_EMBEDDED_IMAGE_BYTES) {
+            throw new AuraHandledException('Theme logo is too large to publish. Please upload an optimized logo under 69 KB.');
         }
 
         return 'data:' + mimeType + ';base64,' + EncodingUtil.base64Encode(versionData.VersionData);
@@ -685,21 +877,49 @@ public with sharing class NativeFormsPublisher {
             }
 
             String prefillAlias = stringValue(elementConfig.get('prefillAlias'));
-            String prefillFieldPath = stringValue(elementConfig.get('prefillFieldPath'));
-            if (String.isBlank(prefillAlias) || String.isBlank(prefillFieldPath) || prefillAlias != aliasValue) {
+            if (String.isBlank(prefillAlias) || prefillAlias != aliasValue) {
                 continue;
             }
 
-            String sourcePath = canonicalFieldApiName(canonicalObjectApiName, prefillFieldPath);
-            if (String.isBlank(sourcePath)) {
-                continue;
+            String mappedSourceValue;
+            Map<String, Object> mappedLocationValue;
+            List<String> sourcePaths = new List<String>();
+            if (elementRecord.Element_Type__c == 'location') {
+                Map<String, String> locationSourceKeysByValueKey = new Map<String, String>{
+                    'countryName' => 'locationPrefillCountryFieldPath',
+                    'regionName' => 'locationPrefillRegionFieldPath',
+                    'cityName' => 'locationPrefillCityFieldPath'
+                };
+                mappedLocationValue = new Map<String, Object>();
+                for (String valueKey : locationSourceKeysByValueKey.keySet()) {
+                    String sourcePath = canonicalFieldApiName(
+                        canonicalObjectApiName,
+                        stringValue(elementConfig.get(locationSourceKeysByValueKey.get(valueKey)))
+                    );
+                    if (String.isBlank(sourcePath)) {
+                        continue;
+                    }
+                    mappedLocationValue.put(valueKey, '{' + aliasValue + '.' + sourcePath + '}');
+                    sourcePaths.add(sourcePath);
+                }
+                if (sourcePaths.isEmpty()) {
+                    continue;
+                }
+            } else {
+                String prefillFieldPath = stringValue(elementConfig.get('prefillFieldPath'));
+                String sourcePath = canonicalFieldApiName(canonicalObjectApiName, prefillFieldPath);
+                if (String.isBlank(sourcePath)) {
+                    continue;
+                }
+                mappedSourceValue = '{' + aliasValue + '.' + sourcePath + '}';
+                sourcePaths.add(sourcePath);
             }
 
             NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
             if (repeatGroupParent != null) {
                 Map<String, Object> repeatConfig = parseJsonMap(repeatGroupParent.Config_JSON__c);
                 if (stringValue(repeatConfig.get('repeatSourceAlias')) == aliasValue) {
-                    collectedFields.add(sourcePath);
+                    collectedFields.addAll(sourcePaths);
                     continue;
                 }
             }
@@ -709,11 +929,12 @@ public with sharing class NativeFormsPublisher {
                 ? 'hidden'
                 : 'input';
 
-            response.put(
-                targetGroup + '.' + elementRecord.Field_Key__c,
-                '{' + aliasValue + '.' + sourcePath + '}'
-            );
-            collectedFields.add(sourcePath);
+            Object mappedResponseValue = mappedSourceValue;
+            if (mappedLocationValue != null) {
+                mappedResponseValue = mappedLocationValue;
+            }
+            response.put(targetGroup + '.' + elementRecord.Field_Key__c, mappedResponseValue);
+            collectedFields.addAll(sourcePaths);
         }
 
         return new List<String>(collectedFields);
@@ -902,10 +1123,35 @@ public with sharing class NativeFormsPublisher {
                 : stringValue(elementConfig.get('submitWhen'));
             Boolean submitEnabled = booleanValue(elementConfig.get('submitEnabled'));
 
-            if (!submitEnabled || String.isBlank(submitActionKey) || String.isBlank(submitFieldPath)) {
+            if (!submitEnabled || String.isBlank(submitActionKey)) {
                 continue;
             }
             if (submitActionKey != actionKey) {
+                continue;
+            }
+
+            NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
+            if (normalizedType != 'upsertMany' && repeatGroupParent != null) {
+                continue;
+            }
+
+            if (elementRecord.Element_Type__c == 'location') {
+                if (normalizedType == 'upsertMany') {
+                    continue;
+                }
+                applyLocationSubmitFieldMappings(
+                    fields,
+                    createOnlyFields,
+                    canonicalObjectApiName,
+                    elementRecord.Field_Key__c,
+                    elementConfig,
+                    normalizedType,
+                    submitWhen
+                );
+                continue;
+            }
+
+            if (String.isBlank(submitFieldPath)) {
                 continue;
             }
 
@@ -915,7 +1161,6 @@ public with sharing class NativeFormsPublisher {
             }
 
             if (normalizedType == 'upsertMany') {
-                NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
                 if (repeatGroupParent == null || repeatGroupParent.Field_Key__c != repeatGroupKey) {
                     continue;
                 }
@@ -925,18 +1170,12 @@ public with sharing class NativeFormsPublisher {
                 }
             }
 
-            String inputExpression = normalizedType == 'upsertMany'
-                ? '{row.' + elementRecord.Field_Key__c + '}'
-                : '{input.' + elementRecord.Field_Key__c + '}';
+            String inputExpression = buildSubmitInputExpression(elementRecord, elementConfig, normalizedType);
             if (String.isBlank(submitFieldPath) || String.isBlank(inputExpression)) {
                 continue;
             }
 
-            if (submitWhen == 'create' && normalizedType == 'update') {
-                createOnlyFields.put(String.valueOf(submitFieldPath), inputExpression);
-            } else {
-                fields.put(String.valueOf(submitFieldPath), inputExpression);
-            }
+            putSubmitFieldMapping(fields, createOnlyFields, submitWhen, normalizedType, submitFieldPath, inputExpression);
         }
 
         if (!fields.isEmpty()) {
@@ -954,6 +1193,57 @@ public with sharing class NativeFormsPublisher {
         }
         if (normalizedType == 'upsertMany' && String.isNotBlank(idFieldKey)) {
             commandConfig.put('idField', idFieldKey);
+        }
+    }
+
+    private static void applyLocationSubmitFieldMappings(
+        Map<String, Object> fields,
+        Map<String, Object> createOnlyFields,
+        String canonicalObjectApiName,
+        String fieldKey,
+        Map<String, Object> elementConfig,
+        String normalizedType,
+        String submitWhen
+    ) {
+        applyLocationSubmitFieldMapping(fields, createOnlyFields, canonicalObjectApiName, fieldKey, elementConfig, normalizedType, submitWhen, 'locationSubmitCountryFieldPath', 'countryName');
+        applyLocationSubmitFieldMapping(fields, createOnlyFields, canonicalObjectApiName, fieldKey, elementConfig, normalizedType, submitWhen, 'locationSubmitRegionFieldPath', 'regionName');
+        applyLocationSubmitFieldMapping(fields, createOnlyFields, canonicalObjectApiName, fieldKey, elementConfig, normalizedType, submitWhen, 'locationSubmitCityFieldPath', 'cityName');
+    }
+
+    private static void applyLocationSubmitFieldMapping(
+        Map<String, Object> fields,
+        Map<String, Object> createOnlyFields,
+        String canonicalObjectApiName,
+        String fieldKey,
+        Map<String, Object> elementConfig,
+        String normalizedType,
+        String submitWhen,
+        String configKey,
+        String locationPart
+    ) {
+        String submitFieldPath = canonicalFieldApiName(canonicalObjectApiName, stringValue(elementConfig.get(configKey)));
+        if (String.isBlank(submitFieldPath) || String.isBlank(fieldKey) || String.isBlank(locationPart)) {
+            return;
+        }
+        String inputExpression = '{input.' + fieldKey + '.' + locationPart + '}';
+        putSubmitFieldMapping(fields, createOnlyFields, submitWhen, normalizedType, submitFieldPath, inputExpression);
+    }
+
+    private static void putSubmitFieldMapping(
+        Map<String, Object> fields,
+        Map<String, Object> createOnlyFields,
+        String submitWhen,
+        String normalizedType,
+        String submitFieldPath,
+        String inputExpression
+    ) {
+        if (String.isBlank(submitFieldPath) || String.isBlank(inputExpression)) {
+            return;
+        }
+        if (submitWhen == 'create' && normalizedType == 'update') {
+            createOnlyFields.put(String.valueOf(submitFieldPath), inputExpression);
+        } else {
+            fields.put(String.valueOf(submitFieldPath), inputExpression);
         }
     }
 
@@ -1047,8 +1337,7 @@ public with sharing class NativeFormsPublisher {
         return new List<String>{ normalized };
     }
 
-    private static String determineSecurityMode(String explicitSecurityMode, List<NF_Form_Action__c> actions, List<NF_Form_Element__c> elements) {
-        List<NF_Form_Action__c> referencedSubmitActions = filterReferencedActions(actions, 'Submit', elements);
+    private static String determineSecurityMode(String explicitSecurityMode, List<NF_Form_Action__c> referencedSubmitActions) {
         Boolean needsFindUpdateCreate = false;
         Boolean needsSecureEdit = false;
 
@@ -1535,6 +1824,10 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:var(--nf-input-bg);color:var(--nf-text);box-shadow:none;}';
         html += '.nf-field textarea{min-height:120px;resize:vertical;}';
         html += '.nf-lookup{position:relative;display:grid;gap:8px;}';
+        html += '.nf-location{position:relative;display:grid;gap:8px;}';
+        html += '.nf-location__inputs{display:grid;gap:8px;}';
+        html += '.nf-location--inline .nf-location__inputs{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));}';
+        html += '.nf-location__inputs > input[hidden]{display:none !important;}';
         html += '.nf-lookup__clear{justify-self:start;border:1px solid var(--nf-input-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:6px 10px;font:inherit;font-size:.9em;cursor:pointer;}';
         html += '.nf-lookup__results{position:absolute;z-index:20;top:48px;left:0;right:0;max-height:240px;overflow:auto;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);background:var(--nf-input-bg);box-shadow:0 16px 36px rgba(15,35,65,.16);}';
         html += '.nf-lookup__results[hidden]{display:none !important;}';
@@ -1609,6 +1902,9 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-actions{margin-top:28px;display:flex;justify-content:flex-end;}';
         html += '.nf-actions button{background:var(--nf-accent);color:var(--nf-accent-contrast);border:0;border-radius:999px;padding:12px 20px;font-weight:700;cursor:pointer;box-shadow:0 10px 20px rgba(15,108,189,.18);}';
         html += '.nf-actions button[disabled]{opacity:.72;cursor:wait;}';
+        html += '.nf-portal-button{margin:12px 0;display:flex;justify-content:flex-start;}';
+        html += '.nf-portal-button button{background:var(--nf-accent);color:var(--nf-accent-contrast);border:0;border-radius:999px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 10px 20px rgba(15,108,189,.18);}';
+        html += '.nf-portal-button button[disabled]{opacity:.72;cursor:wait;}';
         html += '.nf-secret-gated[hidden]{display:none !important;}';
         html += '.nf-secret-verify{display:grid;gap:14px;padding:18px 20px;border:1px solid #d8e4f4;border-radius:18px;background:linear-gradient(180deg,#fbfdff 0%,#f4f8fc 100%);box-shadow:0 10px 24px rgba(15,35,65,.04);}';
         html += '.nf-secret-verify__badge{display:inline-flex;align-items:center;justify-content:center;width:fit-content;padding:4px 10px;border-radius:999px;background:rgba(15,108,189,.08);color:#0f6cbd;font-size:12px;font-weight:700;text-transform:uppercase;}';
@@ -1640,10 +1936,10 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-shell[dir="rtl"] .nf-repeat__meta,.nf-shell[dir="rtl"] .nf-repeat__header-row{direction:rtl;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left{display:flex;align-items:center;justify-content:flex-start;gap:12px;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left label{order:2;flex:0 0 140px;direction:ltr;margin:0;white-space:normal;max-width:100%;text-align:right;}';
-        html += '.nf-shell[dir="rtl"] .nf-field--left input,.nf-shell[dir="rtl"] .nf-field--left textarea,.nf-shell[dir="rtl"] .nf-field--left select,.nf-shell[dir="rtl"] .nf-field--left .nf-field--radio-group{order:1;flex:1 1 auto;min-width:0;}';
+        html += '.nf-shell[dir="rtl"] .nf-field--left input,.nf-shell[dir="rtl"] .nf-field--left textarea,.nf-shell[dir="rtl"] .nf-field--left select,.nf-shell[dir="rtl"] .nf-field--left .nf-location,.nf-shell[dir="rtl"] .nf-field--left .nf-field--radio-group{order:1;flex:1 1 auto;min-width:0;}';
         html += '.nf-shell[dir="rtl"] .nf-field--right{grid-template-columns:140px minmax(0,1fr);column-gap:12px;align-items:start;}';
         html += '.nf-shell[dir="rtl"] .nf-field--right label{margin:0;white-space:normal;overflow-wrap:anywhere;text-align:right;line-height:1.35;padding-top:12px;}';
-        html += '.nf-shell[dir="rtl"] .nf-field--right input,.nf-shell[dir="rtl"] .nf-field--right textarea,.nf-shell[dir="rtl"] .nf-field--right select,.nf-shell[dir="rtl"] .nf-field--right .nf-field--radio-group{grid-column:2;grid-row:1;}';
+        html += '.nf-shell[dir="rtl"] .nf-field--right input,.nf-shell[dir="rtl"] .nf-field--right textarea,.nf-shell[dir="rtl"] .nf-field--right select,.nf-shell[dir="rtl"] .nf-field--right .nf-location,.nf-shell[dir="rtl"] .nf-field--right .nf-field--radio-group{grid-column:2;grid-row:1;}';
         html += '.nf-shell[dir="rtl"] .nf-field--checkbox label,.nf-shell[dir="rtl"] .nf-radio-option,.nf-shell[dir="rtl"] .nf-checkbox-option{flex-direction:row-reverse;justify-content:flex-end;}';
         html += '.nf-shell[dir="rtl"] .nf-radio-option span{margin-left:0;margin-right:8px;}';
         html += '.nf-shell[dir="rtl"] .nf-captcha,.nf-shell[dir="rtl"] .nf-actions,.nf-shell[dir="rtl"] .nf-repeat__actions{direction:rtl;justify-content:flex-start;}';
@@ -1667,6 +1963,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-repeat__row-signature{margin-top:12px;min-width:0;}';
         html += '.nf-repeat__row-body .nf-section__grid{grid-template-columns:1fr;}';
         html += '.nf-repeat__row .nf-field{gap:6px;}';
+        html += '.nf-location--inline .nf-location__inputs{grid-template-columns:1fr;}';
         html += '.nf-repeat__row .nf-field label{display:block;}';
         html += '.nf-repeat__row .nf-field--hidden{grid-template-columns:1fr;}';
         html += '.nf-repeat__row .nf-field--hidden label{display:block;}';
@@ -1775,7 +2072,17 @@ public with sharing class NativeFormsPublisher {
             'prefillUrl' => TEMP_PREFILL_URL,
             'submitUrl' => TEMP_SUBMIT_URL,
             'uploadInitUrl' => TEMP_UPLOAD_INIT_URL,
+            'uploadStatusUrl' => TEMP_UPLOAD_STATUS_URL,
             'lookupUrl' => TEMP_LOOKUP_URL,
+            'locationUrl' => TEMP_LOCATION_URL,
+            'endpoints' => new Map<String, Object>{
+                'prefillUrl' => TEMP_PREFILL_URL,
+                'submitUrl' => TEMP_SUBMIT_URL,
+                'uploadInitUrl' => TEMP_UPLOAD_INIT_URL,
+                'uploadStatusUrl' => TEMP_UPLOAD_STATUS_URL,
+                'lookupUrl' => TEMP_LOOKUP_URL,
+                'locationUrl' => TEMP_LOCATION_URL
+            },
             'captcha' => publicCaptchaConfig,
             'secretCode' => secretCodeConfig,
             'theme' => theme,
@@ -1814,7 +2121,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function parseMultiCheckboxValue(value){if(Array.isArray(value)){return new Set(value.map(function(item){return String(item);}));}return new Set(String(value==null?"":value).split(";").map(function(item){return item.trim();}).filter(function(item){return !!item;}));}';
         html += 'function readMultiCheckboxValue(fields){return Array.from(fields).filter(function(el){return !!el.checked;}).map(function(el){return String(el.value||"");}).filter(function(value){return value!=="";}).join(";");}';
         html += 'function setMultiCheckboxValue(fields,value){const selected=parseMultiCheckboxValue(value);Array.from(fields).forEach(function(el){el.checked=selected.has(String(el.value||""));el.setCustomValidity("");});}';
-        html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
+        html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.locationHidden==="true"){try{return first.value?JSON.parse(first.value):null;}catch(error){return null;}}if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
         html += 'function normalizeFormulaResult(targetType,value){if(targetType==="number"){return formulaToNumber(value);}if(value===null||value===undefined){return "";}return String(value);}';
         html += 'function evaluateFormulaControl(control){if(!control||!formulaParser){return;}const expression=normalizeFormulaExpression(control.dataset.formulaExpression||"");if(!expression){control.value="";return;}const variableMap={};let normalizedExpression=expression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=readRuntimeFieldValue(fieldKey);});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const normalizedValue=normalizeFormulaResult(control.dataset.formulaType||"text",rawValue);control.value=normalizedValue===null||normalizedValue===undefined?"":String(normalizedValue);}catch(error){control.value="";}}';
         html += 'function evaluateAllFormulaFields(){formulaFieldControls().forEach(function(control){evaluateFormulaControl(control);});}';
@@ -1836,7 +2143,7 @@ public with sharing class NativeFormsPublisher {
         html += 'const secretGatedEl=document.querySelector("[data-secret-gated]");';
         html += 'const secretCodeSessionMode=String(secretCodeConfig.sessionMode||"short").trim()==="sameTabUntilMidnight"?"sameTabUntilMidnight":"short";';
         html += 'let secretVerificationToken="";let secretVerificationApproved=!secretCodeEnabled;let secretVerifiedEmail="";let secretVerificationSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-"+Math.random().toString(36).slice(2)+"-"+Date.now());';
-        html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};const lookupTimersByField={};const lookupAbortByField={};';
+        html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};const lookupTimersByField={};const lookupAbortByField={};const locationTimersByField={};const locationAbortByField={};';
         html += 'function setStatus(kind,message){if(!statusEl){return;}statusEl.className="nf-status nf-status--"+kind;statusEl.textContent=message||"";}';
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
         html += 'function getPrefillParams(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});return params;}';
@@ -1855,13 +2162,14 @@ public with sharing class NativeFormsPublisher {
         html += 'function fileUploadElements(control){const fieldWrap=control?control.closest(".nf-field"):null;return{feedback:fieldWrap?fieldWrap.querySelector("[data-file-upload-feedback]"):null,list:fieldWrap?fieldWrap.querySelector("[data-file-upload-list]"):null};}';
         html += 'function renderFileUploadState(control){if(!control){return;}const fieldKey=fileUploadFieldKey(control);const refs=uploadedFilesByField[fieldKey]||[];const state=fileUploadStateByField[fieldKey]||{};const targets=fileUploadElements(control);if(targets.feedback){const message=state.error||state.message||"";targets.feedback.textContent=message;targets.feedback.style.color=state.error?"#b42318":"";}if(targets.list){if(!refs.length){targets.list.innerHTML="";return;}const items=refs.map(function(item){return \'<div class="nf-upload__file"><span class="nf-upload__file-name">\'+escapeHtml(item.fileName||t("fileUploadedFallbackName","Uploaded file"))+\'</span><span class="nf-upload__file-status">\'+escapeHtml(t("fileReady","Ready"))+\'</span></div>\';}).join("");const clearLabel=refs.length===1?t("fileRemoveSingle","Remove file"):t("fileRemoveMultiple","Remove files");const clearButton=\'<button type="button" data-file-upload-clear="\'+escapeHtml(fieldKey)+\'">\'+escapeHtml(clearLabel)+\'</button>\';targets.list.innerHTML=items+clearButton;}}';
         html += 'function clearFileUploadField(fieldKey){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={message:"",error:""};const control=fileUploadControls().find(function(item){return fileUploadFieldKey(item)===fieldKey;});if(control){control.value="";renderFileUploadState(control);}}';
-        html += 'async function uploadSelectedFiles(control){const fieldKey=fileUploadFieldKey(control);const files=Array.from((control&&control.files)||[]);if(!fieldKey){return;}if(!files.length){clearFileUploadField(fieldKey);return;}if(!config.uploadInitUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:true,message:t("fileUploading","Uploading files..."),error:""};renderFileUploadState(control);try{const uploaded=[];for(let index=0;index<files.length;index+=1){const file=files[index];const initResponse=await fetch(config.uploadInitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,fileName:file.name,contentType:file.type||"application/octet-stream",fileSize:file.size,sessionId:fileUploadSessionId})});const initData=await initResponse.json();if(!initResponse.ok||initData.success===false){throw new Error(initData.error||t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadResponse=await fetch(initData.uploadUrl,{method:"PUT",headers:{"Content-Type":initData.contentType||file.type||"application/octet-stream"},body:file});if(!uploadResponse.ok){throw new Error(t("fileUploadFailed","We could not upload this file. Please try again."));}uploaded.push({uploadToken:initData.uploadToken,fileName:initData.fileName||file.name,contentType:initData.contentType||file.type||"application/octet-stream",fileSize:initData.fileSize||file.size});}uploadedFilesByField[fieldKey]=uploaded;fileUploadStateByField[fieldKey]={uploading:false,message:uploaded.length?interpolate(t("fileReadyCount","{count} file(s) ready."),{count:String(uploaded.length)}):"",error:""};renderFileUploadState(control);}catch(error){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:false,message:"",error:error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again.")};renderFileUploadState(control);throw error;}}';
-        html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading){return{valid:false,message:t("fileUploadPleaseWait","Please wait for file uploads to finish.")};}if(control.required&&refs.length===0){return{valid:false,message:t("fileUploadRequired","Please upload the required file before submitting.")};}}return{valid:true,message:""};}';
+        html += 'async function waitForSafeUpload(uploadRef,fieldKey){if(!config.uploadStatusUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}for(let attempt=0;attempt<40;attempt+=1){const response=await fetch(config.uploadStatusUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,sessionId:fileUploadSessionId,uploadToken:uploadRef.uploadToken})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||t("fileSafetyUnavailable","We could not safely process this file. Please upload another file or try again."));}if(data.status==="ready"){return;}if(data.status==="rejected"){throw new Error(t("fileSafetyRejected","This file cannot be accepted. Please upload another file."));}if(data.status==="unavailable"){throw new Error(t("fileSafetyUnavailable","We could not safely process this file. Please upload another file or try again."));}await new Promise(function(resolve){window.setTimeout(resolve,1500);});}throw new Error(t("fileSafetyUnavailable","We could not safely process this file. Please upload another file or try again."));}';
+        html += 'async function uploadSelectedFiles(control){const fieldKey=fileUploadFieldKey(control);const files=Array.from((control&&control.files)||[]);if(!fieldKey){return;}if(!files.length){clearFileUploadField(fieldKey);return;}if(!config.uploadInitUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:true,message:t("fileUploading","Uploading files..."),error:""};renderFileUploadState(control);try{const uploaded=[];for(let index=0;index<files.length;index+=1){const file=files[index];const initResponse=await fetch(config.uploadInitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,fileName:file.name,contentType:file.type||"application/octet-stream",fileSize:file.size,sessionId:fileUploadSessionId})});const initData=await initResponse.json();if(!initResponse.ok||initData.success===false){throw new Error(initData.error||t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadResponse=await fetch(initData.uploadUrl,{method:"PUT",headers:{"Content-Type":initData.contentType||file.type||"application/octet-stream"},body:file});if(!uploadResponse.ok){throw new Error(t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadRef={uploadToken:initData.uploadToken,fileName:initData.fileName||file.name,contentType:initData.contentType||file.type||"application/octet-stream",fileSize:initData.fileSize||file.size};fileUploadStateByField[fieldKey]={scanning:true,message:t("fileSafetyScanning","Checking file safety..."),error:""};renderFileUploadState(control);await waitForSafeUpload(uploadRef,fieldKey);uploaded.push(uploadRef);}uploadedFilesByField[fieldKey]=uploaded;fileUploadStateByField[fieldKey]={uploading:false,scanning:false,message:uploaded.length?interpolate(t("fileReadyCount","{count} file(s) ready."),{count:String(uploaded.length)}):"",error:""};renderFileUploadState(control);}catch(error){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:false,scanning:false,message:"",error:error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again.")};renderFileUploadState(control);throw error;}}';
+        html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading||state.scanning){return{valid:false,message:t("fileSafetyPleaseWait","Please wait while your files are checked.")};}if(control.required&&refs.length===0){return{valid:false,message:t("fileUploadRequired","Please upload the required file before submitting.")};}}return{valid:true,message:""};}';
         html += 'function clearAllUploadedFiles(){fileUploadControls().forEach(function(control){clearFileUploadField(fileUploadFieldKey(control));});}';
         html += 'function signaturePads(){return Array.from(form.querySelectorAll("[data-nativeforms-signature=\'true\']"));}';
         html += 'function signatureCanvasForPad(pad){return pad?pad.querySelector("canvas[data-signature-canvas]"):null;}';
         html += 'function signatureFieldKey(pad){return pad&&pad.dataset.signatureFieldKey?String(pad.dataset.signatureFieldKey):"";}';
-        html += 'function resizeSignatureCanvas(canvas){if(!canvas){return;}const rect=canvas.getBoundingClientRect();const ratio=window.devicePixelRatio||1;const width=Math.max(320,Math.floor(rect.width||canvas.clientWidth||600));const height=Math.max(140,Math.floor(rect.height||180));if(canvas.width===Math.floor(width*ratio)&&canvas.height===Math.floor(height*ratio)){return;}canvas.width=Math.floor(width*ratio);canvas.height=Math.floor(height*ratio);const ctx=canvas.getContext("2d");ctx.setTransform(ratio,0,0,ratio,0,0);ctx.lineWidth=2;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#102a43";}';
+        html += 'function resizeSignatureCanvas(canvas){if(!canvas){return;}const rect=canvas.getBoundingClientRect();const ratio=window.devicePixelRatio||1;const width=Math.floor(rect.width||canvas.clientWidth||320);const height=Math.floor(rect.height||canvas.clientHeight||140);if(canvas.width===Math.floor(width*ratio)&&canvas.height===Math.floor(height*ratio)){return;}canvas.width=Math.floor(width*ratio);canvas.height=Math.floor(height*ratio);const ctx=canvas.getContext("2d");ctx.setTransform(ratio,0,0,ratio,0,0);ctx.lineWidth=2;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#102a43";}';
         html += 'function setSignatureFeedback(pad,message,kind){const feedback=pad?pad.querySelector("[data-signature-feedback]"):null;if(!feedback){return;}feedback.textContent=message||"";feedback.style.color=kind==="error"?"#b42318":"";}';
         html += 'function clearSignaturePad(pad){const canvas=signatureCanvasForPad(pad);if(!canvas){return;}const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);pad.dataset.signatureEmpty="true";setSignatureFeedback(pad,"","");}';
         html += 'function initSignaturePad(pad){const canvas=signatureCanvasForPad(pad);if(!pad||!canvas){return;}resizeSignatureCanvas(canvas);let drawing=false;function point(event){const rect=canvas.getBoundingClientRect();const source=event.touches&&event.touches.length?event.touches[0]:event;return{x:source.clientX-rect.left,y:source.clientY-rect.top};}function start(event){event.preventDefault();resizeSignatureCanvas(canvas);drawing=true;const ctx=canvas.getContext("2d");const p=point(event);ctx.beginPath();ctx.moveTo(p.x,p.y);}function move(event){if(!drawing){return;}event.preventDefault();const ctx=canvas.getContext("2d");const p=point(event);ctx.lineTo(p.x,p.y);ctx.stroke();pad.dataset.signatureEmpty="false";setSignatureFeedback(pad,"","");}function end(){drawing=false;}canvas.addEventListener("pointerdown",start);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",end);canvas.addEventListener("pointerleave",end);canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end);const clearButton=pad.querySelector("[data-signature-clear]");if(clearButton){clearButton.addEventListener("click",function(event){event.preventDefault();clearSignaturePad(pad);});}pad.dataset.signatureEmpty="true";}';
@@ -1882,12 +2190,17 @@ public with sharing class NativeFormsPublisher {
         html += 'function sameTabSecretSessionEnabled(){return secretCodeEnabled&&secretCodeSessionMode==="sameTabUntilMidnight"&&window.sessionStorage;}function secretSessionStorageKey(){return "twinaforms.secretSession."+String(config.formId||"")+"."+String(config.versionId||"");}function clearStoredSecretVerificationSession(){if(!sameTabSecretSessionEnabled()){return;}try{window.sessionStorage.removeItem(secretSessionStorageKey());}catch(error){}}function secretSessionExpiresAtForRequest(){const expiresAt=new Date();expiresAt.setHours(24,0,0,0);return expiresAt.toISOString();}function storeSecretVerificationSession(data,email){if(!sameTabSecretSessionEnabled()||!data||!data.verificationToken){return;}const expiresAt=String(data.expiresAt||"");if(!expiresAt){return;}try{window.sessionStorage.setItem(secretSessionStorageKey(),JSON.stringify({token:data.verificationToken,email:String(email||data.normalizedEmail||"").trim().toLowerCase(),sessionId:data.sessionId||secretVerificationSessionId,expiresAt:expiresAt}));}catch(error){}}async function continueAfterSecretVerification(email){setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const prefillData=await runPrefillWithParams(Object.assign({},getPrefillParams(),{email:email}));if(!hasPrefillData(prefillData)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(prefillError){setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}function restoreSecretVerificationSession(){if(!sameTabSecretSessionEnabled()){return false;}let stored=null;try{stored=JSON.parse(window.sessionStorage.getItem(secretSessionStorageKey())||"null");}catch(error){clearStoredSecretVerificationSession();return false;}if(!stored||!stored.token||!stored.sessionId||!stored.email||!stored.expiresAt){clearStoredSecretVerificationSession();return false;}if(new Date(stored.expiresAt).getTime()<=Date.now()){clearStoredSecretVerificationSession();return false;}secretVerificationToken=stored.token;secretVerificationSessionId=stored.sessionId;secretVerifiedEmail=stored.email;continueAfterSecretVerification(secretVerifiedEmail).catch(function(){clearStoredSecretVerificationSession();});return true;}function isSecretVerificationExpiredResponse(data){const message=String((data&&data.error&&data.error.message)||data&&data.error||"").toLowerCase();return message.includes("secret")&&message.includes("code")&&message.includes("verify");}';
         html += 'function clearPostSubmitRedirect(){if(postSubmitRedirectTimer){window.clearTimeout(postSubmitRedirectTimer);postSubmitRedirectTimer=null;}if(postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}activePostSubmitRedirectUrl="";}';
         html += 'function clearResult(){if(!resultEl){return;}clearPostSubmitRedirect();resultEl.hidden=true;resultEl.innerHTML="";form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}';
-        html += 'function setSubmitting(isSubmitting){const submitButton=form.querySelector("button[type=\'submit\']");if(!submitButton){return;}submitButton.disabled=!!isSubmitting;submitButton.textContent=isSubmitting?t("submitting","Submitting..."):defaultSubmitLabel;}';
+        html += 'function setSubmitting(isSubmitting){const submitButton=form.querySelector("button[type=\'submit\']");if(submitButton){submitButton.disabled=!!isSubmitting;submitButton.textContent=isSubmitting?t("submitting","Submitting..."):defaultSubmitLabel;}form.querySelectorAll("[data-nativeforms-button=\'true\']").forEach(function(button){button.disabled=!!isSubmitting;});}';
         html += 'function failureBucket(errorPayload){const message=String((errorPayload&&errorPayload.message)||errorPayload||"").toLowerCase();const commandType=String((errorPayload&&errorPayload.commandType)||"").toLowerCase();const isConfigIssue=message.includes("mapping")||message.includes("definition")||message.includes("not allowed")||message.includes("not configured")||message.includes("missing required field")||message.includes("invalid publish token")||message.includes("form is not published")||message.includes("prefill policy")||message.includes("submit policy")||message.includes("unauthorized");const isSalesforceIssue=message.includes("create failed")||message.includes("update failed")||message.includes("delete failed")||message.includes("query failed")||message.includes("describe failed")||message.includes("status:")||["create","update","delete","findone","findmany","getbyid"].includes(commandType);if(isSalesforceIssue&&!isConfigIssue){return{label:"Salesforce rejected the request",detail:"Salesforce could not accept this submission. Check required fields, validation rules, or object permissions."};}return{label:"Form logic/configuration issue",detail:"This submit could not complete because of a form or runtime configuration issue."};}';
         html += 'function readPathValue(source,path){if(!source||!path){return source;}return String(path).split(".").reduce(function(current,segment){if(current==null){return undefined;}return current[segment];},source);}';
         html += 'function isAbsoluteHttpUrl(value){try{const parsed=new URL(value);return parsed.protocol==="http:"||parsed.protocol==="https:";}catch(error){return false;}}';
         html += 'function resolvePostSubmitUrl(template,fieldValues,prefillPayload){const sourceTemplate=String(template||"").trim();if(!sourceTemplate){return "";}const aliases=(prefillPayload&&prefillPayload.aliases&&typeof prefillPayload.aliases==="object")?prefillPayload.aliases:{};const resolved=sourceTemplate.replace(/\\{\\{\\s*(field|prefill)\\.([^}]+?)\\s*\\}\\}/g,function(_,kind,path){let rawValue="";if(kind==="field"){rawValue=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,path)?fieldValues[path]:"";}else{const pieces=String(path||"").split(".");const aliasName=pieces.shift();rawValue=readPathValue(aliases[aliasName],pieces.join("."));}if(rawValue===undefined||rawValue===null){return "";}if(typeof rawValue==="object"){try{return encodeURIComponent(JSON.stringify(rawValue));}catch(error){return "";}}return encodeURIComponent(String(rawValue));});return isAbsoluteHttpUrl(resolved)?resolved:"";}';
         html += 'function resolveFormulaPostSubmitUrl(expression,fieldValues){const sourceExpression=normalizeFormulaExpression(expression||"");if(!sourceExpression||!formulaParser){return "";}const variableMap={};let normalizedExpression=sourceExpression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,fieldKey)?fieldValues[fieldKey]:"";});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const resolved=formulaToText(rawValue).trim();return resolved&&isAbsoluteHttpUrl(resolved)?resolved:"";}catch(error){console.error("TwinaForms redirect formula failed",error);return "";}}';
+        html += 'function buttonRowValue(rowEl,fieldKey){return rowEl?readRepeatFieldValueByKey(rowEl,fieldKey):"";}';
+        html += 'function resolveButtonTemplate(template,fieldValues,rowEl){return String(template||"").trim().replace(/\\{\\{\\s*(field|row)\\.([^}]+?)\\s*\\}\\}/g,function(_,kind,key){const value=kind==="row"?buttonRowValue(rowEl,key):(fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,key)?fieldValues[key]:"");return value===undefined||value===null?"":encodeURIComponent(String(value));});}';
+        html += 'function resolveButtonParameterTemplate(template,fieldValues,rowEl){return String(template||"").trim().replace(/\\{\\{\\s*(field|row)\\.([^}]+?)\\s*\\}\\}/g,function(_,kind,key){const value=kind==="row"?buttonRowValue(rowEl,key):(fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,key)?fieldValues[key]:"");return value===undefined||value===null?"":String(value);});}';
+        html += 'function evaluateButtonFormula(expression,fieldValues,rowEl){const source=normalizeFormulaExpression(expression||"");if(!source||!formulaParser){return "";}const variables={};const normalized=source.replace(/\\{(row\\.)?([A-Za-z0-9_]+)\\}/g,function(_,rowPrefix,key){const lookup=(rowPrefix?"row.":"")+key;const safe=formulaSafeVarName(lookup);variables[safe]=rowPrefix?buttonRowValue(rowEl,key):(fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,key)?fieldValues[key]:"");return safe;});try{return formulaToText(formulaParser.parse(normalized).evaluate(variables)).trim();}catch(error){console.error("TwinaForms Button formula failed",error);return "";}}';
+        html += 'function resolveButtonUrl(button){let buttonConfig={};try{buttonConfig=JSON.parse(button.dataset.buttonConfig||"{}");}catch(error){return "";}evaluateAllFormulaFields();const fieldValues=readAllFieldValues();const rowEl=button.closest("[data-repeat-row]");let destination=buttonConfig.destinationType==="form"?String(buttonConfig.destinationUrl||""):(buttonConfig.externalUrlMode==="formula"?evaluateButtonFormula(buttonConfig.externalUrlFormula,fieldValues,rowEl):resolveButtonTemplate(buttonConfig.externalUrlTemplate,fieldValues,rowEl));if(!isAbsoluteHttpUrl(destination)){return "";}const url=new URL(destination);(buttonConfig.queryParameters||[]).forEach(function(parameter){const name=String(parameter.name||"").trim();if(!name){return;}const value=parameter.valueMode==="formula"?evaluateButtonFormula(parameter.valueFormula,fieldValues,rowEl):resolveButtonParameterTemplate(parameter.valueTemplate,fieldValues,rowEl);if(String(value||"").trim()){url.searchParams.append(name,value);}});return url.toString();}';
         html += 'function startPostSubmitRedirect(url,delaySeconds){clearPostSubmitRedirect();activePostSubmitRedirectUrl=url||"";if(!activePostSubmitRedirectUrl){return;}const continueButton=resultEl.querySelector("[data-post-submit-continue]");if(continueButton){continueButton.addEventListener("click",function(){if(activePostSubmitRedirectUrl){window.location.assign(activePostSubmitRedirectUrl);}});}const countdownEl=resultEl.querySelector("[data-post-submit-countdown]");let remaining=Math.max(0,Number(delaySeconds)||0);if(countdownEl){countdownEl.textContent=String(remaining);}if(remaining<=0){window.location.assign(activePostSubmitRedirectUrl);return;}postSubmitRedirectTimer=window.setTimeout(function(){if(activePostSubmitRedirectUrl){window.location.assign(activePostSubmitRedirectUrl);}},remaining*1000);if(countdownEl){postSubmitRedirectCountdownTimer=window.setInterval(function(){remaining=Math.max(remaining-1,0);countdownEl.textContent=String(remaining);if(remaining<=0&&postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}},1000);}}';
         html += 'function renderResult(kind,options){if(!resultEl){return;}const opts=options||{};clearPostSubmitRedirect();if(kind==="success"){const hasRedirect=!!opts.redirectUrl;const countdownLabel=interpolate(t("postSubmitContinuingIn","Continuing in {seconds} seconds..."),{seconds:String(Math.max(0,Number(opts.redirectDelaySeconds)||0))});const countdownText=hasRedirect?\'<p class="nf-result__meta">\'+escapeHtml(countdownLabel).replace(escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0))),\'<span data-post-submit-countdown>\'+escapeHtml(String(Math.max(0,Number(opts.redirectDelaySeconds)||0)))+\'</span>\')+\'</p>\':"";const actionText=hasRedirect?\'<div class="nf-result__actions"><button type="button" data-post-submit-continue>\'+escapeHtml(opts.redirectButtonLabel||postSubmitButtonLabel)+\'</button></div>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--success"><h2 class="nf-result__title">\'+escapeHtml(t("submitSuccessTitle","Submitted successfully"))+\'</h2><p class="nf-result__message">\'+escapeHtml(opts.message||submitSuccessMessage)+\'</p>\'+countdownText+actionText+\'</div>\';form.hidden=true;form.style.display="none";if(shellEl){shellEl.classList.add("nf-shell--result-only");}if(hasRedirect){startPostSubmitRedirect(opts.redirectUrl,opts.redirectDelaySeconds);}}else if(kind==="error"){const bucket=opts.bucket||failureBucket(opts.errorPayload);const detailsText=opts.detailsText?\'<details class="nf-result__details"><summary>Technical details</summary><pre>\'+escapeHtml(opts.detailsText)+\'</pre></details>\':"";resultEl.innerHTML=\'<div class="nf-result__panel nf-result__panel--error"><h2 class="nf-result__title">\'+escapeHtml(t("submitErrorTitle","Submit failed"))+\'</h2><p class="nf-result__message">\'+escapeHtml(bucket.detail)+\'</p><p class="nf-result__subtitle">\'+escapeHtml(bucket.label)+\'</p>\'+detailsText+\'</div>\';form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}resultEl.hidden=false;}';
         html += 'function getCaptchaToken(){const responseField=form.querySelector("textarea[name=\'g-recaptcha-response\'],input[name=\'g-recaptcha-response\']");return responseField?responseField.value||"":"";}';
@@ -1899,7 +2212,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function formatDateForField(value,field){const format=field&&field.dataset&&field.dataset.dateFormat?field.dataset.dateFormat:"us";const parsed=parseDateValue(value,format)||parseDateValue(value,"us")||parseDateValue(value,"eu");return parsed?formatParsedDate(parsed,format):value==null?"":String(value);}';
         html += 'function validateDateField(el,showMessage){if(!el||el.dataset.nativeformsDate!=="true"){return true;}const format=el.dataset.dateFormat||"us";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseDateValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("dateInvalid","Please enter a valid date in {format} format."),{format:dateFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}const minDate=el.dataset.effectiveMinDate||"";const maxDate=el.dataset.effectiveMaxDate||"";if(minDate&&parsed.iso<minDate){el.setCustomValidity(interpolate(t("dateMin","Please enter a date on or after {date}."),{date:formatDateForField(minDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}if(maxDate&&parsed.iso>maxDate){el.setCustomValidity(interpolate(t("dateMax","Please enter a date on or before {date}."),{date:formatDateForField(maxDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
         html += 'function timeFormatHint(format){return format==="12h"?"h:mm AM/PM":"HH:mm";}';
-        html += 'function parseTimeValue(value,format){const raw=String(value||"").trim();if(!raw){return null;}let match;if(format==="12h"){match=raw.match(/^(\\d{1,2}):(\\d{2})\\s*([AaPp][Mm])$/);if(!match){return null;}let hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<1||hours>12||minutes<0||minutes>59){return null;}const meridiem=match[3].toUpperCase();if(meridiem==="AM"&&hours===12){hours=0;}else if(meridiem==="PM"&&hours<12){hours+=12;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}match=raw.match(/^(\\d{1,2}):(\\d{2})$/);if(!match){return null;}const hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<0||hours>23||minutes<0||minutes>59){return null;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}';
+        html += 'function parseTimeValue(value,format){const raw=String(value||"").trim();if(!raw){return null;}const salesforceTimeMatch=raw.match(/^(\\d{1,2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:?\\d{2})?$/);if(salesforceTimeMatch){const sfHours=Number(salesforceTimeMatch[1]);const sfMinutes=Number(salesforceTimeMatch[2]);const sfSeconds=salesforceTimeMatch[3]===undefined?0:Number(salesforceTimeMatch[3]);if(Number.isInteger(sfHours)&&Number.isInteger(sfMinutes)&&Number.isInteger(sfSeconds)&&sfHours>=0&&sfHours<=23&&sfMinutes>=0&&sfMinutes<=59&&sfSeconds>=0&&sfSeconds<=59){return String(sfHours).padStart(2,"0")+":"+String(sfMinutes).padStart(2,"0");}}let match;if(format==="12h"){match=raw.match(/^(\\d{1,2}):(\\d{2})\\s*([AaPp][Mm])$/);if(!match){return null;}let hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<1||hours>12||minutes<0||minutes>59){return null;}const meridiem=match[3].toUpperCase();if(meridiem==="AM"&&hours===12){hours=0;}else if(meridiem==="PM"&&hours<12){hours+=12;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}match=raw.match(/^(\\d{1,2}):(\\d{2})$/);if(!match){return null;}const hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<0||hours>23||minutes<0||minutes>59){return null;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}';
         html += 'function formatTimeForField(value,field){const format=field&&field.dataset&&field.dataset.timeFormat?field.dataset.timeFormat:"24h";const parsed=parseTimeValue(value,"24h")||parseTimeValue(value,"12h");if(!parsed){return value==null?"":String(value);}if(format!=="12h"){return parsed;}const parts=parsed.split(":");const hour24=Number(parts[0]);const meridiem=hour24>=12?"PM":"AM";const hour12=hour24%12||12;return String(hour12)+":"+parts[1]+" "+meridiem;}';
         html += 'function validateTimeField(el,showMessage){if(!el||el.dataset.nativeformsTime!=="true"){return true;}const format=el.dataset.timeFormat||"24h";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseTimeValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("timeInvalid","Please enter a valid time in {format} format."),{format:timeFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
@@ -1908,19 +2221,33 @@ public with sharing class NativeFormsPublisher {
         html += 'function evaluateElementConditions(el){let conditions=[];try{conditions=JSON.parse(el.dataset.conditions||"[]")||[];}catch(error){conditions=[];}if(!conditions.length&&el.dataset.conditionSource){conditions=[{fieldKey:el.dataset.conditionSource,operator:el.dataset.conditionOperator,value:el.dataset.conditionValue||""}];}if(!conditions.length){return true;}const results=conditions.map(function(condition){return evaluateSingleCondition(condition);});return evaluateConditionExpression(results,el.dataset.conditionExpression||"");}';
         html += 'function lookupForField(fieldKey){return form.querySelector("[data-nativeforms-lookup=\'true\'][data-lookup-field-key=\'"+String(fieldKey||"").replace(/\'/g,"\\\\\'")+"\']");}';
         html += 'function setLookupValue(fieldKey,id,label){const lookupEl=lookupForField(fieldKey);if(!lookupEl){return false;}const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");if(hidden){hidden.value=id==null?"":String(id);}if(input){input.value=label||id||"";}if(clear){clear.hidden=!id;}lookupEl.dataset.lookupSelectedLabel=label||"";return true;}';
-        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}if(setLookupValue(fieldKey,value,"")){resolveLookupLabel(fieldKey,value);return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}if(fields[0].dataset.nativeformsMultiCheckbox==="true"){setMultiCheckboxValue(fields,value);return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}if(setLookupValue(fieldKey,value,"")){resolveLookupLabel(fieldKey,value);return;}if(setLocationValue(fieldKey,value)){return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}if(fields[0].dataset.nativeformsMultiCheckbox==="true"){setMultiCheckboxValue(fields,value);return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}});}';
         html += 'function lookupControls(){return Array.from(form.querySelectorAll("[data-nativeforms-lookup=\'true\']"));}';
         html += 'function setLookupStatus(lookupEl,message,isError){const status=lookupEl?lookupEl.querySelector("[data-lookup-status]"):null;if(status){status.textContent=message||"";status.style.color=isError?"#b42318":"";}}';
         html += 'function renderLookupResults(lookupEl,items){const results=lookupEl?lookupEl.querySelector("[data-lookup-results]"):null;if(!results){return;}if(!items||!items.length){results.innerHTML="";results.hidden=true;return;}results.innerHTML=items.map(function(item){return \'<button type="button" class="nf-lookup__option" data-lookup-id="\'+escapeHtml(item.id||"")+\'" data-lookup-label="\'+escapeHtml(item.label||item.id||"")+\'">\'+escapeHtml(item.label||item.id||"")+\'</button>\';}).join("");results.hidden=false;}';
         html += 'async function callLookup(payload){if(!config.lookupUrl){throw new Error(t("lookupConfigMissing","Lookup is not configured for this published form."));}const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({formId:config.formId,publishToken:config.publishToken},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}return data;}';
         html += 'async function resolveLookupLabel(fieldKey,value){const id=String(value||"").trim();if(!id){return;}try{const data=await callLookup({fieldKey:fieldKey,recordId:id});if(data.record){setLookupValue(fieldKey,data.record.id,data.record.label||data.record.id);}}catch(error){}}';
-        html += 'async function runLookupSearch(lookupEl){const fieldKey=lookupEl&&lookupEl.dataset.lookupFieldKey;const input=lookupEl?lookupEl.querySelector("[data-lookup-input]"):null;if(!fieldKey||!input){return;}const search=String(input.value||"").trim();const hidden=lookupEl.querySelector("[data-lookup-hidden]");if(hidden){hidden.value="";}const minLength=Math.max(1,Number(lookupEl.dataset.lookupMinLength||2)||2);if(search.length<minLength){renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}if(lookupAbortByField[fieldKey]){lookupAbortByField[fieldKey].abort();}const controller=window.AbortController?new AbortController():null;lookupAbortByField[fieldKey]=controller;setLookupStatus(lookupEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,search:search})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}renderLookupResults(lookupEl,data.records||[]);setLookupStatus(lookupEl,(data.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
-        html += 'function initLookupControls(){lookupControls().forEach(function(lookupEl){const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const results=lookupEl.querySelector("[data-lookup-results]");if(input){input.addEventListener("input",function(){const fieldKey=lookupEl.dataset.lookupFieldKey;window.clearTimeout(lookupTimersByField[fieldKey]);lookupTimersByField[fieldKey]=window.setTimeout(function(){runLookupSearch(lookupEl);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLookupResults(lookupEl,[]);},180);});}if(results){results.addEventListener("click",function(event){const button=event.target.closest("[data-lookup-id]");if(!button){return;}setLookupValue(lookupEl.dataset.lookupFieldKey,button.dataset.lookupId||"",button.dataset.lookupLabel||button.dataset.lookupId||"");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}if(clear){clear.addEventListener("click",function(){setLookupValue(lookupEl.dataset.lookupFieldKey,"","");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}});}';
+        html += 'async function runLookupSearch(lookupEl){const fieldKey=lookupEl&&lookupEl.dataset.lookupFieldKey;const input=lookupEl?lookupEl.querySelector("[data-lookup-input]"):null;if(!fieldKey||!input||lookupEl.dataset.lookupLocked==="true"||input.readOnly||input.disabled){return;}const search=String(input.value||"").trim();const hidden=lookupEl.querySelector("[data-lookup-hidden]");if(hidden){hidden.value="";}const minLength=Math.max(1,Number(lookupEl.dataset.lookupMinLength||2)||2);if(search.length<minLength){renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}if(lookupAbortByField[fieldKey]){lookupAbortByField[fieldKey].abort();}const controller=window.AbortController?new AbortController():null;lookupAbortByField[fieldKey]=controller;setLookupStatus(lookupEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,search:search})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}renderLookupResults(lookupEl,data.records||[]);setLookupStatus(lookupEl,(data.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
+        html += 'function initLookupControls(){lookupControls().forEach(function(lookupEl){const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const results=lookupEl.querySelector("[data-lookup-results]");if(input){input.addEventListener("input",function(){if(lookupEl.dataset.lookupLocked==="true"||input.readOnly||input.disabled){renderLookupResults(lookupEl,[]);return;}const fieldKey=lookupEl.dataset.lookupFieldKey;window.clearTimeout(lookupTimersByField[fieldKey]);lookupTimersByField[fieldKey]=window.setTimeout(function(){runLookupSearch(lookupEl);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLookupResults(lookupEl,[]);},180);});}if(results){results.addEventListener("click",function(event){if(lookupEl.dataset.lookupLocked==="true"){event.preventDefault();renderLookupResults(lookupEl,[]);return;}const button=event.target.closest("[data-lookup-id]");if(!button){return;}setLookupValue(lookupEl.dataset.lookupFieldKey,button.dataset.lookupId||"",button.dataset.lookupLabel||button.dataset.lookupId||"");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}if(clear){clear.addEventListener("click",function(){if(lookupEl.dataset.lookupLocked==="true"||clear.disabled){return;}setLookupValue(lookupEl.dataset.lookupFieldKey,"","");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}});}';
+        html += 'function locationControls(){return Array.from(form.querySelectorAll("[data-nativeforms-location=\'true\']"));}';
+        html += 'function locationForField(fieldKey){return form.querySelector("[data-nativeforms-location=\'true\'][data-location-field-key=\'"+String(fieldKey||"").replace(/\'/g,"\\\\\'")+"\']");}';
+        html += 'function locationInput(locationEl,kind){return locationEl?locationEl.querySelector("[data-location-input=\'"+kind+"\']"):null;}';
+        html += 'function setLocationStatus(locationEl,message,isError){const status=locationEl?locationEl.querySelector("[data-location-status]"):null;if(status){status.textContent=message||"";status.style.color=isError?"#b42318":"";}}';
+        html += 'function renderLocationResults(locationEl,items){const results=locationEl?locationEl.querySelector("[data-location-results]"):null;if(!results){return;}if(!items||!items.length){results.innerHTML="";results.hidden=true;return;}results.innerHTML=items.map(function(item){return \'<button type="button" class="nf-lookup__option" data-location-item="\'+escapeHtml(JSON.stringify(item))+\'">\'+escapeHtml(item.label||item.displayLabel||item.name||"")+\'</button>\';}).join("");results.hidden=false;}';
+        html += 'function selectedLocationData(locationEl){try{return JSON.parse((locationEl.querySelector("[data-location-hidden]")||{}).value||"{}");}catch(error){return {};}}';
+        html += 'function writeLocationData(locationEl,data){const hidden=locationEl.querySelector("[data-location-hidden]");const clear=locationEl.querySelector("[data-location-clear]");const clean=data&&typeof data==="object"?data:{};if(hidden){hidden.value=Object.keys(clean).length?JSON.stringify(clean):"";}if(clear){clear.hidden=!Object.keys(clean).length;}}';
+        html += 'function setLocationValue(fieldKey,value){const locationEl=locationForField(fieldKey);if(!locationEl){return false;}const data=value&&typeof value==="object"?value:{};writeLocationData(locationEl,data);const country=locationInput(locationEl,"country");const region=locationInput(locationEl,"region");const city=locationInput(locationEl,"city");if(country){country.value=data.countryName||data.countryCode||"";}if(region){region.value=data.regionName||data.regionCode||"";}if(city){city.value=data.cityName||"";}return true;}';
+        html += 'function clearLocationParts(locationEl,fromKind){const data=selectedLocationData(locationEl);if(fromKind==="country"){delete locationEl.dataset.locationRegionExplicit;delete data.countryCode;delete data.countryName;delete data.regionCode;delete data.regionName;delete data.cityName;delete data.geoNameId;delete data.latitude;delete data.longitude;delete data.displayLabel;["region","city"].forEach(function(kind){const input=locationInput(locationEl,kind);if(input){input.value="";}});}if(fromKind==="region"){delete locationEl.dataset.locationRegionExplicit;delete data.regionCode;delete data.regionName;delete data.cityName;delete data.geoNameId;delete data.latitude;delete data.longitude;delete data.displayLabel;const city=locationInput(locationEl,"city");if(city){city.value="";}}if(fromKind==="city"){delete data.cityName;delete data.geoNameId;delete data.latitude;delete data.longitude;delete data.displayLabel;}writeLocationData(locationEl,data);}';
+        html += 'function applyLocationSelection(locationEl,kind,item){const data=selectedLocationData(locationEl);if(kind==="country"){delete locationEl.dataset.locationRegionExplicit;data.countryCode=item.countryCode||item.code||"";data.countryName=item.countryName||item.name||item.label||"";delete data.regionCode;delete data.regionName;delete data.cityName;delete data.geoNameId;delete data.latitude;delete data.longitude;delete data.displayLabel;}else if(kind==="region"){locationEl.dataset.locationRegionExplicit="true";data.regionCode=item.regionCode||item.code||"";data.regionName=item.regionName||item.name||item.label||"";delete data.cityName;delete data.geoNameId;delete data.latitude;delete data.longitude;delete data.displayLabel;}else{data.countryCode=item.countryCode||data.countryCode||"";data.countryName=item.countryName||data.countryName||"";data.regionCode=item.regionCode||data.regionCode||"";data.regionName=item.regionName||data.regionName||"";data.cityName=item.cityName||item.name||item.label||"";data.geoNameId=item.geoNameId||"";data.latitude=item.latitude==null?null:item.latitude;data.longitude=item.longitude==null?null:item.longitude;data.displayLabel=item.displayLabel||item.label||[data.cityName,data.regionName,data.countryName].filter(Boolean).join(", ");}writeLocationData(locationEl,data);["country","region","city"].forEach(function(part){const input=locationInput(locationEl,part);if(input){input.value=part==="country"?(data.countryName||""):part==="region"?(data.regionName||""):(data.cityName||"");}});renderLocationResults(locationEl,[]);setLocationStatus(locationEl,"",false);handleRuntimeStateChange({target:{name:locationEl.dataset.locationFieldKey}});}';
+        html += 'async function runLocationSearch(locationEl,kind){const fieldKey=locationEl&&locationEl.dataset.locationFieldKey;const input=locationInput(locationEl,kind);if(!fieldKey||!input||input.readOnly||input.disabled){return;}const search=String(input.value||"").trim();clearLocationParts(locationEl,kind);const minLength=kind==="country"?1:Math.max(1,Number(locationEl.dataset.locationMinLength||2)||2);if(search.length<minLength){renderLocationResults(locationEl,[]);setLocationStatus(locationEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}const data=selectedLocationData(locationEl);if((kind==="region"||kind==="city")&&!data.countryCode){renderLocationResults(locationEl,[]);setLocationStatus(locationEl,t("locationChooseCountry","Choose a country first."),true);return;}const timerKey=fieldKey+":"+kind;if(locationAbortByField[timerKey]){locationAbortByField[timerKey].abort();}const controller=window.AbortController?new AbortController():null;locationAbortByField[timerKey]=controller;setLocationStatus(locationEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.locationUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,kind:kind,search:search,countryCode:data.countryCode||"",regionCode:kind==="city"&&locationEl.dataset.locationRegionExplicit!=="true"?"":(data.regionCode||"")})});const payload=await response.json();if(!response.ok||payload.success===false){throw new Error(payload.error||"Location search failed");}renderLocationResults(locationEl,payload.records||[]);locationEl.dataset.locationActiveKind=kind;setLocationStatus(locationEl,(payload.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLocationResults(locationEl,[]);setLocationStatus(locationEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
+        html += 'async function applyDefaultLocationCountry(locationEl){const defaultCountry=String(locationEl&&locationEl.dataset.locationDefaultCountry||"").trim().toUpperCase();if(!defaultCountry||selectedLocationData(locationEl).countryCode||!config.locationUrl){return;}try{const response=await fetch(config.locationUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:locationEl.dataset.locationFieldKey,kind:"country",search:defaultCountry})});const payload=await response.json();const match=(payload.records||[]).find(function(item){return String(item.countryCode||"").toUpperCase()===defaultCountry;});if(response.ok&&match){applyLocationSelection(locationEl,"country",match);}}catch(error){}}';
+        html += 'function initLocationControls(){locationControls().forEach(function(locationEl){const mode=locationEl.dataset.locationMode||"countryRegionCity";const region=locationInput(locationEl,"region");const city=locationInput(locationEl,"city");if(region){region.hidden=mode==="country"||mode==="countryCity";}if(city){city.hidden=mode==="country"||mode==="countryRegion";}["country","region","city"].forEach(function(kind){const input=locationInput(locationEl,kind);if(!input){return;}input.addEventListener("input",function(){const key=(locationEl.dataset.locationFieldKey||"")+":"+kind;window.clearTimeout(locationTimersByField[key]);locationTimersByField[key]=window.setTimeout(function(){runLocationSearch(locationEl,kind);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLocationResults(locationEl,[]);},180);});});const results=locationEl.querySelector("[data-location-results]");if(results){results.addEventListener("click",function(event){const button=event.target.closest("[data-location-item]");if(!button){return;}let item={};try{item=JSON.parse(button.dataset.locationItem||"{}");}catch(error){}applyLocationSelection(locationEl,locationEl.dataset.locationActiveKind||"country",item);});}const clear=locationEl.querySelector("[data-location-clear]");if(clear){clear.addEventListener("click",function(){writeLocationData(locationEl,{});["country","region","city"].forEach(function(kind){const input=locationInput(locationEl,kind);if(input){input.value="";}});renderLocationResults(locationEl,[]);setLocationStatus(locationEl,"",false);handleRuntimeStateChange({target:{name:locationEl.dataset.locationFieldKey}});});}applyDefaultLocationCountry(locationEl);});}';
+        html += 'function validateLocationFields(){const controls=locationControls();for(let index=0;index<controls.length;index+=1){const locationEl=controls[index];const data=selectedLocationData(locationEl);const countryInput=locationInput(locationEl,"country");const regionInput=locationInput(locationEl,"region");const cityInput=locationInput(locationEl,"city");const hasCountry=!!(data.countryCode||data.countryName);const hasRegion=!!(data.regionCode||data.regionName);if(locationEl.dataset.locationRequiredCountry==="true"&&!hasCountry){setLocationStatus(locationEl,t("locationCountryRequired","Choose a country."),true);if(countryInput){countryInput.focus();}return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if(regionInput&&!regionInput.hidden&&locationEl.dataset.locationRequiredRegion==="true"&&!hasRegion){setLocationStatus(locationEl,t("locationRegionRequired","Choose a state or region."),true);regionInput.focus();return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if(cityInput&&!cityInput.hidden&&locationEl.dataset.locationRequiredCity==="true"&&!data.cityName){setLocationStatus(locationEl,t("locationCityRequired","Choose a city."),true);cityInput.focus();return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if((countryInput&&String(countryInput.value||"").trim()&&!hasCountry)||(regionInput&&!regionInput.hidden&&String(regionInput.value||"").trim()&&!hasRegion)||(cityInput&&!cityInput.hidden&&String(cityInput.value||"").trim()&&!data.cityName)){setLocationStatus(locationEl,t("lookupSelectResult","Choose a result from the lookup list."),true);return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}}return{valid:true,message:""};}';
         html += 'function validateLookupFields(){const controls=lookupControls();for(let index=0;index<controls.length;index+=1){const lookupEl=controls[index];const input=lookupEl.querySelector("[data-lookup-input]");const hidden=lookupEl.querySelector("[data-lookup-hidden]");const required=lookupEl.dataset.lookupRequired==="true";const hasId=!!(hidden&&String(hidden.value||"").trim());if(required&&!hasId){setLookupStatus(lookupEl,t("lookupRequired","Select a record before submitting."),true);if(input){input.focus();}return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}if(input&&String(input.value||"").trim()&&!hasId){setLookupStatus(lookupEl,t("lookupSelectResult","Choose a result from the lookup list."),true);input.focus();return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}}return{valid:true,message:""};}';
         html += 'function validateMultiCheckboxGroups(){const groups=form.querySelectorAll("[data-nativeforms-multi-checkbox-group=\'true\']");for(let index=0;index<groups.length;index+=1){const group=groups[index];const required=group.dataset.required==="true";const boxes=Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']"));const first=boxes[0];const hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.setCustomValidity("");});if(required&&!hasValue){if(first){first.setCustomValidity(t("multiCheckboxRequired","Select at least one option."));first.reportValidity();first.focus();}return{valid:false,message:t("multiCheckboxReview","Please review the checkbox groups and try again.")};}}return{valid:true,message:""};}';
         html += 'function readAllFieldValues(){const values={};form.querySelectorAll("[name]").forEach(function(control){const fieldKey=String(control.name||"");if(!fieldKey||Object.prototype.hasOwnProperty.call(values,fieldKey)){return;}values[fieldKey]=readRuntimeFieldValue(fieldKey);});return values;}';
         html += 'const repeatDeleteState={};';
-        html += 'let lastPrefillPayload=null;';
+        html += 'let lastPrefillPayload=null;let activeButtonNavigationUrl="";';
         html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
         html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.dataset.nativeformsMultiCheckbox==="true"){field.checked=parseMultiCheckboxValue(value).has(String(field.value||""));field.setCustomValidity("");return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}if(field.dataset.nativeformsTime==="true"){field.value=formatTimeForField(value,field);validateTimeField(field,false);return;}field.value=value==null?"":value;}';
         html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:"";if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
@@ -1929,7 +2256,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);initRepeatRowSignatures(rowsHost.lastElementChild);}';
         html += 'function collectRepeatGroups(){const groups={};form.querySelectorAll("[data-repeat-group]").forEach(function(groupEl){const groupKey=groupEl.dataset.repeatGroup;const rows=[];groupEl.querySelectorAll("[data-repeat-row]").forEach(function(rowEl,rowIndex){const row={};const seen={};rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;if(seen[fieldKey]){return;}row[fieldKey]=readRepeatFieldValueByKey(rowEl,fieldKey);seen[fieldKey]=true;});const rowSignaturePad=rowEl.querySelector("[data-nativeforms-row-signature=\'true\']");const rowSignatureCanvas=signatureCanvasForPad(rowSignaturePad);if(rowSignaturePad&&rowSignatureCanvas&&rowSignaturePad.dataset.signatureEmpty==="false"){row._rowSignature={dataUrl:rowSignatureCanvas.toDataURL("image/png"),contentType:"image/png",fileName:groupKey+"-row-"+String(rowIndex+1)+"-signature.png",signedAt:new Date().toISOString()};}rows.push(row);});groups[groupKey]={rows:rows,deletedIds:repeatDeleteState[groupKey]||[]};});return groups;}';
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
-        html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let hasValue=false;if(control.dataset.nativeformsMultiCheckbox==="true"){const group=control.closest("[data-nativeforms-multi-checkbox-group=\'true\']");const boxes=group?Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']")):[control];hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.disabled=hasValue;});return;}if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
+        html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let lookupEl=null;if(control.matches&&control.matches("[data-nativeforms-lookup=\'true\']")){lookupEl=control;}if(!lookupEl&&control.closest){lookupEl=control.closest("[data-nativeforms-lookup=\'true\']");}if(!lookupEl&&control.querySelector){lookupEl=control.querySelector("[data-nativeforms-lookup=\'true\']");}if(lookupEl){const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const hasLookupValue=!!(hidden&&String(hidden.value||"").trim());lookupEl.dataset.lookupLocked=hasLookupValue?"true":"false";if(input){input.readOnly=hasLookupValue;input.setAttribute("aria-readonly",hasLookupValue?"true":"false");}if(clear){clear.disabled=hasLookupValue;}if(hasLookupValue){renderLookupResults(lookupEl,[]);}return;}let hasValue=false;if(control.dataset.nativeformsMultiCheckbox==="true"){const group=control.closest("[data-nativeforms-multi-checkbox-group=\'true\']");const boxes=group?Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']")):[control];hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.disabled=hasValue;});return;}if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
         html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
         html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});evaluateAllFormulaFields();applyLockedFields();evaluateConditions();}';
         html += 'async function runInitialPrefill(){const params=getPrefillParams();if(!hasPrefillParams(params)||secretCodeEnabled){return;}setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const data=await runPrefillWithParams(params);if(!hasPrefillData(data)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(error){emitTwinaFormsEvent("prefill:error",{message:error&&error.message?error.message:t("prefillLoadFailed","We could not load prefill data for this form.")});setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}';
@@ -1948,9 +2275,11 @@ public with sharing class NativeFormsPublisher {
         html += 'wireLiveValidation();';
         html += 'wireRankingFields();';
         html += 'initLookupControls();';
+        html += 'initLocationControls();';
         html += 'fileUploadControls().forEach(function(control){renderFileUploadState(control);control.addEventListener("change",function(){uploadSelectedFiles(control).catch(function(error){setStatus("error",error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again."));});});});';
         html += 'signaturePads().forEach(initSignaturePad);window.addEventListener("resize",function(){signaturePads().forEach(function(pad){if(pad.dataset.signatureEmpty==="true"){resizeSignatureCanvas(signatureCanvasForPad(pad));}});});';
         html += 'form.addEventListener("click",function(event){const clearButton=event.target.closest("[data-file-upload-clear]");if(!clearButton){return;}event.preventDefault();clearFileUploadField(clearButton.getAttribute("data-file-upload-clear"));});';
+        html += 'form.addEventListener("click",function(event){const button=event.target.closest("[data-nativeforms-button=\'true\']");if(!button){return;}event.preventDefault();let buttonConfig={};try{buttonConfig=JSON.parse(button.dataset.buttonConfig||"{}");}catch(error){}const destination=resolveButtonUrl(button);if(!destination){setStatus("error","This Button destination is not a valid web address.");return;}if(buttonConfig.submitBeforeNavigation===true&&!button.closest("[data-repeat-row]")){activeButtonNavigationUrl=destination;form.requestSubmit();return;}window.location.assign(destination);});';
         html += 'runGuardedCustomJs();';
         html += 'emitTwinaFormsEvent("form:init",{versionId:config.versionId,formId:config.formId});';
         html += 'function handleRuntimeStateChange(event){evaluateAllFormulaFields();evaluateConditions();const fieldKey=event&&event.target&&event.target.name?String(event.target.name):"";if(fieldKey){emitTwinaFormsEvent("change",{fieldKey:fieldKey,value:readRuntimeFieldValue(fieldKey),source:"user"});}}';
@@ -1966,16 +2295,17 @@ public with sharing class NativeFormsPublisher {
         html += 'runInitialPrefill();';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
-        html += 'if(secretCodeEnabled&&!secretVerificationApproved){setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
-        html += 'if(!form.reportValidity()){return;}';
-        html += 'const multiCheckboxValidation=validateMultiCheckboxGroups();if(!multiCheckboxValidation.valid){setStatus("error",multiCheckboxValidation.message||t("multiCheckboxReview","Please review the checkbox groups and try again."));return;}';
-        html += 'const lookupValidation=validateLookupFields();if(!lookupValidation.valid){setStatus("error",lookupValidation.message||t("lookupReview","Please review the lookup fields and try again."));return;}';
-        html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){setStatus("error",uploadValidation.message||t("fileUploadReview","Please review the uploaded files and try again."));return;}';
-        html += 'const signatureValidation=validateSignatures();if(!signatureValidation.valid){setStatus("error",signatureValidation.message||t("signatureReview","Please review the signature fields and try again."));return;}';
-        html += 'const rowSignatureValidation=validateRepeatRowSignatures();if(!rowSignatureValidation.valid){setStatus("error",rowSignatureValidation.message||t("rowSignatureReview","Please review the row signatures and try again."));return;}';
-        html += 'if(captchaEnabled&&!getCaptchaToken()){setStatus("error",t("captchaRequired","Please complete the CAPTCHA."));return;}';
+        html += 'if(secretCodeEnabled&&!secretVerificationApproved){activeButtonNavigationUrl="";setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
+        html += 'if(!form.reportValidity()){activeButtonNavigationUrl="";return;}';
+        html += 'const multiCheckboxValidation=validateMultiCheckboxGroups();if(!multiCheckboxValidation.valid){activeButtonNavigationUrl="";setStatus("error",multiCheckboxValidation.message||t("multiCheckboxReview","Please review the checkbox groups and try again."));return;}';
+        html += 'const lookupValidation=validateLookupFields();if(!lookupValidation.valid){activeButtonNavigationUrl="";setStatus("error",lookupValidation.message||t("lookupReview","Please review the lookup fields and try again."));return;}';
+        html += 'const locationValidation=validateLocationFields();if(!locationValidation.valid){activeButtonNavigationUrl="";setStatus("error",locationValidation.message||t("locationReview","Please review the location fields and try again."));return;}';
+        html += 'const uploadValidation=validateUploadedFiles();if(!uploadValidation.valid){activeButtonNavigationUrl="";setStatus("error",uploadValidation.message||t("fileUploadReview","Please review the uploaded files and try again."));return;}';
+        html += 'const signatureValidation=validateSignatures();if(!signatureValidation.valid){activeButtonNavigationUrl="";setStatus("error",signatureValidation.message||t("signatureReview","Please review the signature fields and try again."));return;}';
+        html += 'const rowSignatureValidation=validateRepeatRowSignatures();if(!rowSignatureValidation.valid){activeButtonNavigationUrl="";setStatus("error",rowSignatureValidation.message||t("rowSignatureReview","Please review the row signatures and try again."));return;}';
+        html += 'if(captchaEnabled&&!getCaptchaToken()){activeButtonNavigationUrl="";setStatus("error",t("captchaRequired","Please complete the CAPTCHA."));return;}';
         html += 'setSubmitting(true);';
-        html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){setStatus("error",normalizedDates.message);return;}const normalizedTimes=collectNormalizedTimeValues();if(!normalizedTimes.success){setStatus("error",normalizedTimes.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
+        html += 'try{evaluateAllFormulaFields();const normalizedDates=collectNormalizedDateValues();if(!normalizedDates.success){activeButtonNavigationUrl="";setStatus("error",normalizedDates.message);return;}const normalizedTimes=collectNormalizedTimeValues();if(!normalizedTimes.success){activeButtonNavigationUrl="";setStatus("error",normalizedTimes.message);return;}const formData=new FormData(form);const input={};for(const [key,value] of formData.entries()){if(value instanceof File){continue;}input[key]=value;}';
         html += 'form.querySelectorAll("[data-nativeforms-multi-checkbox-group=\'true\'][data-field-key]").forEach(function(group){const fieldKey=group.dataset.fieldKey;if(fieldKey){input[fieldKey]=readMultiCheckboxValue(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']"));}});';
         html += 'form.querySelectorAll("input[type=\'checkbox\'][name]").forEach(function(el){if(el.dataset.nativeformsMultiCheckbox==="true"){return;}input[el.name]=!!el.checked;});';
         html += 'Object.keys(normalizedDates.values).forEach(function(key){input[key]=normalizedDates.values[key];});';
@@ -1987,10 +2317,10 @@ public with sharing class NativeFormsPublisher {
         html += 'input.repeatGroups=collectRepeatGroups();';
         html += 'emitTwinaFormsEvent("submit:before",{input:input,prefillSnapshot:lastPrefillPayload});const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,input:input,prefillSnapshot:lastPrefillPayload})});';
         html += 'const data=await response.json();';
-        html += 'if(!response.ok||data.success===false){emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});if(secretCodeEnabled&&isSecretVerificationExpiredResponse(data)){clearStoredSecretVerificationSession();secretVerificationToken="";secretVerifiedEmail="";setSecretGatedState(false);setSecretVerificationSectionVisible(true);setSecretCodeStepVisible(false);}renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
-        html += 'const resolvedPostSubmitUrl=postSubmitAutoLinkEnabled?(postSubmitUrlMode==="formula"?resolveFormulaPostSubmitUrl(postSubmitUrlFormula,input):resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload)):"";';
+        html += 'if(!response.ok||data.success===false){activeButtonNavigationUrl="";emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});if(secretCodeEnabled&&isSecretVerificationExpiredResponse(data)){clearStoredSecretVerificationSession();secretVerificationToken="";secretVerifiedEmail="";setSecretGatedState(false);setSecretVerificationSectionVisible(true);setSecretCodeStepVisible(false);}renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
+        html += 'const resolvedPostSubmitUrl=activeButtonNavigationUrl||(postSubmitAutoLinkEnabled?(postSubmitUrlMode==="formula"?resolveFormulaPostSubmitUrl(postSubmitUrlFormula,input):resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload)):"");activeButtonNavigationUrl="";';
         html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();clearAllSignatures();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
-        html += '}catch(error){emitTwinaFormsEvent("submit:error",{error:{message:error&&error.message?error.message:"Submit failed"}});renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
+        html += '}catch(error){activeButtonNavigationUrl="";emitTwinaFormsEvent("submit:error",{error:{message:error&&error.message?error.message:"Submit failed"}});renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
         html += '});';
         html += '})();</script>';
         html += '</body></html>';
@@ -2002,6 +2332,9 @@ public with sharing class NativeFormsPublisher {
         String typeValue = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
         String fieldName = String.isNotBlank(elementRecord.Field_Key__c) ? elementRecord.Field_Key__c : String.valueOf(elementRecord.Id);
         String label = String.isNotBlank(elementRecord.Label__c) ? elementRecord.Label__c : fieldName;
+        if (typeValue == 'signature') {
+            label = localizedDefaultRuntimeText(languageCode, 'signatureLabel', elementRecord.Label__c, 'Signature');
+        }
         String placeholder = config.containsKey('placeholder') ? String.valueOf(config.get('placeholder')) : '';
         Boolean required = config.containsKey('required') ? Boolean.valueOf(String.valueOf(config.get('required'))) : false;
         String rawDefaultValue = config.containsKey('defaultValue') ? String.valueOf(config.get('defaultValue')) : '';
@@ -2059,10 +2392,6 @@ public with sharing class NativeFormsPublisher {
             Boolean allowAddRows = !config.containsKey('allowAddRows') || booleanValue(config.get('allowAddRows'));
             Boolean allowDeleteRows = !config.containsKey('allowDeleteRows') || booleanValue(config.get('allowDeleteRows'));
             Boolean showLabelsOnEachRow = !config.containsKey('showLabelsOnEachRow') || booleanValue(config.get('showLabelsOnEachRow'));
-            Boolean rowSignatureEnabled = booleanValue(config.get('rowSignatureEnabled'));
-            Boolean rowSignatureRequired = !config.containsKey('rowSignatureRequired') || booleanValue(config.get('rowSignatureRequired'));
-            String rowSignatureLabel = firstNonBlank(stringValue(config.get('rowSignatureLabel')), runtimeTextValue(languageCode, 'rowSignatureLabel', 'Signature'));
-            String rowSignatureHelpText = stringValue(config.get('rowSignatureHelpText'));
             Integer columnCount = safeSectionColumnCount(config);
             String idFieldKey = repeatGroupIdFieldKey(childElements);
             Boolean hasHeader = !showLabelsOnEachRow && childElements != null && !childElements.isEmpty();
@@ -2119,19 +2448,6 @@ public with sharing class NativeFormsPublisher {
                 repeatHtml += '</div>';
             }
             repeatHtml += '</div>';
-            if (rowSignatureEnabled) {
-                String clearLabel = runtimeTextValue(languageCode, 'signatureClear', 'Clear');
-                repeatHtml += '<div class="nf-repeat__row-signature">';
-                repeatHtml += '<div class="nf-field nf-field--above"><label>' + appendRequiredMarker(escapeHtml(rowSignatureLabel), rowSignatureRequired) + '</label>';
-                repeatHtml += '<div class="nf-signature" data-nativeforms-row-signature="true" data-row-signature-required="' + String.valueOf(rowSignatureRequired).toLowerCase() + '">';
-                repeatHtml += '<canvas class="nf-signature__canvas" data-signature-canvas></canvas>';
-                if (String.isNotBlank(rowSignatureHelpText)) {
-                    repeatHtml += '<div class="nf-signature__meta">' + escapeHtml(rowSignatureHelpText) + '</div>';
-                }
-                repeatHtml += '<button type="button" class="nf-signature__clear" data-signature-clear>' + escapeHtml(clearLabel) + '</button>';
-                repeatHtml += '<div class="nf-signature__feedback" data-signature-feedback></div>';
-                repeatHtml += '</div></div></div>';
-            }
             repeatHtml += '</div></template>';
             return repeatHtml;
         }
@@ -2233,6 +2549,11 @@ public with sharing class NativeFormsPublisher {
                 return '<div class="nf-image-wrap nf-image-wrap--' + escapeHtml(imageFit) + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><img class="nf-image nf-image--' + escapeHtml(imageFit) + '" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(altText) + '"' + imageStyleAttr + '></div>';
             }
             return '<div class="nf-copy" data-element-id="' + safeElementId + '"' + wrapperAttrs + '>' + escapeHtml(altText) + '</div>';
+        }
+
+        if (typeValue == 'button') {
+            String buttonConfig = escapeHtml(JSON.serialize(config));
+            return '<div class="nf-portal-button" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><button type="button" data-nativeforms-button="true" data-button-config="' + buttonConfig + '">' + safeLabel + '</button></div>';
         }
 
         if (typeValue == 'textarea') {
@@ -2340,6 +2661,33 @@ public with sharing class NativeFormsPublisher {
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
+        if (typeValue == 'location') {
+            String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '-country"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            Integer minSearchLength = integerValue(config.get('locationMinSearchLength'));
+            if (minSearchLength == null || minSearchLength <= 0) {
+                minSearchLength = 2;
+            }
+            String mode = normalizeLocationMode(config.get('locationMode'));
+            String layout = normalizeLocationLayout(config.get('locationLayout'));
+            String requiredCountry = String.valueOf(config.containsKey('locationRequiredCountry') ? booleanValue(config.get('locationRequiredCountry')) : required).toLowerCase();
+            String requiredRegion = String.valueOf(booleanValue(config.get('locationRequiredRegion'))).toLowerCase();
+            String requiredCity = String.valueOf(booleanValue(config.get('locationRequiredCity'))).toLowerCase();
+            String defaultCountryCode = stringValue(config.get('locationDefaultCountryCode'));
+            defaultCountryCode = String.isBlank(defaultCountryCode) ? '' : defaultCountryCode.trim().toUpperCase();
+            String controlHtml = '<div class="nf-location nf-location--' + escapeHtml(layout) + '" data-nativeforms-location="true" data-location-field-key="' + safeName + '" data-location-mode="' + escapeHtml(mode) + '" data-location-layout="' + escapeHtml(layout) + '" data-location-required-country="' + requiredCountry + '" data-location-required-region="' + requiredRegion + '" data-location-required-city="' + requiredCity + '" data-location-min-length="' + String.valueOf(minSearchLength) + '" data-location-default-country="' + escapeHtml(defaultCountryCode) + '">';
+            controlHtml += '<input type="hidden" name="' + safeName + '" data-location-hidden="true"' + lockOnPrefillAttr + '>';
+            controlHtml += '<div class="nf-location__inputs">';
+            controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '-country" autocomplete="off" data-location-input="country" placeholder="' + escapeHtml(runtimeTextValue(languageCode, 'locationCountryPlaceholder', 'Country')) + '">';
+            controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '-region" autocomplete="off" data-location-input="region" placeholder="' + escapeHtml(runtimeTextValue(languageCode, 'locationRegionPlaceholder', 'State/Region')) + '">';
+            controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '-city" autocomplete="off" data-location-input="city" placeholder="' + escapeHtml(runtimeTextValue(languageCode, 'locationCityPlaceholder', 'City')) + '">';
+            controlHtml += '</div>';
+            controlHtml += '<button type="button" class="nf-lookup__clear" data-location-clear hidden aria-label="Clear selection">' + escapeHtml(runtimeTextValue(languageCode, 'clearSelection', 'Clear')) + '</button>';
+            controlHtml += '<div class="nf-lookup__results" data-location-results hidden></div>';
+            controlHtml += '<div class="nf-lookup__status" data-location-status></div>';
+            controlHtml += '</div>';
+            return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
+
         if (typeValue == 'date') {
             String displayValue = formatDateDefaultValue(defaultValue, config);
             String datePlaceholder = String.isNotBlank(placeholder) ? placeholder : datePlaceholder(config);
@@ -2375,6 +2723,7 @@ public with sharing class NativeFormsPublisher {
             if (String.isNotBlank(helpText)) {
                 controlHtml += '<div class="nf-upload__meta">' + escapeHtml(helpText) + '</div>';
             }
+            controlHtml += '<div class="nf-upload__meta">' + escapeHtml(runtimeTextValue(languageCode, 'fileSafetyNotice', 'Uploaded files are checked for safety before they are attached to Salesforce.')) + '</div>';
             controlHtml += '<div class="nf-upload__feedback" data-file-upload-feedback></div>';
             controlHtml += '<div class="nf-upload__list" data-file-upload-list></div>';
             controlHtml += '</div>';
@@ -2442,6 +2791,11 @@ public with sharing class NativeFormsPublisher {
 
         if (typeValue == 'image') {
             return '';
+        }
+
+        if (typeValue == 'button') {
+            String buttonConfig = escapeHtml(JSON.serialize(config));
+            return '<div class="nf-portal-button" data-element-id="' + escapeHtml(String.isNotBlank(elementRecord.Element_Id__c) ? elementRecord.Element_Id__c : fieldKey) + '"' + conditionalDataAttrs(config) + '><button type="button" data-nativeforms-button="true" data-button-config="' + buttonConfig + '">' + escapeHtml(label) + '</button></div>';
         }
 
         if (typeValue == 'checkbox') {
@@ -2558,7 +2912,20 @@ public with sharing class NativeFormsPublisher {
         }
 
         if (typeValue == 'signature') {
-            return '<div class="nf-field"><label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label><div class="nf-signature__meta">' + escapeHtml(runtimeTextValue(languageCode, 'signatureRepeatUnsupported', 'Signature is not supported inside repeated records.')) + '</div></div>';
+            String clearLabel = String.isNotBlank(stringValue(config.get('clearButtonLabel')))
+                ? stringValue(config.get('clearButtonLabel'))
+                : runtimeTextValue(languageCode, 'signatureClear', 'Clear');
+            String signatureHelpText = stringValue(config.get('helpText'));
+            String signatureHtml = '<div class="nf-field"><label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            signatureHtml += '<div class="nf-signature" data-nativeforms-row-signature="true" data-row-signature-required="' + String.valueOf(required).toLowerCase() + '">';
+            signatureHtml += '<canvas class="nf-signature__canvas" data-signature-canvas></canvas>';
+            if (String.isNotBlank(signatureHelpText)) {
+                signatureHtml += '<div class="nf-signature__meta">' + escapeHtml(signatureHelpText) + '</div>';
+            }
+            signatureHtml += '<button type="button" class="nf-signature__clear" data-signature-clear>' + escapeHtml(clearLabel) + '</button>';
+            signatureHtml += '<div class="nf-signature__feedback" data-signature-feedback></div>';
+            signatureHtml += '</div></div>';
+            return signatureHtml;
         }
 
         String htmlType = normalizeInputType(typeValue);
@@ -2569,6 +2936,15 @@ public with sharing class NativeFormsPublisher {
 
     private static String appendRequiredMarker(String safeLabel, Boolean required) {
         return required ? safeLabel + '<span class="nf-required-marker">*</span>' : safeLabel;
+    }
+
+    private static String buildSubmitInputExpression(NF_Form_Element__c elementRecord, Map<String, Object> elementConfig, String normalizedType) {
+        String scope = normalizedType == 'upsertMany' ? 'row' : 'input';
+        String fieldKey = elementRecord == null ? null : elementRecord.Field_Key__c;
+        if (String.isBlank(fieldKey)) {
+            return null;
+        }
+        return '{' + scope + '.' + fieldKey + '}';
     }
 
     private static Boolean isSurveyPresentation(String presentation) {
@@ -2583,6 +2959,17 @@ public with sharing class NativeFormsPublisher {
     private static String surveyOptionDisplayLabel(String presentation, Map<String, Object> option) {
         String optionValue = stringValue(option == null ? null : option.get('value'));
         String optionLabel = stringValue(option == null ? null : option.get('label'));
+        String normalizedPresentation = String.isBlank(presentation) ? '' : presentation.trim().toLowerCase();
+        if (normalizedPresentation == 'stars') {
+            Integer starCount = integerValue(optionValue);
+            if (starCount != null && starCount > 0) {
+                String stars = '';
+                for (Integer index = 0; index < starCount; index += 1) {
+                    stars += '★';
+                }
+                return stars;
+            }
+        }
         return firstNonBlank(optionLabel, optionValue);
     }
 
@@ -2675,6 +3062,13 @@ public with sharing class NativeFormsPublisher {
         }
         String value = stringValue(runtimeText.get(key));
         return String.isBlank(value) ? fallback : value;
+    }
+
+    private static String localizedDefaultRuntimeText(String languageCode, String key, String candidate, String fallback) {
+        if (String.isBlank(candidate) || NativeFormsRuntimeI18n.matchesAnyLanguageValue(key, candidate)) {
+            return runtimeTextValue(languageCode, key, fallback);
+        }
+        return candidate;
     }
 
     private static String normalizedLabelPosition(Map<String, Object> config) {
@@ -2925,6 +3319,9 @@ public with sharing class NativeFormsPublisher {
             if (elementRecord == null || elementRecord.Element_Type__c != 'signature') {
                 continue;
             }
+            if (recordsListParentForSignature(elementRecord, elements) != null) {
+                continue;
+            }
 
             Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
             signatureFields.add(new Map<String, Object>{
@@ -2944,10 +3341,8 @@ public with sharing class NativeFormsPublisher {
             return false;
         }
         for (NF_Form_Element__c elementRecord : elements) {
-            if (elementRecord == null || elementRecord.Element_Type__c != 'repeatGroup') {
-                continue;
-            }
-            if (booleanValue(parseJsonMap(elementRecord.Config_JSON__c).get('rowSignatureEnabled'))) {
+            if (elementRecord != null && elementRecord.Element_Type__c == 'signature'
+                && recordsListParentForSignature(elementRecord, elements) != null) {
                 return true;
             }
         }
@@ -2961,23 +3356,111 @@ public with sharing class NativeFormsPublisher {
         }
 
         for (NF_Form_Element__c elementRecord : elements) {
-            if (elementRecord == null || elementRecord.Element_Type__c != 'repeatGroup' || String.isBlank(elementRecord.Field_Key__c)) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'signature') {
+                continue;
+            }
+            NF_Form_Element__c recordsList = recordsListParentForSignature(elementRecord, elements);
+            if (recordsList == null || String.isBlank(recordsList.Field_Key__c)) {
                 continue;
             }
             Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
-            if (!booleanValue(config.get('rowSignatureEnabled'))) {
-                continue;
-            }
             rowSignatures.add(new Map<String, Object>{
                 'elementId' => elementRecord.Element_Id__c,
-                'groupKey' => elementRecord.Field_Key__c,
-                'label' => firstNonBlank(stringValue(config.get('rowSignatureLabel')), 'Signature'),
-                'required' => !config.containsKey('rowSignatureRequired') || booleanValue(config.get('rowSignatureRequired')),
-                'attachToRowRecord' => booleanValue(config.get('rowSignatureAttachToRowRecord'))
+                'groupKey' => recordsList.Field_Key__c,
+                'label' => firstNonBlank(elementRecord.Label__c, 'Signature'),
+                'required' => booleanValue(config.get('required')),
+                'attachToRowRecord' => booleanValue(config.get('attachToRowRecord'))
             });
         }
 
         return rowSignatures;
+    }
+
+    private static String validateRecordsListSignatures(List<NF_Form_Element__c> elements) {
+        if (elements == null) {
+            return null;
+        }
+        Map<String, Integer> signatureCountByRecordsList = new Map<String, Integer>();
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'signature') {
+                continue;
+            }
+            NF_Form_Element__c recordsList = recordsListParentForSignature(elementRecord, elements);
+            if (recordsList == null) {
+                continue;
+            }
+            Integer nextCount = (signatureCountByRecordsList.containsKey(recordsList.Element_Id__c)
+                ? signatureCountByRecordsList.get(recordsList.Element_Id__c)
+                : 0) + 1;
+            signatureCountByRecordsList.put(recordsList.Element_Id__c, nextCount);
+            if (nextCount > 1) {
+                return 'A Records List supports one Signature element in this version.';
+            }
+        }
+        return null;
+    }
+
+    private static String validateRecordsListSubmitActions(List<NF_Form_Element__c> elements, List<NF_Form_Action__c> actions) {
+        if (elements == null || actions == null) {
+            return null;
+        }
+
+        Set<String> rowSignatureAttachGroupKeys = new Set<String>();
+        Map<String, String> groupLabelsByKey = new Map<String, String>();
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'signature') {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            if (!booleanValue(config.get('attachToRowRecord'))) {
+                continue;
+            }
+            NF_Form_Element__c recordsList = recordsListParentForSignature(elementRecord, elements);
+            if (recordsList == null || String.isBlank(recordsList.Field_Key__c)) {
+                continue;
+            }
+            rowSignatureAttachGroupKeys.add(recordsList.Field_Key__c);
+            groupLabelsByKey.put(recordsList.Field_Key__c, firstNonBlank(recordsList.Label__c, recordsList.Field_Key__c));
+        }
+        if (rowSignatureAttachGroupKeys.isEmpty()) {
+            return null;
+        }
+
+        Set<String> savedRecordsListKeys = new Set<String>();
+        for (NF_Form_Action__c actionRecord : actions) {
+            if (actionRecord == null || actionRecord.Action_Scope__c != 'Submit' || actionRecord.Command_Type__c != 'upsertMany') {
+                continue;
+            }
+            Map<String, Object> actionConfig = parseJsonMap(actionRecord.Config_JSON__c);
+            String repeatGroupKey = stringValue(actionConfig.get('repeatGroupKey'));
+            if (String.isNotBlank(repeatGroupKey)) {
+                savedRecordsListKeys.add(repeatGroupKey);
+            }
+        }
+
+        for (String groupKey : rowSignatureAttachGroupKeys) {
+            if (!savedRecordsListKeys.contains(groupKey)) {
+                return 'Signature files can attach to Records List rows only when "' + groupLabelsByKey.get(groupKey) + '" has a Submit Action using Save records list.';
+            }
+        }
+        return null;
+    }
+
+    private static NF_Form_Element__c recordsListParentForSignature(
+        NF_Form_Element__c signatureRecord,
+        List<NF_Form_Element__c> elements
+    ) {
+        if (signatureRecord == null || String.isBlank(signatureRecord.Parent_Element_Id__c) || elements == null) {
+            return null;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null
+                && elementRecord.Element_Type__c == 'repeatGroup'
+                && elementRecord.Element_Id__c == signatureRecord.Parent_Element_Id__c) {
+                return elementRecord;
+            }
+        }
+        return null;
     }
 
     private static Map<String, Object> buildPublishedLookupDefinition(List<NF_Form_Element__c> elements) {
@@ -3029,6 +3512,66 @@ public with sharing class NativeFormsPublisher {
         }
 
         return definition;
+    }
+
+    private static Map<String, Object> buildPublishedLocationDefinition(List<NF_Form_Element__c> elements) {
+        Map<String, Object> definition = new Map<String, Object>{
+            'schemaVersion' => 'v1',
+            'fields' => new Map<String, Object>()
+        };
+        Map<String, Object> fields = (Map<String, Object>) definition.get('fields');
+        if (elements == null) {
+            return definition;
+        }
+
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || elementRecord.Element_Type__c != 'location' || String.isBlank(elementRecord.Field_Key__c)) {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            Integer minSearchLength = integerValue(config.get('locationMinSearchLength'));
+            Integer resultLimit = integerValue(config.get('locationLimit'));
+            fields.put(elementRecord.Field_Key__c, new Map<String, Object>{
+                'elementId' => elementRecord.Element_Id__c,
+                'fieldKey' => elementRecord.Field_Key__c,
+                'label' => elementRecord.Label__c,
+                'mode' => normalizeLocationMode(config.get('locationMode')),
+                'layout' => normalizeLocationLayout(config.get('locationLayout')),
+                'requiredCountry' => config.containsKey('locationRequiredCountry') ? booleanValue(config.get('locationRequiredCountry')) : booleanValue(config.get('required')),
+                'requiredRegion' => booleanValue(config.get('locationRequiredRegion')),
+                'requiredCity' => booleanValue(config.get('locationRequiredCity')),
+                'defaultCountryCode' => stringValue(config.get('locationDefaultCountryCode')),
+                'allowedCountries' => normalizeCountryCodeList(config.get('locationAllowedCountries')),
+                'minSearchLength' => minSearchLength == null || minSearchLength <= 0 ? 2 : Math.min(minSearchLength, 10),
+                'limit' => resultLimit == null || resultLimit <= 0 ? 10 : Math.min(resultLimit, 25),
+                'outputMode' => 'structured'
+            });
+        }
+
+        return definition;
+    }
+
+    private static List<String> normalizeCountryCodeList(Object rawValue) {
+        List<String> output = new List<String>();
+        List<Object> rawValues = new List<Object>();
+        if (rawValue instanceof List<Object>) {
+            rawValues.addAll((List<Object>) rawValue);
+        } else if (rawValue != null) {
+            for (String value : String.valueOf(rawValue).split(',')) {
+                rawValues.add(value);
+            }
+        }
+        for (Object item : rawValues) {
+            String code = stringValue(item);
+            if (String.isBlank(code)) {
+                continue;
+            }
+            code = code.trim().toUpperCase();
+            if (code.length() == 2 && code.replaceAll('[A-Z]', '').length() == 0 && !output.contains(code)) {
+                output.add(code);
+            }
+        }
+        return output;
     }
 
     private static List<String> canonicalLookupFields(Object rawFields, Set<String> allowedFieldNames) {
@@ -3096,6 +3639,7 @@ public with sharing class NativeFormsPublisher {
                 : true,
             'targetSubmitActionKey' => stringValue(uiSettings.get('submissionPdfTargetSubmitActionKey')),
             'title' => firstNonBlank(stringValue(uiSettings.get('submissionPdfTitle')), 'Submitted Response'),
+            'rtlEnabled' => booleanValue(uiSettings.get('rtlEnabled')),
             'includeEmptyFields' => uiSettings.containsKey('submissionPdfIncludeEmptyFields')
                 ? booleanValue(uiSettings.get('submissionPdfIncludeEmptyFields'))
                 : true,
@@ -3115,17 +3659,21 @@ public with sharing class NativeFormsPublisher {
             }
 
             String elementType = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
             if (elementType == 'hidden' || elementType == 'fileUpload') {
                 continue;
             }
+            if (isHiddenBehavior(config)) {
+                continue;
+            }
 
-            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
             Map<String, Object> item = new Map<String, Object>{
                 'elementId' => elementRecord.Element_Id__c,
                 'fieldKey' => elementRecord.Field_Key__c,
                 'type' => elementType,
                 'label' => elementRecord.Label__c,
                 'presentation' => stringValue(config.get('presentation')),
+                'fieldBehavior' => stringValue(config.get('fieldBehavior')),
                 'parentElementId' => elementRecord.Parent_Element_Id__c,
                 'order' => elementRecord.Order__c,
                 'sectionColumn' => readSectionColumn(elementRecord.Config_JSON__c),
@@ -3137,12 +3685,16 @@ public with sharing class NativeFormsPublisher {
                 item.put('showTitle', !config.containsKey('showTitle') || booleanValue(config.get('showTitle')));
                 item.put('boxed', !config.containsKey('boxed') || booleanValue(config.get('boxed')));
                 item.put('text', stripHtmlForPdf(stringValue(config.get('text'))));
-                if (elementType == 'repeatGroup' && booleanValue(config.get('rowSignatureEnabled'))) {
+                NF_Form_Element__c rowSignatureElement = elementType == 'repeatGroup'
+                    ? recordsListSignatureChild(elementRecord, elements)
+                    : null;
+                if (rowSignatureElement != null) {
+                    Map<String, Object> rowSignatureConfig = parseJsonMap(rowSignatureElement.Config_JSON__c);
                     item.put('rowSignature', new Map<String, Object>{
                         'enabled' => true,
-                        'label' => firstNonBlank(stringValue(config.get('rowSignatureLabel')), 'Signature'),
-                        'required' => !config.containsKey('rowSignatureRequired') || booleanValue(config.get('rowSignatureRequired')),
-                        'attachToRowRecord' => booleanValue(config.get('rowSignatureAttachToRowRecord'))
+                        'label' => firstNonBlank(rowSignatureElement.Label__c, 'Signature'),
+                        'required' => booleanValue(rowSignatureConfig.get('required')),
+                        'attachToRowRecord' => booleanValue(rowSignatureConfig.get('attachToRowRecord'))
                     });
                 }
             } else if (elementType == 'heading' || elementType == 'paragraph' || elementType == 'richText') {
@@ -3168,6 +3720,23 @@ public with sharing class NativeFormsPublisher {
         }
 
         return schema;
+    }
+
+    private static NF_Form_Element__c recordsListSignatureChild(
+        NF_Form_Element__c recordsList,
+        List<NF_Form_Element__c> elements
+    ) {
+        if (recordsList == null || String.isBlank(recordsList.Element_Id__c) || elements == null) {
+            return null;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null
+                && elementRecord.Element_Type__c == 'signature'
+                && elementRecord.Parent_Element_Id__c == recordsList.Element_Id__c) {
+                return elementRecord;
+            }
+        }
+        return null;
     }
 
     private static List<Object> normalizePdfOptions(Object rawOptions) {
@@ -3681,6 +4250,17 @@ public with sharing class NativeFormsPublisher {
 
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private static String normalizeLocationMode(Object value) {
+        String mode = stringValue(value);
+        return new Set<String>{ 'country', 'countryRegion', 'countryCity', 'countryRegionCity' }.contains(mode)
+            ? mode
+            : 'countryRegionCity';
+    }
+
+    private static String normalizeLocationLayout(Object value) {
+        return stringValue(value) == 'inline' ? 'inline' : 'stacked';
     }
 
     private static Boolean booleanValue(Object value) {

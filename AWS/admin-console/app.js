@@ -43,17 +43,21 @@ const FEATURE_FLAG_METADATA = {
     label: "Submission PDF",
     description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
   },
-  enableProRecordsListRowSignaturePdf: {
-    label: "Records List Row Signature + PDF",
-    description: "Require signatures on repeated rows and include them in the submitted PDF."
-  },
   enableProSurveyFields: {
     label: "Survey Fields",
     description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
   },
+  enableProLocationFields: {
+    label: "Country / State / City",
+    description: "Add AWS-backed country, state/region, and city autocomplete fields to Pro forms."
+  },
   enableProCustomJs: {
     label: "Custom JavaScript",
     description: "Run supported TwinaForms custom JavaScript in published forms for advanced behavior."
+  },
+  enableProButtonElements: {
+    label: "Portal Buttons",
+    description: "Add navigation buttons that link published forms or external portal destinations."
   },
   enableDetailedSubmissionLogs: {
     label: "Detailed Submission Logs",
@@ -110,92 +114,6 @@ function sortPlans(plans) {
   });
 }
 
-const adminFeatureListPrimary = [
-  {
-    title: "Status alert recipient persistence",
-    detail: "Finish saving the status-change alert email from Settings into a dedicated admin settings store instead of using only the default fallback.",
-    phase: "Now"
-  },
-  {
-    title: "Automatic Active / Alert recompute",
-    detail: "Keep customer status updated from end-date and submission-limit rules in the Admin backend while preserving manual Blocked as the only service-deny state.",
-    phase: "Now"
-  },
-  {
-    title: "Status change notification email",
-    detail: "Send an email with customer name, org id, admin email, previous status, new status, and reason whenever status changes.",
-    phase: "Now"
-  },
-  {
-    title: "Block and unblock audit hardening",
-    detail: "Continue validating that every manual Block / Unblock action is captured cleanly in the audit trail with reason and actor.",
-    phase: "Now"
-  },
-  {
-    title: "Full enforcement testing",
-    detail: "Test Active, Alert, and Blocked behavior end to end against Prefill, Submit, and the Admin Control screens.",
-    phase: "Now"
-  },
-  {
-    title: "Connection health actions",
-    detail: "Finish the customer connection workflow items from the spec: refresh or recheck connection health, surface recent connection failures, and expose clearer resend setup actions from one operational view.",
-    phase: "Now"
-  },
-  {
-    title: "Support timeline hardening",
-    detail: "Complete the dedicated support flow with cleaner note history, support-event visibility, and faster support triage around setup and connection issues.",
-    phase: "Now"
-  },
-  {
-    title: "Usage tab and daily usage feed",
-    detail: "Add the documented usage view with recent usage trend, anomalies, and the usage-daily API data so customer limits can be understood without digging into raw records.",
-    phase: "Now"
-  }
-];
-
-const adminFeatureListSecondary = [
-  {
-    title: "Additional alert rules",
-    detail: "Add optional alert types later for setup issues, OAuth disconnect, tenant auth health, and other non-blocking customer-risk signals."
-  },
-  {
-    title: "Multiple notification recipients",
-    detail: "Support more than one admin email recipient for status-change notifications and maybe per-environment recipients."
-  },
-  {
-    title: "Customer history summary",
-    detail: "Show a compact timeline of plan changes, alerts, blocks, and major support actions in one combined history view."
-  },
-  {
-    title: "Usage counters and limit visuals",
-    detail: "Make customer usage limits more visible with clearer warning thresholds and monthly trend summaries."
-  },
-  {
-    title: "Operational dashboards",
-    detail: "Expand overview cards and lists once the support, audit, and status data has been proven stable in testing."
-  },
-  {
-    title: "Cognito login and protected admin access",
-    detail: "Replace the current dev-style open access with the planned Cognito hosted login and protected AWS admin flow."
-  },
-  {
-    title: "API Gateway and Cognito authorizer",
-    detail: "Move the Admin Control API from the public Lambda URL pattern to the documented API Gateway plus Cognito authorizer setup."
-  },
-  {
-    title: "Role-based admin groups",
-    detail: "Introduce the planned admin roles so support, product, and read-only users do not all share the same powers inside the control console."
-  },
-  {
-    title: "Commercial and lifecycle guardrails",
-    detail: "Add stronger confirmation, reason capture, and action guardrails for plan changes, suspend or reactivate flows, and other high-impact customer operations."
-  },
-  {
-    title: "Connection tab and setup diagnostics",
-    detail: "Build the fuller connection screen from the plan with OAuth state, login base URL, last successful check, recent failures, and cleaner setup diagnostics."
-  }
-];
-
 const state = {
   view: "overview",
   search: "",
@@ -206,6 +124,7 @@ const state = {
   sortKey: "",
   sortDirection: "asc",
   selectedOrgId: null,
+  tenantsMode: "list",
   selectedPlanCode: "free",
   tenants: [],
   tenantDetailsById: new Map(),
@@ -252,6 +171,8 @@ const refs = {
   tenantTableBody: document.getElementById("tenantTableBody"),
   tenantsLayout: document.getElementById("tenantsLayout"),
   tenantsSplitter: document.getElementById("tenantsSplitter"),
+  tenantFilters: document.querySelector("#tenantsSection .filters"),
+  tenantTableCard: document.querySelector("#tenantsLayout .table-card"),
   tenantDetail: document.getElementById("tenantDetail"),
   emptyState: document.getElementById("emptyState"),
   tenantCount: document.getElementById("tenantCount"),
@@ -271,15 +192,12 @@ const refs = {
   plansPanel: document.getElementById("plansPanel"),
   plansSection: document.getElementById("plansSection"),
   auditSection: document.getElementById("auditSection"),
-  featureListSection: document.getElementById("featureListSection"),
   settingsSection: document.getElementById("settingsSection"),
   overviewSummary: document.getElementById("overviewSummary"),
   overviewSetupIssues: document.getElementById("overviewSetupIssues"),
   overviewExpiringTrials: document.getElementById("overviewExpiringTrials"),
   overviewSupportNotes: document.getElementById("overviewSupportNotes"),
   overviewAdminActions: document.getElementById("overviewAdminActions"),
-  featureListPrimary: document.getElementById("featureListPrimary"),
-  featureListSecondary: document.getElementById("featureListSecondary"),
   auditLogList: document.getElementById("auditLogList"),
   settingsApiUrl: document.getElementById("settingsApiUrl"),
   settingsActiveMode: document.getElementById("settingsActiveMode"),
@@ -516,6 +434,20 @@ function labelize(value) {
 
 function formatLimit(value) {
   return value == null ? "Unlimited" : String(value);
+}
+
+function formatLockedPrice(pricing) {
+  if (!pricing || typeof pricing !== "object") {
+    return "Not set";
+  }
+  const amount = String(pricing.amount || "").trim();
+  if (!amount) {
+    return "Not set";
+  }
+  const periodLabels = { monthly: "/mo", yearly: "/yr", one_time: " one-time" };
+  const currency = String(pricing.currency || "").trim();
+  const period = periodLabels[pricing.period] || "";
+  return `${currency ? currency + " " : ""}${amount}${period}`.trim();
 }
 
 function formatRelative(isoValue) {
@@ -939,6 +871,13 @@ async function saveTenantProfile(form) {
     internalNotes: String(formData.get("internalNotes") || ""),
     supportFlags: {
       enableSalesforceAdminApp: formData.get("enableSalesforceAdminApp") === "on"
+    },
+    lockedPricing: {
+      amount: String(formData.get("priceAmount") || "").trim(),
+      currency: String(formData.get("priceCurrency") || "").trim(),
+      period: String(formData.get("pricePeriod") || "").trim(),
+      lockedAt: String(formData.get("priceLockedAt") || "").trim() || null,
+      notes: String(formData.get("priceNotes") || "").trim()
     }
   };
 
@@ -1356,24 +1295,24 @@ function applySplitLayout() {
     return;
   }
 
-  if (window.innerWidth <= 900) {
-    refs.tenantsLayout.style.gridTemplateColumns = "";
-    return;
+  // Master -> detail navigation: show the customer list OR a single customer's
+  // full-width management page, never both at once.
+  const detailMode = state.tenantsMode === "detail" && Boolean(state.selectedOrgId);
+
+  if (refs.tenantFilters) {
+    refs.tenantFilters.hidden = detailMode;
+  }
+  if (refs.tenantTableCard) {
+    refs.tenantTableCard.hidden = detailMode;
+  }
+  if (refs.tenantsSplitter) {
+    refs.tenantsSplitter.hidden = true;
+  }
+  if (refs.tenantDetail) {
+    refs.tenantDetail.hidden = !detailMode;
   }
 
-  const containerWidth = refs.tenantsLayout.clientWidth;
-  if (!containerWidth) {
-    return;
-  }
-
-  const minLeft = 620;
-  const minRight = 360;
-  const splitterWidth = 14;
-  const maxLeft = Math.max(minLeft, containerWidth - minRight - splitterWidth);
-  const desiredLeft = state.splitLeftWidth ?? Math.round(containerWidth * 0.68);
-  const clampedLeft = Math.min(Math.max(desiredLeft, minLeft), maxLeft);
-  state.splitLeftWidth = clampedLeft;
-  refs.tenantsLayout.style.gridTemplateColumns = `${clampedLeft}px ${splitterWidth}px minmax(${minRight}px, 1fr)`;
+  refs.tenantsLayout.style.gridTemplateColumns = "minmax(0, 1fr)";
 }
 
 function renderTable(items) {
@@ -1425,6 +1364,7 @@ function renderTable(items) {
 
     row.addEventListener("click", () => {
       state.selectedOrgId = tenant.orgId;
+      state.tenantsMode = "detail";
       render();
       ensureTenantData(tenant.orgId);
     });
@@ -1455,6 +1395,7 @@ function renderDetail(items) {
   const isBusy = (action) => state.busyActionKey === `${selectedTenant.orgId}:${action}`;
 
   refs.tenantDetail.innerHTML = `
+    <button class="ghost-button detail-back" type="button" id="backToCustomers">← Back to customers</button>
     <div class="detail-header">
       <div>
         <p class="detail-card__eyebrow">Customer Detail</p>
@@ -1468,6 +1409,10 @@ function renderDetail(items) {
       <div class="detail-block">
         <p class="detail-block__label">Current Plan</p>
         <p class="detail-block__value">${escapeHtml(selectedTenant.planLabel || labelize(selectedTenant.planCode))}</p>
+      </div>
+      <div class="detail-block">
+        <p class="detail-block__label">Locked Price</p>
+        <p class="detail-block__value">${escapeHtml(formatLockedPrice(selectedTenant.lockedPricing))}</p>
       </div>
       <div class="detail-block">
         <p class="detail-block__label">Service Status</p>
@@ -1511,15 +1456,17 @@ function renderDetail(items) {
       <h5>Edit Customer</h5>
       <form id="tenantProfileForm" class="stack-form">
         <input type="hidden" name="orgId" value="${escapeHtml(selectedTenant.orgId)}">
-        <label class="field">
-          <span class="field__label">Company Name</span>
-          <input class="field__control" name="companyName" type="text" value="${escapeHtml(selectedTenant.companyName)}">
-        </label>
-        <label class="field">
-          <span class="field__label">Admin Email</span>
-          <input class="field__control" name="adminEmail" type="email" value="${escapeHtml(selectedTenant.adminEmail)}">
-        </label>
         <div class="inline-fields">
+          <label class="field">
+            <span class="field__label">Company Name</span>
+            <input class="field__control" name="companyName" type="text" value="${escapeHtml(selectedTenant.companyName)}">
+          </label>
+          <label class="field">
+            <span class="field__label">Admin Email</span>
+            <input class="field__control" name="adminEmail" type="email" value="${escapeHtml(selectedTenant.adminEmail)}">
+          </label>
+        </div>
+        <div class="inline-fields inline-fields--quad">
           <label class="field field--readonly">
             <span class="field__label">Current Status</span>
             <input class="field__control" type="text" value="${escapeHtml(labelize(selectedTenant.status))}" disabled>
@@ -1528,8 +1475,6 @@ function renderDetail(items) {
             <span class="field__label">Assigned Plan</span>
             <select class="field__control" name="planCode">${planOptions}</select>
           </label>
-        </div>
-        <div class="inline-fields">
           <label class="field">
             <span class="field__label">Subscription Status</span>
             <select class="field__control" name="subscriptionStatus">
@@ -1555,7 +1500,7 @@ function renderDetail(items) {
             <span>Open TwinaForms Admin in Salesforce for support/debug use</span>
           </label>
         </div>
-        <div class="inline-fields">
+        <div class="inline-fields inline-fields--quad">
           <label class="field">
             <span class="field__label">Plan Start Date</span>
             <input class="field__control" name="planStartedAt" type="date" value="${escapeHtml(formatDateInput(selectedTenant.planStartedAt))}">
@@ -1564,8 +1509,6 @@ function renderDetail(items) {
             <span class="field__label">Plan End Date</span>
             <input class="field__control" name="planEndsAt" type="date" value="${escapeHtml(formatDateInput(selectedTenant.planEndsAt))}">
           </label>
-        </div>
-        <div class="inline-fields">
           <label class="field">
             <span class="field__label">Trial Start Date</span>
             <input class="field__control" name="trialStartedAt" type="date" value="${escapeHtml(formatDateInput(selectedTenant.trialStartedAt))}">
@@ -1579,6 +1522,36 @@ function renderDetail(items) {
           <span class="field__label">Internal Notes</span>
           <textarea class="field__control field__control--textarea" name="internalNotes">${escapeHtml(selectedTenant.internalNotes || "")}</textarea>
         </label>
+        <div class="pricing-fieldset">
+          <p class="pricing-fieldset__title">Locked-In Pricing</p>
+          <p class="pricing-fieldset__hint">What this customer actually pays. Recorded here so a future price increase does not apply to them (grandfathered price).</p>
+          <div class="inline-fields inline-fields--quad">
+            <label class="field">
+              <span class="field__label">Price Amount</span>
+              <input class="field__control" name="priceAmount" type="text" inputmode="decimal" placeholder="e.g. 15" value="${escapeHtml(selectedTenant.lockedPricing?.amount || "")}">
+            </label>
+            <label class="field">
+              <span class="field__label">Currency</span>
+              <select class="field__control" name="priceCurrency">
+                ${["", "USD", "ILS", "EUR", "GBP"].map((code) => `<option value="${code}" ${(selectedTenant.lockedPricing?.currency || "") === code ? "selected" : ""}>${code || "—"}</option>`).join("")}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Billing Period</span>
+              <select class="field__control" name="pricePeriod">
+                ${[["", "—"], ["monthly", "Monthly"], ["yearly", "Yearly"], ["one_time", "One-time"]].map(([code, label]) => `<option value="${code}" ${(selectedTenant.lockedPricing?.period || "") === code ? "selected" : ""}>${label}</option>`).join("")}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Price Locked On</span>
+              <input class="field__control" name="priceLockedAt" type="date" value="${escapeHtml(formatDateInput(selectedTenant.lockedPricing?.lockedAt))}">
+            </label>
+          </div>
+          <label class="field">
+            <span class="field__label">Pricing Notes</span>
+            <input class="field__control" name="priceNotes" type="text" placeholder="e.g. Launch promo, grandfathered" value="${escapeHtml(selectedTenant.lockedPricing?.notes || "")}">
+          </label>
+        </div>
         <label class="field field--readonly">
           <span class="field__label">Connected Username</span>
           <input class="field__control" type="text" value="${escapeHtml(selectedTenant.connectedUsername || "Not connected yet")}" disabled>
@@ -1684,6 +1657,11 @@ function renderDetail(items) {
       </details>
     </section>
   `;
+
+  document.getElementById("backToCustomers")?.addEventListener("click", () => {
+    state.tenantsMode = "list";
+    render();
+  });
 
   document.getElementById("tenantProfileForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1836,27 +1814,6 @@ function renderAuditPage() {
   renderTimeline(refs.auditLogList, items, "No audit entries yet", "audit");
 }
 
-function renderFeatureList() {
-  refs.featureListPrimary.innerHTML = adminFeatureListPrimary.map((item) => `
-    <article class="timeline-item">
-      <div class="timeline-item__row">
-        <strong>${escapeHtml(item.title)}</strong>
-        <span class="timeline-item__meta">${escapeHtml(item.phase)}</span>
-      </div>
-      <p>${escapeHtml(item.detail)}</p>
-    </article>
-  `).join("");
-
-  refs.featureListSecondary.innerHTML = adminFeatureListSecondary.map((item) => `
-    <article class="timeline-item">
-      <div class="timeline-item__row">
-        <strong>${escapeHtml(item.title)}</strong>
-      </div>
-      <p>${escapeHtml(item.detail)}</p>
-    </article>
-  `).join("");
-}
-
 function bindSettingsForm() {
   const form = document.getElementById("settingsForm");
   if (!form || form.dataset.bound === "true") {
@@ -1891,11 +1848,6 @@ function renderView() {
       heroEyebrow: "Plan Management",
       heroTitle: "Manage the four commercial plans and the Pro feature flags they unlock."
     },
-    "feature-list": {
-      workspaceTitle: "Admin Feature List",
-      heroEyebrow: "Roadmap",
-      heroTitle: "Track the open admin features we still plan to add after the current control workflow is stable."
-    },
     audit: {
       workspaceTitle: "Administrative Audit Log",
       heroEyebrow: "Audit Trail",
@@ -1916,7 +1868,6 @@ function renderView() {
   refs.tenantsPanel.hidden = state.view !== "tenants";
   refs.plansPanel.hidden = state.view !== "plans";
   refs.plansSection.hidden = state.view !== "plans";
-  refs.featureListSection.hidden = state.view !== "feature-list";
   refs.auditSection.hidden = state.view !== "audit";
   refs.settingsSection.hidden = state.view !== "settings";
 
@@ -1944,7 +1895,6 @@ function render() {
   renderTable(filteredTenants);
   renderDetail(filteredTenants);
   renderPlans();
-  renderFeatureList();
   renderAuditPage();
   bindSettingsForm();
   refs.emptyState.hidden = filteredTenants.length > 0;
@@ -1998,6 +1948,7 @@ refs.navButtons.forEach((button) => {
     }
 
     if (state.view === "tenants") {
+      state.tenantsMode = "list";
       await ensureTenantData(state.selectedOrgId || state.tenants[0]?.orgId || null);
     }
 
