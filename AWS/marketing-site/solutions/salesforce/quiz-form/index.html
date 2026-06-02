@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Salesforce Quiz &amp; Assessment Form | TwinaForms</title>
+  <meta name="description" content="Build scored quizzes and assessments that write results straight to Salesforce. Auto-grade with formulas, pass/fail logic, verified identity, and a Quiz Attempt record per submission — native to Salesforce, no per-user license.">
+  <meta name="keywords" content="salesforce quiz form, salesforce assessment form, salesforce test form, online quiz salesforce, training quiz salesforce, compliance quiz salesforce, certification form salesforce, knowledge assessment salesforce, score quiz to salesforce, salesforce exam form">
+  <link rel="alternate" hreflang="en" href="/solutions/salesforce/quiz-form/">
+  <link rel="alternate" hreflang="x-default" href="/solutions/salesforce/quiz-form/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/solutions/salesforce/quiz-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="Salesforce Quiz &amp; Assessment Form | TwinaForms">
+  <meta property="og:description" content="Build scored quizzes and assessments that write results straight to Salesforce. Auto-grade with formulas, pass/fail logic, verified identity, and a Quiz Attempt record per submission.">
+  <meta property="og:url" content="https://twinaforms.com/solutions/salesforce/quiz-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Salesforce Quiz &amp; Assessment Form | TwinaForms">
+  <meta name="twitter:description" content="Build scored quizzes and assessments that write results straight to Salesforce. Auto-grade, pass/fail, verified identity, native writeback.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://twinaforms.com/solutions/"},{"@type":"ListItem","position":3,"name":"Salesforce","item":"https://twinaforms.com/solutions/salesforce/"},{"@type":"ListItem","position":4,"name":"Quiz &amp; Assessment Form","item":"https://twinaforms.com/solutions/salesforce/quiz-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can a Salesforce quiz form auto-score answers?","acceptedAnswer":{"@type":"Answer","text":"Yes. Each question is a radio or picklist field, and a TwinaForms Number formula field adds up the correct answers as the user fills the form — for example IF({q1}==\"A\",1,0)+IF({q2}==\"C\",1,0). The computed score is read-only and is submitted to Salesforce along with the answers, so there is no manual grading."}},{"@type":"Question","name":"How do I show a pass or fail result?","acceptedAnswer":{"@type":"Answer","text":"A Text formula field returns the result by comparing the total to your passing threshold, e.g. IF(score >= 8, \"Pass\", \"Fail\"). You can also use Conditional Logic to reveal a different message block for pass vs. fail, and a formula-driven Post-Submit Redirect to send a passing learner to a certificate page and others to a retry page."}},{"@type":"Question","name":"Does the quiz result get written to Salesforce?","acceptedAnswer":{"@type":"Answer","text":"Yes. TwinaForms writes the submission to any standard or custom Salesforce object — typically a custom Quiz Attempt object linked to the learner's Contact, capturing the score, pass/fail, date, and each answer. From there your existing Salesforce reports, dashboards, and automations work out of the box."}},{"@type":"Question","name":"Can I confirm who actually took the quiz?","acceptedAnswer":{"@type":"Answer","text":"Yes. Turn on User Verification so the learner must enter a one-time code sent to the email on their Salesforce Contact before the quiz opens. Every attempt is then tied to a confirmed identity — important for compliance, certification, and training records — with no Salesforce login or per-user license for the learner."}},{"@type":"Question","name":"How is this different from Google Forms, SurveyMonkey, or FormAssembly?","acceptedAnswer":{"@type":"Answer","text":"Google Forms and SurveyMonkey can score a quiz but do not write the result into Salesforce — someone re-keys it, and there is no link to the Contact. FormAssembly connects to Salesforce but is an external form platform; scoring and routing are built outside your org. TwinaForms is a native Salesforce app: the quiz is built in Salesforce, scored by formulas, identity-verified against the Contact record, and the Quiz Attempt is written straight to Salesforce — no connector to maintain and no per-user license for the people taking the quiz."}},{"@type":"Question","name":"Can learners retake the quiz, and can I issue a certificate?","acceptedAnswer":{"@type":"Answer","text":"Yes. Each submission creates a new Quiz Attempt record, so retakes are tracked over time. Using a formula-driven Post-Submit Redirect, a passing learner can be sent to a certificate or confirmation page while a failing learner is routed to a retry, and a Submission PDF can attach a record of the attempt to Salesforce."}},{"@type":"Question","name":"Do quiz takers need a Salesforce login?","acceptedAnswer":{"@type":"Answer","text":"No. The quiz is a public form. Learners never log in to Salesforce and never consume a Salesforce license — they simply open the link, optionally verify by email code, take the quiz, and submit. This makes it practical for large training, partner, and customer audiences."}}]}</script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/solutions/" aria-current="page">Solutions</a>
+      <a href="/#security">Security</a>
+      <a href="/#plans">Plans</a>
+      <a href="/help/index.html">Help</a>
+      <a class="nav-cta" href="/contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">Salesforce quiz &amp; assessment forms</p>
+        <h1>Scored Salesforce quizzes <span>that grade themselves and write to Salesforce.</span></h1>
+        <p class="lead">Build a knowledge quiz, training assessment, or compliance test as a public TwinaForms form. Answers are auto-scored with formulas, pass/fail is decided on the spot, and every attempt &mdash; score, result, and answers &mdash; is written straight to Salesforce against the learner's Contact. No manual grading, no spreadsheet, no Salesforce login for the people taking it.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+        <ul class="trust-pills" aria-label="Key attributes of the TwinaForms Salesforce quiz form">
+          <li class="trust-pill trust-pill--blue">Native to Salesforce</li>
+          <li class="trust-pill trust-pill--green">Auto-scored with formulas</li>
+          <li class="trust-pill trust-pill--green">Pass / fail + writeback</li>
+          <li class="trust-pill trust-pill--amber">Verified identity, no login</li>
+        </ul>
+      </div>
+      <figure class="product-screenshot-frame">
+        <img class="product-screenshot" src="/assets/image.png" alt="TwinaForms Salesforce quiz and assessment form builder running inside Salesforce">
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">The problem</p>
+        <h2>Quizzes live everywhere except Salesforce.</h2>
+        <p>Training, onboarding, compliance, and certification teams run quizzes all the time &mdash; but the results almost never end up where they belong: on the person's record in Salesforce.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>Results stuck in Google Forms</h3>
+          <p>Google Forms and SurveyMonkey can grade a quiz, but the score never reaches Salesforce. Someone exports a sheet and re-keys who passed.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>No record of who passed</h3>
+          <p>For compliance and certification you need a durable, per-person record. A spreadsheet row is not an audit trail tied to the Contact.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>You can't trust the identity</h3>
+          <p>Anonymous quiz links mean anyone can submit as anyone. For mandatory training, you need to know the right person actually took it.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>An LMS is overkill</h3>
+          <p>A full LMS is heavy and expensive for a 10-question compliance check &mdash; and still needs wiring back into Salesforce.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section">
+      <div>
+        <p class="eyebrow">The solution</p>
+        <h2>A native Salesforce quiz that scores itself.</h2>
+        <p class="lead">TwinaForms is a native Salesforce form builder. Build the quiz once, share a public link, and each submission is graded by formula and written to Salesforce as a Quiz Attempt &mdash; tied to a verified Contact.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/help/formulas.html">See the formula engine</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>Auto-scored as they answer</h3>
+          <p>A Number formula totals the correct answers live &mdash; <span class="q-code">IF({q1}=="A",1,0)+IF({q2}=="C",1,0)+&hellip;</span> &mdash; so the score is ready the moment they submit.</p>
+        </div>
+        <div>
+          <h3>Pass/fail decided on submit</h3>
+          <p>A second formula returns the result, e.g. <span class="q-code">IF(score &gt;= 8, "Pass", "Fail")</span>, and Conditional Logic shows the matching message.</p>
+        </div>
+        <div>
+          <h3>Verified identity per attempt</h3>
+          <p>Add <a href="/solutions/salesforce/user-verification/">User Verification</a> so each learner confirms a one-time email code matched to their Salesforce Contact before the quiz opens.</p>
+        </div>
+        <div>
+          <h3>Every attempt written to Salesforce</h3>
+          <p>Score, result, date, and each answer land on a Quiz Attempt record linked to the Contact &mdash; ready for reports, dashboards, and automation.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">How it works</p>
+        <h2>From question to Salesforce record in four steps.</h2>
+        <p>Each piece is a standard TwinaForms capability. A quiz is what happens when you combine them in one form.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">1</span>
+          <h3>Build the questions</h3>
+          <p>Add each question as a Radio or Picklist field with the answer options. Mix in Display Text, images, and sections to lay out the quiz cleanly.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">2</span>
+          <h3>Add a scoring formula</h3>
+          <p>A Number formula field sums one point per correct answer with <span class="q-code">IF()</span>, so the total score updates live as the learner answers.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">3</span>
+          <h3>Decide pass/fail &amp; route</h3>
+          <p>A Text formula returns Pass or Fail against your threshold. A formula-driven Post-Submit Redirect can send passers to a certificate and others to a retry.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">4</span>
+          <h3>Write the attempt to Salesforce</h3>
+          <p>On submit, the score, result, and answers write to a Quiz Attempt object linked to the Contact &mdash; optionally with a Submission PDF attached.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== WHY NATIVE / VS OTHERS ===== -->
+    <section class="section security-band">
+      <div class="section-heading">
+        <p class="eyebrow">Native vs. add-on</p>
+        <h2>Why a native Salesforce quiz beats Google Forms or an external form tool.</h2>
+        <p>Quiz builders score answers; the hard part is getting a trustworthy result onto the right Salesforce record. That's where native wins.</p>
+      </div>
+      <div class="qz-compare">
+        <table>
+          <thead>
+            <tr><th>&nbsp;</th><th>TwinaForms (native)</th><th>Google Forms / SurveyMonkey</th><th>External form tool (e.g. FormAssembly)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Writes the result to Salesforce</td><td>Native, to any object</td><td>No &mdash; manual export / re-key</td><td>Via connector / mapping</td></tr>
+            <tr><td>Auto-scoring</td><td>Formula fields, live</td><td>Built-in quiz mode</td><td>Calculations / rules</td></tr>
+            <tr><td>Identity tied to the Contact</td><td>User Verification by email</td><td>None</td><td>External auth / SF login</td></tr>
+            <tr><td>License to take the quiz</td><td>None for learners</td><td>None</td><td>Sometimes for SSO</td></tr>
+            <tr><td>Built &amp; managed in</td><td>The Salesforce Designer</td><td>A separate Google/SM account</td><td>A separate vendor console</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== USE CASES ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Where teams use it</p>
+        <h2>Built for assessments that need a record.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">TR</span>
+          <h3>Employee training &amp; onboarding</h3>
+          <p>Check understanding after a module and log each score to the employee's Contact, so L&amp;D can report completion and gaps.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">CO</span>
+          <h3>Compliance &amp; certification</h3>
+          <p>Mandatory policy, safety, or regulatory quizzes with verified identity and a durable pass/fail record for audits.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">PA</span>
+          <h3>Partner &amp; customer enablement</h3>
+          <p>Certify partners or customers on your product at scale &mdash; public link, no Salesforce seat, results on their Contact.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">FAQ</p>
+        <h2>Common questions about Salesforce quiz forms.</h2>
+      </div>
+      <div class="qz-faq">
+        <details>
+          <summary>Can a Salesforce quiz form auto-score answers?</summary>
+          <p>Yes. Each question is a radio or picklist field, and a TwinaForms Number formula field adds up the correct answers as the user fills the form &mdash; for example <span class="q-code">IF({q1}=="A",1,0)+IF({q2}=="C",1,0)</span>. The computed score is read-only and is submitted to Salesforce along with the answers, so there is no manual grading.</p>
+        </details>
+        <details>
+          <summary>How do I show a pass or fail result?</summary>
+          <p>A Text formula field returns the result by comparing the total to your passing threshold, e.g. <span class="q-code">IF(score &gt;= 8, "Pass", "Fail")</span>. You can also use Conditional Logic to reveal a different message block for pass vs. fail, and a formula-driven Post-Submit Redirect to send a passing learner to a certificate page and others to a retry page.</p>
+        </details>
+        <details>
+          <summary>Does the quiz result get written to Salesforce?</summary>
+          <p>Yes. TwinaForms writes the submission to any standard or custom Salesforce object &mdash; typically a custom Quiz Attempt object linked to the learner's Contact, capturing the score, pass/fail, date, and each answer. From there your existing Salesforce reports, dashboards, and automations work out of the box.</p>
+        </details>
+        <details>
+          <summary>Can I confirm who actually took the quiz?</summary>
+          <p>Yes. Turn on <a href="/solutions/salesforce/user-verification/">User Verification</a> so the learner must enter a one-time code sent to the email on their Salesforce Contact before the quiz opens. Every attempt is then tied to a confirmed identity &mdash; important for compliance, certification, and training records &mdash; with no Salesforce login or per-user license for the learner.</p>
+        </details>
+        <details>
+          <summary>How is this different from Google Forms, SurveyMonkey, or FormAssembly?</summary>
+          <p>Google Forms and SurveyMonkey can score a quiz but do not write the result into Salesforce &mdash; someone re-keys it, and there is no link to the Contact. FormAssembly connects to Salesforce but is an external form platform, so scoring and routing are built outside your org. TwinaForms is a native Salesforce app: the quiz is built in Salesforce, scored by formulas, identity-verified against the Contact record, and the Quiz Attempt is written straight to Salesforce &mdash; no connector to maintain and no per-user license for the people taking the quiz.</p>
+        </details>
+        <details>
+          <summary>Can learners retake the quiz, and can I issue a certificate?</summary>
+          <p>Yes. Each submission creates a new Quiz Attempt record, so retakes are tracked over time. Using a formula-driven Post-Submit Redirect, a passing learner can be sent to a certificate or confirmation page while a failing learner is routed to a retry, and a Submission PDF can attach a record of the attempt to Salesforce.</p>
+        </details>
+        <details>
+          <summary>Do quiz takers need a Salesforce login?</summary>
+          <p>No. The quiz is a public form. Learners never log in to Salesforce and never consume a Salesforce license &mdash; they simply open the link, optionally verify by email code, take the quiz, and submit. This makes it practical for large training, partner, and customer audiences.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">Ready to grade automatically</p>
+        <h2>Turn your next training or compliance quiz into a Salesforce record.</h2>
+        <p style="margin-top:20px">Formula scoring, conditional results, and Salesforce writeback are TwinaForms Pro features; User Verification is included from Starter. Install into a sandbox and build a scored quiz end-to-end in an afternoon. Nonprofit discount available.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>A Harmony-IT product</span>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href="/">Home</a>
+      <a href="/solutions/">Solutions</a>
+      <a href="/help/index.html">Help</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </footer>
+
+  <style>
+    .q-code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.86em;
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: #eef4fb;
+      color: var(--blue-dark);
+      white-space: nowrap;
+    }
+    .qz-compare { overflow-x: auto; }
+    .qz-compare table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 0.94rem;
+    }
+    .qz-compare th, .qz-compare td {
+      padding: 13px 15px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .qz-compare thead th { background: #f4f8fb; color: var(--ink); font-weight: 800; }
+    .qz-compare thead th:nth-child(2) { color: var(--blue-dark); }
+    .qz-compare td:first-child { color: var(--muted); font-weight: 700; }
+    .qz-compare td:nth-child(2) { color: var(--ink); font-weight: 600; }
+    .qz-compare tbody tr:last-child td { border-bottom: none; }
+
+    .qz-faq { display: grid; gap: 12px; }
+    .qz-faq details {
+      padding: 18px 20px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .qz-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+    }
+    .qz-faq summary::-webkit-details-marker { display: none; }
+    .qz-faq summary::after { content: '+'; float: right; margin-left: 12px; color: var(--blue); font-weight: 900; }
+    .qz-faq details[open] summary::after { content: '\2212'; }
+    .qz-faq p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
