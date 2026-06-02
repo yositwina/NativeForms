@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>טופס הסכמה לסיילספורס (Salesforce) עם חתימה אלקטרונית | TwinaForms</title>
+  <meta name="description" content="בנו טפסי הסכמה והסכמים אישיים לסיילספורס עם חתימה אלקטרונית. מסמך מיזוג מושך נתונים מ-Salesforce לתוך הטקסט, החותם מאמת זהות במייל וחותם, ו-PDF חתום מצורף לרשומה ב-Salesforce. חלופה פשוטה ל-DocuSign להסכמות והסכמים בסיסיים.">
+  <meta name="keywords" content="טופס הסכמה לסיילספורס, חתימה אלקטרונית סיילספורס, טופס הסכמה דיגיטלי, כתב ויתור סיילספורס, הסכמת הורים טופס, אישור צילום עמותה, טופס הסכם חתום, חלופה ל-DocuSign, חתימה דיגיטלית Salesforce, salesforce consent form, docusign alternative salesforce">
+  <link rel="alternate" hreflang="he" href="/he/solutions/salesforce/consent-form/">
+  <link rel="alternate" hreflang="en" href="/solutions/salesforce/consent-form/">
+  <link rel="alternate" hreflang="x-default" href="/solutions/salesforce/consent-form/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/he/solutions/salesforce/consent-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="טופס הסכמה לסיילספורס (Salesforce) עם חתימה אלקטרונית | TwinaForms">
+  <meta property="og:description" content="טפסי הסכמה והסכמים אישיים לסיילספורס עם חתימה אלקטרונית. מיזוג נתוני Salesforce לתוך המסמך, אימות החותם, ו-PDF חתום שמצורף לרשומה. חלופה פשוטה ל-DocuSign.">
+  <meta property="og:url" content="https://twinaforms.com/he/solutions/salesforce/consent-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="he_IL">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="טופס הסכמה לסיילספורס עם חתימה אלקטרונית | TwinaForms">
+  <meta name="twitter:description" content="טפסי הסכמה אישיים לסיילספורס עם חתימה אלקטרונית, מצורפים כ-PDF חתום לרשומה ב-Salesforce.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"דף הבית","item":"https://twinaforms.com/he/"},{"@type":"ListItem","position":2,"name":"פתרונות","item":"https://twinaforms.com/he/solutions/"},{"@type":"ListItem","position":3,"name":"טופס הסכמה","item":"https://twinaforms.com/he/solutions/salesforce/consent-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"מה זה טופס הסכמה לסיילספורס עם חתימה אלקטרונית?","acceptedAnswer":{"@type":"Answer","text":"זהו טופס ציבורי של TwinaForms שמציג מסמך הסכמה או הסכם אישי שממוזג מנתוני Salesforce, מאפשר לאדם לחתום עליו על המסך, ומצרף PDF חתום בחזרה לרשומה ב-Salesforce. המסמך נבנה בעורך טקסט עשיר עם שדות מיזוג — כותבים את הטקסט פעם אחת ושותלים שדות מ-Salesforce כמו {{Prefill_Contact.LastName}} שמתמלאים לכל נמען."}},{"@type":"Question","name":"איך מסמך המיזוג הופך את ההסכם לאישי?","acceptedAnswer":{"@type":"Answer","text":"בעורך כותבים את טקסט ההסכמה בעורך טקסט עשיר ושותלים טוקנים של שדות Salesforce, לדוגמה 'לכבוד {{Prefill_Contact.LastName}}'. כשאדם מסוים פותח את הקישור שלו, מילוי מראש טוען את נתוני ה-Salesforce שלו והטוקנים מוחלפים בערכים האמיתיים, כך שכל חותם קורא הסכם אישי משלו."}},{"@type":"Question","name":"מה קורה ברשומת ה-Salesforce כשמישהו חותם?","acceptedAnswer":{"@type":"Answer","text":"בשליחה, TwinaForms יוצרת PDF חתום שמכיל את טקסט המסמך הממוזג ואת החתימה המצוירת, ומצרפת אותו לאובייקט ה-Salesforce שבחרתם (סטנדרטי או מותאם). השליחה גם שומרת את פרטי החותם, וכשאימות משתמש פעיל — נשמרים גם המייל המאומת וזמן החתימה, כך שיש לכם רשומה מעשית של מי הסכים, על מה, ומתי."}},{"@type":"Question","name":"האם זו חלופה ל-DocuSign?","acceptedAnswer":{"@type":"Answer","text":"להסכמות והסכמים פשוטים בחותם יחיד היא יכולה להחליף את DocuSign: מסמך אישי, חתימה על המסך, ו-PDF חתום על רשומת ה-Salesforce, בלי תשלום לפי מעטפה ובלי מערכת נפרדת. היא פשוטה בכוונה לעומת DocuSign ואינה מבצעת ניתוב חתימה רב-משתתפים או מסלול ביקורת ארגוני מאושר. לתהליכי חתימה מורכבים או רגולטוריים, פלטפורמת חתימה ייעודית עדיין מתאימה יותר."}},{"@type":"Question","name":"האם החתימה האלקטרונית מחייבת משפטית?","acceptedAnswer":{"@type":"Answer","text":"TwinaForms שומרת את החתימה המצוירת, את המסמך הממוזג שעליו הסכים האדם, ו(עם אימות משתמש) מייל מאומת וחותמת זמן — הכל ב-PDF חתום על רשומת ה-Salesforce. האם זה עומד בדרישות לחתימה אלקטרונית מחייבת תלוי בתחום השיפוט ובסוג ההסכם, ולכן מומלץ להיוועץ ביועץ המשפטי של הארגון לגבי הדרישות החלות (בישראל — חוק חתימה אלקטרונית; ובחו\"ל ESIGN, UETA או eIDAS) למקרה הספציפי שלכם."}},{"@type":"Question","name":"אפשר לוודא מי באמת חתם?","acceptedAnswer":{"@type":"Answer","text":"כן. הפעילו אימות משתמש כך שהחותם יידרש להזין קוד חד-פעמי שנשלח לכתובת המייל שב-Salesforce Contact שלו לפני שהמסמך נפתח. החתימה מקושרת אז לזהות מאומתת, בלי התחברות ל-Salesforce ובלי רישיון למשתמש החותם."}},{"@type":"Question","name":"לאיזה אובייקט ב-Salesforce מצורף ה-PDF החתום?","acceptedAnswer":{"@type":"Answer","text":"לכל אובייקט סטנדרטי או מותאם שתבחרו בהגדרת השליחה של הטופס. ה-PDF החתום מצורף כקובץ Salesforce על אותה רשומה — כך שהסכמה יכולה לחיות על איש הקשר, כתב ויתור על אובייקט הסכם מותאם, אישור על Case, וכן הלאה."}}]}</script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/he/index.html">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="ניווט ראשי">
+      <a href="/he/index.html#product">המוצר</a>
+      <a href="/he/solutions/" aria-current="page">פתרונות</a>
+      <a href="/he/np.html">לעמותות</a>
+      <a href="/he/index.html#plans">מסלולים</a>
+      <a href="/help/index.html">עזרה</a>
+      <a class="nav-cta" href="/he/contact.html">צור קשר</a>
+      <a class="lang-switch" href="/solutions/salesforce/consent-form/" hreflang="en" lang="en">English</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">טפסי הסכמה והסכמים לסיילספורס</p>
+        <h1>טפסי הסכמה לסיילספורס <span>אישיים, חתומים, ומתויקים אוטומטית.</span></h1>
+        <p class="lead">כתבו הסכמה או הסכם פעם אחת במסמך מיזוג עשיר, שתלו שדות מ-Salesforce כמו <span class="cf-token">{{Prefill_Contact.LastName}}</span>, וכל חותם רואה גרסה אישית משלו. הוא מאמת זהות במייל, חותם על המסך, ו-PDF חתום מצורף לרשומת ה-Salesforce שתבחרו. חלופה פשוטה ל-DocuSign להסכמות והסכמים בסיסיים &mdash; טבעי ל-Salesforce.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+          <a class="button button-secondary" href="/he/contact.html">דברו איתנו</a>
+        </div>
+        <ul class="trust-pills" aria-label="עיקרי הצעת הערך של טופס ההסכמה">
+          <li class="trust-pill trust-pill--blue">טבעי ל-Salesforce</li>
+          <li class="trust-pill trust-pill--green">אישי מנתוני Salesforce</li>
+          <li class="trust-pill trust-pill--green">חתימה + PDF חתום</li>
+          <li class="trust-pill trust-pill--amber">חותם מאומת, בלי התחברות</li>
+        </ul>
+      </div>
+
+      <figure class="cf-doc" aria-label="מסמך הסכמה אישי לסיילספורס עם חתימה">
+        <div class="cf-doc__paper">
+          <p class="cf-doc__title">הסכמה והסכם</p>
+          <p>לכבוד <mark>כהן</mark>,</p>
+          <p>אני, <mark>דנה כהן</mark>, מאשרת שקראתי ואני מסכימה לתנאי תוכנית <mark>המתנדבים</mark> המתוארת לעיל, ומסכימה לעיבוד המידע שלי בהתאם למדיניות.</p>
+          <p class="cf-doc__muted">ממוזג בזמן אמת מ-Salesforce &mdash; מסמך אחד, אישי לכל חותם.</p>
+          <div class="cf-doc__sign">
+            <span class="cf-doc__stroke"></span>
+            <em>חתימה &mdash; נחתם ב-2 ביוני 2026</em>
+          </div>
+        </div>
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">הבעיה</p>
+        <h2>לקבל חתימה זה קל. להכניס אותה לרשומה — פחות.</h2>
+        <p>טפסי הסכמה, כתבי ויתור והסכמים פשוטים נמצאים בכל מקום &mdash; אבל העותק החתום כמעט אף פעם לא מגיע נקי, אישי, ומצורף לרשומה הנכונה ב-Salesforce.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>הדפסה, חתימה, סריקה, מייל</h3>
+          <p>הלולאה הקלאסית: שולחים PDF, מקווים שיחזור חתום, ואז מישהי מתייקת את הסריקה ידנית &mdash; אם בכלל מגיע ל-Salesforce.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>DocuSign זה יותר מדי (וגם מתומחר ככה)</h3>
+          <p>להסכמה או ויתור של עמוד אחד, תמחור לפי מעטפה ומערכת נפרדת זה הרבה &mdash; ועדיין צריך לסנכרן חזרה ל-Salesforce.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>שום דבר לא אישי</h3>
+          <p>PDF גנרי לא יכול לכתוב "לכבוד דנה, בנוגע להסכם המתנדבים שלך מתאריך…" בלי שמישהו יערוך כל עותק ידנית.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>אין הוכחה מי הסכים</h3>
+          <p>חתימה שמגיעה במייל בלי אימות זהות היא ראיה חלשה. קשה להראות שהאדם הנכון הסכים לטקסט המדויק הזה.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section">
+      <div>
+        <p class="eyebrow">הפתרון</p>
+        <h2>מסמך מיזוג, חתימה, ו-PDF חתום על הרשומה.</h2>
+        <p class="lead">TwinaForms היא אפליקציה טבעית של Salesforce. בנו את מסמך ההסכמה פעם אחת עם שדות מיזוג, שתפו קישור ציבורי, וכל חותם קורא הסכם אישי, מאמת, חותם ושולח &mdash; וה-PDF החתום נוחת על אובייקט ה-Salesforce שתבחרו.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+          <a class="button button-secondary" href="/he/np.html">לעמותות</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>מסמך מיזוג עשיר</h3>
+          <p>כתבו את ההסכם בעורך טקסט עשיר ושתלו שדות Salesforce עם טוקנים כמו <span class="cf-token">{{Prefill_Contact.LastName}}</span> &mdash; כותרות, פסקאות ותנאים, אישיים לכל חותם.</p>
+        </div>
+        <div>
+          <h3>חתימה על המסך</h3>
+          <p>החותם מצייר את חתימתו ישירות מתחת למסמך, בכל מכשיר &mdash; בלי אפליקציה, בלי חשבון, בלי הדפסה.</p>
+        </div>
+        <div>
+          <h3>זהות מאומתת</h3>
+          <p>עם אימות משתמש, החותם מאשר קוד חד-פעמי שנשלח לכתובת המייל שב-Salesforce Contact שלו, לפני שהמסמך נפתח.</p>
+        </div>
+        <div>
+          <h3>PDF חתום על האובייקט שתבחרו</h3>
+          <p>בשליחה, הטקסט הממוזג והחתימה מרונדרים ל-PDF ומצורפים לאובייקט הסטנדרטי או המותאם שתגדירו.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">איך זה עובד</p>
+        <h2>מטקסט ההסכם לרשומה חתומה &mdash; בארבעה שלבים.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">1</span>
+          <h3>כותבים את המסמך עם שדות מיזוג</h3>
+          <p>בעורך מקלידים את טקסט ההסכמה ושותלים טוקנים של שדות Salesforce במקומות שאמורים להיות אישיים.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">2</span>
+          <h3>זה הופך לאישי לכל חותם</h3>
+          <p>מילוי מראש טוען את נתוני ה-Salesforce של החותם, והטוקנים הופכים לערכים האמיתיים שלו &mdash; מסמך אחד, גרסה אישית לכל אחד.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">3</span>
+          <h3>הוא מאמת וחותם</h3>
+          <p>החותם מאשר קוד חד-פעמי במייל, קורא את המסמך, וחותם על המסך &mdash; בנייד, בטאבלט או במחשב.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">4</span>
+          <h3>PDF חתום מצורף ל-Salesforce</h3>
+          <p>בשליחה, ה-PDF החתום &mdash; טקסט ממוזג וחתימה &mdash; מצורף לאובייקט שבחרתם, עם פרטי החותם.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== VS DOCUSIGN / PRINT ===== -->
+    <section class="section security-band">
+      <div class="section-heading">
+        <p class="eyebrow">חלופה פשוטה וכנה</p>
+        <h2>איפה זה משתלב לצד DocuSign והדפסה-וסריקה.</h2>
+        <p>TwinaForms מכסה את המקרה הנפוץ &mdash; הסכמה או הסכם אישי, בחותם יחיד, שצריך לחיות ב-Salesforce. זה פשוט בכוונה; זו אינה חלופה לפלטפורמת חתימה מלאה לחתימות מורכבות.</p>
+      </div>
+      <div class="cf-compare">
+        <table>
+          <thead>
+            <tr><th>&nbsp;</th><th>TwinaForms (טבעי)</th><th>DocuSign ודומיו</th><th>הדפסה / סריקה / מייל</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>מתאים ביותר ל</td><td>הסכמות והסכמים פשוטים, חותם יחיד</td><td>חתימה מורכבת, רב-משתתפים, רגולטורית</td><td>מקרים חד-פעמיים</td></tr>
+            <tr><td>אישי מנתוני Salesforce</td><td>כן &mdash; שדות מיזוג במסמך</td><td>דרך תבניות / קונקטורים</td><td>עריכה ידנית</td></tr>
+            <tr><td>נוחת על רשומת Salesforce</td><td>PDF חתום על כל אובייקט, אוטומטי</td><td>דרך אינטגרציה / סנכרון</td><td>תיוק ידני</td></tr>
+            <tr><td>החותם צריך חשבון / התחברות</td><td>לא &mdash; אימות מייל בלבד</td><td>לרוב חשבון / מעטפה</td><td>לא</td></tr>
+            <tr><td>מודל עלות</td><td>כלול במסלול, בלי תשלום לפי מעטפה</td><td>לפי מעטפה / משתמש</td><td>זמן עבודה</td></tr>
+            <tr><td>ניתוב רב-משתתפים וביקורת מאושרת</td><td>לא בתחום</td><td>כן</td><td>לא</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== USE CASES ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">איפה משתמשים בזה</p>
+        <h2>בנוי למסמכי "קראתי ואני מסכים" של היום-יום.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">הס</span>
+          <h3>הסכמה ופרטיות</h3>
+          <p>הסכמת דיוור/GDPR, אישור צילום ומדיה, הסכמה למחקר או לטיפול &mdash; אישי ומתויק על איש הקשר.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">וי</span>
+          <h3>כתבי ויתור ושחרור</h3>
+          <p>ויתורי אחריות ושחרור לפעילות, נחתמים בנייד, עם ה-PDF החתום מצורף לרשומה הרלוונטית.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">הר</span>
+          <h3>הסכמי חברות והתנדבות</h3>
+          <p>תנאי חברות, הסכמי מתנדבים, קוד התנהגות ואישורי מדיניות &mdash; חתומים ומאוחסנים מול האדם. אידיאלי גם להסכמת הורים לפעילות עם קטינים.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== LEGAL CAVEAT ===== -->
+    <section class="section">
+      <div class="install-cta">
+        <div class="install-cta__body">
+          <span class="install-cta__badge">כדאי לדעת</span>
+          <h3>רשומה מעשית &mdash; בדקו את הדרישות המשפטיות שלכם.</h3>
+          <p>TwinaForms שומרת את המסמך המדויק שעליו הסכים האדם, את החתימה המצוירת שלו, ו(עם אימות משתמש) מייל מאומת וחותמת זמן &mdash; ב-PDF חתום על רשומת ה-Salesforce. האם זה עומד בדרישות לחתימה אלקטרונית מחייבת תלוי בתחום השיפוט ובסוג ההסכם, ולכן מומלץ להיוועץ ביועץ המשפטי של הארגון לגבי הדרישות החלות (בישראל &mdash; חוק חתימה אלקטרונית; ובחו"ל ESIGN, UETA או eIDAS) למקרה הספציפי שלכם.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">שאלות נפוצות</p>
+        <h2>שאלות נפוצות על טפסי הסכמה לסיילספורס.</h2>
+      </div>
+      <div class="cf-faq">
+        <details>
+          <summary>מה זה טופס הסכמה לסיילספורס עם חתימה אלקטרונית?</summary>
+          <p>זהו טופס ציבורי של TwinaForms שמציג מסמך הסכמה או הסכם אישי שממוזג מנתוני Salesforce, מאפשר לאדם לחתום עליו על המסך, ומצרף PDF חתום בחזרה לרשומה ב-Salesforce. המסמך נבנה בעורך טקסט עשיר עם שדות מיזוג &mdash; כותבים את הטקסט פעם אחת ושותלים שדות מ-Salesforce כמו <span class="cf-token">{{Prefill_Contact.LastName}}</span> שמתמלאים לכל נמען.</p>
+        </details>
+        <details>
+          <summary>איך מסמך המיזוג הופך את ההסכם לאישי?</summary>
+          <p>בעורך כותבים את טקסט ההסכמה בעורך טקסט עשיר ושותלים טוקנים של שדות Salesforce, לדוגמה "לכבוד <span class="cf-token">{{Prefill_Contact.LastName}}</span>". כשאדם מסוים פותח את הקישור שלו, מילוי מראש טוען את נתוני ה-Salesforce שלו והטוקנים מוחלפים בערכים האמיתיים, כך שכל חותם קורא הסכם אישי משלו.</p>
+        </details>
+        <details>
+          <summary>מה קורה ברשומת ה-Salesforce כשמישהו חותם?</summary>
+          <p>בשליחה, TwinaForms יוצרת PDF חתום שמכיל את טקסט המסמך הממוזג ואת החתימה המצוירת, ומצרפת אותו לאובייקט ה-Salesforce שבחרתם (סטנדרטי או מותאם). השליחה גם שומרת את פרטי החותם, וכשאימות משתמש פעיל &mdash; נשמרים גם המייל המאומת וזמן החתימה, כך שיש לכם רשומה מעשית של מי הסכים, על מה, ומתי.</p>
+        </details>
+        <details>
+          <summary>האם זו חלופה ל-DocuSign?</summary>
+          <p>להסכמות והסכמים פשוטים בחותם יחיד היא יכולה להחליף את DocuSign: מסמך אישי, חתימה על המסך, ו-PDF חתום על רשומת ה-Salesforce, בלי תשלום לפי מעטפה ובלי מערכת נפרדת. היא פשוטה בכוונה לעומת DocuSign ואינה מבצעת ניתוב חתימה רב-משתתפים או מסלול ביקורת ארגוני מאושר. לתהליכי חתימה מורכבים או רגולטוריים, פלטפורמת חתימה ייעודית עדיין מתאימה יותר.</p>
+        </details>
+        <details>
+          <summary>האם החתימה האלקטרונית מחייבת משפטית?</summary>
+          <p>TwinaForms שומרת את החתימה המצוירת, את המסמך הממוזג שעליו הסכים האדם, ו(עם אימות משתמש) מייל מאומת וחותמת זמן &mdash; הכל ב-PDF חתום על רשומת ה-Salesforce. האם זה עומד בדרישות לחתימה אלקטרונית מחייבת תלוי בתחום השיפוט ובסוג ההסכם, ולכן מומלץ להיוועץ ביועץ המשפטי של הארגון לגבי הדרישות החלות (בישראל &mdash; חוק חתימה אלקטרונית; ובחו"ל ESIGN, UETA או eIDAS) למקרה הספציפי שלכם.</p>
+        </details>
+        <details>
+          <summary>אפשר לוודא מי באמת חתם?</summary>
+          <p>כן. הפעילו אימות משתמש כך שהחותם יידרש להזין קוד חד-פעמי שנשלח לכתובת המייל שב-Salesforce Contact שלו לפני שהמסמך נפתח. החתימה מקושרת אז לזהות מאומתת, בלי התחברות ל-Salesforce ובלי רישיון למשתמש החותם.</p>
+        </details>
+        <details>
+          <summary>לאיזה אובייקט ב-Salesforce מצורף ה-PDF החתום?</summary>
+          <p>לכל אובייקט סטנדרטי או מותאם שתבחרו בהגדרת השליחה של הטופס. ה-PDF החתום מצורף כקובץ Salesforce על אותה רשומה &mdash; כך שהסכמה יכולה לחיות על איש הקשר, כתב ויתור על אובייקט הסכם מותאם, אישור על Case, וכן הלאה.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">מוכנים להחתים</p>
+        <h2>הפכו את ההסכמה או ההסכם הבא לרשומה חתומה ב-Salesforce.</h2>
+        <p style="margin-top:20px">מסמך המיזוג, החתימה וכתיבת ה-PDF החתום הם יכולות Pro של TwinaForms; אימות משתמש כלול ממסלול Starter. התקינו ב-Sandbox ושלחו הסכמה אישית חתומה תוך אחר צהריים אחד. הנחה משמעותית לעמותות.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+          <a class="button button-secondary" href="/he/contact.html">דברו איתנו</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>מוצר של Harmony-IT</span>
+    </div>
+    <nav aria-label="ניווט תחתון">
+      <a href="/he/index.html">דף הבית</a>
+      <a href="/he/solutions/">פתרונות</a>
+      <a href="/he/np.html">לעמותות</a>
+      <a href="/help/index.html">עזרה</a>
+      <a href="/he/privacy.html">פרטיות</a>
+      <a href="/he/terms.html">תנאי שימוש</a>
+      <a href="/he/contact.html">צור קשר</a>
+    </nav>
+  </footer>
+
+  <style>
+    .cf-token {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.86em;
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: #eef4fb;
+      color: var(--blue-dark);
+      white-space: nowrap;
+      direction: ltr;
+      display: inline-block;
+    }
+
+    /* Document mock in the hero */
+    .cf-doc { margin: 0; }
+    .cf-doc__paper {
+      background: var(--white);
+      border: 1px solid #cbd9e6;
+      border-radius: 14px;
+      padding: 30px 32px;
+      line-height: 1.75;
+      color: var(--ink);
+      box-shadow:
+        0 30px 60px rgba(5, 103, 216, 0.18),
+        0 12px 30px rgba(16, 35, 63, 0.10);
+    }
+    .cf-doc__title {
+      margin: 0 0 16px;
+      font-size: 1.2rem; font-weight: 900;
+    }
+    .cf-doc__paper p { margin: 0 0 12px; }
+    .cf-doc__paper mark {
+      background: #fff3cf;
+      color: var(--ink);
+      padding: 0 4px; border-radius: 4px;
+      font-weight: 700;
+    }
+    .cf-doc__muted { color: var(--muted); font-size: 0.86rem; }
+    .cf-doc__sign {
+      margin-top: 22px; padding-top: 14px;
+      border-top: 1px dashed #b9cadd;
+    }
+    .cf-doc__stroke {
+      display: block; width: 60%; height: 26px; margin-bottom: 6px;
+      background:
+        radial-gradient(circle at 5% 60%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 20% 30%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 35% 70%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 50% 40%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 65% 65%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 80% 35%, #10233f 1.5px, transparent 2px);
+      mask: linear-gradient(270deg, #000 0%, #000 92%, transparent 100%);
+    }
+    .cf-doc__sign em { color: var(--muted); font-style: normal; font-size: 0.82rem; font-weight: 700; }
+
+    .cf-compare { overflow-x: auto; }
+    .cf-compare table {
+      width: 100%; border-collapse: collapse;
+      background: var(--white); border: 1px solid var(--line);
+      border-radius: 12px; overflow: hidden; font-size: 0.93rem;
+    }
+    .cf-compare th, .cf-compare td {
+      padding: 13px 15px; text-align: right;
+      border-bottom: 1px solid var(--line); vertical-align: top;
+    }
+    .cf-compare thead th { background: #f4f8fb; color: var(--ink); font-weight: 800; }
+    .cf-compare thead th:nth-child(2) { color: var(--blue-dark); }
+    .cf-compare td:first-child { color: var(--muted); font-weight: 700; }
+    .cf-compare td:nth-child(2) { color: var(--ink); font-weight: 600; }
+    .cf-compare tbody tr:last-child td { border-bottom: none; }
+
+    .cf-faq { display: grid; gap: 12px; }
+    .cf-faq details {
+      padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white); box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .cf-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+    }
+    .cf-faq summary::-webkit-details-marker { display: none; }
+    .cf-faq summary::after { content: '+'; float: left; margin-right: 12px; color: var(--blue); font-weight: 900; }
+    .cf-faq details[open] summary::after { content: '\2212'; }
+    .cf-faq p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
