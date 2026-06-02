@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Salesforce Consent Form with E-Signature | TwinaForms</title>
+  <meta name="description" content="Build personalized Salesforce consent and agreement forms with e-signature. A merge document pulls Salesforce data into the text, the signer verifies by email and signs, and a signed PDF is attached to the Salesforce record. A simple DocuSign alternative for basic consent and agreements.">
+  <meta name="keywords" content="salesforce consent form, salesforce e-signature form, electronic signature salesforce, salesforce agreement form, salesforce waiver form, consent form with signature, docusign alternative salesforce, mail merge signature salesforce, salesforce signed pdf agreement, online consent form salesforce">
+  <link rel="alternate" hreflang="en" href="/solutions/salesforce/consent-form/">
+  <link rel="alternate" hreflang="x-default" href="/solutions/salesforce/consent-form/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/solutions/salesforce/consent-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="Salesforce Consent Form with E-Signature | TwinaForms">
+  <meta property="og:description" content="Personalized Salesforce consent and agreement forms with e-signature. Merge Salesforce data into the document, verify the signer, and attach a signed PDF to the record. A simple DocuSign alternative.">
+  <meta property="og:url" content="https://twinaforms.com/solutions/salesforce/consent-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Salesforce Consent Form with E-Signature | TwinaForms">
+  <meta name="twitter:description" content="Personalized Salesforce consent and agreement forms with e-signature, attached as a signed PDF to the Salesforce record.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://twinaforms.com/solutions/"},{"@type":"ListItem","position":3,"name":"Salesforce","item":"https://twinaforms.com/solutions/salesforce/"},{"@type":"ListItem","position":4,"name":"Consent Form","item":"https://twinaforms.com/solutions/salesforce/consent-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is a Salesforce consent form with e-signature?","acceptedAnswer":{"@type":"Answer","text":"It is a public TwinaForms form that shows a consent or agreement document personalized with Salesforce data, lets the person sign it on screen, and attaches a signed PDF back to a Salesforce record. The document is built with a rich-text merge editor, so you write the text once and drop in Salesforce fields like {{Prefill_Contact.LastName}} that fill in per recipient."}},{"@type":"Question","name":"How does the merge document personalize the agreement?","acceptedAnswer":{"@type":"Answer","text":"In the Designer you write the consent text in a rich-text editor and insert merge tokens that reference Salesforce fields, for example 'Dear {{Prefill_Contact.LastName}}'. When a specific person opens their link, prefill loads their Salesforce data and the tokens are replaced with their real values, so each signer reads an agreement personalized to them."}},{"@type":"Question","name":"What happens on the Salesforce record when someone signs?","acceptedAnswer":{"@type":"Answer","text":"On submit, TwinaForms generates a signed PDF that contains the merged document text and the drawn signature, and attaches it to the Salesforce object you choose (standard or custom). The submission also records the signer's details, and when User Verification is on, the verified email and the time of signing are captured too, so you have a practical record of who agreed to what and when."}},{"@type":"Question","name":"Is this a DocuSign alternative?","acceptedAnswer":{"@type":"Answer","text":"For simple, single-signer agreements and consent it can replace DocuSign: a personalized document, an on-screen signature, and a signed PDF on the Salesforce record, with no per-envelope fee and no separate platform. It is intentionally basic compared to DocuSign and does not do multi-party signing routing or a certified enterprise audit trail. For complex or highly regulated signing workflows, a dedicated e-signature platform is still the right tool."}},{"@type":"Question","name":"Is the e-signature legally binding?","acceptedAnswer":{"@type":"Answer","text":"TwinaForms captures a drawn signature, the merged document the person agreed to, and (with User Verification) a verified email and timestamp, all preserved in a signed PDF on the Salesforce record. Whether that meets the legal requirements for a binding electronic signature depends on your jurisdiction and use case, so consult your legal team about requirements such as ESIGN, UETA, or eIDAS for your specific agreements."}},{"@type":"Question","name":"Can I confirm who actually signed?","acceptedAnswer":{"@type":"Answer","text":"Yes. Turn on User Verification so the signer must enter a one-time code sent to the email on their Salesforce Contact before the document opens. The signature is then tied to a verified identity, with no Salesforce login or per-user license for the signer."}},{"@type":"Question","name":"Which Salesforce object does the signed PDF attach to?","acceptedAnswer":{"@type":"Answer","text":"Any standard or custom object you choose in the form's submit configuration. The signed PDF is attached as a Salesforce File on that record, so a consent can live on the Contact, a waiver on a custom Agreement object, a release on a Case, and so on."}}]}</script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/solutions/" aria-current="page">Solutions</a>
+      <a href="/#security">Security</a>
+      <a href="/#plans">Plans</a>
+      <a href="/help/index.html">Help</a>
+      <a class="nav-cta" href="/contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">Salesforce consent &amp; agreement forms</p>
+        <h1>Salesforce consent forms <span>that are personalized, signed, and filed automatically.</span></h1>
+        <p class="lead">Write a consent or agreement once with a rich-text merge document, drop in Salesforce fields like <span class="cf-token">{{Prefill_Contact.LastName}}</span>, and every signer reads a version personalized to them. They verify by email, sign on screen, and a signed PDF is attached to the Salesforce record you choose. A simple DocuSign alternative for basic agreements and consent &mdash; native to Salesforce.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+        <ul class="trust-pills" aria-label="Key attributes of the TwinaForms Salesforce consent form">
+          <li class="trust-pill trust-pill--blue">Native to Salesforce</li>
+          <li class="trust-pill trust-pill--green">Personalized from Salesforce data</li>
+          <li class="trust-pill trust-pill--green">Signature + signed PDF</li>
+          <li class="trust-pill trust-pill--amber">Verified signer, no login</li>
+        </ul>
+      </div>
+
+      <figure class="cf-doc" aria-label="A personalized Salesforce consent document with a signature">
+        <div class="cf-doc__paper">
+          <p class="cf-doc__title">Consent &amp; Agreement</p>
+          <p>Dear <mark>Cohen</mark>,</p>
+          <p>I, <mark>Dana Cohen</mark>, confirm that I have read and agree to the terms of the <mark>Volunteer</mark> program described above, and consent to the processing of my data as set out in the policy.</p>
+          <p class="cf-doc__muted">Merged live from Salesforce &mdash; one document, personalized per signer.</p>
+          <div class="cf-doc__sign">
+            <span class="cf-doc__stroke"></span>
+            <em>Signature &mdash; signed 2 Jun 2026</em>
+          </div>
+        </div>
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">The problem</p>
+        <h2>Getting a signature is easy. Getting it onto the record isn't.</h2>
+        <p>Consent forms, waivers, and simple agreements are everywhere &mdash; but the signed copy rarely ends up clean, personalized, and attached to the right Salesforce record.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>Print, sign, scan, email</h3>
+          <p>The classic loop: send a PDF, hope it comes back signed, then someone files the scan by hand &mdash; if it lands in Salesforce at all.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>DocuSign is overkill (and priced for it)</h3>
+          <p>For a one-page consent or waiver, per-envelope e-sign pricing and a separate platform are a lot &mdash; and it still needs syncing back to Salesforce.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>Nothing is personalized</h3>
+          <p>A generic PDF can't say "Dear Dana, regarding your Volunteer agreement dated…" without someone editing each copy by hand.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>No proof of who agreed</h3>
+          <p>An emailed signature with no identity check is weak evidence. You can't easily show the right person agreed to this exact text.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section">
+      <div>
+        <p class="eyebrow">The solution</p>
+        <h2>A merge document, a signature, and a signed PDF on the record.</h2>
+        <p class="lead">TwinaForms is a native Salesforce app. Build the consent document once with merge tokens, share a public link, and each signer reads a personalized agreement, verifies, signs, and submits &mdash; the signed PDF lands on the Salesforce object you choose.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/solutions/salesforce/user-verification/">About verified signers</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>Rich-text merge document</h3>
+          <p>Write the agreement in a rich-text editor and insert Salesforce fields with tokens like <span class="cf-token">{{Prefill_Contact.LastName}}</span> &mdash; headings, paragraphs, and terms, personalized per signer.</p>
+        </div>
+        <div>
+          <h3>On-screen signature</h3>
+          <p>The signer draws their signature directly below the document on any device &mdash; no app, no account, no printing.</p>
+        </div>
+        <div>
+          <h3>Verified identity</h3>
+          <p>With <a href="/solutions/salesforce/user-verification/">User Verification</a>, the signer confirms a one-time email code matched to their Salesforce Contact before the document opens.</p>
+        </div>
+        <div>
+          <h3>Signed PDF on the object you choose</h3>
+          <p>On submit, the merged text and signature are rendered to a PDF and attached to the standard or custom Salesforce object you configure.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">How it works</p>
+        <h2>From agreement text to a signed record in four steps.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">1</span>
+          <h3>Write the document with merge tokens</h3>
+          <p>In the Designer, type the consent or agreement text in the rich-text merge editor and insert Salesforce field tokens where you want personalized values.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">2</span>
+          <h3>It personalizes per signer</h3>
+          <p>Prefill loads the signer's Salesforce data, and the tokens become their real values &mdash; one document, a personalized version for everyone.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">3</span>
+          <h3>They verify &amp; sign</h3>
+          <p>The signer confirms a one-time email code, reads the document, and signs on screen &mdash; on a phone, tablet, or desktop.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">4</span>
+          <h3>Signed PDF attached to Salesforce</h3>
+          <p>On submit, the signed PDF &mdash; merged text plus signature &mdash; is attached to the Salesforce object you chose, with the signer's details recorded.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== VS DOCUSIGN / PRINT ===== -->
+    <section class="section security-band">
+      <div class="section-heading">
+        <p class="eyebrow">A simple, honest alternative</p>
+        <h2>Where this fits next to DocuSign and print-and-scan.</h2>
+        <p>TwinaForms covers the common case &mdash; a personalized, single-signer consent or agreement that needs to live in Salesforce. It is intentionally simple; it does not replace a full e-signature platform for complex signing.</p>
+      </div>
+      <div class="cf-compare">
+        <table>
+          <thead>
+            <tr><th>&nbsp;</th><th>TwinaForms (native)</th><th>DocuSign &amp; similar</th><th>Print / scan / email</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Best for</td><td>Simple, single-signer consent &amp; agreements</td><td>Complex, multi-party, regulated signing</td><td>Ad-hoc one-offs</td></tr>
+            <tr><td>Personalized from Salesforce</td><td>Yes &mdash; merge tokens in the document</td><td>Via templates / connectors</td><td>Manual editing</td></tr>
+            <tr><td>Lands on the Salesforce record</td><td>Signed PDF on any object, automatically</td><td>Via integration / sync</td><td>Manual filing</td></tr>
+            <tr><td>Signer needs an account / login</td><td>No &mdash; email verification only</td><td>Usually an account / envelope</td><td>No</td></tr>
+            <tr><td>Cost model</td><td>Included in your plan, no per-envelope fee</td><td>Per-envelope / per-seat</td><td>Staff time</td></tr>
+            <tr><td>Multi-party routing &amp; certified audit</td><td>Not in scope</td><td>Yes</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== USE CASES ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Where teams use it</p>
+        <h2>Built for everyday "read and agree" documents.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">CN</span>
+          <h3>Consent &amp; data privacy</h3>
+          <p>GDPR/marketing consent, photo &amp; media release, research or treatment consent &mdash; personalized and filed on the Contact.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">WV</span>
+          <h3>Waivers &amp; releases</h3>
+          <p>Liability waivers and activity releases signed on a phone, with the signed PDF attached to the relevant record.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">AG</span>
+          <h3>Membership &amp; volunteer agreements</h3>
+          <p>Membership terms, volunteer agreements, codes of conduct, and policy acknowledgments &mdash; signed and stored against the person.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== LEGAL CAVEAT ===== -->
+    <section class="section">
+      <div class="install-cta">
+        <div class="install-cta__body">
+          <span class="install-cta__badge">Good to know</span>
+          <h3>A practical record &mdash; check your legal requirements.</h3>
+          <p>TwinaForms preserves the exact document the person agreed to, their drawn signature, and (with User Verification) a verified email and timestamp, in a signed PDF on the Salesforce record. Whether that satisfies the rules for a legally binding electronic signature depends on your jurisdiction and the type of agreement, so please consult your legal team about requirements such as ESIGN, UETA, or eIDAS for your use case.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">FAQ</p>
+        <h2>Common questions about Salesforce consent forms.</h2>
+      </div>
+      <div class="cf-faq">
+        <details>
+          <summary>What is a Salesforce consent form with e-signature?</summary>
+          <p>It is a public TwinaForms form that shows a consent or agreement document personalized with Salesforce data, lets the person sign it on screen, and attaches a signed PDF back to a Salesforce record. The document is built with a rich-text merge editor, so you write the text once and drop in Salesforce fields like <span class="cf-token">{{Prefill_Contact.LastName}}</span> that fill in per recipient.</p>
+        </details>
+        <details>
+          <summary>How does the merge document personalize the agreement?</summary>
+          <p>In the Designer you write the consent text in a rich-text editor and insert merge tokens that reference Salesforce fields, for example "Dear <span class="cf-token">{{Prefill_Contact.LastName}}</span>". When a specific person opens their link, prefill loads their Salesforce data and the tokens are replaced with their real values, so each signer reads an agreement personalized to them.</p>
+        </details>
+        <details>
+          <summary>What happens on the Salesforce record when someone signs?</summary>
+          <p>On submit, TwinaForms generates a signed PDF that contains the merged document text and the drawn signature, and attaches it to the Salesforce object you choose (standard or custom). The submission also records the signer's details, and when User Verification is on, the verified email and the time of signing are captured too &mdash; so you have a practical record of who agreed to what and when.</p>
+        </details>
+        <details>
+          <summary>Is this a DocuSign alternative?</summary>
+          <p>For simple, single-signer agreements and consent it can replace DocuSign: a personalized document, an on-screen signature, and a signed PDF on the Salesforce record, with no per-envelope fee and no separate platform. It is intentionally basic compared to DocuSign and does not do multi-party signing routing or a certified enterprise audit trail. For complex or highly regulated signing workflows, a dedicated e-signature platform is still the right tool.</p>
+        </details>
+        <details>
+          <summary>Is the e-signature legally binding?</summary>
+          <p>TwinaForms captures a drawn signature, the merged document the person agreed to, and (with User Verification) a verified email and timestamp, all preserved in a signed PDF on the Salesforce record. Whether that meets the legal requirements for a binding electronic signature depends on your jurisdiction and use case, so consult your legal team about requirements such as ESIGN, UETA, or eIDAS for your specific agreements.</p>
+        </details>
+        <details>
+          <summary>Can I confirm who actually signed?</summary>
+          <p>Yes. Turn on <a href="/solutions/salesforce/user-verification/">User Verification</a> so the signer must enter a one-time code sent to the email on their Salesforce Contact before the document opens. The signature is then tied to a verified identity, with no Salesforce login or per-user license for the signer.</p>
+        </details>
+        <details>
+          <summary>Which Salesforce object does the signed PDF attach to?</summary>
+          <p>Any standard or custom object you choose in the form's submit configuration. The signed PDF is attached as a Salesforce File on that record, so a consent can live on the Contact, a waiver on a custom Agreement object, a release on a Case, and so on.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">Ready to get it signed</p>
+        <h2>Turn your next consent or agreement into a signed Salesforce record.</h2>
+        <p style="margin-top:20px">The merge document, signature, and signed-PDF writeback are TwinaForms Pro features; User Verification is included from Starter. Install into a sandbox and send a personalized, signed consent in an afternoon. Nonprofit discount available.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>A Harmony-IT product</span>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href="/">Home</a>
+      <a href="/solutions/">Solutions</a>
+      <a href="/help/index.html">Help</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </footer>
+
+  <style>
+    .cf-token {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.86em;
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: #eef4fb;
+      color: var(--blue-dark);
+      white-space: nowrap;
+    }
+
+    /* Document mock in the hero */
+    .cf-doc { margin: 0; }
+    .cf-doc__paper {
+      background: var(--white);
+      border: 1px solid #cbd9e6;
+      border-radius: 14px;
+      padding: 30px 32px;
+      line-height: 1.65;
+      color: var(--ink);
+      box-shadow:
+        0 30px 60px rgba(5, 103, 216, 0.18),
+        0 12px 30px rgba(16, 35, 63, 0.10);
+    }
+    .cf-doc__title {
+      margin: 0 0 16px;
+      font-size: 1.2rem; font-weight: 900; letter-spacing: -0.01em;
+    }
+    .cf-doc__paper p { margin: 0 0 12px; }
+    .cf-doc__paper mark {
+      background: #fff3cf;
+      color: var(--ink);
+      padding: 0 4px; border-radius: 4px;
+      font-weight: 700;
+    }
+    .cf-doc__muted { color: var(--muted); font-size: 0.86rem; }
+    .cf-doc__sign {
+      margin-top: 22px; padding-top: 14px;
+      border-top: 1px dashed #b9cadd;
+    }
+    .cf-doc__stroke {
+      display: block; width: 60%; height: 26px; margin-bottom: 6px;
+      background:
+        radial-gradient(circle at 5% 60%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 20% 30%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 35% 70%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 50% 40%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 65% 65%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 80% 35%, #10233f 1.5px, transparent 2px);
+      mask: linear-gradient(90deg, #000 0%, #000 92%, transparent 100%);
+    }
+    .cf-doc__sign em { color: var(--muted); font-style: normal; font-size: 0.82rem; font-weight: 700; }
+
+    .cf-compare { overflow-x: auto; }
+    .cf-compare table {
+      width: 100%; border-collapse: collapse;
+      background: var(--white); border: 1px solid var(--line);
+      border-radius: 12px; overflow: hidden; font-size: 0.93rem;
+    }
+    .cf-compare th, .cf-compare td {
+      padding: 13px 15px; text-align: left;
+      border-bottom: 1px solid var(--line); vertical-align: top;
+    }
+    .cf-compare thead th { background: #f4f8fb; color: var(--ink); font-weight: 800; }
+    .cf-compare thead th:nth-child(2) { color: var(--blue-dark); }
+    .cf-compare td:first-child { color: var(--muted); font-weight: 700; }
+    .cf-compare td:nth-child(2) { color: var(--ink); font-weight: 600; }
+    .cf-compare tbody tr:last-child td { border-bottom: none; }
+
+    .cf-faq { display: grid; gap: 12px; }
+    .cf-faq details {
+      padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white); box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .cf-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+    }
+    .cf-faq summary::-webkit-details-marker { display: none; }
+    .cf-faq summary::after { content: '+'; float: right; margin-left: 12px; color: var(--blue); font-weight: 900; }
+    .cf-faq details[open] summary::after { content: '\2212'; }
+    .cf-faq p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
