@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Salesforce Timesheet Form | Contractor &amp; Employee Time Tracking</title>
+  <meta name="description" content="Track contractor, consultant, and employee hours directly in Salesforce. Verified user identity, signed PDF receipt, mobile responsive. Native to Salesforce.">
+  <meta name="keywords" content="salesforce timesheet form, salesforce time tracking form, salesforce contractor hours form, salesforce employee timesheet, salesforce consultant timesheet, employee hours tracking salesforce, time tracking app salesforce, weekly timesheet salesforce, track billable hours salesforce, signed timesheet salesforce, salesforce timesheet with signature, salesforce timesheet form for consultants, verified salesforce timesheet, mobile salesforce timesheet">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="alternate" hreflang="en" href="/solutions/salesforce/timesheet-form/">
+  <link rel="alternate" hreflang="x-default" href="/solutions/salesforce/timesheet-form/">
+  <link rel="canonical" href="https://twinaforms.com/solutions/salesforce/timesheet-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="Salesforce Timesheet Form | Contractor & Employee Time Tracking">
+  <meta property="og:description" content="Track contractor, consultant, and employee hours directly in Salesforce. Verified user identity, signed PDF receipt, mobile responsive. Native to Salesforce.">
+  <meta property="og:url" content="https://twinaforms.com/solutions/salesforce/timesheet-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Salesforce Timesheet Form | Contractor & Employee Time Tracking">
+  <meta name="twitter:description" content="Track contractor, consultant, and employee hours directly in Salesforce. Verified user identity, signed PDF receipt, mobile responsive. Native to Salesforce.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://twinaforms.com/solutions/"},{"@type":"ListItem","position":3,"name":"Salesforce","item":"https://twinaforms.com/solutions/salesforce/"},{"@type":"ListItem","position":4,"name":"Timesheet Form","item":"https://twinaforms.com/solutions/salesforce/timesheet-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does user verification work on the Salesforce timesheet form?","acceptedAnswer":{"@type":"Answer","text":"When a contractor opens the form link, TwinaForms sends a one-time verification code to the email address on their Salesforce Contact record. They enter the code, the session opens, and they can fill the timesheet. If the code is wrong or never entered, the form does not open. This blocks anonymous, spoofed, or shared-link timesheet submissions before they reach Salesforce."}},{"@type":"Question","name":"Can contractors fill the Salesforce timesheet form from a phone?","acceptedAnswer":{"@type":"Answer","text":"Yes. The timesheet form is fully mobile responsive — the verification step, the multi-row time entry table, the signature pad, and the submit flow all work on phones and tablets. The contractor signs with a finger on touchscreens. No mobile app or separate portal to build."}},{"@type":"Question","name":"Can the contractor add multiple time entries for different projects in one weekly Salesforce timesheet?","acceptedAnswer":{"@type":"Answer","text":"Yes. The TwinaForms Repeated Records feature lets the contractor add as many rows as they need in a single submission — each row writes a separate Salesforce record (typically a Timesheet Entry), and the header writes the parent Timesheet record."}},{"@type":"Question","name":"How does the signature work on a Salesforce timesheet form?","acceptedAnswer":{"@type":"Answer","text":"TwinaForms captures a drawn signature inside the form and embeds it into an auto-generated PDF receipt. The signed PDF is attached to the Salesforce timesheet record on submit. Combined with TwinaForms email verification, this gives you a defensible audit trail for payroll or client billing."}},{"@type":"Question","name":"Do I need a custom Timesheet object in Salesforce?","acceptedAnswer":{"@type":"Answer","text":"No. TwinaForms writes to any standard or custom Salesforce object, so you can point the timesheet form at existing objects or create new ones in minutes — no Apex required."}},{"@type":"Question","name":"Why not use Salesforce Flow for timesheets? (Salesforce Flow vs public timesheet forms)","acceptedAnswer":{"@type":"Answer","text":"Salesforce Flow screen flows are powerful for internal Salesforce users but break down for timesheet collection at scale. Licensing: Flow requires every user who fills the timesheet to have a Salesforce license, from $25 to $165+ per month per seat depending on edition. For 20 timesheet submitters that is $500 to $3,300 per month just to log hours. A TwinaForms public timesheet form needs no Salesforce login and no per-user license. Authentication: Flow uses Salesforce SSO; TwinaForms uses email-code verification — the worker enters their email, gets a 6-digit code at the address on their Salesforce Contact record, and only then sees the form. Signature and PDF: Flow has no native signature field or PDF receipt generator — you wire up DocuSign or a custom LWC/Apex component. TwinaForms captures a drawn signature and auto-generates a signed PDF attached to the Salesforce record on submit. Mobile: Flow screen flows are designed for the Salesforce mobile app, not for external workers on a personal phone browser. TwinaForms forms are fully responsive across desktop, tablet, and phone. When Flow is the right choice: internal Salesforce-licensed employees doing lightweight time corrections, or admin-only workflows. For anyone else — contractors, consultants, hourly staff at partner orgs — a public timesheet form is the sensible model."}},{"@type":"Question","name":"How do I track contractor hours in Salesforce without spreadsheets?","acceptedAnswer":{"@type":"Answer","text":"Send each contractor a TwinaForms timesheet form link. They fill weekly time entries, sign at the bottom, and submit. Each entry lands as a Salesforce record automatically. A signed PDF copy of the timesheet is attached to the record for payroll and billing reference."}},{"@type":"Question","name":"Does the TwinaForms timesheet form work for tracking billable hours for consultants?","acceptedAnswer":{"@type":"Answer","text":"Yes. Consultants enter billable hours per client or project per row, with the form prefilling their billing rate from the contact record. The form totals the hours and the auto-generated signed PDF is a ready-to-attach billing artifact."}},{"@type":"Question","name":"Can the Salesforce timesheet form track employee hours, not just contractors?","acceptedAnswer":{"@type":"Answer","text":"Yes. Same form, same Repeated Records, same signed PDF — works for W-2 employees, hourly staff, project teams, or anyone you need verified weekly time data for. Hours land on the same Salesforce object you point the form at, typically Timesheet plus Timesheet Entry. For grant or project-funded employee time, the Repeated Records table can carry the project or grant code per row, so each entry maps to the right allocation. Verification ensures the right employee logs the right hours; the signed PDF gives HR or finance a defensible audit copy."}}]}</script>
+
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/solutions/" aria-current="page">Solutions</a>
+      <a href="/#security">Security</a>
+      <a href="/#plans">Plans</a>
+      <a href="/#about">About</a>
+      <a href="/help/index.html">Help</a>
+      <a class="nav-cta" href="/contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">Salesforce Timesheet Form</p>
+        <h1>Track contractor, consultant, and employee hours <span>directly in Salesforce.</span></h1>
+        <p class="lead">Only verified users can submit. Each contractor, consultant, or employee signs in with a one-time email code, fills weekly time entries, signs at the bottom, and submits &mdash; from any phone. Every hour lands on the right Salesforce record with a signed PDF attached.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Build your Salesforce timesheet form</a>
+          <a class="button button-secondary" href="mailto:supportat@twinaforms.com">Email us</a>
+        </div>
+        <ul class="trust-pills" aria-label="Key attributes of the TwinaForms Salesforce timesheet form">
+          <li class="trust-pill trust-pill--blue">Native to Salesforce</li>
+          <li class="trust-pill trust-pill--green">Verified user identity</li>
+          <li class="trust-pill trust-pill--green">Signed PDF on every submission</li>
+          <li class="trust-pill trust-pill--amber">Mobile responsive &mdash; fill from any phone</li>
+        </ul>
+      </div>
+
+      <!-- Mockup hero: an HTML rendering of a TwinaForms weekly timesheet form -->
+      <figure class="ts-hero" aria-label="Salesforce Timesheet Form screenshot &mdash; TwinaForms">
+        <img class="ts-hero__img" src="/assets/timesheet-form-hero.png" alt="Salesforce Timesheet Form &mdash; TwinaForms public form for tracking employee, contractor, and consultant hours directly in Salesforce, with mobile-friendly time entries and signature support">
+        <figcaption class="ts-caption">The actual TwinaForms Salesforce timesheet form &mdash; employees, contractors, and consultants fill weekly time entries, sign, and submit directly into Salesforce.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">The problem</p>
+        <h2>Why tracking contractor, consultant, and employee hours in Salesforce usually breaks.</h2>
+        <p>Whether you&rsquo;re paying contractors, billing consultant time to clients, or recording employee hours for grant or project allocations, you&rsquo;re probably stitching something together today to collect timesheets.</p>
+        <p>Most teams reach for Excel spreadsheets that sprawl, Google Forms that doesn&rsquo;t write to Salesforce, Salesforce Screen Flows that require a per-user license, Salesforce Experience Cloud portals that need a portal-grade project to build, or Salesforce Field Service modules sized for technicians on jobs rather than consultants billing project hours.</p>
+        <p>They all break down for the same reason: there is no native, public Salesforce timesheet form that the worker can sign and submit themselves.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>Manual rekey, every week</h3>
+          <p>Contractors send weekly timesheets by email or spreadsheet. An admin retypes the hours into Salesforce. The work compounds at scale &mdash; ten contractors equals hours of weekly busywork that nobody owns.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>No signed audit trail</h3>
+          <p>A billing dispute lands and there&rsquo;s no signed copy of what the contractor actually claimed. The Salesforce timesheet record has the numbers, but no signature, no PDF, nothing to forward to the client.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>Spreadsheet sprawl</h3>
+          <p>Every contractor uses their own template. Currencies drift, time formats drift, project codes drift. Reconciling weekly billable hours becomes a part-time job.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>Approval chaos and payroll handoff</h3>
+          <p>Approvals happen over Slack or email. Payroll asks for signed PDFs. Admins generate them by hand from raw spreadsheet data &mdash; or skip the signed copy entirely and hope nobody asks later.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION (with mockup) ===== -->
+    <section class="split-section" id="solution">
+      <div>
+        <p class="eyebrow">The solution</p>
+        <h2>One Salesforce timesheet form. Signed PDF on every submission.</h2>
+        <p class="lead">TwinaForms is a native Salesforce form builder. Build a weekly timesheet form in your Salesforce org, share the public link with contractors, consultants, or employees, and every signed submission lands on the right record automatically &mdash; with a PDF receipt attached.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Build your Salesforce timesheet form</a>
+          <a class="button button-secondary" href="mailto:supportat@twinaforms.com">Email us</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>Only verified contractors and employees can submit</h3>
+          <p>Each contractor, consultant, or employee signs in with a one-time email code sent to the address on their Salesforce Contact record. No code, no submission &mdash; the form simply won&rsquo;t open. Stops anonymous, duplicate, or spoofed timesheet entries before they reach Salesforce.</p>
+        </div>
+        <div>
+          <h3>Multiple time entries per submission</h3>
+          <p>Contractors and employees add as many project rows as they worked on that week &mdash; each row writes a separate Salesforce Timesheet Entry record, totalled on the parent Timesheet record.</p>
+        </div>
+        <div>
+          <h3>Prefilled with what we already know</h3>
+          <p>The contractor or employee&rsquo;s name, project picklist, and billing rate are prefilled from their Salesforce Contact record. They only enter the hours and notes.</p>
+        </div>
+        <div>
+          <h3>Drawn signature &amp; signed PDF</h3>
+          <p>The contractor, consultant, or employee signs at the bottom of the form. A PDF receipt &mdash; same fields, same signature &mdash; is generated and attached to the Salesforce timesheet record on submit. Payroll never asks for a signed copy again.</p>
+        </div>
+        <div>
+          <h3>Mobile responsive &mdash; fill from any phone</h3>
+          <p>Contractors and employees aren&rsquo;t always at a desk. The timesheet form, verification step, signature pad and submit flow all work on phones &mdash; no app to install, no separate mobile portal.</p>
+        </div>
+        <div>
+          <h3>Native Salesforce writeback</h3>
+          <p>Submissions write to any standard or custom Salesforce object. Approvals, reports, dashboards work out of the box because the data lives in Salesforce, not a third-party tool.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FEATURE MECHANICS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">How it works</p>
+        <h2>The five features that make this Salesforce timesheet form click.</h2>
+        <p>Each piece is a TwinaForms capability you&rsquo;ll find listed on the homepage. The timesheet form is what happens when you combine them in one form &mdash; for contractors, consultants, and employees alike.</p>
+      </div>
+
+      <div class="ts-mech">
+
+        <article class="ts-mech__card ts-mech__card--accent ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">01</span>
+            <h3>User Verification &mdash; only verified contractors can submit</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>Before the timesheet form opens, the contractor receives a one-time 6-digit code by email at the address on their Salesforce Contact record. They enter the code, the session opens, and they fill the form. No code, no access &mdash; the form simply will not load.</p>
+              <p>This blocks anonymous, spoofed, or accidentally-shared timesheet submissions at the door. Every hour that lands in Salesforce is tied to a confirmed email identity, and the verification event itself is logged for audit. Combined with the signed PDF below, you get a defensible billing artifact: this contractor, this signature, this submission.</p>
+              <ul class="ts-mech__list">
+                <li>One-time 6-digit code sent to the contractor&rsquo;s Salesforce Contact email</li>
+                <li>Form does not open without successful verification</li>
+                <li>Session capped &mdash; no long-lived browser tokens</li>
+                <li>Stops shared-link abuse and duplicate submissions</li>
+              </ul>
+            </div>
+            <figure class="ts-mech__shot">
+              <img src="/assets/user-verification.png" alt="TwinaForms user verification screen &mdash; enter email, receive a 6-digit code, click Verify to access the Salesforce timesheet form" loading="lazy">
+              <figcaption>The real verification screen contractors see &mdash; enter email, receive a 6-digit code, verify.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="ts-mech__card">
+          <header>
+            <span class="ts-mech__num">02</span>
+            <h3>Repeated Records &mdash; multiple time entries per submission</h3>
+          </header>
+          <p>A standard form gives you one set of fields, one submission, one Salesforce record. A weekly timesheet needs many rows in one submission &mdash; one per project, day, or task.</p>
+          <p>TwinaForms Repeated Records lets you define a row layout (project + Mon&ndash;Fri hours, or whatever shape you need) and the contractor or employee adds as many rows as they worked. On submit, each row becomes a separate Salesforce record on the child object, all linked to the parent Timesheet record.</p>
+          <ul class="ts-mech__list">
+            <li>Add and remove rows inline, no page refresh</li>
+            <li>Auto-totals per day and per week</li>
+            <li>Each row writes to a Timesheet Entry custom object</li>
+          </ul>
+          <figure class="ts-mech__pic">
+            <img src="/assets/timesheet-repeated-rows.png" alt="Salesforce timesheet form showing multiple weekly time entries &mdash; projects, daily hours, and totals across multiple rows in one submission" loading="lazy">
+            <figcaption>Repeated rows in a Salesforce timesheet form &mdash; one submission, many time entries.</figcaption>
+          </figure>
+        </article>
+
+        <article class="ts-mech__card">
+          <header>
+            <span class="ts-mech__num">03</span>
+            <h3>Prefill &mdash; load what Salesforce already knows</h3>
+          </header>
+          <p>Every contractor, consultant, or employee receives a personalised link. When they open the form (after verification), TwinaForms prefills their name, contact info, the project picklist (filtered to their active assignments), and their billing rate or cost rate &mdash; all read straight from their Salesforce Contact and related records.</p>
+          <p>The contractor or employee only types what changes week-to-week: hours and short notes. No retyping a master list. No "what was that project code again?" emails.</p>
+        </article>
+
+        <article class="ts-mech__card ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">04</span>
+            <h3>Mobile responsive &mdash; built for contractors and employees in the field</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>Contractors and employees aren&rsquo;t always at a desk. They&rsquo;re between client visits, on a job site, at a customer location, or on the train home Friday evening. The TwinaForms Salesforce timesheet form is fully mobile responsive &mdash; the verification step, the multi-row timesheet table, the signature pad, and the submit flow all work on phones.</p>
+              <p>No mobile app to install. No separate "mobile portal" to build. The same URL works on desktop, tablet, and phone, and the contractor, consultant, or employee signs with a finger if they&rsquo;re on a touchscreen.</p>
+            </div>
+            <figure class="ts-mech__shot ts-mech__shot--phone">
+              <img src="/assets/timesheet-mobile.png" alt="Salesforce timesheet form on mobile &mdash; verification, time entry, and signature pad rendered on a phone screen for contractors and employees in the field" loading="lazy">
+              <figcaption>The Salesforce timesheet form on a phone &mdash; verify, fill, sign, and submit, no app required.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="ts-mech__card ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">05</span>
+            <h3>Signed PDF receipt + native Salesforce records &mdash; one submit, both outputs</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>At submit, two things happen automatically. First, TwinaForms generates a signed PDF receipt &mdash; the same project rows, the same totals, the same drawn signature &mdash; and attaches it as a Salesforce File on the parent Timesheet record. Second, the structured data is written into Salesforce as records: a parent Timesheet plus one Timesheet Entry row per project.</p>
+              <p>The PDF is the artifact &mdash; what you forward to payroll, finance, or the client for billing. The records are the data &mdash; what powers your existing Salesforce approval processes, reports, and dashboards out of the box. Both come from one submit. No third-party tool to sync, no manual PDF generation, no DocuSign add-on.</p>
+              <ul class="ts-mech__list">
+                <li>Drawn signature captured inside the form</li>
+                <li>PDF auto-generated on submit, with signature embedded</li>
+                <li>PDF attached as a Salesforce File on the parent Timesheet record</li>
+                <li>Records write to standard or custom Salesforce objects &mdash; no Apex</li>
+                <li>Existing Salesforce approvals, reports, and dashboards work out of the box</li>
+              </ul>
+              <p style="margin-top:14px"><a href="/assets/timesheet-signed-sample.pdf" target="_blank" rel="noopener" style="color:var(--blue);font-weight:800;text-decoration:none">Download a sample signed timesheet PDF &rarr;</a></p>
+            </div>
+            <figure class="ts-mech__shot">
+              <img src="/assets/timesheet-signed-pdf.png" alt="Sample signed Salesforce timesheet PDF receipt &mdash; project rows, daily hours, totals, and drawn signature, auto-generated on submit and attached to the Salesforce timesheet record" loading="lazy">
+              <figcaption>Sample signed timesheet PDF &mdash; auto-generated on submit and attached to the Salesforce record alongside the structured data.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+      </div>
+
+      <div class="install-cta" style="margin-top:42px">
+        <div class="install-cta__body">
+          <span class="install-cta__badge">Free to start</span>
+          <h3>Try the Salesforce timesheet form in your sandbox</h3>
+          <p>Install the TwinaForms managed package into a Salesforce sandbox, clone a layout, and have a working signed timesheet form ready to share with one contractor in under an hour. For setup questions, email <a href="mailto:supportat@twinaforms.com">supportat@twinaforms.com</a>.</p>
+        </div>
+        <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Build your Salesforce timesheet form</a>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">FAQ</p>
+        <h2>Common questions about the Salesforce timesheet form.</h2>
+      </div>
+
+      <div class="ts-faq">
+        <details>
+          <summary>How does user verification work on the Salesforce timesheet form?</summary>
+          <p>When a contractor opens the form link, TwinaForms sends a one-time verification code to the email address on their Salesforce Contact record. They enter the code, the session opens, and they can fill the timesheet. If the code is wrong or never entered, the form does not open. This blocks anonymous, spoofed, or shared-link timesheet submissions before they reach Salesforce.</p>
+        </details>
+        <details>
+          <summary>Can contractors fill the Salesforce timesheet form from a phone?</summary>
+          <p>Yes. The timesheet form is fully mobile responsive &mdash; the verification step, the multi-row time entry table, the signature pad, and the submit flow all work on phones and tablets. The contractor signs with a finger on touchscreens. No mobile app or separate portal to build.</p>
+        </details>
+        <details>
+          <summary>Can the contractor add multiple time entries for different projects in one weekly Salesforce timesheet?</summary>
+          <p>Yes. The TwinaForms Repeated Records feature lets the contractor add as many rows as they need in a single submission &mdash; each row writes a separate Salesforce record (typically a Timesheet Entry), and the header writes the parent Timesheet record.</p>
+        </details>
+        <details>
+          <summary>How does the signature work on a Salesforce timesheet form?</summary>
+          <p>TwinaForms captures a drawn signature inside the form and embeds it into an auto-generated PDF receipt. The signed PDF is attached to the Salesforce timesheet record on submit. Combined with TwinaForms email verification, this gives you a defensible audit trail for payroll or client billing. Consult your legal team for jurisdiction-specific e-signature requirements.</p>
+        </details>
+        <details>
+          <summary>Do I need a custom Timesheet object in Salesforce?</summary>
+          <p>No. TwinaForms writes to any standard or custom Salesforce object, so you can point the timesheet form at existing objects or create new ones in minutes &mdash; no Apex required.</p>
+        </details>
+        <details>
+          <summary>Why not use Salesforce Flow for timesheets? (Salesforce Flow vs public timesheet forms)</summary>
+          <p>Salesforce Flow screen flows are powerful for internal Salesforce users &mdash; but they break down fast for timesheet collection at scale. Here&rsquo;s the honest comparison.</p>
+          <p><strong>Licensing.</strong> Screen flows require every user who fills the timesheet to have a Salesforce license. A 1099 contractor, an external consultant, or a staff member at a partner agency without a Salesforce seat cannot use a Flow at all. Per-user Salesforce licenses range from roughly $25 to $165+ per month depending on edition &mdash; for 20 timesheet submitters that&rsquo;s $500 to $3,300 a month just to log hours. A TwinaForms public timesheet form is reachable by anyone with the form link. No Salesforce login required, no license cost per submitter.</p>
+          <p><strong>Authentication and security.</strong> Flow relies on Salesforce SSO. TwinaForms uses email-code verification &mdash; the worker enters their email, receives a 6-digit one-time code at the address on their Salesforce Contact record, and only then sees the form. Same defensible audit trail, no Salesforce login needed.</p>
+          <p><strong>Signature and signed PDF.</strong> Flow has no native signature field and no built-in PDF receipt generator. To get there you wire up DocuSign or a custom LWC/Apex component &mdash; both add cost and maintenance. TwinaForms captures a drawn signature inside the form and auto-generates a signed PDF attached to the Salesforce timesheet record on submit.</p>
+          <p><strong>Mobile experience.</strong> Flow screen flows are designed for the Salesforce mobile app, not for external workers on their personal phone browser. TwinaForms forms are fully responsive &mdash; verification, multi-row time entry, signature pad, and submit all work on a phone with no app to install.</p>
+          <p><strong>When Flow is the right choice.</strong> Internal Salesforce-licensed employees doing lightweight time corrections, or admin-only workflows where Salesforce login is already standard. Anything else &mdash; contractors, consultants, hourly staff at partner orgs, anyone without a Salesforce seat &mdash; needs a public timesheet form.</p>
+        </details>
+        <details>
+          <summary>How do I track contractor hours in Salesforce without spreadsheets?</summary>
+          <p>Send each contractor a TwinaForms timesheet form link. They fill weekly time entries, sign at the bottom, and submit. Each entry lands as a Salesforce record automatically. A signed PDF copy of the timesheet is attached to the record for payroll and billing reference.</p>
+        </details>
+        <details>
+          <summary>Does the TwinaForms timesheet form work for tracking billable hours for consultants?</summary>
+          <p>Yes. Consultants enter billable hours per client or project per row, with the form prefilling their billing rate from the contact record. The form totals the hours and the auto-generated signed PDF is a ready-to-attach billing artifact.</p>
+        </details>
+        <details>
+          <summary>Can the Salesforce timesheet form track employee hours, not just contractors?</summary>
+          <p>Yes. Same form, same Repeated Records, same signed PDF &mdash; it works for W-2 employees, hourly staff, project teams, or anyone you need verified weekly time data for. Hours land on the same Salesforce object you point the form at &mdash; typically a Timesheet plus Timesheet Entry custom object. For grant- or project-funded employee time, the Repeated Records table can carry the project or grant code per row, so each entry maps to the right allocation. Verification ensures the right employee is logging the right hours; the signed PDF gives HR or finance a defensible audit copy.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">Ready to ship it</p>
+        <h2>Stop chasing weekly timesheets from contractors, consultants, and employees. Ship a signed Salesforce timesheet form this week.</h2>
+        <p style="margin-top:20px">Free to install. Pro plan unlocks the signature, PDF receipt, and Repeated Records features used in the timesheet form on this page. Nonprofit discount available.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Build your Salesforce timesheet form</a>
+          <a class="button button-secondary" href="mailto:supportat@twinaforms.com">Email us</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>A Harmony-IT product</span>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href="/">Home</a>
+      <a href="/solutions/">Solutions</a>
+      <a href="/help/index.html">Help</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </footer>
+
+  <!-- Page-scoped styles for the timesheet mockup hero, mechanics cards, and FAQ -->
+  <style>
+    /* ===== Typography overrides (tighter than homepage, H1 > H2 hierarchy) ===== */
+    .hero-section h1 {
+      font-size: clamp(2.1rem, 3.8vw, 3.1rem);
+      line-height: 1.12;
+      letter-spacing: -0.015em;
+      max-width: 720px;
+    }
+    .hero-section h1 span { display: inline; }
+    .hero-section .lead {
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+    /* All H2s on this page must be smaller than H1 */
+    main h2 {
+      font-size: clamp(1.45rem, 2.5vw, 2.0rem);
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      font-weight: 800;
+    }
+
+    /* ===== Hero timesheet screenshot ===== */
+    .ts-hero { margin: 0; }
+    .ts-hero__img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #cbd9e6;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow:
+        0 30px 60px rgba(5, 103, 216, 0.20),
+        0 12px 30px rgba(16, 35, 63, 0.10),
+        0 0 80px rgba(5, 103, 216, 0.12);
+    }
+
+    /* Verified contractor banner inside the mockup */
+    .ts-verify {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; margin-bottom: 14px;
+      border: 1px solid #b6e1c8; border-radius: 8px;
+      background: var(--mint);
+      color: #0b6d48;
+      font-size: 0.86rem; line-height: 1.45;
+    }
+    .ts-verify__check {
+      flex: none;
+      display: inline-grid; place-items: center;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      color: #fff; background: var(--green);
+      font-weight: 900; font-size: 0.78rem;
+    }
+    .ts-verify__text strong { color: var(--ink); }
+    .ts-browser {
+      overflow: hidden;
+      border: 1px solid #cbd9e6;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow:
+        0 30px 60px rgba(5, 103, 216, 0.20),
+        0 12px 30px rgba(16, 35, 63, 0.10),
+        0 0 80px rgba(5, 103, 216, 0.12);
+    }
+    .ts-browser__bar {
+      display: flex; align-items: center; gap: 7px;
+      height: 42px; padding: 0 16px;
+      background: #e9eef4;
+      border-bottom: 1px solid #d4dee8;
+    }
+    .ts-browser__bar > span {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #92a3b5;
+    }
+    .ts-browser__bar em {
+      margin-left: 14px;
+      color: #5f6f84; font-style: normal; font-size: 0.82rem; font-weight: 600;
+    }
+    .ts-form { padding: 28px 30px 26px; }
+    .ts-eyebrow {
+      margin: 0 0 6px;
+      color: var(--blue);
+      font-size: 0.74rem; font-weight: 900;
+      letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    .ts-form__title-row {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 18px; margin-bottom: 18px;
+    }
+    .ts-form__title {
+      margin: 0; font-size: 1.45rem; font-weight: 800;
+      letter-spacing: -0.01em; color: var(--ink); line-height: 1.15;
+    }
+    .ts-status {
+      align-self: flex-start;
+      padding: 6px 12px; border-radius: 999px;
+      color: #0b6d48; background: var(--mint);
+      font-size: 0.78rem; font-weight: 800;
+      white-space: nowrap;
+    }
+    .ts-meta {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; padding: 14px 16px; margin-bottom: 18px;
+      border: 1px solid var(--line); border-radius: 8px;
+      background: #f6fafd;
+    }
+    .ts-meta > div { display: grid; gap: 2px; }
+    .ts-meta span {
+      color: var(--muted);
+      font-size: 0.74rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .ts-meta strong { color: var(--ink); font-size: 0.95rem; }
+    .ts-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .ts-table th, .ts-table td {
+      padding: 10px 8px; text-align: center;
+      border-bottom: 1px solid var(--line);
+    }
+    .ts-table thead th {
+      color: var(--muted);
+      font-size: 0.74rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      background: #f4f8fb;
+    }
+    .ts-th-project, .ts-td-project { text-align: left; }
+    .ts-td-project { color: var(--ink); font-weight: 700; }
+    .ts-td-project small {
+      display: block; margin-top: 2px;
+      color: var(--muted); font-weight: 500; font-size: 0.78rem;
+    }
+    .ts-th-total, .ts-td-total, .ts-tf-total {
+      color: var(--blue-dark); font-weight: 900;
+    }
+    .ts-row-add td {
+      padding: 12px; text-align: left;
+      color: var(--blue); font-weight: 700; font-size: 0.86rem;
+      background: #f7fbff;
+      border-bottom: none;
+    }
+    .ts-table tfoot td {
+      padding-top: 14px;
+      color: var(--ink); font-weight: 800;
+      border-top: 2px solid var(--line); border-bottom: none;
+    }
+    .ts-tf-label { text-align: left; color: var(--muted); }
+    .ts-sign-row {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 18px; align-items: end;
+      margin-top: 22px;
+    }
+    .ts-sign-pad {
+      position: relative;
+      min-height: 86px; padding: 14px 16px;
+      border: 1.5px dashed #b9cadd; border-radius: 8px;
+      background: linear-gradient(180deg, #fbfdfe, #f3f7fb);
+    }
+    .ts-sign-stroke {
+      display: block;
+      width: 72%; height: 28px;
+      margin: 6px 0 10px;
+      background:
+        radial-gradient(circle at 5% 60%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 18% 30%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 32% 70%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 48% 40%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 62% 65%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 75% 35%, #10233f 1.5px, transparent 2px),
+        radial-gradient(circle at 88% 60%, #10233f 1.5px, transparent 2px);
+      mask: linear-gradient(90deg, #000 0%, #000 95%, transparent 100%);
+    }
+    .ts-sign-pad em {
+      color: var(--muted); font-style: normal; font-size: 0.78rem; font-weight: 700;
+    }
+    .ts-submit { display: grid; gap: 6px; justify-items: end; }
+    .ts-submit-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 44px; padding: 0 22px;
+      border: none; border-radius: 8px;
+      color: var(--white); background: var(--blue);
+      font-weight: 800; font-size: 0.95rem;
+      box-shadow: 0 10px 24px rgba(5, 103, 216, 0.28);
+      cursor: default;
+    }
+    .ts-submit small {
+      color: var(--muted); font-size: 0.78rem; font-weight: 600;
+    }
+    .ts-caption {
+      margin: 14px 2px 0;
+      color: var(--muted); font-size: 0.86rem; line-height: 1.55;
+    }
+
+    /* Two-column hero on wide screens */
+    @media (min-width: 981px) {
+      .hero-section {
+        grid-template-columns: 1fr 1.05fr;
+        gap: 56px;
+        align-items: start;
+      }
+    }
+
+    /* ===== Mechanics cards ===== */
+    .ts-mech {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+    .ts-mech__card {
+      padding: 28px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--white);
+      box-shadow: 0 4px 14px rgba(16, 35, 63, 0.05);
+      border-top: 4px solid var(--blue);
+    }
+    .ts-mech__card--accent {
+      border-top-color: var(--green);
+      background: linear-gradient(180deg, #f3fbf6, var(--white) 30%);
+    }
+    .ts-mech__card--accent .ts-mech__num {
+      color: #0b6d48;
+      background: linear-gradient(135deg, var(--mint), #d6f1e2);
+    }
+    .ts-mech__card--wide { grid-column: 1 / -1; }
+
+    /* Two-column layout inside a wide mechanics card (text + screenshot) */
+    .ts-mech__cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+    .ts-mech__text > p:first-child { margin-top: 0; }
+    .ts-mech__shot {
+      margin: 0;
+      display: grid; gap: 10px;
+    }
+    .ts-mech__shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdfe;
+      box-shadow: 0 8px 24px rgba(16, 35, 63, 0.08);
+    }
+    .ts-mech__shot figcaption {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    @media (max-width: 980px) {
+      .ts-mech__cols { grid-template-columns: 1fr; }
+    }
+
+    /* Phone screenshots render smaller and centered (portrait, no need for full column width) */
+    .ts-mech__shot--phone {
+      align-self: center;
+      justify-self: center;
+      max-width: 280px;
+    }
+    .ts-mech__shot--phone img {
+      max-width: 100%;
+    }
+
+    /* In-card screenshot placeholders (gray box until real image is loaded) */
+    .ts-mech__pic {
+      display: block;
+      margin: 20px 0 0;
+    }
+    .ts-mech__pic img {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 220px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background:
+        repeating-linear-gradient(
+          45deg,
+          #f1f6fa,
+          #f1f6fa 12px,
+          #e7eff5 12px,
+          #e7eff5 24px
+        );
+      color: var(--muted);
+      font-size: 0.85rem;
+      box-shadow: 0 4px 14px rgba(16, 35, 63, 0.06);
+    }
+    .ts-mech__pic figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .ts-mech__card header {
+      display: flex; align-items: flex-start; gap: 14px;
+      margin-bottom: 12px;
+    }
+    .ts-mech__num {
+      flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      color: var(--blue-dark);
+      background: linear-gradient(135deg, var(--panel), var(--mint));
+      font-weight: 900; font-size: 0.92rem;
+    }
+    .ts-mech__card h3 {
+      margin: 0; font-size: 1.15rem; line-height: 1.3;
+    }
+    .ts-mech__card p {
+      margin: 10px 0 0; color: var(--muted); line-height: 1.6;
+    }
+    .ts-mech__list {
+      margin: 14px 0 0; padding-left: 20px;
+      color: var(--muted); line-height: 1.6;
+    }
+    .ts-mech__list li { margin-bottom: 4px; }
+
+    @media (max-width: 980px) {
+      .ts-mech { grid-template-columns: 1fr; }
+      .ts-meta { grid-template-columns: 1fr; }
+      .ts-sign-row { grid-template-columns: 1fr; }
+      .ts-submit { justify-items: stretch; }
+      .ts-submit-btn { width: 100%; }
+    }
+    @media (max-width: 640px) {
+      .ts-form { padding: 18px 16px 18px; }
+      .ts-table { font-size: 0.82rem; }
+      .ts-table th, .ts-table td { padding: 8px 4px; }
+    }
+
+    /* ===== FAQ ===== */
+    .ts-faq { display: grid; gap: 12px; }
+    .ts-faq details {
+      padding: 18px 20px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .ts-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+    }
+    .ts-faq summary::-webkit-details-marker { display: none; }
+    .ts-faq summary::after {
+      content: '+';
+      float: right; margin-left: 12px;
+      color: var(--blue); font-weight: 900;
+    }
+    .ts-faq details[open] summary::after { content: '\2212'; }
+    .ts-faq p {
+      margin: 12px 0 0;
+      color: var(--muted); line-height: 1.6;
+    }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+
+</body>
+</html>

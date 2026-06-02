@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=Rubik:wght@500;700;800;900&display=swap');
+
 :root {
   --ink: #10233f;
   --muted: #5f6f84;
@@ -52,7 +54,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  min-height: 72px;
+  min-height: 76px;
   padding: 0 40px;
   background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid var(--line);
@@ -172,10 +174,31 @@ h2 {
 
 h1 {
   max-width: 1180px;
-  font-size: clamp(2.9rem, 6.4vw, 6rem);
+  font-size: clamp(2.7rem, 5vw, 4.8rem);
   font-weight: 900;
-  line-height: 0.95;
+  line-height: 1.02;
   letter-spacing: -0.02em;
+}
+
+.hero-section--compact {
+  min-height: auto;
+  padding-top: 36px;
+  padding-bottom: 52px;
+}
+
+.hero-section--compact h1,
+.hero-section--compact h2 {
+  max-width: 900px;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+.page-customer-story .section,
+.page-customer-story .split-section {
+  padding-top: 52px;
+  padding-bottom: 52px;
 }
 
 h1 span {
@@ -685,6 +708,61 @@ h3 {
   background: var(--amber-soft);
 }
 
+.install-cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 30px 34px;
+  border: 1px solid #e4c983;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff7e0, var(--amber-soft));
+  box-shadow: 0 12px 30px rgba(180, 117, 0, 0.10);
+}
+
+.install-cta__body {
+  min-width: 0;
+}
+
+.install-cta__badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.install-cta h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.install-cta p {
+  margin: 0;
+  color: #65440a;
+  line-height: 1.6;
+}
+
+.install-cta .button-primary {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .install-cta {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+}
+
 .plans-cta p {
   margin: 0;
   color: #65440a;
@@ -879,7 +957,17 @@ h3 {
 }
 
 [dir="rtl"] body {
-  font-family: "Segoe UI", "Arial Hebrew", Arial, "Helvetica Neue", sans-serif;
+  font-family: 'Assistant', 'Segoe UI', 'Arial Hebrew', Arial, 'Helvetica Neue', sans-serif;
+}
+
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] .eyebrow,
+[dir="rtl"] .plan-code,
+[dir="rtl"] .preview-title-row small,
+[dir="rtl"] .ts-faq summary {
+  font-family: 'Rubik', 'Assistant', 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
 }
 
 [dir="rtl"] h1,
@@ -912,4 +1000,17 @@ h3 {
 [dir="rtl"] .plan-ribbon {
   right: auto;
   left: 18px;
+}
+
+.brand-logo {
+  display: block;
+  height: 100px;
+  width: auto;
+  max-width: none;
+}
+
+@media (max-width: 640px) {
+  .brand-logo {
+    height: 62px;
+  }
 }

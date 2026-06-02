@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin-console/
+Disallow: /upgrade/
+
+Sitemap: https://twinaforms.com/sitemap.xml

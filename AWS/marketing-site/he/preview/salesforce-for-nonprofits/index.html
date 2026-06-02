@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salesforce לעמותות – 10 רישיונות חינם, ניהול מתנדבים ותורמים | Harmony IT (Preview)</title>
+<meta name="description" content="מדריך מקיף ל-Salesforce לעמותות: 10 רישיונות חינם דרך Power of Us, NPSP, ניהול מתנדבים ותורמים, ואיך לחבר טפסים בעברית. ייעוץ Harmony IT.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="/assets/Mango.png">
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+/* Preview banner — only visible on this temporary hosted version */
+.preview-banner {
+  background: #fef3c7;
+  border-bottom: 2px solid #f59e0b;
+  padding: 10px 18px;
+  text-align: center;
+  font-family: 'Assistant', 'Segoe UI', sans-serif;
+  font-size: 0.88rem;
+  color: #92400e;
+  direction: rtl;
+}
+.preview-banner strong { color: #78350f; }
+body { background: #f8fafc; margin: 0; }
+</style>
+</head>
+<body>
+<div class="preview-banner">
+  <strong>תצוגה מקדימה</strong> — הדף הזה מתארח זמנית על TwinaForms לצורך הצגה ל-WordPress admin של Harmony IT. היעד הסופי: <code>harmony-it.co.il/salesforce-for-nonprofits/</code>
+</div>
+<!--
+==============================================================================
+Harmony IT — Salesforce לעמותות — page content
+Target URL: https://harmony-it.co.il/salesforce-for-nonprofits/
+Target length: ~2,800 Hebrew words
+Built: 2026-05-29
+
+PASTE LOCATION:
+  Elementor:  HTML widget (drag onto page, paste entire content below)
+  Gutenberg:  Custom HTML block
+  Classic:    Text tab, paste as-is
+
+This is page-scoped HTML with all CSS inline (scoped under .hit-np-page so it
+will not collide with the theme). RTL-aware. Includes FAQPage + BreadcrumbList
+JSON-LD schema.
+==============================================================================
+-->
+
+<!-- ============================== JSON-LD SCHEMA ============================== -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+{"@type":"ListItem","position":1,"name":"בית","item":"https://harmony-it.co.il/"},
+{"@type":"ListItem","position":2,"name":"Salesforce לעמותות","item":"https://harmony-it.co.il/salesforce-for-nonprofits/"}
+]}
+</script>
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"מה זה Salesforce לעמותות וכמה רישיונות חינם מקבלים?","acceptedAnswer":{"@type":"Answer","text":"Salesforce.org (זרוע ההשפעה החברתית של Salesforce) מעניקה לכל עמותה רשומה מאושרת בעולם 10 רישיונות Sales & Service Cloud Enterprise Edition בחינם, באמצעות תכנית Power of Us. בנוסף, כלולה חבילת NPSP — Nonprofit Success Pack — שמותאמת לתורמים, מתנדבים, אירועים וקמפיינים. ההטבה תקפה גם לעמותות ישראליות (מלכ\"ר/עמותה רשומה ברשם העמותות)."}},
+{"@type":"Question","name":"האם Salesforce מתאים לעמותה קטנה?","acceptedAnswer":{"@type":"Answer","text":"כן. ההטבה של 10 רישיונות חינם מתאימה בדיוק לעמותות קטנות עד בינוניות — צוות של מנכ\"ל, רכזי תוכניות, מנהל גיוס משאבים ומנהלי מתנדבים נכנס לרוב בתוך 10 הרישיונות. עמותות בנות 1–5 עובדים פעמים רבות לא מנצלות אפילו את כל 10 הרישיונות."}},
+{"@type":"Question","name":"האם הרישיונות באמת חינמיים — גם בעתיד?","acceptedAnswer":{"@type":"Answer","text":"כן. 10 הרישיונות הראשונים חינמיים לכל החיים כל עוד העמותה שומרת על הסטטוס של מלכ\"ר ועומדת בתנאי השימוש של Salesforce.org. רישיון מעבר ל-10 הראשונים — בתשלום מוזל לעמותות (בדרך כלל 36 דולר לחודש לרישיון לעומת 165 דולר במחיר המסחרי)."}},
+{"@type":"Question","name":"מה זה NPSP?","acceptedAnswer":{"@type":"Answer","text":"NPSP — Nonprofit Success Pack — היא חבילה חינמית של Salesforce שמתקינים מעל הרישיון הסטנדרטי. היא מוסיפה אובייקטים ייעודיים לעמותות: Households (משקי בית), Affiliations (קשרים בין אנשים לארגונים), Volunteer Hours (שעות התנדבות), Gifts (תרומות) ו-Campaigns מותאמים לקמפיינים של גיוס משאבים."}},
+{"@type":"Question","name":"כמה זמן לוקח להטמיע Salesforce בעמותה?","acceptedAnswer":{"@type":"Answer","text":"הטמעה בסיסית של NPSP לעמותה קטנה עם נתונים מוגבלים — בין 4 ל-6 שבועות. הטמעה מלאה לעמותה בינונית עם הגירת נתונים מ-Excel, התאמות, הדרכת צוות, וחיבור לטפסים — בין 2 ל-4 חודשים. הטמעה לעמותה גדולה עם פעילות מורכבת — 4–6 חודשים."}},
+{"@type":"Question","name":"האם חייבים רישיון Salesforce לכל מתנדב?","acceptedAnswer":{"@type":"Answer","text":"לא — וזה הנושא המרכזי שעמותות צריכות לדעת. רישיונות Salesforce הם לצוות שעובד בתוך המערכת (רכזות, מנהלי תוכניות, מנכ\"ל). מתנדבים, תורמים ונעזרים לא צריכים רישיון — הם פועלים מול העמותה דרך טפסים ציבוריים. כאן נכנסת TwinaForms: היא מאפשרת למתנדב למלא טופס בנייד, לאמת זהות, לחתום ולשלוח — והמידע נכנס ל-Salesforce בלי שהמתנדב יזדקק לרישיון."}},
+{"@type":"Question","name":"האם ניתן לעבוד עם Salesforce מהנייד?","acceptedAnswer":{"@type":"Answer","text":"כן. Salesforce זמין כאפליקציה מובייל לחברי הצוות. עבור מי שלא צריך גישה מלאה למערכת — למשל מתנדב שרוצה רק לרשום שעות — אין צורך באפליקציה. במקום זאת, הוא פותח קישור TwinaForms בדפדפן הטלפון, ממלא, שולח. המידע נכנס ישירות ל-Salesforce."}},
+{"@type":"Question","name":"מה ההבדל בין Salesforce לבין Excel או Google Forms?","acceptedAnswer":{"@type":"Answer","text":"Excel הוא קובץ — לא יודע לקשר אדם לתרומה לאירוע למתנדב. כל קובץ עומד בפני עצמו, מתפצל בין רכזות, ואין מקור אמת אחד. Google Forms יודע לאסוף נתונים אבל לא יודע לחבר אותם לאיש קשר קיים, לא מאמת זהות, ולא בונה דוחות לאורך זמן. Salesforce הוא CRM — מאגר אחד שמרכז את כל המידע על אדם, ארגון, תרומות, מתנדבות, אירועים — ויודע לחבר ביניהם. NPSP מתאים את החיבורים האלה ספציפית לעמותה."}},
+{"@type":"Question","name":"האם המידע מאובטח?","acceptedAnswer":{"@type":"Answer","text":"Salesforce הוא ממובילי האבטחה בעולם, עם תקני SOC 1, SOC 2, ISO 27001, ו-GDPR. עבור עמותות ישראליות שמטפלות בנתוני נעזרים רגישים — זו רמת אבטחה שלא ריאלי לבנות לבד. עוד יתרון: המידע במקום אחד מאובטח (Salesforce), לא מפוזר באקסלים על דיסקים אישיים של רכזות שמשתפות בוואטסאפ."}},
+{"@type":"Question","name":"האם אפשר לחבר טפסים ל-Salesforce?","acceptedAnswer":{"@type":"Answer","text":"כן. Salesforce עצמה לא כוללת בונה טפסים ציבוריים מובנה — צריך פתרון חיצוני. TwinaForms היא אפליקציה טבעית של Salesforce שמתאימה במיוחד לעמותות: בעברית, RTL, אימות זהות במייל, חתימה דיגיטלית, PDF חתום אוטומטי, ובלי רישיון Salesforce למילוי הטופס. כל שליחה נכנסת ישירות ל-NPSP."}},
+{"@type":"Question","name":"מה ההבדל בין Salesforce.org לבין Salesforce הרגיל?","acceptedAnswer":{"@type":"Answer","text":"Salesforce.org היה בעבר ארגון נפרד; ב-2019 הוא התמזג ל-Salesforce עצמה. היום מדובר באותה מערכת בדיוק, רק עם תכנית הטבות לעמותות שכוללת את 10 הרישיונות החינמיים, את NPSP, ותמיכה ייעודית. הקוד, הנתונים, האבטחה — זהים בדיוק לגרסה המסחרית."}},
+{"@type":"Question","name":"האם אפשר להגר נתונים מ-Excel ל-Salesforce?","acceptedAnswer":{"@type":"Answer","text":"כן, וזה חלק מ-90% מהטמעות העמותות שאנחנו בליווי. תהליך ההגירה כולל ניקוי הנתונים (כפילויות, פורמטים, שדות חסרים), מיפוי שדות מהאקסל לאובייקטים של NPSP (Contact, Household, Donation), ייבוא, אימות, ותיקונים. עמותה עם 2,000–10,000 אנשי קשר — סדר גודל סביר של 2–4 שבועות להגירה."}},
+{"@type":"Question","name":"האם יש קורסים או הדרכות לעמותה שמתחילה עם Salesforce?","acceptedAnswer":{"@type":"Answer","text":"Salesforce עצמה מציעה את Trailhead — פלטפורמת לימוד חינמית. לעמותות בישראל, Harmony IT מעבירה קורס ייעודי לעמותות וארגונים בעברית, שמתאים גם למי שלא הכיר Salesforce קודם. הקורס משלב הסברים, תרגול, ובניית טופס ראשון בעמותה תוך כדי."}},
+{"@type":"Question","name":"מה קורה אם העמותה גדלה מעבר ל-10 רישיונות?","acceptedAnswer":{"@type":"Answer","text":"רישיונות מעבר ל-10 הראשונים זמינים בהנחה משמעותית לעמותות — כיום 36 דולר לחודש לרישיון Sales Cloud Enterprise Edition (לעומת 165 דולר במחיר המסחרי). זה נכון לרישיון מלא של חבר צוות. מתנדבים ותורמים שממלאים טפסים — לא צריכים רישיון בכלל, ולכן עמותה עם 20 אנשי צוות ו-500 מתנדבים תשלם על 10 רישיונות נוספים בלבד."}},
+{"@type":"Question","name":"איך מתחילים? מה הצעד הראשון?",  "acceptedAnswer":{"@type":"Answer","text":"שני צעדים מקבילים. ראשית — להגיש בקשה ל-Salesforce.org להענקת 10 הרישיונות החינמיים (תהליך אישור של כ-2–4 שבועות, מצריך אישור עמותה רשומה). במקביל — לקבוע שיחת היכרות עם איש מקצוע שמכיר את העולם של עמותות ב-Salesforce, כדי למפות תהליכים קיימים, להחליט מה להגר ראשון, ולתכנן את ההטמעה. Harmony IT מעבירה את השיחה הזו ללא התחייבות."}}
+]}
+</script>
+
+
+<!-- ============================== PAGE STYLES ============================== -->
+<style>
+.hit-np-page {
+  direction: rtl;
+  font-family: 'Assistant', 'Heebo', 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
+  color: #1f2937;
+  line-height: 1.75;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 18px;
+  font-size: 1.05rem;
+}
+.hit-np-page h1, .hit-np-page h2, .hit-np-page h3 {
+  font-family: 'Rubik', 'Assistant', 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
+  color: #0f172a;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+}
+.hit-np-page h1 {
+  font-size: clamp(1.85rem, 4vw, 2.7rem);
+  font-weight: 900;
+  margin: 0 0 16px;
+}
+.hit-np-page h2 {
+  font-size: clamp(1.4rem, 2.8vw, 1.95rem);
+  font-weight: 800;
+  margin: 48px 0 14px;
+  border-bottom: 2px solid #0ea5e9;
+  padding-bottom: 8px;
+  display: inline-block;
+}
+.hit-np-page h3 {
+  font-size: clamp(1.15rem, 2vw, 1.35rem);
+  font-weight: 700;
+  margin: 28px 0 8px;
+  color: #0f4c81;
+}
+.hit-np-page p { margin: 0 0 14px; }
+.hit-np-page strong { color: #0f172a; }
+.hit-np-page ul, .hit-np-page ol {
+  margin: 0 0 16px;
+  padding-right: 24px;
+  padding-left: 0;
+}
+.hit-np-page li { margin-bottom: 6px; }
+.hit-np-page a { color: #0567d8; font-weight: 700; text-decoration: none; border-bottom: 1px solid transparent; }
+.hit-np-page a:hover { border-bottom-color: #0567d8; }
+
+/* Lead paragraph */
+.hit-np-page .lead {
+  font-size: 1.18rem;
+  line-height: 1.7;
+  color: #334155;
+  margin-bottom: 22px;
+}
+
+/* TLDR box */
+.hit-np-page .tldr {
+  background: linear-gradient(180deg, #ecfeff, #f0fdfa);
+  border-right: 4px solid #14b8a6;
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin: 22px 0;
+}
+.hit-np-page .tldr strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f766e;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Callout (info / quote / customer-story) */
+.hit-np-page .callout {
+  background: #fff7ed;
+  border-right: 4px solid #f59e0b;
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin: 22px 0;
+}
+.hit-np-page .callout--blue {
+  background: #eff6ff;
+  border-right-color: #3b82f6;
+}
+.hit-np-page .callout--green {
+  background: #f0fdf4;
+  border-right-color: #22c55e;
+}
+
+/* CTA boxes */
+.hit-np-page .cta {
+  background: linear-gradient(135deg, #0567d8, #0ea5e9);
+  color: #fff;
+  padding: 28px 26px;
+  border-radius: 12px;
+  margin: 36px 0;
+  text-align: right;
+  box-shadow: 0 10px 25px rgba(5,103,216,0.18);
+}
+.hit-np-page .cta h3 { color: #fff; margin: 0 0 8px; }
+.hit-np-page .cta p { color: #e0f2fe; margin: 0 0 14px; }
+.hit-np-page .cta a.btn {
+  display: inline-block;
+  background: #fff;
+  color: #0567d8;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: 800;
+  text-decoration: none;
+  margin-inline-end: 8px;
+}
+.hit-np-page .cta a.btn--ghost {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid #fff;
+}
+
+/* Comparison table */
+.hit-np-page table.compare {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0 24px;
+  font-size: 0.97rem;
+}
+.hit-np-page table.compare th,
+.hit-np-page table.compare td {
+  border: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  text-align: right;
+  vertical-align: top;
+}
+.hit-np-page table.compare thead th {
+  background: #f1f5f9;
+  font-weight: 800;
+  color: #0f172a;
+}
+.hit-np-page table.compare tbody tr:nth-child(even) td { background: #f8fafc; }
+
+/* Glossary / dictionary */
+.hit-np-page .glossary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.hit-np-page .glossary > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.hit-np-page .glossary h4 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f4c81;
+}
+.hit-np-page .glossary p { margin: 0; font-size: 0.94rem; line-height: 1.6; color: #475569; }
+
+/* FAQ */
+.hit-np-page .faq details {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.hit-np-page .faq summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #0f172a;
+  list-style: none;
+  line-height: 1.5;
+}
+.hit-np-page .faq summary::-webkit-details-marker { display: none; }
+.hit-np-page .faq summary::before {
+  content: '+';
+  display: inline-block;
+  margin-left: 10px;
+  color: #0567d8;
+  font-weight: 900;
+}
+.hit-np-page .faq details[open] summary::before { content: '−'; }
+.hit-np-page .faq details p { margin: 10px 0 0; color: #475569; line-height: 1.7; }
+
+/* Table of contents (mobile-friendly) */
+.hit-np-page .toc {
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 16px 22px;
+  margin: 22px 0 32px;
+}
+.hit-np-page .toc strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #0f172a;
+  font-size: 1rem;
+}
+.hit-np-page .toc ol { margin: 0; padding-right: 22px; }
+.hit-np-page .toc li { margin-bottom: 4px; }
+.hit-np-page .toc a { color: #475569; font-weight: 600; }
+.hit-np-page .toc a:hover { color: #0567d8; }
+</style>
+
+
+<!-- ============================== PAGE CONTENT ============================== -->
+<div class="hit-np-page" dir="rtl" lang="he">
+
+  <!-- ===== HERO ===== -->
+  <h1>Salesforce לעמותות – 10 רישיונות חינם לניהול מתנדבים, תורמים ותוכניות</h1>
+
+  <p class="lead">Salesforce.org מעניקה לכל עמותה רשומה בעולם — כולל בישראל — <strong>10 רישיונות Salesforce חינמיים לכל החיים</strong>, ועל גביהם את NPSP (Nonprofit Success Pack) — חבילה ייעודית לניהול תורמים, מתנדבים, אירועים וקמפיינים. עבור עמותה קטנה או בינונית, זו לרוב נקודת הכניסה הריאלית הראשונה ל-CRM אמיתי בלי תשלום חודשי לתוכנה.</p>
+
+  <div class="tldr">
+    <strong>תקציר ניהולי</strong>
+    Salesforce.org נותנת 10 רישיונות חינם לעמותות רשומות, עם חבילת NPSP מותאמת לתחום. עבור ניהול מתנדבים, תורמים ותוכניות — זו האפשרות הריאלית הטובה ביותר כיום. את הטפסים הציבוריים (רישום מתנדבים, רישום לאירוע, פתיחת פניות) מוסיפים מעל באמצעות TwinaForms — בעברית, ללא רישיון נוסף לכל מתנדב. ההטמעה נמשכת בין 4 שבועות (עמותה קטנה) ל-4 חודשים (פעילות מורכבת).
+  </div>
+
+  <div class="cta">
+    <h3>רוצים לדעת אם זה מתאים לעמותה שלכם?</h3>
+    <p>שיחת היכרות של 30 דקות עם איש מקצוע שהטמיע Salesforce בעמותות ישראליות — ללא התחייבות, בעברית.</p>
+    <a href="mailto:revital@harmony-it.co.il?subject=ייעוץ Salesforce לעמותה" class="btn">קבעו שיחת ייעוץ</a>
+    <a href="https://wa.me/972584938049" class="btn btn--ghost">WhatsApp</a>
+  </div>
+
+  <!-- ===== TABLE OF CONTENTS ===== -->
+  <nav class="toc" aria-label="תוכן עניינים">
+    <strong>במדריך הזה</strong>
+    <ol>
+      <li><a href="#ch1">למה ניהול המידע בעמותה מתפרק כל פעם מחדש</a></li>
+      <li><a href="#ch2">מה זה Salesforce ומה כוללת ההטבה של 10 הרישיונות החינמיים</a></li>
+      <li><a href="#ch3">NPSP — חבילת העמותות של Salesforce</a></li>
+      <li><a href="#ch4">חמישה תחומים ש-Salesforce פותר לעמותה</a></li>
+      <li><a href="#ch5">דוגמאות מהשטח — איך זה נראה בעמותה ישראלית</a></li>
+      <li><a href="#ch6">למה טפסים הם חלק קריטי מכל פרויקט Salesforce</a></li>
+      <li><a href="#ch7">TwinaForms — שכבת הטפסים ל-Salesforce בעברית</a></li>
+      <li><a href="#ch8">מילון מונחי NPSP</a></li>
+      <li><a href="#ch9">למה לעבוד עם Harmony IT</a></li>
+      <li><a href="#faq">שאלות נפוצות</a></li>
+    </ol>
+  </nav>
+
+  <!-- ===== CHAPTER 1 ===== -->
+  <h2 id="ch1">למה ניהול המידע בעמותה מתפרק כל פעם מחדש</h2>
+
+  <p>רוב העמותות בישראל לא נכשלות בגלל חוסר במוטיבציה — הן נכשלות בגלל ניהול מידע. רכזת מתנדבים שומרת קובץ Excel. מנהלת גיוס המשאבים שומרת קובץ אחר. רכז התוכניות שומר את שלו. מנכ"ל מבקש דוח חודשי, ומגלה ששלושת הקבצים סופרים את אותם אנשים פעמיים, ושמחציתם ללא פרטי קשר עדכניים.</p>
+
+  <p>חוסר אינטגרציה זה לא רק אי-נוחות. זה פוגע ישירות בגיוס משאבים (תורם נשאל את אותה שאלה שלוש פעמים), בניהול מתנדבים (כפל רישומים, פספוס משמרות), ובדיווח לתורמי-על ולרגולטור (אין מקור אמת אחד).</p>
+
+  <p>ברוב העמותות הנקודה הזו לא נפתרת באמצעות "להוסיף עוד עמודה לאקסל" אלא דרך מעבר ל-CRM אמיתי. השאלה לרוב לא <em>אם</em>, אלא <em>מתי</em> ו<em>איך</em>.</p>
+
+  <h3>מה רוב העמותות בישראל משתמשות בו היום</h3>
+
+  <p>רוב העמותות תופרות את ניהול המידע עם כלים שלא נבנו לעבודה הזו: <strong>Excel</strong> שמתפצל בין רכזות וכל אחת מנהלת גרסה משלה; <strong>Google Forms</strong> שיודע לאסוף נתונים אבל לא יודע לחבר אותם לאיש קשר קיים ולא מאמת זהות; <strong>Monday.com</strong> או <strong>Trello</strong> שעובדים יפה לניהול משימות אבל לא לניהול תורמים או מתנדבים לאורך זמן; <strong>Priority</strong> או <strong>SAP</strong> שהם overkill מוחלט וגם יקרים מדי לרוב העמותות; ובכמה עמותות גם <strong>קבצי וורד</strong> בתקיות בדרייב משותף, מה שמגביל אבטחת מידע ויכולת דיווח.</p>
+
+  <p>כל אחת מהמערכות פותרת חלק קטן ויוצרת כפילויות. השורש משותף: <strong>אין מאגר אחד שמרכז את כל הקשרים — תורם → תרומה → אירוע → מתנדב — ויודע להפיק דוח אחד מאמין לסוף השנה.</strong></p>
+
+
+  <!-- ===== CHAPTER 2 ===== -->
+  <h2 id="ch2">מה זה Salesforce ומה כוללת ההטבה של 10 הרישיונות החינמיים</h2>
+
+  <p>Salesforce היא מערכת CRM (Customer Relationship Management) ענן — מאגר מרכזי שמכיר את כל הקשרים בין אנשים, ארגונים, אירועים, תרומות, מתנדבות, ומה שעמותה מגדירה. במקום שמונה קבצים מפוזרים, יש מקור אחד, נגיש מכל מקום, מאובטח ברמה ארגונית.</p>
+
+  <p>הסיבה ש-Salesforce הפכה לסטנדרט בעמותות בעולם — לרבות במאות עמותות בישראל — היא שילוב של שלושה דברים: <strong>מאגר מאוחד</strong> (Contact אחד מקושר לכל מה שהאדם הזה עשה בעמותה), <strong>גמישות</strong> (אובייקטים מותאמים לתחום הספציפי של העמותה), ו<strong>תקציב נמוך מאוד</strong> — בזכות תכנית Power of Us של Salesforce.org.</p>
+
+  <h3>תכנית Power of Us — 10 רישיונות חינם לכל עמותה רשומה</h3>
+
+  <p>תכנית Power of Us של Salesforce.org היא ההטבה הגדולה ביותר בעולם הטכנולוגיה לעמותות. כל עמותה רשומה ברחבי העולם — כולל עמותות ישראליות עם אישור מלכ"ר תקף — זכאית ל:</p>
+
+  <ul>
+    <li><strong>10 רישיונות Sales & Service Cloud Enterprise Edition חינמיים</strong> לכל החיים (כלומר לא תקופת ניסיון — מענק קבוע)</li>
+    <li><strong>חבילת NPSP מותאמת לעמותות</strong> (Nonprofit Success Pack) — חינם, ראו פרק 3</li>
+    <li><strong>גישה ל-Trailhead</strong> — פלטפורמת הלימוד החינמית של Salesforce (גם לרישיונות שאינם חינמיים)</li>
+    <li><strong>הנחה משמעותית על רישיונות נוספים</strong> — 36 דולר לחודש לרישיון לעומת 165 דולר במחיר המסחרי</li>
+    <li><strong>הנחות על מוצרים נלווים</strong> — Marketing Cloud, Tableau, Experience Cloud — בתעריפים של עמותה</li>
+  </ul>
+
+  <p>הזכאות מתבססת על מסמכי רישום של העמותה ברשם העמותות הישראלי. תהליך האישור עורך כ-2 עד 4 שבועות. עמותה לא צריכה להיות גדולה — גם עמותה בת שני עובדים זכאית במלואה.</p>
+
+  <div class="callout callout--green">
+    <strong>נקודה חשובה לעמותות בישראל:</strong> ההטבה מוענקת על ידי Salesforce.org ישירות לעמותה — לא דרך ספק מקומי. עם זאת, ההטמעה עצמה, ההגירה מ-Excel, וההתאמה לעברית ולתהליכים של עמותה ישראלית — דורשת איש מקצוע שמכיר את התחום. כאן Harmony IT נכנסת.
+  </div>
+
+  <h3>מה מקבלים בפועל ב-10 הרישיונות</h3>
+
+  <p>10 הרישיונות החינמיים הם רישיון Salesforce מלא — אותו רישיון שחברה מסחרית משלמת עליו 165 דולר לחודש לרישיון. זה כולל:</p>
+
+  <ul>
+    <li>גישה מלאה ל-Sales Cloud ו-Service Cloud</li>
+    <li>בניית אובייקטים מותאמים (Custom Objects) ושדות מותאמים</li>
+    <li>אוטומציות (Flow), כללי תיקוף, וכללי הקצאה</li>
+    <li>דוחות ודשבורדים ללא הגבלה</li>
+    <li>אפליקציית מובייל מלאה</li>
+    <li>API מלא לחיבור למערכות אחרות (כולל TwinaForms, מערכות חיוב, וכו')</li>
+    <li>2GB אחסון נתונים + 10GB אחסון קבצים — לרוב מספיק לעמותה קטנה–בינונית</li>
+  </ul>
+
+
+  <!-- ===== CHAPTER 3 ===== -->
+  <h2 id="ch3">NPSP — חבילת העמותות של Salesforce</h2>
+
+  <p>NPSP, או Nonprofit Success Pack, היא חבילה חינמית שמתקינים מעל הרישיון הסטנדרטי של Salesforce. NPSP מתאימה את המבנה של Salesforce ספציפית לעמותות — במקום "חברה ולקוחות" יש "משק בית, איש קשר, תרומה, התנדבות, אירוע".</p>
+
+  <p>היא נבנתה במקור על ידי קהילת Salesforce.org ומשתמשים בה כיום למעלה מ-50,000 עמותות בעולם — מה שהופך אותה לסטנדרט הדה-פאקטו של תחום ה-Nonprofit CRM.</p>
+
+  <h3>מה NPSP מוסיפה מעל לרישיון הסטנדרטי</h3>
+
+  <ul>
+    <li><strong>Households</strong> — קיבוץ של אנשי קשר למשק בית (זוג, משפחה, עזבון) — קריטי לתורמים, גם לדיווח על מתנדבים שמגיעים מאותה משפחה</li>
+    <li><strong>Affiliations</strong> — קשר בין איש קשר לארגון (למשל מתנדב שעובד גם בחברה שתורמת)</li>
+    <li><strong>Volunteer Hours</strong> — רישום משמרות התנדבות, סיכומי שעות, דוחות לעמותה ולמתנדב עצמו</li>
+    <li><strong>Gifts &amp; Donations</strong> — תרומות, מקור, סיווג, חוזרות, יעוד</li>
+    <li><strong>General Accounting Units (GAU)</strong> — חלוקה תקציבית של תרומה לתוכניות (לדיווח לתורמי-על וגרנטים)</li>
+    <li><strong>Engagement Plans</strong> — תוכניות גיוס משאבים אוטומטיות (לדוגמה: שלח מייל חודש לאחר תרומה, צור משימה למנהל לאחר 3 חודשים בלי תרומה)</li>
+    <li><strong>NPSP Campaigns</strong> — קמפיינים מותאמים לגיוס משאבים (תוצאה מצופה, יעדי תרומות, ROI)</li>
+  </ul>
+
+  <p>NPSP נטענת חינם דרך AppExchange ומותקנת על ה-org הקיים בכמה דקות. לא דורשת רישיון נוסף.</p>
+
+
+  <!-- ===== CHAPTER 4 ===== -->
+  <h2 id="ch4">שישה תחומים ש-Salesforce פותר לעמותה</h2>
+
+  <h3>1. ניהול מתנדבים</h3>
+  <p>מי המתנדבים שלכם, מתי הצטרפו, באילו אירועים השתתפו, כמה שעות, איזה רכז אחראי על מי, מי קיבל הסכמת הורים, ומי לא הגיע 3 פעמים ברציפות. כל זה במקום אחד, מקושר לאיש הקשר. דוח שנתי לתורם, או דוח לרגולטור, נבנה בכמה לחיצות במקום שעות באקסל.</p>
+
+  <h3>2. ניהול תורמים</h3>
+  <p>תרומה בודדת, תרומה חוזרת, התחייבות (Pledge), עזבון. כל תרומה מקושרת לאיש הקשר, ל-Household, ולקמפיין שגרם לה. סכומי שיא, גידול שנתי, יחס בין תורמים קטנים לתורמי-על — דוחות סטנדרטיים שזמינים מהיום הראשון.</p>
+
+  <h3>3. ניהול אירועים, הדרכות, וקבוצות תמיכה</h3>
+  <p>עמותה ממוצעת מנהלת מגוון רחב של פעילויות שדורשות רישום: <strong>אירועי גיוס משאבים</strong> (אונליין ופנים-מול-פנים), <strong>הדרכות מקצועיות</strong> לצוות, למתנדבים, או לקהל הרחב, <strong>קבוצות תמיכה</strong> לנעזרים, סדנאות, כנסים, וטיולים קהילתיים. כל פעילות כזו דורשת בעקרון את אותו דבר: דף נחיתה עם טופס רישום, רשימת משתתפים, מעקב נוכחות, ותקשורת עם הנרשמים לפני ואחרי.</p>
+  <p>ב-NPSP, כל פעילות כזו נשמרת כ-Campaign, וכל נרשם נכנס כ-Campaign Member. את הרישום עצמו אוספים דרך טופס TwinaForms ציבורי (ראו בהמשך) — והנרשמים נכנסים ישירות ל-NPSP. בתצוגת היומן (Calendar View) של Salesforce אפשר לראות את כל הפעילויות של החודש בצורה גרפית, מי נרשם לכל אחת, ומי הגיע בפועל. עמותה שמנהלת 30 הדרכות בשנה תקבל דשבורד שמראה אילו סוגי הדרכות הכי מצליחות לפי נוכחות, פידבק, או תרומות בעקבותיהן.</p>
+
+  <h3>4. ניהול פעילויות ותוכניות</h3>
+  <p>עמותה שמפעילה תוכניות ארוכות-טווח (קבוצות תמיכה קבועות, תוכניות מנטורינג רב-חודשיות, חוגים שנתיים) צריכה לעקוב אחרי המשתתפים לאורך זמן: מי הגיע, מי השלים, מי נשר, מי הצליח. NPSP כולל אובייקטים שמותאמים לסוג הפעילות הזו, ומאפשרים מדידת השפעה אמיתית (Impact) לתורמים ולרגולטור.</p>
+
+  <h3>5. מדידת השפעה ודיווח לרגולטור</h3>
+  <p>רוב העמותות בישראל מחויבות לדיווח שנתי לרשם העמותות, ולתורמי-על לדיווח פרטני על תוצאות התוכניות. כש-Salesforce מרכז את כל הפעילות — דיווח שנתי הוא דוח שמופק תוך דקות, לא פרויקט של שבוע.</p>
+
+  <h3>6. אינטגרציות עם מערכות צד שלישי</h3>
+  <p>Salesforce תומך באינטגרציות עם מגוון רחב של מערכות צד שלישי שנפוצות בעמותות ישראליות:</p>
+  <ul>
+    <li><strong>שליחת SMS</strong> — חיבור למערכות כמו ActiveTrail, SMS4Free או InforU לשליחת תזכורות למתנדבים, אישורי רישום לאירועים, או בקשות תרומה</li>
+    <li><strong>שליחת WhatsApp</strong> — חיבור ל-WATI, 360dialog, או UltraMsg לשליחת הודעות אישיות מתוך Salesforce, כולל אוטומציות (לדוגמה: לשלוח תזכורת WhatsApp 24 שעות לפני אירוע)</li>
+    <li><strong>סליקת תרומות</strong> — חיבור ל-Tranzila, Cardcom, Pelecard, או iCount — תרומה שמתבצעת בדף הסליקה נכנסת אוטומטית כ-Donation ב-NPSP</li>
+    <li><strong>שליחת אימיילים</strong> — Mailchimp, ActiveCampaign, או Salesforce Marketing Cloud Account Engagement (לשעבר Pardot) — לקמפיינים גדולים יותר</li>
+    <li><strong>מערכות חשבונאות</strong> — חיבור ל-Priority, Hashavshevet, או Rivhit לסנכרון תרומות וחשבוניות</li>
+  </ul>
+  <p>היתרון: אין צורך לעבור בין מערכות. כל אינטראקציה — SMS שנשלח, WhatsApp שנענה, תרומה שנסלקה — נשמרת ב-Contact של האדם ב-NPSP. בדוח שנתי לתורם רואים בדיוק כמה פעמים פנו אליו, איך ענה, וכמה תרם.</p>
+
+
+  <!-- ===== CHAPTER 5 ===== -->
+  <h2 id="ch5">דוגמאות מהשטח — איך זה נראה בעמותה ישראלית</h2>
+
+  <h3>דוגמה 1: ניהול שעות מתנדבים בעמותה עם 80 מתנדבים פעילים</h3>
+  <p>במקום שכל מתנדב ישלח שעות בוואטסאפ לרכזת ושהרכזת תזין ידנית באקסל, המתנדב מקבל קישור TwinaForms בנייד, מאמת זהות במייל חד-פעמי, מוסיף שורות לכמה משמרות שעבד באותו שבוע, חותם, ושולח. כל משמרת נכנסת כ-Volunteer Hours ב-NPSP, מקושרת לאיש הקשר. בסוף החודש — דוח אחד לכל מתנדב.</p>
+
+  <h3>דוגמה 2: רישום לאירוע גיוס משאבים</h3>
+  <p>הזמנה נשלחת ב-WhatsApp או במייל עם קישור. הנרשם פותח, ממלא פרטים בסיסיים, ויכול גם להוסיף תרומה מקדימה. הרישום נכנס כ-Campaign Member ב-NPSP, התרומה נכנסת כ-Donation מקושרת לקמפיין, ויומיים לאחר האירוע מתבצע מעקב אוטומטי (Engagement Plan) למי שנרשם ולא הגיע.</p>
+
+  <h3>דוגמה 3: קליטת פנייה חדשה מהציבור</h3>
+  <p>אדם שזקוק לעזרה ממלא טופס בנייד — בלי להזדהות, אבל מאומת במייל. הפנייה נפתחת כ-Case ב-Salesforce, מוקצית אוטומטית לרכזת אזורית לפי מקום מגורים, וברגע שמטופל — איש הקשר מקבל מייל אוטומטי עם סטטוס. כל הפעילות נשמרת ל-Case, כך שבמקרה שהאדם חוזר עם פנייה דומה — הרכזת רואה את ההיסטוריה.</p>
+
+  <h3>דוגמה 4: עדכון פרטי תורם שנמצא במאגר</h3>
+  <p>תורם שכתובתו השתנתה (או שמספר הטלפון לא תקין) מקבל לינק עם קוד אימות. הוא נכנס, רואה את הפרטים הנוכחיים מ-NPSP, מעדכן את מה שהשתנה. השינויים חוזרים ל-Contact שלו ב-NPSP — בלי שאיש בעמותה הקליד מחדש, ובלי שהתורם נדרש לחשבון Salesforce.</p>
+
+  <div class="callout">
+    <strong>סיפור לקוח — עמותת איל (האגודה הישראלית לאפילפסיה)</strong>
+    <p>עמותת איל מפעילה כ-15 מתנדבים בקהילה ברחבי הארץ. עד לפני שנתיים, כל פנייה חדשה התקבלה במייל, הועברה לרכזת, ונרשמה ידנית. כיום, המתנדבים פותחים פניות (Cases) ב-Salesforce ישירות מהטלפון באמצעות טופס TwinaForms, בלי להזדקק לרישיון Salesforce. הצוות במשרד רואה את הפניות מיד, ואין יותר מיילים שהולכים לאיבוד. <a href="https://twinaforms.com/he/customers/eyal-epilepsy.html" target="_blank" rel="noopener">קראו את הסיפור המלא</a>.</p>
+  </div>
+
+
+  <!-- ===== CHAPTER 6 ===== -->
+  <h2 id="ch6">למה טפסים הם חלק קריטי מכל פרויקט Salesforce</h2>
+
+  <p>זה הפרט שכמעט תמיד מתגלה בשבוע השני של פרויקט Salesforce בעמותה: <strong>ל-Salesforce אין בונה טפסים ציבוריים מובנה</strong>. אפשר לבנות מסכי קלט פנימיים (Screen Flows), אבל יש להם שני חסרונות שעוצרים אותם מלהיות הפתרון לעמותה:</p>
+  <p><strong>חוויית המשתמש —</strong> גם בעמותה קטנה עם 10 מתנדבים בלבד, שבה אין מכשול תקציבי, מתנדב לא רוצה להתחבר ל-Salesforce, ללמוד את המסכים, ולזכור סיסמה כדי לדווח על שעת התנדבות אחת. הוא רוצה לפתוח קישור בנייד, למלא, ולהיגמר. בלי טופס פשוט וזריז — המתנדב פשוט לא ידווח, ודיווח שעות ההתנדבות מתפרק בנקודה הזו. זה נכון לא רק למתנדבים, אלא גם לתורמים, נעזרים, ונרשמים לאירועים — אף אחד מהם לא יסכים ללמוד מערכת CRM כדי לבצע פעולה של חצי דקה.</p>
+  <p><strong>תקציב —</strong> Screen Flows דורשים רישיון Salesforce לכל מי שממלא אותם, מה שלא ריאלי לעמותה עם 50, 100, או 200 מתנדבים. רישיון אחד לכל מתנדב הוא הוצאה של עשרות אלפי שקלים בשנה — סכום שכמעט אף עמותה לא תוכל להצדיק רק עבור טופס דיווח שעות.</p>
+
+  <p>כל עמותה צריכה לפחות 3–4 טפסים ציבוריים: <strong>טופס הרשמת מתנדב</strong>, <strong>טופס רישום לאירוע</strong>, <strong>טופס דיווח שעות התנדבות</strong>, ו<strong>טופס פנייה</strong>. אלה לא טפסים פנימיים — הם המקום שבו אנשים שאינם צוות העמותה מזינים מידע ל-Salesforce.</p>
+
+  <p>בלי פתרון טפסים שמתחבר ל-Salesforce ישירות, ההטמעה תקועה ב-50%: הצוות במשרד עובד ב-Salesforce, אבל כל מי שלא במשרד מזין ב-Google Forms או באקסל, ומישהי במשרד מקלידה מחדש. זה לא Salesforce, זה Salesforce + העתקה ידנית.</p>
+
+
+  <!-- ===== CHAPTER 7 ===== -->
+  <h2 id="ch7">TwinaForms — שכבת הטפסים ל-Salesforce בעברית</h2>
+
+  <p>TwinaForms היא אפליקציה טבעית של Salesforce שפיתחנו ב-Harmony IT כדי לפתור בדיוק את הפער הזה. היא מאפשרת לעמותה לבנות טופס ב-Salesforce, לפרסם קישור ציבורי, ולקבל את השליחות ישירות כרשומות ב-NPSP — בלי שהממלא יזדקק לחשבון Salesforce.</p>
+
+  <h3>למה זה רלוונטי במיוחד לעמותה ישראלית</h3>
+
+  <ul>
+    <li><strong>בעברית עם RTL מלא</strong> — שדות, כפתורים, הודעות שגיאה, הכל מותאם</li>
+    <li><strong>ללא רישיון Salesforce למילוי הטופס</strong> — חיסכון של עשרות אלפי שקלים בשנה לעמותה עם 100+ מתנדבים</li>
+    <li><strong>מובייל ראשון</strong> — מתנדב בקהילה ממלא מהטלפון, בלי אפליקציה</li>
+    <li><strong>אימות זהות במייל חד-פעמי</strong> — חוסם רישומים אנונימיים, מתאים גם להסכמת הורים</li>
+    <li><strong>חתימה דיגיטלית + PDF חתום</strong> — ארטיפקט הגנתי לדוחות, לרגולטור, ולתורמי-על</li>
+    <li><strong>כתיבה ישירה ל-NPSP</strong> — Volunteer Hours, Campaign Members, Cases, Households — כל אובייקט</li>
+    <li><strong>הנחה משמעותית לעמותות</strong> — מסלולים מותאמים בתעריפים של עמותה</li>
+  </ul>
+
+  <p>למידע מפורט יותר: <a href="https://twinaforms.com/he/np.html" target="_blank" rel="noopener">דף TwinaForms לעמותות בישראל</a>. דוגמה ספציפית של פתרון לטופס מתנדבים: <a href="https://twinaforms.com/he/solutions/npsp/volunteer-signup-form/" target="_blank" rel="noopener">טופס רישום מתנדבים NPSP</a>.</p>
+
+
+  <!-- ===== CHAPTER 8 ===== -->
+  <h2 id="ch8">מילון מונחי NPSP</h2>
+
+  <p>NPSP מציג כמה מונחים שלא תמיד מובנים מאליהם בעמותה שמתחילה איתו. הנה הקצרצרים החיוניים:</p>
+
+  <div class="glossary">
+    <div>
+      <h4>Contact (איש קשר)</h4>
+      <p>הרשומה המרכזית — אדם בעמותה. מתנדב, תורם, נעזר, עובד — כולם Contact.</p>
+    </div>
+    <div>
+      <h4>Household (משק בית)</h4>
+      <p>קיבוץ של אנשי קשר משפחתיים. בני זוג, ילדים. חשוב לתורמים ולסוכמות תרומה שנתיות.</p>
+    </div>
+    <div>
+      <h4>Affiliation (קשר ארגוני)</h4>
+      <p>קשר בין איש קשר לארגון (מתנדב שעובד בחברה תורמת, מורה שמתנדב מטעם בית ספר).</p>
+    </div>
+    <div>
+      <h4>Opportunity / Donation (תרומה)</h4>
+      <p>תרומה — חד-פעמית, חוזרת, התחייבות. מקושרת ל-Contact ול-Household.</p>
+    </div>
+    <div>
+      <h4>Campaign (קמפיין)</h4>
+      <p>פעולת גיוס משאבים או חשיפה — אירוע, SMS, מייל. תרומות מקושרות לקמפיין שגרם להן.</p>
+    </div>
+    <div>
+      <h4>Campaign Member (משתתף בקמפיין)</h4>
+      <p>אדם שנרשם או השתתף בקמפיין/אירוע. כאן נכנסים רישומים לאירועי גיוס.</p>
+    </div>
+    <div>
+      <h4>Volunteer Hours (שעות התנדבות)</h4>
+      <p>רשומת משמרת התנדבות — תאריך, שעות, פעילות, רכזת אחראית.</p>
+    </div>
+    <div>
+      <h4>Case (פנייה)</h4>
+      <p>פנייה לעמותה — בקשת סיוע, שאלה, תקלה. סטטוס, רכזת מטפלת, ציר זמן.</p>
+    </div>
+    <div>
+      <h4>GAU — General Accounting Unit</h4>
+      <p>יחידת תקצוב. תרומה אחת מתחלקת בין תוכניות (לדיווח לתורמי-על וגרנטים).</p>
+    </div>
+    <div>
+      <h4>Engagement Plan</h4>
+      <p>תוכנית פעולה אוטומטית לאחר אירוע (למשל: שלח מייל תודה 24 שעות אחרי תרומה).</p>
+    </div>
+  </div>
+
+  <!-- ===== MID-PAGE CTA ===== -->
+  <div class="cta">
+    <h3>רוצים לראות איך זה ייראה אצלכם?</h3>
+    <p>שיחה של 30 דקות. תשמעו מה מתאים לעמותה שלכם ספציפית, מה לא, מאיפה להתחיל, וכמה זה אמור לקחת. ללא התחייבות.</p>
+    <a href="mailto:revital@harmony-it.co.il?subject=ייעוץ Salesforce לעמותה - שיחת היכרות" class="btn">קבעו שיחה</a>
+    <a href="tel:+972584938049" class="btn btn--ghost">058-4938049</a>
+  </div>
+
+
+  <!-- ===== CHAPTER 9 ===== -->
+  <h2 id="ch9">למה לעבוד עם Harmony IT</h2>
+
+  <p>Harmony IT היא חברת בוטיק ישראלית המתמחה בהטמעת Salesforce ו-Priority. אנחנו עובדים עם עמותות בישראל מאז 2014 — הטמעות מ-A עד ת, הגירת נתונים מ-Excel, הדרכת צוות בעברית, ותחזוקה שוטפת.</p>
+
+  <h3>מה ייחודי אצלנו לעמותות</h3>
+
+  <ul>
+    <li><strong>צוות דובר עברית בארץ</strong> — לא תמיכה במייל מחו"ל, אנשי מקצוע שמכירים את עולם העמותות הישראלי</li>
+    <li><strong>ניסיון ספציפי ב-NPSP</strong> — עשרות הטמעות בעמותות בישראל, מקטנות (3 עובדים) ועד בינוניות (40 עובדים, 500 מתנדבים)</li>
+    <li><strong>TwinaForms — מוצר טפסים שאנחנו בעלים שלו</strong> — לא רק יועצים, גם בונים מוצרים שעובדים. כלומר אנחנו מבינים את הצד של הפיתוח לעומק, לא רק את ההגדרה</li>
+    <li><strong>קורס Salesforce ייעודי לעמותות בעברית</strong> — שמועבר מספר פעמים בשנה, גם לאנשים שלא הכירו את Salesforce קודם</li>
+    <li><strong>מומחיות גם ב-Priority</strong> — אם העמותה כבר עובדת עם Priority לחשבונאות, אנחנו יודעים לחבר בין השניים</li>
+  </ul>
+
+  <p>אנחנו לא מתאימים לכל עמותה. עמותות שמחפשות פתרון של "שגר ושכח" בלי לערב את הצוות בהטמעה — לא יקבלו מאיתנו ערך. עמותות שמוכנות להשקיע 4–6 שבועות בהטמעה רצינית — יקבלו מערכת שמשרתת אותן 10 שנים קדימה.</p>
+
+
+  <!-- ===== FAQ ===== -->
+  <h2 id="faq">שאלות נפוצות</h2>
+
+  <div class="faq">
+
+    <details>
+      <summary>מה זה Salesforce לעמותות וכמה רישיונות חינם מקבלים?</summary>
+      <p>Salesforce.org מעניקה לכל עמותה רשומה מאושרת בעולם 10 רישיונות Sales &amp; Service Cloud Enterprise Edition בחינם, באמצעות תכנית Power of Us. בנוסף, כלולה חבילת NPSP — Nonprofit Success Pack — שמותאמת לתורמים, מתנדבים, אירועים וקמפיינים. ההטבה תקפה גם לעמותות ישראליות (מלכ"ר/עמותה רשומה ברשם העמותות).</p>
+    </details>
+
+    <details>
+      <summary>האם Salesforce מתאים לעמותה קטנה?</summary>
+      <p>כן. ההטבה של 10 רישיונות חינם מתאימה בדיוק לעמותות קטנות עד בינוניות — צוות של מנכ"ל, רכזי תוכניות, מנהל גיוס משאבים ומנהלי מתנדבים נכנס לרוב בתוך 10 הרישיונות. עמותות בנות 1–5 עובדים פעמים רבות לא מנצלות אפילו את כל 10 הרישיונות.</p>
+    </details>
+
+    <details>
+      <summary>האם הרישיונות באמת חינמיים — גם בעתיד?</summary>
+      <p>כן. 10 הרישיונות הראשונים חינמיים לכל החיים כל עוד העמותה שומרת על הסטטוס של מלכ"ר ועומדת בתנאי השימוש של Salesforce.org. רישיון מעבר ל-10 הראשונים — בתשלום מוזל לעמותות (בדרך כלל 36 דולר לחודש לרישיון לעומת 165 דולר במחיר המסחרי).</p>
+    </details>
+
+    <details>
+      <summary>מה זה NPSP?</summary>
+      <p>NPSP — Nonprofit Success Pack — היא חבילה חינמית של Salesforce שמתקינים מעל הרישיון הסטנדרטי. היא מוסיפה אובייקטים ייעודיים לעמותות: Households (משקי בית), Affiliations (קשרים בין אנשים לארגונים), Volunteer Hours (שעות התנדבות), Gifts (תרומות) ו-Campaigns מותאמים לקמפיינים של גיוס משאבים.</p>
+    </details>
+
+    <details>
+      <summary>כמה זמן לוקח להטמיע Salesforce בעמותה?</summary>
+      <p>הטמעה בסיסית של NPSP לעמותה קטנה עם נתונים מוגבלים — בין 4 ל-6 שבועות. הטמעה מלאה לעמותה בינונית עם הגירת נתונים מ-Excel, התאמות, הדרכת צוות, וחיבור לטפסים — בין 2 ל-4 חודשים. הטמעה לעמותה גדולה עם פעילות מורכבת — 4–6 חודשים.</p>
+    </details>
+
+    <details>
+      <summary>האם חייבים רישיון Salesforce לכל מתנדב?</summary>
+      <p>לא — וזה הנושא המרכזי שעמותות צריכות לדעת. רישיונות Salesforce הם לצוות שעובד בתוך המערכת (רכזות, מנהלי תוכניות, מנכ"ל). מתנדבים, תורמים ונעזרים לא צריכים רישיון — הם פועלים מול העמותה דרך טפסים ציבוריים. כאן נכנסת TwinaForms: היא מאפשרת למתנדב למלא טופס בנייד, לאמת זהות, לחתום ולשלוח — והמידע נכנס ל-Salesforce בלי שהמתנדב יזדקק לרישיון.</p>
+    </details>
+
+    <details>
+      <summary>האם ניתן לעבוד עם Salesforce מהנייד?</summary>
+      <p>כן. Salesforce זמין כאפליקציה מובייל לחברי הצוות. עבור מי שלא צריך גישה מלאה למערכת — למשל מתנדב שרוצה רק לרשום שעות — אין צורך באפליקציה. במקום זאת, הוא פותח קישור TwinaForms בדפדפן הטלפון, ממלא, שולח. המידע נכנס ישירות ל-Salesforce.</p>
+    </details>
+
+    <details>
+      <summary>מה ההבדל בין Salesforce לבין Excel או Google Forms?</summary>
+      <p>Excel הוא קובץ — לא יודע לקשר אדם לתרומה לאירוע למתנדב. כל קובץ עומד בפני עצמו, מתפצל בין רכזות, ואין מקור אמת אחד. Google Forms יודע לאסוף נתונים אבל לא יודע לחבר אותם לאיש קשר קיים, לא מאמת זהות, ולא בונה דוחות לאורך זמן. Salesforce הוא CRM — מאגר אחד שמרכז את כל המידע על אדם, ארגון, תרומות, מתנדבות, אירועים — ויודע לחבר ביניהם. NPSP מתאים את החיבורים האלה ספציפית לעמותה.</p>
+    </details>
+
+    <details>
+      <summary>האם המידע מאובטח?</summary>
+      <p>Salesforce הוא ממובילי האבטחה בעולם, עם תקני SOC 1, SOC 2, ISO 27001, ו-GDPR. עבור עמותות ישראליות שמטפלות בנתוני נעזרים רגישים — זו רמת אבטחה שלא ריאלי לבנות לבד. עוד יתרון: המידע במקום אחד מאובטח (Salesforce), לא מפוזר באקסלים על דיסקים אישיים של רכזות שמשתפות בוואטסאפ.</p>
+    </details>
+
+    <details>
+      <summary>האם אפשר לחבר טפסים ל-Salesforce?</summary>
+      <p>כן. Salesforce עצמה לא כוללת בונה טפסים ציבוריים מובנה — צריך פתרון חיצוני. TwinaForms היא אפליקציה טבעית של Salesforce שמתאימה במיוחד לעמותות: בעברית, RTL, אימות זהות במייל, חתימה דיגיטלית, PDF חתום אוטומטי, ובלי רישיון Salesforce למילוי הטופס. כל שליחה נכנסת ישירות ל-NPSP.</p>
+    </details>
+
+    <details>
+      <summary>מה ההבדל בין Salesforce.org לבין Salesforce הרגיל?</summary>
+      <p>Salesforce.org היה בעבר ארגון נפרד; ב-2019 הוא התמזג ל-Salesforce עצמה. היום מדובר באותה מערכת בדיוק, רק עם תכנית הטבות לעמותות שכוללת את 10 הרישיונות החינמיים, את NPSP, ותמיכה ייעודית. הקוד, הנתונים, האבטחה — זהים בדיוק לגרסה המסחרית.</p>
+    </details>
+
+    <details>
+      <summary>האם אפשר להגר נתונים מ-Excel ל-Salesforce?</summary>
+      <p>כן, וזה חלק מ-90% מהטמעות העמותות שאנחנו בליווי. תהליך ההגירה כולל ניקוי הנתונים (כפילויות, פורמטים, שדות חסרים), מיפוי שדות מהאקסל לאובייקטים של NPSP (Contact, Household, Donation), ייבוא, אימות, ותיקונים. עמותה עם 2,000–10,000 אנשי קשר — סדר גודל סביר של 2–4 שבועות להגירה.</p>
+    </details>
+
+    <details>
+      <summary>האם יש קורסים או הדרכות לעמותה שמתחילה עם Salesforce?</summary>
+      <p>Salesforce עצמה מציעה את Trailhead — פלטפורמת לימוד חינמית. לעמותות בישראל, Harmony IT מעבירה קורס ייעודי לעמותות וארגונים בעברית, שמתאים גם למי שלא הכיר Salesforce קודם. הקורס משלב הסברים, תרגול, ובניית טופס ראשון בעמותה תוך כדי.</p>
+    </details>
+
+    <details>
+      <summary>מה קורה אם העמותה גדלה מעבר ל-10 רישיונות?</summary>
+      <p>רישיונות מעבר ל-10 הראשונים זמינים בהנחה משמעותית לעמותות — כיום 36 דולר לחודש לרישיון Sales Cloud Enterprise Edition (לעומת 165 דולר במחיר המסחרי). זה נכון לרישיון מלא של חבר צוות. מתנדבים ותורמים שממלאים טפסים — לא צריכים רישיון בכלל, ולכן עמותה עם 20 אנשי צוות ו-500 מתנדבים תשלם על 10 רישיונות נוספים בלבד.</p>
+    </details>
+
+    <details>
+      <summary>איך מתחילים? מה הצעד הראשון?</summary>
+      <p>שני צעדים מקבילים. ראשית — להגיש בקשה ל-Salesforce.org להענקת 10 הרישיונות החינמיים (תהליך אישור של כ-2–4 שבועות, מצריך אישור עמותה רשומה). במקביל — לקבוע שיחת היכרות עם איש מקצוע שמכיר את העולם של עמותות ב-Salesforce, כדי למפות תהליכים קיימים, להחליט מה להגר ראשון, ולתכנן את ההטמעה. Harmony IT מעבירה את השיחה הזו ללא התחייבות.</p>
+    </details>
+
+  </div>
+
+
+  <!-- ===== CLOSING CTA ===== -->
+  <div class="cta" style="background:linear-gradient(135deg,#0f4c81,#0567d8)">
+    <h3>צריכים עזרה להבין מאיפה להתחיל?</h3>
+    <p>שיחת היכרות של 30 דקות — נמפה את הצורך של העמותה, נסביר מה ההטבה החינמית מכסה, ומה לא, ונציע צעדים מעשיים בהמשך. ללא התחייבות, בעברית, מול אנשי מקצוע שכבר הטמיעו עשרות עמותות בישראל.</p>
+    <a href="mailto:revital@harmony-it.co.il?subject=ייעוץ Salesforce לעמותה" class="btn">שלחו מייל</a>
+    <a href="https://wa.me/972584938049" class="btn btn--ghost">WhatsApp</a>
+    <a href="tel:+972584938049" class="btn btn--ghost">058-4938049</a>
+  </div>
+
+</div>
+<!-- ============================== END PAGE CONTENT ============================== -->
+</body>
+</html>

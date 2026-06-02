@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://twinaforms.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/contact.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/contact.html"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/contact.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/contact.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/contact.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/contact.html"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/contact.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/contact.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/privacy.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/privacy.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/privacy.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/privacy.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/terms.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/terms.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/terms.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/terms.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/np.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/np.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/customers/eyal-epilepsy.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/customers/eyal-epilepsy.html"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/designer-basics.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/prefill.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/submit.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/themes.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/formulas.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/custom-javascript.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/user-verification.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/page-layout-clone.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/help/repeat-groups.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/solutions/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/solutions/"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/solutions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/solutions/"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/solutions/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://twinaforms.com/solutions/"/>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/solutions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://twinaforms.com/solutions/"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/solutions/salesforce/timesheet-form/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/solutions/salesforce/user-verification/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/solutions/npsp/volunteer-signup-form/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/solutions/npsp/volunteer-signup-form/"/>
+  </url>
+  <url>
+    <loc>https://twinaforms.com/he/solutions/npsp/event-registration-form/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="he" href="https://twinaforms.com/he/solutions/npsp/event-registration-form/"/>
+  </url>
+</urlset>

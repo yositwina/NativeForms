@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Verification for Salesforce Forms | TwinaForms</title>
+  <meta name="description" content="Add user verification to your Salesforce forms. TwinaForms sends a one-time email code matched to the Salesforce Contact record before the form opens — no portal, no login, no per-user license. A native alternative to FormAssembly form authentication.">
+  <meta name="keywords" content="user verification salesforce forms, salesforce form user verification, verify identity salesforce form, email verification salesforce form, one-time code salesforce form, authenticated salesforce form, secure salesforce forms, salesforce form authentication, formassembly authentication alternative, salesforce form OTP">
+  <link rel="alternate" hreflang="en" href="/solutions/salesforce/user-verification/">
+  <link rel="alternate" hreflang="x-default" href="/solutions/salesforce/user-verification/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/solutions/salesforce/user-verification/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="User Verification for Salesforce Forms | TwinaForms">
+  <meta property="og:description" content="Add user verification to Salesforce forms — a one-time email code matched to the Salesforce Contact record before the form opens. Native to Salesforce, no portal or per-user license.">
+  <meta property="og:url" content="https://twinaforms.com/solutions/salesforce/user-verification/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="User Verification for Salesforce Forms | TwinaForms">
+  <meta name="twitter:description" content="Add user verification to Salesforce forms — a one-time email code matched to the Salesforce Contact record before the form opens.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://twinaforms.com/solutions/"},{"@type":"ListItem","position":3,"name":"Salesforce","item":"https://twinaforms.com/solutions/salesforce/"},{"@type":"ListItem","position":4,"name":"User Verification","item":"https://twinaforms.com/solutions/salesforce/user-verification/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is user verification on a Salesforce form?","acceptedAnswer":{"@type":"Answer","text":"User verification is a gate that sits in front of a public Salesforce form. Before the form opens, the visitor must prove who they are with a one-time code sent to their email. TwinaForms matches that email against a Salesforce Contact record, so only known contacts can open the form — even though the form URL is public. It turns an anonymous public form into a verified, identity-aware Salesforce form."}},{"@type":"Question","name":"How does TwinaForms verify users before they open the form?","acceptedAnswer":{"@type":"Answer","text":"When a visitor opens the form link, they first see a verification step asking for their email. TwinaForms looks the email up against Salesforce Contacts. If a Contact is found, a one-time code is emailed to that address. The visitor enters the code and only then does the form render. If the email is not on any Contact, or the code is wrong, the form never opens."}},{"@type":"Question","name":"Is the verification tied to the Salesforce Contact record?","acceptedAnswer":{"@type":"Answer","text":"Yes. Verification is matched to an existing Salesforce Contact by email, and runs on the Salesforce side inside your org's own trust boundary. That is what lets TwinaForms safely prefill the form with that Contact's data and write the submission back to the correct record — no risk of one person editing another person's data."}},{"@type":"Question","name":"How is this different from FormAssembly form authentication?","acceptedAnswer":{"@type":"Answer","text":"FormAssembly and similar tools offer form authentication, but they sit outside Salesforce and typically authenticate against their own user system or a Salesforce login. TwinaForms is a native Salesforce app: verification is matched directly to the Salesforce Contact record by email, the code is sent and checked on the Salesforce side, and there is no separate portal, no Salesforce login, and no per-user license for the people filling the form. You manage everything from Salesforce."}},{"@type":"Question","name":"Do users need a Salesforce login or license to verify?","acceptedAnswer":{"@type":"Answer","text":"No. The form is public and the people filling it never log in to Salesforce and never consume a Salesforce license. They verify with a one-time email code only. This is the main difference from Salesforce Experience Cloud portals or Screen Flows, which require a licensed login for each user."}},{"@type":"Question","name":"Can I prefill and lock Contact data after verification?","acceptedAnswer":{"@type":"Answer","text":"Yes. Because the verified visitor is matched to a Salesforce Contact, TwinaForms can prefill the form with that Contact's data and set fields to Locked (read-only) so the visitor can confirm or update only the fields you allow. This is ideal for contact-update, donor self-update, and renewal forms."}},{"@type":"Question","name":"How long does a verified session last?","acceptedAnswer":{"@type":"Answer","text":"Two modes are supported per form. A short session keeps the visitor verified for the duration of the code's expiry window. A same-tab session stores the verified token in the browser tab so a refresh does not require re-verifying; it clears when the tab closes, expires at the visitor's local midnight, and is capped at 12 hours. A fresh browser tab always starts a fresh verification."}}]}</script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/solutions/" aria-current="page">Solutions</a>
+      <a href="/#security">Security</a>
+      <a href="/#plans">Plans</a>
+      <a href="/help/index.html">Help</a>
+      <a class="nav-cta" href="/contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">User Verification for Salesforce forms</p>
+        <h1>User verification for Salesforce forms <span>— before the form even opens.</span></h1>
+        <p class="lead">TwinaForms adds user verification to your public Salesforce forms: a one-time code sent to the visitor's email and matched to their Salesforce Contact record. Only known contacts get in &mdash; no portal, no Salesforce login, no per-user license. The form stays public; the data stays protected.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+        <ul class="trust-pills" aria-label="Key attributes of TwinaForms user verification">
+          <li class="trust-pill trust-pill--blue">Native to Salesforce</li>
+          <li class="trust-pill trust-pill--green">One-time email code</li>
+          <li class="trust-pill trust-pill--green">Matched to the Contact record</li>
+          <li class="trust-pill trust-pill--amber">No login, no portal license</li>
+        </ul>
+      </div>
+      <figure class="product-screenshot-frame">
+        <img class="product-screenshot" src="/assets/user-verification.png" alt="TwinaForms user verification screen for a Salesforce form — enter email, receive a one-time code, verify to open the form">
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">The problem</p>
+        <h2>A public Salesforce form is open to anyone with the link.</h2>
+        <p>The moment you publish a public form that prefills or updates Salesforce data, you have a problem: how do you know the person filling it is who they say they are?</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>Anyone can open it</h3>
+          <p>A public form URL can be forwarded, guessed, or scraped. Without verification, a stranger can open a form meant for one specific contact.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>Prefilled data is exposed</h3>
+          <p>If the form prefills a contact's details from Salesforce, an unverified link leaks that data to whoever opens it.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>Anyone can overwrite a record</h3>
+          <p>An update-the-record form with no identity check lets the wrong person change the right record &mdash; silently, in your CRM.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>Bots and junk submissions</h3>
+          <p>Anonymous public forms attract spam and duplicate entries that pollute Salesforce and waste admin time cleaning up.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section">
+      <div>
+        <p class="eyebrow">The solution</p>
+        <h2>Verify the user against Salesforce before the form renders.</h2>
+        <p class="lead">User Verification is a native TwinaForms feature. Turn it on for any form and the visitor must verify with a one-time email code, matched to a Salesforce Contact, before they ever see the fields.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/help/user-verification.html">How it works (docs)</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>Identity matched to the Contact record</h3>
+          <p>The visitor's email must match an existing Salesforce Contact. Unknown emails never pass and never see the form, even though the URL is public.</p>
+        </div>
+        <div>
+          <h3>One-time code, no password</h3>
+          <p>A fresh code is emailed for each verification. No accounts to create, no passwords to reset, nothing for the visitor to remember.</p>
+        </div>
+        <div>
+          <h3>Safe prefill &amp; locked fields</h3>
+          <p>Once verified, the form can prefill that Contact's data and lock the fields you choose &mdash; so the visitor confirms or updates only what you allow.</p>
+        </div>
+        <div>
+          <h3>Runs inside your Salesforce trust boundary</h3>
+          <p>The lookup and the code are handled on the Salesforce side, so verification lives where your users, permissions, and records already live.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">How it works</p>
+        <h2>Four steps from public link to verified Salesforce form.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">1</span>
+          <h3>Visitor enters their email</h3>
+          <p>The published form opens to a verification step instead of the fields. The visitor types the email you'd expect to find on their Contact.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">2</span>
+          <h3>TwinaForms matches a Contact</h3>
+          <p>The email is checked against Salesforce Contacts. No match means no code, and the form stays closed.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">3</span>
+          <h3>One-time code is emailed</h3>
+          <p>A single-use code is sent to that address. The visitor enters it to prove they control the inbox tied to the Contact.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">4</span>
+          <h3>The verified form renders</h3>
+          <p>Only now do the fields appear &mdash; prefilled from the Contact, with a verified session for the duration you configure.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== VS ADD-ONS / FORMASSEMBLY ===== -->
+    <section class="section security-band">
+      <div class="section-heading">
+        <p class="eyebrow">Native vs. add-on</p>
+        <h2>Why native user verification beats a bolt-on form tool.</h2>
+        <p>Tools like FormAssembly offer form authentication, but they live outside Salesforce. TwinaForms verifies against the Salesforce Contact itself &mdash; here's the practical difference.</p>
+      </div>
+      <div class="uv-compare">
+        <table>
+          <thead>
+            <tr><th>&nbsp;</th><th>TwinaForms (native)</th><th>Typical external form tool</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Where verification runs</td><td>Inside Salesforce, against the Contact record</td><td>In the vendor's platform, outside Salesforce</td></tr>
+            <tr><td>Who can pass</td><td>Only emails matched to a Salesforce Contact</td><td>Vendor accounts or a Salesforce login</td></tr>
+            <tr><td>Login required to fill</td><td>No &mdash; one-time email code only</td><td>Often a login or vendor account</td></tr>
+            <tr><td>Per-user Salesforce license</td><td>None for the people filling the form</td><td>Sometimes required for SSO/login flows</td></tr>
+            <tr><td>Prefill &amp; writeback</td><td>Native to the matched Contact and any object</td><td>Via connectors / mapping steps</td></tr>
+            <tr><td>Managed from</td><td>The Salesforce Designer</td><td>A separate vendor console</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== USE CASES ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Where teams use it</p>
+        <h2>Forms that should never open for the wrong person.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">UC</span>
+          <h3>Update contact / donor self-update</h3>
+          <p>Let a contact confirm and update their own record &mdash; verified first, prefilled, with the fields you choose locked.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">TS</span>
+          <h3><a href="/solutions/salesforce/timesheet-form/" style="color:inherit;text-decoration:none">Timesheets &amp; signed submissions</a></h3>
+          <p>Verify the contractor or employee before they log hours, so every signed timesheet is tied to a confirmed identity. <a href="/solutions/salesforce/timesheet-form/" style="color:var(--blue);font-weight:700;text-decoration:none">See the timesheet form &rarr;</a></p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">RN</span>
+          <h3>Renewals &amp; sensitive intake</h3>
+          <p>Membership renewals, case intake, and any form that exposes or changes personal data behind a verified gate.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">FAQ</p>
+        <h2>Common questions about Salesforce form user verification.</h2>
+      </div>
+      <div class="uv-faq">
+        <details>
+          <summary>What is user verification on a Salesforce form?</summary>
+          <p>User verification is a gate that sits in front of a public Salesforce form. Before the form opens, the visitor must prove who they are with a one-time code sent to their email. TwinaForms matches that email against a Salesforce Contact record, so only known contacts can open the form &mdash; even though the form URL is public. It turns an anonymous public form into a verified, identity-aware Salesforce form.</p>
+        </details>
+        <details>
+          <summary>How does TwinaForms verify users before they open the form?</summary>
+          <p>When a visitor opens the form link, they first see a verification step asking for their email. TwinaForms looks the email up against Salesforce Contacts. If a Contact is found, a one-time code is emailed to that address. The visitor enters the code and only then does the form render. If the email is not on any Contact, or the code is wrong, the form never opens.</p>
+        </details>
+        <details>
+          <summary>Is the verification tied to the Salesforce Contact record?</summary>
+          <p>Yes. Verification is matched to an existing Salesforce Contact by email, and runs on the Salesforce side inside your org's own trust boundary. That is what lets TwinaForms safely prefill the form with that Contact's data and write the submission back to the correct record &mdash; no risk of one person editing another person's data.</p>
+        </details>
+        <details>
+          <summary>How is this different from FormAssembly form authentication?</summary>
+          <p>FormAssembly and similar tools offer form authentication, but they sit outside Salesforce and typically authenticate against their own user system or a Salesforce login. TwinaForms is a native Salesforce app: verification is matched directly to the Salesforce Contact record by email, the code is sent and checked on the Salesforce side, and there is no separate portal, no Salesforce login, and no per-user license for the people filling the form. You manage everything from Salesforce.</p>
+        </details>
+        <details>
+          <summary>Do users need a Salesforce login or license to verify?</summary>
+          <p>No. The form is public and the people filling it never log in to Salesforce and never consume a Salesforce license. They verify with a one-time email code only. This is the main difference from Salesforce Experience Cloud portals or Screen Flows, which require a licensed login for each user.</p>
+        </details>
+        <details>
+          <summary>Can I prefill and lock Contact data after verification?</summary>
+          <p>Yes. Because the verified visitor is matched to a Salesforce Contact, TwinaForms can prefill the form with that Contact's data and set fields to Locked (read-only) so the visitor can confirm or update only the fields you allow. This is ideal for contact-update, donor self-update, and renewal forms.</p>
+        </details>
+        <details>
+          <summary>How long does a verified session last?</summary>
+          <p>Two modes are supported per form. A short session keeps the visitor verified for the duration of the code's expiry window. A same-tab session stores the verified token in the browser tab so a refresh does not require re-verifying; it clears when the tab closes, expires at the visitor's local midnight, and is capped at 12 hours. A fresh browser tab always starts a fresh verification. See the <a href="/help/user-verification.html">User Verification documentation</a> for setup details.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">Ready to lock it down</p>
+        <h2>Turn your public Salesforce form into a verified one.</h2>
+        <p style="margin-top:20px">User Verification is included from the Starter plan. Install TwinaForms into a sandbox, switch it on for a form, and watch an unknown email get turned away. Nonprofit discount available.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>A Harmony-IT product</span>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href="/">Home</a>
+      <a href="/solutions/">Solutions</a>
+      <a href="/help/index.html">Help</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </footer>
+
+  <style>
+    .uv-compare { overflow-x: auto; }
+    .uv-compare table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 0.96rem;
+    }
+    .uv-compare th, .uv-compare td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .uv-compare thead th {
+      background: #f4f8fb;
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .uv-compare thead th:nth-child(2) { color: var(--blue-dark); }
+    .uv-compare td:first-child { color: var(--muted); font-weight: 700; }
+    .uv-compare td:nth-child(2) { color: var(--ink); font-weight: 600; }
+    .uv-compare tbody tr:last-child td { border-bottom: none; }
+
+    .uv-faq { display: grid; gap: 12px; }
+    .uv-faq details {
+      padding: 18px 20px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .uv-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+    }
+    .uv-faq summary::-webkit-details-marker { display: none; }
+    .uv-faq summary::after {
+      content: '+';
+      float: right; margin-left: 12px;
+      color: var(--blue); font-weight: 900;
+    }
+    .uv-faq details[open] summary::after { content: '\2212'; }
+    .uv-faq p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

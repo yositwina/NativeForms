@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>טופס רישום לאירוע לסיילספורס NPSP — בלי Google Forms, בלי הזנה ידנית | TwinaForms</title>
+  <meta name="description" content="טופס רישום לאירוע ישירות ל-Salesforce NPSP. רישום משפחתי בשליחה אחת, אימות מייל אנטי-spam, יצירת Campaign Member אוטומטית, תזכורות, ומעקב נוכחות. בלי Google Forms, בלי Eventbrite, בלי הזנה ידנית.">
+  <meta name="keywords" content="טופס רישום לאירוע, רישום לאירוע עמותה, טופס רישום לכנס, רישום אונליין לאירוע, NPSP Campaign Member, אירועי עמותה סיילספורס, רישום משפחתי לאירוע, תזכורת אירוע אוטומטית, מעקב נוכחות אירוע, salesforce event registration form, npsp event form, salesforce event signup">
+  <link rel="alternate" hreflang="he" href="/he/solutions/npsp/event-registration-form/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/he/solutions/npsp/event-registration-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="טופס רישום לאירוע לסיילספורס NPSP — בלי Google Forms, בלי הזנה ידנית">
+  <meta property="og:description" content="טופס רישום לאירוע ישירות ל-Salesforce NPSP. רישום משפחתי, אימות מייל, יצירת Campaign Member אוטומטית, ותזכורות. בלי Google Forms, בלי Eventbrite.">
+  <meta property="og:url" content="https://twinaforms.com/he/solutions/npsp/event-registration-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/timesheet-form-hero.png">
+  <meta property="og:locale" content="he_IL">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="טופס רישום לאירוע לסיילספורס NPSP">
+  <meta name="twitter:description" content="טופס רישום לאירוע ישירות ל-Salesforce NPSP. בלי Google Forms, בלי Eventbrite, בלי הזנה ידנית.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/timesheet-form-hero.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"בית","item":"https://twinaforms.com/he/"},{"@type":"ListItem","position":2,"name":"לעמותות","item":"https://twinaforms.com/he/np.html"},{"@type":"ListItem","position":3,"name":"טופס רישום לאירוע NPSP","item":"https://twinaforms.com/he/solutions/npsp/event-registration-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"איך נרשם נכנס ל-NPSP אחרי שמילא את הטופס?","acceptedAnswer":{"@type":"Answer","text":"בשליחה — הנרשם נכנס אוטומטית כ-Campaign Member על ה-Campaign של האירוע ב-NPSP, מקושר לאיש הקשר שלו (Contact). אם הוא לא קיים במערכת — נוצר Contact חדש. כל פרטי הרישום נשמרים, כולל זמן ההרשמה ופרטים מותאמים שתגדירו (סוג כרטיס, אילוץ אוכל, וכו'). אין הזנה ידנית, אין יצוא מ-Google Forms, אין סנכרון מ-Eventbrite."}},{"@type":"Question","name":"האם אפשר לרשום משפחה שלמה בטופס אחד?","acceptedAnswer":{"@type":"Answer","text":"כן. דרך פיצ'ר Repeated Records של TwinaForms — הנרשם הראשי ממלא את פרטיו, ואז מוסיף שורות לכל בני המשפחה (שם, גיל, אילוץ אוכל). בשליחה — כל אחד מהם נכנס כ-Contact ב-NPSP ומקושר אליו ב-Household, וכל אחד מהם נכנס כ-Campaign Member על ה-Campaign של האירוע. שליחה אחת — כמה רישומים."}},{"@type":"Question","name":"מה ההבדל בינכם לבין Eventbrite?","acceptedAnswer":{"@type":"Answer","text":"Eventbrite יודע לקבל תשלום ולנהל אירועים — אבל לא מכיר את NPSP. כל רישום ב-Eventbrite חי באוקיינוס שלהם, ועמותה צריכה לסנכרן ידנית או דרך Zapier כדי לקבל את הנתונים ל-Salesforce. אצל TwinaForms — הטופס מתחבר ישירות ל-Campaign של האירוע ב-NPSP, יוצר Campaign Members, ומקשר תרומות ל-Donation עם Campaign Source. בנוסף, Eventbrite גובה דמי שימוש על כל כרטיס נמכר, ו-TwinaForms עובד בתעריף קבוע ובהנחה לעמותות. תרומה לאירוע גיוס משאבים ב-Eventbrite היא הוצאה של כ-7% מהסכום; אצל TwinaForms — 0%."}},{"@type":"Question","name":"האם אפשר לקבל תשלום בתוך הטופס?","acceptedAnswer":{"@type":"Answer","text":"TwinaForms יודעת לקבל מהנרשם הצהרת תרומה (Pledge) שנכנסת ל-NPSP, או להעביר אותו לדף סליקה חיצוני (Tranzila, Cardcom, Pelecard, iCount) בסוף הטופס. הסליקה חוזרת ל-NPSP אוטומטית כ-Donation מקושרת לקמפיין. הגישה הזו מאפשרת לעמותה לשמור על מערכת הסליקה הקיימת שלה ולא להחליף ספק."}},{"@type":"Question","name":"איך עוקבים אחרי נוכחות באירוע?","acceptedAnswer":{"@type":"Answer","text":"ב-NPSP, ה-Campaign Member של כל נרשם מתחיל בסטטוס 'Registered'. ביום האירוע — באמצעות אפליקציית Salesforce בנייד, רכזת מעדכנת סטטוס ל-'Attended' עבור מי שהגיע (אפשר גם דרך סריקת קוד QR שמופיע באישור הרישום). בסוף האירוע, יש בידכם דשבורד שמראה כמה נרשמו, כמה הגיעו, ומה אחוז הנוכחות — קריטי לדיווח לתורמי-על ולתכנון אירועים עתידיים."}},{"@type":"Question","name":"האם הנרשמים מקבלים אישור רישום ותזכורת לפני האירוע?","acceptedAnswer":{"@type":"Answer","text":"כן. עם השליחה, הנרשם מקבל מייל אישור עם פרטי האירוע, מיקום, ו-PDF של פרטי הרישום. דרך Engagement Plans של NPSP אפשר להגדיר תזכורת אוטומטית 24 שעות לפני האירוע (במייל או דרך אינטגרציית WhatsApp). שני אלה ביחד מורידים משמעותית את אחוז הנרשמים שלא מגיעים."}},{"@type":"Question","name":"האם הנרשמים יכולים לעדכן את הפרטים שלהם או לבטל רישום?","acceptedAnswer":{"@type":"Answer","text":"כן. הקישור שנשלח באישור הרישום מאפשר לנרשם לחזור לטופס, לראות את פרטיו, ולעדכן (למשל לשנות אילוץ אוכל) או לבטל את הרישום. עדכון או ביטול חוזרים אוטומטית ל-Campaign Member ב-NPSP, וסטטוס הביטול נשמר לרקורד — כך שאתם רואים גם את מי שביטל ומתי."}},{"@type":"Question","name":"מה אם האירוע מלא? האם יש רשימת המתנה?","acceptedAnswer":{"@type":"Answer","text":"כן. אפשר להגדיר קיבולת לאירוע, ומשהגיעו אליה — הטופס עובר אוטומטית למצב רשימת המתנה. נרשמים חדשים נכנסים כ-Campaign Members בסטטוס 'Waitlisted'. אם נרשם מבטל — אפשר להגדיר אוטומציה ב-NPSP שמעדכנת את הראשון ברשימה ל-'Registered' ושולחת לו מייל אישור אוטומטי."}},{"@type":"Question","name":"יש הנחה לעמותה?","acceptedAnswer":{"@type":"Answer","text":"כן. כל המסלולים בתשלום (Starter ו-Pro) זמינים בהנחה משמעותית לעמותות רשומות. שלחו מייל קצר עם שם העמותה, סוגי האירועים שאתם מארגנים, וכמות הרישומים החודשית — ונחזור עם הצעה ספציפית כולל פירוט ההנחה."}}]}</script>
+
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/he/index.html">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="ניווט ראשי">
+      <a href="/he/index.html#product">המוצר</a>
+      <a href="/he/index.html#plans">מסלולים</a>
+      <a href="/he/np.html">לעמותות</a>
+      <a href="/he/contact.html">צור קשר</a>
+      <a class="lang-switch" href="/index.html" hreflang="en" lang="en">English</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">טופס רישום לאירוע · Salesforce NPSP</p>
+        <h1>טופס רישום לאירוע <span>ישירות ל-Salesforce NPSP</span></h1>
+        <p class="lead">הנרשם פותח קישור בטלפון, ממלא פרטים (גם למשפחה שלמה במכה אחת), מאמת מייל, ושולח. הרישום נכנס ישירות כ-Campaign Member ב-NPSP של העמותה, יחד עם אישור רישום ותזכורת אוטומטית יום לפני האירוע. בלי Google Forms שלא מתחבר לכלום, בלי Eventbrite שלא מכיר את ה-NPSP, ובלי שמישהי במשרד תקליד מחדש.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס רישום לאירוע&body=שלום, אני מהעמותה _______ ונרצה לבדוק טופס רישום לאירועים. סוג האירועים: ______. כמות רישומים חודשית: ______.">דברו איתנו — הנחה לעמותה</a>
+          <a class="button button-secondary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+        </div>
+        <ul class="trust-pills" aria-label="עיקרי הצעת הערך לטופס רישום לאירוע NPSP">
+          <li class="trust-pill trust-pill--blue">טבעי ל-NPSP</li>
+          <li class="trust-pill trust-pill--green">רישום משפחתי בשליחה אחת</li>
+          <li class="trust-pill trust-pill--green">אימות מייל אנטי-spam</li>
+          <li class="trust-pill trust-pill--amber">תזכורות אוטומטיות לפני האירוע</li>
+        </ul>
+      </div>
+
+      <figure class="ts-hero" aria-label="טופס רישום לאירוע TwinaForms ל-Salesforce NPSP">
+        <img class="ts-hero__img" src="/assets/timesheet-form-hero.png" alt="טופס רישום לאירוע TwinaForms ל-Salesforce NPSP — אימות מייל, פרטי משתתפים ובני משפחה, ושליחה ישירה ל-Campaign Member ב-NPSP מהטלפון">
+        <figcaption class="ts-caption">דוגמת טופס TwinaForms ב-Salesforce (כרגע באנגלית — צילום של טופס רישום לאירוע בעברית יעודכן בקרוב). אותו רעיון: הנרשם ממלא, מאמת, ושולח — הרישום נכנס כ-Campaign Member ל-NPSP.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">הבעיה</p>
+        <h2>למה רישום לאירועים בעמותה תמיד מתפרק (ומה השורש)</h2>
+        <p>אירוע גיוס משאבים שנתי, סדנה לחברי קהילה, רישום לקבוצת תמיכה, או רישום משפחות לטיול קהילתי — בכל אחד מהמקרים האלה הנקודה הראשונה שנתקעת היא איך לאסוף את הרישומים, ואיך לקבל אותם ל-Salesforce בלי שמישהי במשרד תיקליד אותם מחדש.</p>
+        <p>הרבה עמותות מתחילות ב-Google Forms שלא מתחבר ל-Salesforce ודורש הזנה ידנית של כל נרשם. אחרות לוקחות Eventbrite שיודע לקבל תשלום אבל לא מכיר את ה-NPSP, לא יודע להתחבר ל-Campaign קיים, ומחייב את העמותה לשלם דמי שימוש על כל כרטיס. ויש שמשתמשות בטפסי WordPress עם Contact Form 7 שלא מתממשק לכלום מעבר לאימייל. עמותות מתקדמות יותר בונות Salesforce Experience Cloud portal — אבל זה פרויקט בקנה מידה גדול שלא רלוונטי לרוב האירועים.</p>
+        <p>כל אחת מהאופציות יוצרת את אותה בעיה: הרישומים לא נכנסים ל-NPSP אוטומטית, ואין דרך לדעת מי באמת הגיע לאירוע — בלי מישהי במשרד שמקלידה.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>הזנה ידנית של כל נרשם</h3>
+          <p>אחרי כל אירוע, מישהי במשרד יושבת חצי יום ומכניסה את 150 הנרשמים מ-Google Sheets ל-Salesforce. כפילויות עם אנשי קשר קיימים? נפתרות ידנית. שגיאות הקלדה? בדיקה לעין.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>אין מעקב נוכחות אוטומטי</h3>
+          <p>נרשמו 200, הגיעו 130. אבל ב-Google Forms אין דרך לסמן מי הגיע. בדיווח לתורם-על אפשר רק להגיד "נרשמו 200" — וזה לא מספיק טוב.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>אין רישום משפחתי</h3>
+          <p>אבא רוצה לרשום את עצמו ואת שני הילדים לטיול. בטפסים סטנדרטיים זה אומר שהוא ממלא 3 טפסים. אצל הרוב — הוא יוותר על הילדים או יזרוק את העמותה לטיפול בזה במייל.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>תרומות באירוע — מנותקות מהקמפיין</h3>
+          <p>הנרשם רצה להוסיף תרומה של 100 ₪ ברישום. הוא עבר לדף סליקה — אבל זה כבר לא חלק מהקמפיין של האירוע ב-NPSP. ב-ROI של הקמפיין התרומה הזו לא תופיע.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section" id="solution">
+      <div>
+        <p class="eyebrow">הפתרון</p>
+        <h2>טופס אחד. רישום משפחתי, תזכורות, Campaign Member ב-NPSP — אוטומטית.</h2>
+        <p class="lead">TwinaForms היא אפליקציה טבעית של Salesforce. בנו טופס רישום פעם אחת לכל אירוע (או תשכפלו פעם הבאה), שלחו את הקישור — וכל רישום נכנס ישירות כ-Campaign Member על הקמפיין של האירוע. אישור רישום אוטומטי, תזכורת יום לפני, ומעקב נוכחות ביום האירוע — הכל ב-NPSP, בלי הזנה ידנית.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס רישום לאירוע">דברו איתנו — הנחה לעמותה</a>
+          <a class="button button-secondary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>רישום ישירות ל-NPSP כ-Campaign Member</h3>
+          <p>שליחה אחת בטופס — Campaign Member נוצר אוטומטית על ה-Campaign של האירוע, מקושר לאיש הקשר (Contact). אם הנרשם לא קיים — נוצר Contact חדש. אין הזנה ידנית, אין יצוא, אין סנכרון.</p>
+        </div>
+        <div>
+          <h3>רישום משפחתי בשליחה אחת</h3>
+          <p>הנרשם הראשי ממלא פרטיו, מוסיף שורות לבני המשפחה (שם, גיל, אילוץ אוכל). בשליחה — כל אחד נכנס כ-Contact ב-NPSP, מקושר ל-Household, וכל אחד נכנס גם כ-Campaign Member על האירוע.</p>
+        </div>
+        <div>
+          <h3>אימות מייל — אנטי-spam ואנטי-bot</h3>
+          <p>בלי קוד אימות שמגיע למייל הנרשם — הטופס לא נשלח. חוסם בוטים, רישומים כפולים, ורישומים עם פרטים שגויים שמלכלכים את ה-NPSP.</p>
+        </div>
+        <div>
+          <h3>אישור רישום אוטומטי + תזכורת לפני האירוע</h3>
+          <p>עם השליחה — מייל אישור עם PDF של פרטי הרישום. דרך Engagement Plans של NPSP — תזכורת אוטומטית 24 שעות לפני (מייל או WhatsApp). פחות נרשמים שלא מגיעים.</p>
+        </div>
+        <div>
+          <h3>מעקב נוכחות מהנייד ביום האירוע</h3>
+          <p>ביום האירוע — רכזת באירוע פותחת את אפליקציית Salesforce בנייד, רואה את רשימת Campaign Members, ומעדכנת סטטוס ל-'Attended' עבור מי שהגיע. דשבורד נוכחות בזמן אמת.</p>
+        </div>
+        <div>
+          <h3>תרומה בתוך הטופס — מקושרת לקמפיין</h3>
+          <p>הנרשם מוסיף תרומה ברישום — או דרך Pledge ב-NPSP, או באמצעות מעבר לדף סליקה (Tranzila, Cardcom, Pelecard, iCount). התרומה חוזרת ל-NPSP כ-Donation מקושרת לקמפיין של האירוע, ומופיעה ב-ROI שלו.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FEATURE MECHANICS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">איך זה עובד</p>
+        <h2>חמשת הפיצ'רים שעושים את ההבדל</h2>
+        <p>כל אחד הוא יכולת של TwinaForms שמופיעה גם בדף הבית. הטופס לרישום לאירוע הוא מה שקורה כשמשלבים אותם בטופס אחד.</p>
+      </div>
+
+      <div class="ts-mech">
+
+        <article class="ts-mech__card ts-mech__card--accent ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">01</span>
+            <h3>אימות מייל — חוסם בוטים, כפילויות וטעויות</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>לפני שהטופס בכלל נשלח, הנרשם מקבל קוד חד-פעמי בן 6 ספרות לכתובת המייל שהזין. הוא מקליד את הקוד, ורק אז הטופס נשלח ל-NPSP. בלי קוד — אין רישום.</p>
+              <p>זה חוסם בוטים שמנסים לזבל את האירוע, מונע רישומים כפולים של אותו אדם (טעות נפוצה כשעמותה מפרסמת באירוע מרובה ערוצים), וחוסם רישומים עם פרטים שגויים שמייצרים אחר כך כפילויות ב-NPSP. בנוסף — אם הנרשם רוצה אחר כך לעדכן פרטים או לבטל רישום, אותו אימות מאפשר לו לעשות זאת באופן בטוח.</p>
+              <ul class="ts-mech__list">
+                <li>קוד חד-פעמי במייל</li>
+                <li>הרישום לא נשלח בלי אימות</li>
+                <li>חוסם בוטים, רישומים כפולים, ופרטים שגויים</li>
+                <li>אותו מנגנון מאפשר עדכון או ביטול רישום מאוחר יותר</li>
+              </ul>
+            </div>
+            <figure class="ts-mech__shot">
+              <img src="/assets/user-verification.png" alt="מסך אימות מייל בטופס רישום לאירוע TwinaForms — הזנת מייל, קבלת קוד בן 6 ספרות, ולחיצה על אישור כדי לשלוח את הרישום" loading="lazy">
+              <figcaption>מסך האימות שנרשמים רואים — חוסם בוטים וכפילויות.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="ts-mech__card">
+          <header>
+            <span class="ts-mech__num">02</span>
+            <h3>רישום משפחתי — בני משפחה בטופס אחד</h3>
+          </header>
+          <p>טופס סטנדרטי מקבל רישום אחד בלבד. רישום משפחתי לאירוע (טיול, יום משפחה, מסיבת חנוכה) דורש כמה רישומים — אחד לכל בן משפחה.</p>
+          <p>פיצ'ר Repeated Records של TwinaForms מאפשר לנרשם הראשי לפתוח שורה לכל בן משפחה — שם, גיל, אילוץ אוכל, מידת חולצה, מה שצריך. בשליחה — כל אחד מהם נכנס כ-Contact ב-NPSP, מקושר ל-Household של המשפחה, וכל אחד נכנס כ-Campaign Member על האירוע. שליחה אחת — כמה רישומים.</p>
+          <ul class="ts-mech__list">
+            <li>הוספת בני משפחה בלי טעינה מחדש</li>
+            <li>כל בן משפחה נכנס כ-Contact ו-Campaign Member</li>
+            <li>כולם מקושרים ל-Household ב-NPSP</li>
+          </ul>
+          <figure class="ts-mech__pic">
+            <img src="/assets/timesheet-repeated-rows.png" alt="טופס רישום משפחתי לאירוע — שורות לכל בן משפחה עם שם, גיל ואילוץ אוכל, ושמירה אוטומטית כ-Contact ו-Campaign Member ב-NPSP" loading="lazy">
+            <figcaption>שורות לכל בן משפחה — שליחה אחת, רישומים מרובים ב-NPSP.</figcaption>
+          </figure>
+        </article>
+
+        <article class="ts-mech__card">
+          <header>
+            <span class="ts-mech__num">03</span>
+            <h3>מילוי מראש לנרשמים חוזרים מ-NPSP Contact</h3>
+          </header>
+          <p>נרשם חוזר (תורם, מתנדב, או חבר ותיק של העמותה) מקבל קישור אישי. כשהוא פותח את הטופס, TwinaForms ממלאת מראש את שמו, פרטי הקשר, וכתובתו — הכל מ-NPSP Contact שלו.</p>
+          <p>הוא מקליד רק מה שספציפי לאירוע: כמה אנשים, אילוצי אוכל, האם מעוניין בסעדה מוקדמת. תהליך הרישום מתקצר ל-30 שניות, ואחוז הנטישה צונח. גם הסיכוי לכפילויות ב-NPSP מצטמצם כי הנרשם משתמש ב-Contact הקיים, לא יוצר חדש.</p>
+        </article>
+
+        <article class="ts-mech__card ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">04</span>
+            <h3>מובייל ראשון — רישום מהטלפון בכל מקום</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>רוב הנרשמים פותחים את הקישור בטלפון — בזמן שהוא נשלח להם בוואטסאפ, או דרך פוסט בפייסבוק שהם רואים בנסיעה. הטופס של TwinaForms רספונסיבי מלא — האימות, פרטי המשתתפים, ההוספה של בני משפחה, ושלב התרומה האופציונלית — הכל עובד בטלפון.</p>
+              <p>אין אפליקציה להתקין, אין פורטל נפרד לבנות. אותו לינק עובד במחשב, בטאבלט, ובסמארטפון. הנרשם משלים ב-30 שניות, גם בעמידה בתחנת אוטובוס.</p>
+            </div>
+            <figure class="ts-mech__shot ts-mech__shot--phone">
+              <img src="/assets/timesheet-mobile.png" alt="טופס רישום לאירוע בטלפון — אימות, פרטי משתתפים, ושליחה ל-NPSP מהמסך הנייד" loading="lazy">
+              <figcaption>הטופס בטלפון — אימות, מילוי, שליחה. בלי אפליקציה.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="ts-mech__card ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">05</span>
+            <h3>Campaign Member + תזכורות + מעקב נוכחות — הכל אוטומטי ב-NPSP</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>בשליחה — שלושה דברים קורים אוטומטית. ראשית, Campaign Member נוצר על ה-Campaign של האירוע ב-NPSP, מקושר ל-Contact של הנרשם (קיים או חדש), בסטטוס 'Registered'. שנית, מייל אישור נשלח לנרשם עם PDF של פרטי הרישום, מיקום, ולוח זמנים. שלישית, דרך Engagement Plans של NPSP מתוזמנת תזכורת אוטומטית 24 שעות לפני האירוע — במייל או דרך אינטגרציית WhatsApp.</p>
+              <p>ביום האירוע — רכזת באירוע פותחת את אפליקציית Salesforce בנייד או דרך סריקת QR שמופיע באישור הרישום, ומעדכנת את הסטטוס של מי שהגיע ל-'Attended'. בסוף האירוע יש לכם דשבורד ב-NPSP שמראה: נרשמו X, הגיעו Y, אחוז נוכחות Z, ותרומות שגויסו במהלך הקמפיין. <strong>זה הקרדיט שתורם-על מבקש בדוח שנתי.</strong></p>
+              <ul class="ts-mech__list">
+                <li>Campaign Member נוצר אוטומטית — קיים או חדש</li>
+                <li>מייל אישור + PDF של פרטי הרישום</li>
+                <li>תזכורת אוטומטית 24 שעות לפני האירוע</li>
+                <li>מעקב נוכחות מאפליקציית Salesforce בנייד או QR</li>
+                <li>דשבורד ROI לקמפיין: נרשמו / הגיעו / תרמו</li>
+              </ul>
+            </div>
+            <figure class="ts-mech__shot">
+              <img src="/assets/timesheet-signed-pdf.png" alt="דוגמת אישור רישום לאירוע — PDF של פרטי הרישום, מיקום האירוע ולוח זמנים, נוצר אוטומטית בשליחה" loading="lazy">
+              <figcaption>דוגמת PDF של אישור רישום — נוצר אוטומטית בשליחה ונשלח לנרשם.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+      </div>
+
+      <div class="install-cta" style="margin-top:42px">
+        <div class="install-cta__body">
+          <span class="install-cta__badge">הנחה לעמותה</span>
+          <h3>תרצו לראות איך זה נראה אצלכם?</h3>
+          <p>שלחו מייל קצר עם שם העמותה, סוגי האירועים שאתם מארגנים (גיוס משאבים, סדנאות, קבוצות תמיכה, טיולים), וכמות הרישומים החודשית בערך — ונחזור עם המלצה ספציפית כולל פירוט ההנחה. אפשר גם להתקין ב-Sandbox ולנסות לבד. <a href="mailto:supportat@twinaforms.com">supportat@twinaforms.com</a></p>
+        </div>
+        <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס רישום לאירוע">דברו איתנו</a>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">שאלות נפוצות</p>
+        <h2>שאלות נפוצות על טופס רישום לאירוע NPSP</h2>
+      </div>
+
+      <div class="ts-faq">
+        <details>
+          <summary>איך נרשם נכנס ל-NPSP אחרי שמילא את הטופס?</summary>
+          <p>בשליחה — הנרשם נכנס אוטומטית כ-Campaign Member על ה-Campaign של האירוע ב-NPSP, מקושר לאיש הקשר שלו (Contact). אם הוא לא קיים במערכת — נוצר Contact חדש. כל פרטי הרישום נשמרים, כולל זמן ההרשמה ופרטים מותאמים שתגדירו (סוג כרטיס, אילוץ אוכל, וכו'). אין הזנה ידנית, אין יצוא מ-Google Forms, אין סנכרון מ-Eventbrite.</p>
+        </details>
+        <details>
+          <summary>האם אפשר לרשום משפחה שלמה בטופס אחד?</summary>
+          <p>כן. דרך פיצ'ר Repeated Records של TwinaForms — הנרשם הראשי ממלא את פרטיו, ואז מוסיף שורות לכל בני המשפחה (שם, גיל, אילוץ אוכל). בשליחה — כל אחד מהם נכנס כ-Contact ב-NPSP ומקושר אליו ב-Household, וכל אחד מהם נכנס כ-Campaign Member על ה-Campaign של האירוע. שליחה אחת — כמה רישומים.</p>
+        </details>
+        <details>
+          <summary>מה ההבדל בינכם לבין Eventbrite?</summary>
+          <p>Eventbrite יודע לקבל תשלום ולנהל אירועים — אבל לא מכיר את NPSP. כל רישום ב-Eventbrite חי באוקיינוס שלהם, ועמותה צריכה לסנכרן ידנית או דרך Zapier כדי לקבל את הנתונים ל-Salesforce. אצל TwinaForms — הטופס מתחבר ישירות ל-Campaign של האירוע ב-NPSP, יוצר Campaign Members, ומקשר תרומות ל-Donation עם Campaign Source. בנוסף, Eventbrite גובה דמי שימוש על כל כרטיס נמכר, ו-TwinaForms עובד בתעריף קבוע ובהנחה לעמותות. תרומה לאירוע גיוס משאבים ב-Eventbrite היא הוצאה של כ-7% מהסכום; אצל TwinaForms — 0%.</p>
+        </details>
+        <details>
+          <summary>האם אפשר לקבל תשלום בתוך הטופס?</summary>
+          <p>TwinaForms יודעת לקבל מהנרשם הצהרת תרומה (Pledge) שנכנסת ל-NPSP, או להעביר אותו לדף סליקה חיצוני (Tranzila, Cardcom, Pelecard, iCount) בסוף הטופס. הסליקה חוזרת ל-NPSP אוטומטית כ-Donation מקושרת לקמפיין. הגישה הזו מאפשרת לעמותה לשמור על מערכת הסליקה הקיימת שלה ולא להחליף ספק.</p>
+        </details>
+        <details>
+          <summary>איך עוקבים אחרי נוכחות באירוע?</summary>
+          <p>ב-NPSP, ה-Campaign Member של כל נרשם מתחיל בסטטוס 'Registered'. ביום האירוע — באמצעות אפליקציית Salesforce בנייד, רכזת מעדכנת סטטוס ל-'Attended' עבור מי שהגיע (אפשר גם דרך סריקת קוד QR שמופיע באישור הרישום). בסוף האירוע, יש בידכם דשבורד שמראה כמה נרשמו, כמה הגיעו, ומה אחוז הנוכחות — קריטי לדיווח לתורמי-על ולתכנון אירועים עתידיים.</p>
+        </details>
+        <details>
+          <summary>האם הנרשמים מקבלים אישור רישום ותזכורת לפני האירוע?</summary>
+          <p>כן. עם השליחה, הנרשם מקבל מייל אישור עם פרטי האירוע, מיקום, ו-PDF של פרטי הרישום. דרך Engagement Plans של NPSP אפשר להגדיר תזכורת אוטומטית 24 שעות לפני האירוע (במייל או דרך אינטגרציית WhatsApp). שני אלה ביחד מורידים משמעותית את אחוז הנרשמים שלא מגיעים.</p>
+        </details>
+        <details>
+          <summary>האם הנרשמים יכולים לעדכן את הפרטים שלהם או לבטל רישום?</summary>
+          <p>כן. הקישור שנשלח באישור הרישום מאפשר לנרשם לחזור לטופס, לראות את פרטיו, ולעדכן (למשל לשנות אילוץ אוכל) או לבטל את הרישום. עדכון או ביטול חוזרים אוטומטית ל-Campaign Member ב-NPSP, וסטטוס הביטול נשמר לרקורד — כך שאתם רואים גם את מי שביטל ומתי.</p>
+        </details>
+        <details>
+          <summary>מה אם האירוע מלא? האם יש רשימת המתנה?</summary>
+          <p>כן. אפשר להגדיר קיבולת לאירוע, ומשהגיעו אליה — הטופס עובר אוטומטית למצב רשימת המתנה. נרשמים חדשים נכנסים כ-Campaign Members בסטטוס 'Waitlisted'. אם נרשם מבטל — אפשר להגדיר אוטומציה ב-NPSP שמעדכנת את הראשון ברשימה ל-'Registered' ושולחת לו מייל אישור אוטומטי.</p>
+        </details>
+        <details>
+          <summary>יש הנחה לעמותה?</summary>
+          <p>כן. כל המסלולים בתשלום (Starter ו-Pro) זמינים בהנחה משמעותית לעמותות רשומות. שלחו מייל קצר עם שם העמותה, סוגי האירועים שאתם מארגנים, וכמות הרישומים החודשית — ונחזור עם הצעה ספציפית כולל פירוט ההנחה.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">בואו נדבר</p>
+        <h2>תפסיקו להקליד רישומים מחדש. השיקו טופס רישום שמתחבר ל-NPSP השבוע.</h2>
+        <p style="margin-top:20px">המסלולים מתחילים מחינמי. הנחה משמעותית לעמותות רשומות. רואים גם <a href="/he/solutions/npsp/volunteer-signup-form/" style="color:#74b3f3">טופס רישום מתנדבים NPSP</a> אם אתם מנהלים גם שעות התנדבות, או <a href="/he/np.html" style="color:#74b3f3">דף לעמותות</a> לתמונה רחבה יותר של מה TwinaForms עושה ל-NPSP.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס רישום לאירוע">דברו איתנו — הנחה לעמותה</a>
+          <a class="button button-secondary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>מוצר של Harmony-IT</span>
+    </div>
+    <nav aria-label="ניווט תחתון">
+      <a href="/he/index.html">דף הבית</a>
+      <a href="/he/solutions/">פתרונות</a>
+      <a href="/he/np.html">לעמותות</a>
+      <a href="/help/index.html">עזרה</a>
+      <a href="/he/privacy.html">פרטיות</a>
+      <a href="/he/terms.html">תנאי שימוש</a>
+      <a href="/he/contact.html">צור קשר</a>
+    </nav>
+  </footer>
+
+  <!-- Page-scoped styles (same as the volunteer-signup-form page for layout consistency) -->
+  <style>
+    /* ===== Typography overrides (H1 > H2 hierarchy) ===== */
+    .hero-section h1 {
+      font-size: clamp(2.1rem, 3.8vw, 3.1rem);
+      line-height: 1.12;
+      letter-spacing: 0;
+      max-width: 720px;
+    }
+    .hero-section h1 span { display: inline; }
+    .hero-section .lead {
+      font-size: 1.05rem;
+      line-height: 1.7;
+    }
+    main h2 {
+      font-size: clamp(1.45rem, 2.5vw, 2.0rem);
+      line-height: 1.3;
+      letter-spacing: 0;
+      font-weight: 800;
+    }
+
+    /* ===== Hero screenshot ===== */
+    .ts-hero { margin: 0; }
+    .ts-hero__img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #cbd9e6;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow:
+        0 30px 60px rgba(5, 103, 216, 0.20),
+        0 12px 30px rgba(16, 35, 63, 0.10),
+        0 0 80px rgba(5, 103, 216, 0.12);
+    }
+    .ts-caption {
+      margin: 14px 2px 0;
+      color: var(--muted); font-size: 0.86rem; line-height: 1.7;
+    }
+
+    /* Two-column hero on wide screens */
+    @media (min-width: 981px) {
+      .hero-section {
+        grid-template-columns: 1fr 1.05fr;
+        gap: 56px;
+        align-items: start;
+      }
+    }
+
+    /* ===== Mechanics cards ===== */
+    .ts-mech {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+    .ts-mech__card {
+      padding: 28px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--white);
+      box-shadow: 0 4px 14px rgba(16, 35, 63, 0.05);
+      border-top: 4px solid var(--blue);
+    }
+    .ts-mech__card--accent {
+      border-top-color: var(--green);
+      background: linear-gradient(180deg, #f3fbf6, var(--white) 30%);
+    }
+    .ts-mech__card--accent .ts-mech__num {
+      color: #0b6d48;
+      background: linear-gradient(135deg, var(--mint), #d6f1e2);
+    }
+    .ts-mech__card--wide { grid-column: 1 / -1; }
+
+    .ts-mech__cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+    .ts-mech__text > p:first-child { margin-top: 0; }
+    .ts-mech__shot {
+      margin: 0;
+      display: grid; gap: 10px;
+    }
+    .ts-mech__shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdfe;
+      box-shadow: 0 8px 24px rgba(16, 35, 63, 0.08);
+    }
+    .ts-mech__shot figcaption {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+    @media (max-width: 980px) {
+      .ts-mech__cols { grid-template-columns: 1fr; }
+    }
+
+    /* Phone screenshots render smaller and centered */
+    .ts-mech__shot--phone {
+      align-self: center;
+      justify-self: center;
+      max-width: 280px;
+    }
+    .ts-mech__shot--phone img {
+      max-width: 100%;
+    }
+
+    .ts-mech__card header {
+      display: flex; align-items: flex-start; gap: 14px;
+      margin-bottom: 12px;
+    }
+    .ts-mech__num {
+      flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      color: var(--blue-dark);
+      background: linear-gradient(135deg, var(--panel), var(--mint));
+      font-weight: 900; font-size: 0.92rem;
+    }
+    .ts-mech__card h3 {
+      margin: 0; font-size: 1.15rem; line-height: 1.4;
+    }
+    .ts-mech__card p {
+      margin: 10px 0 0; color: var(--muted); line-height: 1.7;
+    }
+    .ts-mech__list {
+      margin: 14px 0 0; padding-right: 20px; padding-left: 0;
+      color: var(--muted); line-height: 1.7;
+    }
+    .ts-mech__list li { margin-bottom: 4px; }
+
+    @media (max-width: 980px) {
+      .ts-mech { grid-template-columns: 1fr; }
+    }
+
+    .ts-mech__pic {
+      display: block;
+      margin: 20px 0 0;
+    }
+    .ts-mech__pic img {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 220px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background:
+        repeating-linear-gradient(
+          45deg,
+          #f1f6fa,
+          #f1f6fa 12px,
+          #e7eff5 12px,
+          #e7eff5 24px
+        );
+      color: var(--muted);
+      font-size: 0.85rem;
+      box-shadow: 0 4px 14px rgba(16, 35, 63, 0.06);
+    }
+    .ts-mech__pic figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+
+    /* ===== FAQ ===== */
+    .ts-faq { display: grid; gap: 12px; }
+    .ts-faq details {
+      padding: 18px 20px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .ts-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+      line-height: 1.5;
+    }
+    .ts-faq summary::-webkit-details-marker { display: none; }
+    .ts-faq summary::after {
+      content: '+';
+      float: left; margin-right: 12px;
+      color: var(--blue); font-weight: 900;
+    }
+    .ts-faq details[open] summary::after { content: '\2212'; }
+    .ts-faq p {
+      margin: 12px 0 0;
+      color: var(--muted); line-height: 1.7;
+    }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+
+</body>
+</html>

@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>טופס רישום מתנדבים לסיילספורס NPSP — שעות, חתימה, ואימות זהות | TwinaForms</title>
+  <meta name="description" content="טופס רישום וניהול שעות מתנדבים לעמותות, ישירות ל-Salesforce NPSP. אימות זהות במייל, חתימה דיגיטלית, PDF חתום, מובייל ראשון, ללא רישיון Salesforce למתנדב. הנחה לעמותות.">
+  <meta name="keywords" content="טופס רישום מתנדבים, ניהול שעות מתנדבים, טופס מתנדב לסיילספורס, שעות מתנדבים סיילספורס, NPSP מתנדבים, אימות זהות מתנדב, חתימה דיגיטלית מתנדבים, טופס מתנדב חתום, הסכמת הורים מתנדבים, טפסים לעמותות, טפסים לסיילספורס לעמותות, volunteer signup form salesforce, NPSP volunteer form, salesforce volunteer hours form">
+  <link rel="alternate" hreflang="he" href="/he/solutions/npsp/volunteer-signup-form/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/he/solutions/npsp/volunteer-signup-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="טופס רישום מתנדבים לסיילספורס NPSP — שעות, חתימה, ואימות זהות">
+  <meta property="og:description" content="טופס רישום וניהול שעות מתנדבים לעמותות, ישירות ל-Salesforce NPSP. אימות זהות, חתימה, PDF חתום, מובייל. ללא רישיון Salesforce למתנדב.">
+  <meta property="og:url" content="https://twinaforms.com/he/solutions/npsp/volunteer-signup-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/timesheet-form-hero.png">
+  <meta property="og:locale" content="he_IL">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="טופס רישום מתנדבים לסיילספורס NPSP">
+  <meta name="twitter:description" content="טופס רישום וניהול שעות מתנדבים לעמותות, ישירות ל-Salesforce NPSP. אימות, חתימה, PDF, מובייל.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/timesheet-form-hero.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"בית","item":"https://twinaforms.com/he/"},{"@type":"ListItem","position":2,"name":"לעמותות","item":"https://twinaforms.com/he/np.html"},{"@type":"ListItem","position":3,"name":"טופס רישום מתנדבים NPSP","item":"https://twinaforms.com/he/solutions/npsp/volunteer-signup-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"איך עובד אימות הזהות בטופס רישום מתנדבים?","acceptedAnswer":{"@type":"Answer","text":"כשהמתנדב פותח את הקישור לטופס, TwinaForms שולחת קוד חד-פעמי בן 6 ספרות לכתובת המייל שרשומה ב-Salesforce Contact שלו. הוא מקליד את הקוד, הסשן נפתח, ורק אז הוא יכול למלא את הטופס. אם הקוד שגוי או לא הוקלד — הטופס פשוט לא נפתח. זה חוסם רישומים אנונימיים, כפילויות והעברת קישור לאדם לא נכון."}},{"@type":"Question","name":"האם המתנדב צריך חשבון Salesforce?","acceptedAnswer":{"@type":"Answer","text":"לא. הטופס ציבורי לחלוטין — המתנדב פותח את הקישור בדפדפן (גם מהטלפון), עובר את אימות הזהות במייל, ממלא, חותם ושולח. אין רישיון Salesforce למתנדב, אין צורך בחשבון. זה גם החיסכון העיקרי לעמותה — Salesforce Screen Flow היה דורש רישיון לכל מתנדב, מה שלא ריאלי לעמותה עם 50–500 מתנדבים."}},{"@type":"Question","name":"האם זה תומך ב-NPSP Volunteer Hours?","acceptedAnswer":{"@type":"Answer","text":"כן. TwinaForms כותבת לכל אובייקט Salesforce — סטנדרטי או מותאם — כולל אובייקטים של NPSP כמו Volunteer Hours, Households, Affiliations, ו-Campaign Members. אפשר להגדיר שכל שורת משמרת תיצור רשומת Volunteer Hours, או רישום לאירוע ייצור Campaign Member, וכו'."}},{"@type":"Question","name":"האם המתנדב יכול למלא מהטלפון?","acceptedAnswer":{"@type":"Answer","text":"כן. הטופס רספונסיבי מלא — שלב האימות, טבלת המשמרות, פד החתימה, והשליחה — הכל עובד בטלפון. המתנדב חותם באצבע על מסך מגע. אין אפליקציה להוריד, אין פורטל נפרד לבנות. אותו לינק עובד במחשב, בטאבלט ובסמארטפון."}},{"@type":"Question","name":"האם החתימה הדיגיטלית תקפה משפטית (גם להסכמת הורים)?","acceptedAnswer":{"@type":"Answer","text":"TwinaForms קולטת חתימה ידנית בטופס ומטמיעה אותה ב-PDF שנוצר אוטומטית, מצורף לרשומה ב-Salesforce. בשילוב עם אימות הזהות במייל, יש לעמותה ארטיפקט הגנתי: זהותו של החותם אומתה, החתימה הוטמעה ב-PDF, וה-PDF נשמר ב-Salesforce. למידע ספציפי על תקפות משפטית של חתימה דיגיטלית בישראל (חוק החתימה האלקטרונית) מומלץ להיוועץ ביועץ משפטי של העמותה."}},{"@type":"Question","name":"מה ההבדל בינכם לבין Google Forms, אקסל או Salesforce Screen Flow?","acceptedAnswer":{"@type":"Answer","text":"Google Forms — חינמי, אבל לא נכתב ל-Salesforce. כל רישום צריך הזנה ידנית מחדש ל-NPSP, ואין חתימה. אקסל — מתפצל בין רכזות, אין מקור אמת אחד, ואין חתימה. Salesforce Screen Flow — דורש רישיון Salesforce לכל מתנדב, מה שלא ריאלי לעמותה. TwinaForms ציבורי, נכתב ישירות ל-NPSP, כולל אימות זהות, חתימה דיגיטלית, ו-PDF חתום, ללא רישיון לכל מתנדב."}},{"@type":"Question","name":"יש הנחה לעמותה?","acceptedAnswer":{"@type":"Answer","text":"כן. כל המסלולים בתשלום (Starter ו-Pro) זמינים בהנחה משמעותית לעמותות רשומות. שלחו מייל קצר עם שם העמותה, מה תרצו שהטופס יעשה, וכמות הרישומים החודשית — ונחזור עם הצעה ספציפית כולל פירוט ההנחה."}}]}</script>
+
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/he/index.html">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="ניווט ראשי">
+      <a href="/he/index.html#product">המוצר</a>
+      <a href="/he/index.html#plans">מסלולים</a>
+      <a href="/he/np.html">לעמותות</a>
+      <a href="/he/contact.html">צור קשר</a>
+      <a class="lang-switch" href="/index.html" hreflang="en" lang="en">English</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">טופס רישום מתנדבים · Salesforce NPSP</p>
+        <h1>טופס רישום וניהול שעות מתנדבים <span>ישירות ב-Salesforce NPSP</span></h1>
+        <p class="lead">המתנדב פותח קישור בטלפון, עובר אימות זהות במייל, רושם שעות לכמה אירועים בבת אחת, חותם, ושולח. כל רשומה נכנסת ל-NPSP של העמותה אוטומטית, עם PDF חתום מצורף. בלי רישיון Salesforce למתנדב. בלי תפירת אקסל בין רכזות.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס מתנדבים&body=שלום, אני מהעמותה _______ ונרצה לבדוק טופס רישום מתנדבים. הצורך שלנו: ______. כמות רישומים חודשית בערך: ______.">דברו איתנו — הנחה לעמותה</a>
+          <a class="button button-secondary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+        </div>
+        <ul class="trust-pills" aria-label="עיקרי הצעת הערך לטופס מתנדבים NPSP">
+          <li class="trust-pill trust-pill--blue">טבעי ל-NPSP</li>
+          <li class="trust-pill trust-pill--green">אימות זהות מתנדב</li>
+          <li class="trust-pill trust-pill--green">חתימה דיגיטלית + PDF חתום</li>
+          <li class="trust-pill trust-pill--amber">מובייל ראשון — בלי אפליקציה</li>
+        </ul>
+      </div>
+
+      <figure class="ts-hero" aria-label="טופס רישום מתנדבים TwinaForms ל-Salesforce NPSP">
+        <img class="ts-hero__img" src="/assets/timesheet-form-hero.png" alt="טופס רישום מתנדבים TwinaForms לסיילספורס NPSP — אימות זהות במייל, רישום משמרות, חתימה דיגיטלית ושליחה ישירה ל-NPSP מהטלפון">
+        <figcaption class="ts-caption">דוגמת טופס TwinaForms ב-Salesforce (כרגע באנגלית — צילום בעברית יעודכן בקרוב). אותו רעיון בדיוק: המתנדב ממלא, חותם, ושולח — והכל נכנס ל-NPSP.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">הבעיה</p>
+        <h2>למה ניהול שעות מתנדבים בעמותה נשבר כל פעם מחדש</h2>
+        <p>בין אם אתם מנהלים מאה מתנדבים בקהילה, פותחים פנייה (Case) מהשטח, או חותמים על הסכמת הורים לפעילות עם קטינים — סביר שהיום אתם תופרים את הכל עם כלים שלא נבנו לעבודה הזו.</p>
+        <p>רוב העמותות שולחות לינקים של Google Forms שלא נכתבים ל-Salesforce, מסתפקות בקבצי אקסל שמתפצלים בין משרד ורכזות, או נשענות על Salesforce Screen Flow שדורש רישיון Salesforce לכל מתנדב — דבר שלא ריאלי לעמותה עם תקציב מוגבל. גם פורטלי Salesforce Experience Cloud הם פרויקט בקנה מידה גדול, לרוב מעבר ליכולת של עמותה.</p>
+        <p>הכל מתפרק מאותה סיבה: אין טופס Salesforce ציבורי שמתנדב יכול לאמת זהות, לחתום ולשלוח בעצמו.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>הזנה ידנית בכל שבוע</h3>
+          <p>מתנדבים שולחים שעות בוואטסאפ או במייל. רכזת מקלידה ב-NPSP. עם 30 מתנדבים זה הופך לחצי משרה לבדה — ואף אחת לא רוצה לעשות את זה.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>אין רישום חתום</h3>
+          <p>בדוח שנתי או בדיווח לתורם נדרש "מי חתם, מתי, על מה". בלי חתימה דיגיטלית ובלי PDF — אין מה להראות. ברישום שעות לקטינים זה גם דרישה רגולטורית.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>אקסל מפוצל בין רכזות</h3>
+          <p>כל רכזת תורמת או אזורית מנהלת אקסל משלה. שמות מאויתים שונה, תאריכים בפורמטים שונים, ושעות נכפלות. שילוב לדוח חודשי = יום עבודה.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>הסכמת הורים בנייר</h3>
+          <p>פעילות עם קטינים מחייבת חתימת הורה. נייר נשמר אצל מי שזכרה לסרוק. אם רגולטור מבקש — אין ארטיפקט דיגיטלי מסודר ב-NPSP.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section" id="solution">
+      <div>
+        <p class="eyebrow">הפתרון</p>
+        <h2>טופס אחד. אימות, חתימה, ו-NPSP — מהטלפון של המתנדב.</h2>
+        <p class="lead">TwinaForms היא אפליקציה טבעית של Salesforce. בנו טופס רישום מתנדבים פעם אחת ב-Salesforce של העמותה, שלחו את הקישור הציבורי — וכל רישום של מתנדב נכנס ישירות ל-NPSP עם PDF חתום מצורף, אחרי אימות זהות אמיתי.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס מתנדבים">דברו איתנו — הנחה לעמותה</a>
+          <a class="button button-secondary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>רק מתנדבים מאומתים יכולים לשלוח</h3>
+          <p>כל מתנדב מקבל קוד חד-פעמי בן 6 ספרות לכתובת המייל שב-Salesforce Contact שלו. בלי קוד — אין כניסה לטופס. עוצר רישומים אנונימיים, כפילויות, והעברת קישור לא רצויה.</p>
+        </div>
+        <div>
+          <h3>ריבוי משמרות בשליחה אחת</h3>
+          <p>המתנדב מוסיף שורות לפי כמה משמרות שעבד באותו שבוע. כל שורה הופכת לרשומת Volunteer Hours (או רשומה מותאמת) ב-NPSP, מקושרת לאיש הקשר.</p>
+        </div>
+        <div>
+          <h3>מילוי מראש מ-NPSP Contact</h3>
+          <p>שם, פרטים, רשימת אירועים הרלוונטיים למתנדב, ושעת התחלת המשמרת — הכל ממולא מראש מ-NPSP. המתנדב מקליד רק שעות וטקסט חופשי.</p>
+        </div>
+        <div>
+          <h3>חתימה דיגיטלית + PDF חתום</h3>
+          <p>חתימה באצבע על מסך מגע. PDF נוצר אוטומטית עם החתימה מוטמעת, ומצורף לרשומת השעות ב-NPSP. ארטיפקט הגנתי לדוחות, להסכמת הורים, ולתורמים.</p>
+        </div>
+        <div>
+          <h3>מובייל ראשון — בלי אפליקציה</h3>
+          <p>המתנדב לא ליד מחשב. הוא בקהילה, באירוע, במכונית בדרך הביתה. כל שלבי הטופס — אימות, רישום, חתימה — עובדים מצוין בטלפון. אותו לינק עובד גם במחשב.</p>
+        </div>
+        <div>
+          <h3>טבעי ל-NPSP — בלי רישיון למתנדב</h3>
+          <p>הטופס ציבורי, המתנדב לא צריך חשבון Salesforce. השליחה כותבת ל-Volunteer Hours, Campaign Members, Cases, או כל אובייקט אחר — בלי אקסל באמצע, בלי כלי שלישי לתחזק.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FEATURE MECHANICS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">איך זה עובד</p>
+        <h2>חמשת הפיצ'רים שעושים את ההבדל</h2>
+        <p>כל אחד הוא יכולת של TwinaForms שמופיעה גם בדף הבית. הטופס למתנדבים הוא מה שקורה כשמשלבים אותם בטופס אחד.</p>
+      </div>
+
+      <div class="ts-mech">
+
+        <article class="ts-mech__card ts-mech__card--accent ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">01</span>
+            <h3>אימות זהות מתנדב — רק מאומתים שולחים</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>לפני שהטופס בכלל נפתח, המתנדב מקבל קוד חד-פעמי בן 6 ספרות לכתובת המייל שרשומה ב-Salesforce Contact שלו. הוא מקליד את הקוד, הסשן נפתח, ורק אז הוא רואה את הטופס. בלי קוד — אין גישה.</p>
+              <p>זה חוסם רישומים אנונימיים או מוטעים, מונע שליחה כפולה, וחוסם העברת קישור לאדם לא נכון. כל שעת התנדבות שנכנסת ל-NPSP מקושרת לזהות מאומתת, ואירוע האימות עצמו נשמר לתיעוד. בשילוב עם ה-PDF החתום בהמשך, יש לעמותה ארטיפקט הגנתי לתורמים, לרגולטור, ולדוחות.</p>
+              <ul class="ts-mech__list">
+                <li>קוד חד-פעמי במייל ל-Salesforce Contact של המתנדב</li>
+                <li>הטופס לא נפתח בלי אימות מוצלח</li>
+                <li>סשן עם תפוגה — אין טוקנים ארוכי-טווח בדפדפן</li>
+                <li>חוסם שיתוף קישור והגשות כפולות</li>
+              </ul>
+            </div>
+            <figure class="ts-mech__shot">
+              <img src="/assets/user-verification.png" alt="מסך אימות זהות מתנדב TwinaForms — הזנת מייל, קבלת קוד בן 6 ספרות, ולחיצה על אישור כדי לגשת לטופס רישום המתנדבים" loading="lazy">
+              <figcaption>מסך האימות האמיתי שמתנדבים רואים — הזנת מייל, קבלת קוד, אישור.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="ts-mech__card">
+          <header>
+            <span class="ts-mech__num">02</span>
+            <h3>ריבוי שורות שעות — כמה משמרות בשליחה אחת</h3>
+          </header>
+          <p>טופס סטנדרטי נותן לכם שדות אחד, שליחה אחת, רשומה אחת. רישום שעות מתנדב מצריך כמה שורות — אחת לכל משמרת, אירוע, או יום.</p>
+          <p>TwinaForms Repeated Records מאפשרת להגדיר תבנית שורה (אירוע + תאריך + שעת התחלה ושעת סיום, או כל שדות שצריך), והמתנדב מוסיף שורות כמספר המשמרות שעבד. בשליחה — כל שורה הופכת לרשומת Volunteer Hours נפרדת ב-NPSP, כולן מקושרות לאיש הקשר.</p>
+          <ul class="ts-mech__list">
+            <li>הוספה והסרה של שורות בלי טעינה מחדש</li>
+            <li>סיכומים אוטומטיים בסוף השבוע / החודש</li>
+            <li>כל שורה כותבת ל-Volunteer Hours (או כל אובייקט מותאם)</li>
+          </ul>
+          <figure class="ts-mech__pic">
+            <img src="/assets/timesheet-repeated-rows.png" alt="טופס רישום מתנדבים עם ריבוי שורות שעות — שלוש משמרות לאירועים שונים בשורה אחת, שעות לפי יום, וסיכומים — שמירה ישירה לרשומות NPSP" loading="lazy">
+            <figcaption>ריבוי שורות בטופס — שליחה אחת, הרבה רשומות Volunteer Hours.</figcaption>
+          </figure>
+        </article>
+
+        <article class="ts-mech__card">
+          <header>
+            <span class="ts-mech__num">03</span>
+            <h3>מילוי מראש מ-NPSP Contact</h3>
+          </header>
+          <p>כל מתנדב מקבל קישור אישי. כשהוא פותח את הטופס (אחרי האימות), TwinaForms ממלאת מראש את שמו, פרטי הקשר, רשימת האירועים הרלוונטיים לו (מסונן לפי השיוך שלו), ואת רכזת התורנות — הכל נקרא מ-NPSP Contact והרשומות הקשורות.</p>
+          <p>המתנדב מקליד רק מה שמשתנה: שעות, הערות חופשיות. בלי הקלדה חוזרת של רשימת אירועים. בלי "מה היה הקוד של האירוע ההוא?" במייל.</p>
+        </article>
+
+        <article class="ts-mech__card ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">04</span>
+            <h3>מובייל ראשון — מתנדבים בשטח</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>מתנדבים לא ליד מחשב. הם בקהילה, באירוע, במכונית בדרך הביתה, או באוטובוס בדרך לפעילות הבאה. הטופס של TwinaForms רספונסיבי מלא — האימות, טבלת המשמרות, פד החתימה, וההגשה — הכל עובד בטלפון.</p>
+              <p>אין אפליקציה להתקין. אין "פורטל מובייל" נפרד לבנות. אותו לינק עובד במחשב, בטאבלט ובסמארטפון, והמתנדב חותם באצבע על מסך מגע.</p>
+            </div>
+            <figure class="ts-mech__shot ts-mech__shot--phone">
+              <img src="/assets/timesheet-mobile.png" alt="טופס רישום מתנדבים בטלפון — אימות, רישום משמרות וחתימה דיגיטלית במסך נייד, בלי אפליקציה" loading="lazy">
+              <figcaption>הטופס בטלפון — אימות, מילוי, חתימה, ושליחה. בלי אפליקציה.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="ts-mech__card ts-mech__card--wide">
+          <header>
+            <span class="ts-mech__num">05</span>
+            <h3>PDF חתום + רשומות NPSP טבעיות — שליחה אחת, שתי תוצאות</h3>
+          </header>
+          <div class="ts-mech__cols">
+            <div class="ts-mech__text">
+              <p>בשליחה — שני דברים קורים אוטומטית. ראשית, TwinaForms יוצרת PDF חתום: אותן שורות, אותם סיכומים, אותה חתימה ידנית — ומצרפת אותו כקובץ ל-Salesforce על רשומת ההורה של השליחה. שנית, הנתונים המובנים נכתבים ל-NPSP כרשומות: רשומת אם של השליחה, ושורת Volunteer Hours לכל משמרת.</p>
+              <p>ה-PDF הוא הארטיפקט — מה ששולחים לתורם, לדוח שנתי, או לרגולטור (כולל הסכמות הורים). הרשומות הן הדאטה — מה שמפעיל את התהליכים, הדוחות, והדשבורדים שכבר קיימים ב-NPSP שלכם. הכל משליחה אחת. בלי הוצאת PDF ידנית. בלי תוסף DocuSign. בלי כלי שלישי לסנכרן.</p>
+              <ul class="ts-mech__list">
+                <li>חתימה ידנית בתוך הטופס</li>
+                <li>PDF נוצר אוטומטית בשליחה, עם החתימה מוטמעת</li>
+                <li>PDF מצורף כקובץ Salesforce לרשומה</li>
+                <li>רשומות נכתבות לאובייקטים סטנדרטיים או מותאמים של NPSP — בלי Apex</li>
+                <li>תהליכי אישור, דוחות ודשבורדים קיימים ממשיכים לעבוד</li>
+              </ul>
+              <p style="margin-top:14px"><a href="/assets/timesheet-signed-sample.pdf" target="_blank" rel="noopener" style="color:var(--blue);font-weight:800;text-decoration:none">הורידו דוגמת PDF חתום ←</a></p>
+            </div>
+            <figure class="ts-mech__shot">
+              <img src="/assets/timesheet-signed-pdf.png" alt="דוגמת PDF חתום של רישום מתנדב — שורות משמרות, סיכומי שעות, וחתימה ידנית, נוצר אוטומטית בשליחה ומצורף לרשומה ב-Salesforce NPSP" loading="lazy">
+              <figcaption>דוגמת PDF חתום של רישום מתנדב — נוצר בשליחה ומצורף לרשומה ב-NPSP יחד עם הדאטה.</figcaption>
+            </figure>
+          </div>
+        </article>
+
+      </div>
+
+      <div class="install-cta" style="margin-top:42px">
+        <div class="install-cta__body">
+          <span class="install-cta__badge">הנחה לעמותה</span>
+          <h3>תרצו לראות איך זה נראה אצלכם?</h3>
+          <p>שלחו מייל קצר עם שם העמותה, מה תרצו שהטופס יעשה (רישום מתנדבים, שעות, הסכמות הורים, או רישום לאירוע), וכמות הרישומים החודשית בערך — ונחזור עם המלצה ספציפית לעמותה, כולל פירוט ההנחה. אפשר גם להתקין ב-Sandbox ולנסות לבד. <a href="mailto:supportat@twinaforms.com">supportat@twinaforms.com</a></p>
+        </div>
+        <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס מתנדבים">דברו איתנו</a>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">שאלות נפוצות</p>
+        <h2>שאלות נפוצות על טופס רישום מתנדבים NPSP</h2>
+      </div>
+
+      <div class="ts-faq">
+        <details>
+          <summary>איך עובד אימות הזהות בטופס רישום מתנדבים?</summary>
+          <p>כשהמתנדב פותח את הקישור לטופס, TwinaForms שולחת קוד חד-פעמי בן 6 ספרות לכתובת המייל שרשומה ב-Salesforce Contact שלו. הוא מקליד את הקוד, הסשן נפתח, ורק אז הוא יכול למלא את הטופס. אם הקוד שגוי או לא הוקלד — הטופס פשוט לא נפתח. זה חוסם רישומים אנונימיים, כפילויות, והעברת קישור לאדם לא נכון.</p>
+        </details>
+        <details>
+          <summary>האם המתנדב צריך חשבון Salesforce?</summary>
+          <p>לא. הטופס ציבורי לחלוטין — המתנדב פותח את הקישור בדפדפן (גם מהטלפון), עובר את אימות הזהות במייל, ממלא, חותם ושולח. אין רישיון Salesforce למתנדב, אין צורך בחשבון. זה גם החיסכון העיקרי לעמותה — Salesforce Screen Flow היה דורש רישיון לכל מתנדב, מה שלא ריאלי לעמותה עם 50–500 מתנדבים.</p>
+        </details>
+        <details>
+          <summary>האם זה תומך ב-NPSP Volunteer Hours?</summary>
+          <p>כן. TwinaForms כותבת לכל אובייקט Salesforce — סטנדרטי או מותאם — כולל אובייקטים של NPSP כמו Volunteer Hours, Households, Affiliations, ו-Campaign Members. אפשר להגדיר שכל שורת משמרת תיצור רשומת Volunteer Hours, או שרישום לאירוע ייצור Campaign Member, וכו'.</p>
+        </details>
+        <details>
+          <summary>האם המתנדב יכול למלא מהטלפון?</summary>
+          <p>כן. הטופס רספונסיבי מלא — שלב האימות, טבלת המשמרות, פד החתימה, והשליחה — הכל עובד בטלפון. המתנדב חותם באצבע על מסך מגע. אין אפליקציה להוריד, אין פורטל נפרד לבנות. אותו לינק עובד במחשב, בטאבלט ובסמארטפון.</p>
+        </details>
+        <details>
+          <summary>האם החתימה הדיגיטלית תקפה משפטית (גם להסכמת הורים)?</summary>
+          <p>TwinaForms קולטת חתימה ידנית בטופס ומטמיעה אותה ב-PDF שנוצר אוטומטית, מצורף לרשומה ב-Salesforce. בשילוב עם אימות הזהות במייל, יש לעמותה ארטיפקט הגנתי: זהותו של החותם אומתה, החתימה הוטמעה ב-PDF, וה-PDF נשמר ב-Salesforce. למידע ספציפי על תקפות משפטית של חתימה דיגיטלית בישראל (חוק החתימה האלקטרונית) מומלץ להיוועץ ביועץ משפטי של העמותה.</p>
+        </details>
+        <details>
+          <summary>מה ההבדל בינכם לבין Google Forms, אקסל או Salesforce Screen Flow?</summary>
+          <p><strong>Google Forms</strong> — חינמי, אבל לא נכתב ל-Salesforce. כל רישום צריך הזנה ידנית מחדש ל-NPSP, ואין חתימה דיגיטלית. <strong>אקסל</strong> — מתפצל בין רכזות, אין מקור אמת אחד, ואין חתימה. <strong>Salesforce Screen Flow</strong> — דורש רישיון Salesforce לכל מתנדב, מה שלא ריאלי לעמותה עם עשרות או מאות מתנדבים. <strong>Salesforce Experience Cloud</strong> — פרויקט בקנה מידה גדול, מעבר ליכולת של רוב העמותות. <strong>TwinaForms</strong> — ציבורי, נכתב ישירות ל-NPSP, כולל אימות זהות, חתימה דיגיטלית, ו-PDF חתום, בלי רישיון Salesforce לכל מתנדב, ובהנחה לעמותות.</p>
+        </details>
+        <details>
+          <summary>יש הנחה לעמותה?</summary>
+          <p>כן. כל המסלולים בתשלום (Starter ו-Pro) זמינים בהנחה משמעותית לעמותות רשומות. שלחו מייל קצר עם שם העמותה, מה תרצו שהטופס יעשה, וכמות הרישומים החודשית — ונחזור עם הצעה ספציפית כולל פירוט ההנחה.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">בואו נדבר</p>
+        <h2>תפסיקו לרדוף אחרי שעות מתנדבים. השיקו טופס חתום עם NPSP השבוע.</h2>
+        <p style="margin-top:20px">המסלולים מתחילים מחינמי. הנחה משמעותית לעמותות רשומות. כדאי גם להציץ ב<a href="/he/np.html" style="color:#74b3f3">דף לעמותות</a> אם רוצים תמונה רחבה יותר של מה TwinaForms עושה ל-NPSP.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="mailto:supportat@twinaforms.com?subject=פנייה מעמותה — טופס מתנדבים">דברו איתנו — הנחה לעמותה</a>
+          <a class="button button-secondary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">נסו ב-Sandbox</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>מוצר של Harmony-IT</span>
+    </div>
+    <nav aria-label="ניווט תחתון">
+      <a href="/he/index.html">דף הבית</a>
+      <a href="/he/solutions/">פתרונות</a>
+      <a href="/he/np.html">לעמותות</a>
+      <a href="/help/index.html">עזרה</a>
+      <a href="/he/privacy.html">פרטיות</a>
+      <a href="/he/terms.html">תנאי שימוש</a>
+      <a href="/he/contact.html">צור קשר</a>
+    </nav>
+  </footer>
+
+  <!-- Page-scoped styles (copied from the English timesheet-form page so the layout matches) -->
+  <style>
+    /* ===== Typography overrides (H1 > H2 hierarchy) ===== */
+    .hero-section h1 {
+      font-size: clamp(2.1rem, 3.8vw, 3.1rem);
+      line-height: 1.12;
+      letter-spacing: 0;
+      max-width: 720px;
+    }
+    .hero-section h1 span { display: inline; }
+    .hero-section .lead {
+      font-size: 1.05rem;
+      line-height: 1.7;
+    }
+    main h2 {
+      font-size: clamp(1.45rem, 2.5vw, 2.0rem);
+      line-height: 1.3;
+      letter-spacing: 0;
+      font-weight: 800;
+    }
+
+    /* ===== Hero screenshot ===== */
+    .ts-hero { margin: 0; }
+    .ts-hero__img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #cbd9e6;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow:
+        0 30px 60px rgba(5, 103, 216, 0.20),
+        0 12px 30px rgba(16, 35, 63, 0.10),
+        0 0 80px rgba(5, 103, 216, 0.12);
+    }
+    .ts-caption {
+      margin: 14px 2px 0;
+      color: var(--muted); font-size: 0.86rem; line-height: 1.7;
+    }
+
+    /* Two-column hero on wide screens */
+    @media (min-width: 981px) {
+      .hero-section {
+        grid-template-columns: 1fr 1.05fr;
+        gap: 56px;
+        align-items: start;
+      }
+    }
+
+    /* ===== Mechanics cards ===== */
+    .ts-mech {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+    .ts-mech__card {
+      padding: 28px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--white);
+      box-shadow: 0 4px 14px rgba(16, 35, 63, 0.05);
+      border-top: 4px solid var(--blue);
+    }
+    .ts-mech__card--accent {
+      border-top-color: var(--green);
+      background: linear-gradient(180deg, #f3fbf6, var(--white) 30%);
+    }
+    .ts-mech__card--accent .ts-mech__num {
+      color: #0b6d48;
+      background: linear-gradient(135deg, var(--mint), #d6f1e2);
+    }
+    .ts-mech__card--wide { grid-column: 1 / -1; }
+
+    .ts-mech__cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+    .ts-mech__text > p:first-child { margin-top: 0; }
+    .ts-mech__shot {
+      margin: 0;
+      display: grid; gap: 10px;
+    }
+    .ts-mech__shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdfe;
+      box-shadow: 0 8px 24px rgba(16, 35, 63, 0.08);
+    }
+    .ts-mech__shot figcaption {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+    @media (max-width: 980px) {
+      .ts-mech__cols { grid-template-columns: 1fr; }
+    }
+
+    /* Phone screenshots render smaller and centered */
+    .ts-mech__shot--phone {
+      align-self: center;
+      justify-self: center;
+      max-width: 280px;
+    }
+    .ts-mech__shot--phone img {
+      max-width: 100%;
+    }
+
+    .ts-mech__card header {
+      display: flex; align-items: flex-start; gap: 14px;
+      margin-bottom: 12px;
+    }
+    .ts-mech__num {
+      flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      color: var(--blue-dark);
+      background: linear-gradient(135deg, var(--panel), var(--mint));
+      font-weight: 900; font-size: 0.92rem;
+    }
+    .ts-mech__card h3 {
+      margin: 0; font-size: 1.15rem; line-height: 1.4;
+    }
+    .ts-mech__card p {
+      margin: 10px 0 0; color: var(--muted); line-height: 1.7;
+    }
+    .ts-mech__list {
+      margin: 14px 0 0; padding-right: 20px; padding-left: 0;
+      color: var(--muted); line-height: 1.7;
+    }
+    .ts-mech__list li { margin-bottom: 4px; }
+
+    @media (max-width: 980px) {
+      .ts-mech { grid-template-columns: 1fr; }
+    }
+
+    .ts-mech__pic {
+      display: block;
+      margin: 20px 0 0;
+    }
+    .ts-mech__pic img {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 220px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background:
+        repeating-linear-gradient(
+          45deg,
+          #f1f6fa,
+          #f1f6fa 12px,
+          #e7eff5 12px,
+          #e7eff5 24px
+        );
+      color: var(--muted);
+      font-size: 0.85rem;
+      box-shadow: 0 4px 14px rgba(16, 35, 63, 0.06);
+    }
+    .ts-mech__pic figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+
+    /* ===== FAQ ===== */
+    .ts-faq { display: grid; gap: 12px; }
+    .ts-faq details {
+      padding: 18px 20px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .ts-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+      line-height: 1.5;
+    }
+    .ts-faq summary::-webkit-details-marker { display: none; }
+    .ts-faq summary::after {
+      content: '+';
+      float: left; margin-right: 12px;
+      color: var(--blue); font-weight: 900;
+    }
+    .ts-faq details[open] summary::after { content: '\2212'; }
+    .ts-faq p {
+      margin: 12px 0 0;
+      color: var(--muted); line-height: 1.7;
+    }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+
+</body>
+</html>

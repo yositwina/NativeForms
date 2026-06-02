@@ -9,15 +9,31 @@
   <link rel="alternate" hreflang="he" href="/he/index.html">
   <link rel="alternate" hreflang="x-default" href="/index.html">
   <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="TwinaForms | Native Salesforce Forms">
+  <meta property="og:description" content="TwinaForms is a native Salesforce app for publishing secure public forms, prefilling Salesforce data, and writing submissions back to Salesforce.">
+  <meta property="og:url" content="https://twinaforms.com/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="TwinaForms | Native Salesforce Forms">
+  <meta name="twitter:description" content="TwinaForms is a native Salesforce app for publishing secure public forms, prefilling Salesforce data, and writing submissions back to Salesforce.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"TwinaForms","alternateName":"Twina Forms","url":"https://twinaforms.com","logo":"https://twinaforms.com/assets/image.png","description":"Native Salesforce form builder","parentOrganization":{"@type":"Organization","name":"Harmony-IT"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"TwinaForms","alternateName":"Twina Forms","keywords":"free Salesforce forms, free Salesforce form builder, Salesforce forms free, free Salesforce native forms, Salesforce form builder, native Salesforce forms, Salesforce native form, Salesforce form to update record, טפסים חינם לסיילספורס, טפסים חינם ל-Salesforce, בונה טפסים חינם לסיילספורס, טפסים לסיילספורס, טפסים סיילספורס, טפסים ל-Salesforce, טפסים נטיביים לסיילספורס, טפסים סיילספורסס","operatingSystem":"Web, Salesforce","applicationCategory":"BusinessApplication","applicationSubCategory":"Form Builder","description":"Native Salesforce form builder for designing, publishing, and operating forms tied to Salesforce records.","url":"https://twinaforms.com","publisher":{"@type":"Organization","name":"Harmony-IT"},"offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Starter","price":"60","priceCurrency":"USD"},{"@type":"Offer","name":"Pro","price":"200","priceCurrency":"USD"}]}</script>
+
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="/">
-      <span class="brand-mark" aria-hidden="true">TF</span>
-      <span>TwinaForms</span>
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
     </a>
     <nav class="site-nav" aria-label="Main navigation">
       <a href="#product">Product</a>
+      <a href="/solutions/">Solutions</a>
       <a href="#security">Security</a>
       <a href="#plans">Plans</a>
       <a href="#about">About</a>
@@ -34,7 +50,7 @@
         <h2>Simply create public forms <span>directly from Salesforce</span></h2>
         <p class="lead">TwinaForms is a native Salesforce app that helps teams create public forms, prefill known data, collect submissions, and write results back to Salesforce without building a custom portal.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="/contact.html">Request access</a>
+          <a class="button button-primary" href="#install">Try in sandbox</a>
           <a class="button button-secondary" href="#plans">View plans</a>
         </div>
         <ul class="trust-pills" aria-label="Key product attributes">
@@ -90,13 +106,48 @@
           <p>Form designers work from Salesforce tabs with simple UX instead of switching to a separate form-builder account for daily work.</p>
         </div>
         <div>
-          <h3>Secret-code workflows</h3>
-          <p>Forms can use a secret-code step for sensitive flows where the respondent should verify access before continuing.</p>
+          <h3>User Verification on Form</h3>
+          <p>Add a verification step before users can access the form, using a one-time code sent to their email. Ideal for protecting existing contacts' info and prefill data.</p>
+          <p style="margin-top:10px"><a href="/solutions/salesforce/user-verification/" style="color:var(--blue);font-weight:700;text-decoration:none">User verification for Salesforce forms &rarr;</a></p>
         </div>
         <div>
           <h3>Page Layout Clone</h3>
           <p>Create a form based on a Salesforce object page layout in one click, including prefill and submission settings.</p>
         </div>
+      </div>
+    </section>
+
+    <section class="section" id="solutions" aria-label="TwinaForms solution pages">
+      <div class="section-heading">
+        <p class="eyebrow">Solutions</p>
+        <h2>Built for specific Salesforce processes.</h2>
+        <p>One TwinaForms setup, many concrete use cases. Start with the recommended solution pages &mdash; more on the way.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">TS</span>
+          <h3><a href="/solutions/salesforce/timesheet-form/" style="color:inherit;text-decoration:none">Salesforce timesheet form</a></h3>
+          <p>Track contractor, consultant, and employee hours directly in Salesforce. Verified user identity, signed PDF receipt, mobile responsive &mdash; native to Salesforce.</p>
+          <p style="margin-top:14px"><a href="/solutions/salesforce/timesheet-form/" style="color:var(--blue);font-weight:800;text-decoration:none">See the Salesforce timesheet form solution &rarr;</a></p>
+        </article>
+        <article class="feature-card" style="opacity:0.7">
+          <span class="feature-icon" style="background:linear-gradient(135deg,#eef4f8,#f3fbf6);color:#5f6f84">NP</span>
+          <h3>NPSP volunteer signup form</h3>
+          <p>For nonprofit volunteer hours, donor self-updates, and grant intake. Page in development.</p>
+          <p style="margin-top:14px;color:var(--muted);font-weight:700">In development</p>
+        </article>
+        <article class="feature-card" style="opacity:0.7">
+          <span class="feature-icon" style="background:linear-gradient(135deg,#eef4f8,#f3fbf6);color:#5f6f84">UC</span>
+          <h3>Salesforce update contact form</h3>
+          <p>Let contacts and donors update their own records, prefilled and verified, without exposing data.</p>
+          <p style="margin-top:14px;color:var(--muted);font-weight:700">In development</p>
+        </article>
+        <article class="feature-card" style="opacity:0.7">
+          <span class="feature-icon" style="background:linear-gradient(135deg,#eef4f8,#f3fbf6);color:#5f6f84">IF</span>
+          <h3>Salesforce intake form</h3>
+          <p>Client onboarding, case intake, and program/grant intake forms with signed PDF on file.</p>
+          <p style="margin-top:14px;color:var(--muted);font-weight:700">In development</p>
+        </article>
       </div>
     </section>
 
@@ -114,6 +165,10 @@
         <article>
           <h3>AWS protects the public form layer</h3>
           <p>Published forms run on AWS, one of the world’s most trusted cloud platforms for secure hosting, storage, and application delivery.</p>
+        </article>
+        <article>
+          <h3>Uploaded files are scanned for malware</h3>
+          <p>Files uploaded through Pro forms are scanned by AWS before they can be attached to Salesforce records.</p>
         </article>
         <article>
           <h3>Encrypted operational data</h3>
@@ -163,7 +218,7 @@
             <li>All Free features</li>
             <li>Conditional logic</li>
             <li>Page Layout clone</li>
-            <li>Contact verification on form</li>
+            <li>User Verification on form</li>
           </ul>
         </article>
         <article class="plan-card" data-tier="pro">
@@ -174,12 +229,13 @@
           <p>For richer processes with advanced actions, repeatable data, and custom form behavior.</p>
           <ul>
             <li>Unlimited forms</li>
-            <li>Unlimited monthly submissions</li>
+            <li>10,000 monthly submissions</li>
             <li>5 active Salesforce users</li>
             <li>All Starter features</li>
             <li>Survey fields</li>
             <li>Repeated records table</li>
-            <li>File uploads</li>
+            <li>Country / State / City autocomplete</li>
+            <li>File uploads (scanned for malware)</li>
             <li>Signature</li>
             <li>Formula fields</li>
             <li>Post Submit redirect</li>
@@ -215,7 +271,7 @@
             <p>Create a draft form based on a Salesforce object page layout.</p>
           </article>
           <article>
-            <h4>Contact Verification on Form</h4>
+            <h4>User Verification on Form</h4>
             <p>Add a verification step before users can access the form, using a one-time code sent to their email.</p>
           </article>
           <article>
@@ -227,8 +283,12 @@
             <p>Collect and submit multiple rows of related records like products, household members, or case items in one form.</p>
           </article>
           <article>
+            <h4>Country / State / City</h4>
+            <p>Add a grouped country, state/region, and city autocomplete field backed by TwinaForms AWS location data, with no Google API key or Google billing required.</p>
+          </article>
+          <article>
             <h4>File Uploads</h4>
-            <p>Allow forms to upload files.</p>
+            <p>Collect file uploads that are scanned by AWS for malware before they are attached to Salesforce records.</p>
           </article>
           <article>
             <h4>Signature</h4>
@@ -260,8 +320,13 @@
           </article>
         </div>
       </div>
-      <div class="plans-cta">
-        <p>TwinaForms will be available on Salesforce AppExchange soon. For early access or plan questions, contact <a href="mailto:supportat@twinaforms.com">supportat@twinaforms.com</a>.</p>
+      <div class="install-cta" id="install">
+        <div class="install-cta__body">
+          <span class="install-cta__badge">Early access</span>
+          <h3>Try TwinaForms in a Salesforce sandbox</h3>
+          <p>Install the managed package directly into a Salesforce sandbox and run a real form end-to-end. The AppExchange listing is in progress &mdash; for plan questions or upgrade conversations, email <a href="mailto:supportat@twinaforms.com">supportat@twinaforms.com</a>.</p>
+        </div>
+        <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GNDZQA4" target="_blank" rel="noopener">Install in sandbox</a>
       </div>
     </section>
 
@@ -280,10 +345,15 @@
       <span>A Harmony-IT product</span>
     </div>
     <nav aria-label="Footer navigation">
+      <a href="/">Home</a>
+      <a href="/solutions/">Solutions</a>
+      <a href="/help/index.html">Help</a>
       <a href="/privacy.html">Privacy</a>
       <a href="/terms.html">Terms</a>
       <a href="/contact.html">Contact</a>
     </nav>
   </footer>
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+
 </body>
 </html>
