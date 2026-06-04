@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>NativeForms_Secret_Code__c</fullName>
+    <fullName>NativeForms_User_Verification_Number__c</fullName>
     <description>Stores the latest NativeForms verification number for support and admin visibility.</description>
     <externalId>false</externalId>
     <inlineHelpText>Latest NativeForms 6-digit verification number sent to this Contact.</inlineHelpText>

@@ -1,6 +1,6 @@
 # Salesforce Packaging Namespace Audit V1
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## Current TwinaForms Managed 2GP Package
 
@@ -13,13 +13,13 @@ Last updated: 2026-06-03
 - latest package code coverage: `83%`
 - latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GWbpQAG`
 - latest released note: includes Merged Document, locked Lookup runtime behavior after prefill, Layout-to-Form picklist source-property preservation, textarea character-limit UX/publish handling, the Pro Button element, Country / State / City autocomplete, updated User Verification and Submission PDF/signature UX, scanned-file-upload support, App Launcher branding, 69 KB embedded image guards for publish stability, and the published 1-5 Star Rating label fix
-- latest beta package version create request id: `08cgL0000009qqbQAA`
-- latest beta package2 version id: `05igL0000003VNRQA2`
-- latest beta subscriber package version id: `04tgL000000GWTlQAO`
-- latest beta version number: `0.9.0.7`
+- latest beta package version create request id: `08cgL0000009t5JQAQ`
+- latest beta package2 version id: `05igL0000003WhhQAE`
+- latest beta subscriber package version id: `04tgL000000GZ6fQAG`
+- latest beta version number: `0.10.0.1`
 - latest beta package code coverage: not calculated for this beta package version
-- latest beta sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GWTlQAO`
-- latest beta note: includes Merged Document, locked Lookup runtime behavior after prefill, Layout-to-Form picklist source-property preservation, textarea character-limit UX/publish handling, the Pro Button element, Country / State / City autocomplete, updated User Verification and Submission PDF/signature UX, scanned-file-upload support, App Launcher branding, 69 KB embedded image guards for publish stability, and the published 1-5 Star Rating label fix
+- latest beta sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GZ6fQAG`
+- latest beta note: User Verification rename beta. The active implementation uses `NativeFormsUserVerificationApi`, `/nativeforms/user-verification`, `Enable_Pro_User_Verification__c`, `NativeForms_User_Verification_Default`, and new Contact verification fields. Because this is a promoted managed 2GP package and metadata deletion access is not enabled, the previously released `NativeFormsSecretCodeApi`, `/nativeforms/secret-code`, old Contact/config fields, and old email template remain packaged as compatibility components.
 - target namespace: `twinaforms`
 
 ## Packaging Note

@@ -345,7 +345,7 @@ private class NativeFormsCoreServicesTest {
             'enableProPageLayoutClone' => true,
             'enableProFormulaFields' => true,
             'enableProPostSubmitAutoLink' => 'true',
-            'enableProSfSecretCodeAuth' => true,
+            'enableProUserVerification' => true,
             'enableProLoadFile' => true,
             'enableProCustomJs' => true
         };
@@ -366,7 +366,7 @@ private class NativeFormsCoreServicesTest {
         Boolean pageLayoutClone = NativeFormsFeatureFlags.isProPageLayoutCloneEnabled();
         Boolean formulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         Boolean autoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
-        Boolean secretCode = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
+        Boolean userVerification = NativeFormsFeatureFlags.isProSfUserVerificationAuthEnabled();
         Boolean loadFile = NativeFormsFeatureFlags.isProLoadFileEnabled();
         Boolean customJs = NativeFormsFeatureFlags.isProCustomJsEnabled();
         Test.stopTest();
@@ -381,7 +381,7 @@ private class NativeFormsCoreServicesTest {
         System.assertEquals(true, pageLayoutClone);
         System.assertEquals(true, formulaFields);
         System.assertEquals(true, autoLink);
-        System.assertEquals(true, secretCode);
+        System.assertEquals(true, userVerification);
         System.assertEquals(true, loadFile);
         System.assertEquals(true, customJs);
         }

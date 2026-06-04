@@ -91,7 +91,7 @@ private class NativeFormsPublisherTest {
             'enableProPageLayoutClone' => true,
             'enableProFormulaFields' => true,
             'enableProPostSubmitAutoLink' => true,
-            'enableProSfSecretCodeAuth' => true,
+            'enableProUserVerification' => true,
             'enableProLoadFile' => true,
             'enableProElectronicSignature' => true,
             'enableProSubmissionPdf' => true,
@@ -280,7 +280,7 @@ private class NativeFormsPublisherTest {
         System.assertEquals(1, mock.uploadCalls, 'Publish should upload the generated HTML exactly once.');
         System.assertEquals(1, mock.registerCalls, 'Publish should register the published form exactly once.');
         System.assert(String.isNotBlank(mock.uploadedHtml), 'Successful publish should upload generated HTML.');
-        System.assert(mock.uploadedHtml.contains('nf-secret-verify'), 'Generated HTML should include the User Verification section when enabled.');
+        System.assert(mock.uploadedHtml.contains('nf-user-verification'), 'Generated HTML should include the User Verification section when enabled.');
         System.assert(mock.uploadedHtml.contains('data-formula-target="true"'), 'Generated HTML should include formula metadata for formula fields.');
         System.assert(mock.uploadedHtml.contains('uploadStatusUrl'), 'Generated HTML should publish the upload scan status endpoint.');
         System.assert(mock.uploadedHtml.contains('waitForSafeUpload'), 'Generated HTML should wait for malware scan completion before accepting uploaded files.');
@@ -340,10 +340,10 @@ private class NativeFormsPublisherTest {
         System.assertEquals(true, captcha.get('enabled'), 'Register payload should enable CAPTCHA when the form requires it.');
         System.assert(String.isNotBlank(String.valueOf(captcha.get('siteKey'))), 'Register payload should include the shared CAPTCHA site key.');
 
-        Map<String, Object> secretCodeConfig = (Map<String, Object>) registerPayload.get('secretCodeConfig');
-        System.assertEquals(true, secretCodeConfig.get('enabled'), 'Register payload should include User Verification settings when enabled.');
-        System.assertEquals('Email', String.valueOf(secretCodeConfig.get('matchField')), 'Register payload should preserve the configured User Verification match field.');
-        System.assertEquals('short', String.valueOf(secretCodeConfig.get('sessionMode')), 'User Verification sessions should default to short mode.');
+        Map<String, Object> userVerificationConfig = (Map<String, Object>) registerPayload.get('userVerificationConfig');
+        System.assertEquals(true, userVerificationConfig.get('enabled'), 'Register payload should include User Verification settings when enabled.');
+        System.assertEquals('Email', String.valueOf(userVerificationConfig.get('matchField')), 'Register payload should preserve the configured User Verification match field.');
+        System.assertEquals('short', String.valueOf(userVerificationConfig.get('sessionMode')), 'User Verification sessions should default to short mode.');
         Map<String, Object> submissionPdfConfig = (Map<String, Object>) registerPayload.get('submissionPdf');
         System.assertEquals(true, submissionPdfConfig.get('rtlEnabled'), 'Submission PDF config should preserve the form RTL setting.');
         List<Object> submissionPdfSchema = (List<Object>) submissionPdfConfig.get('schema');
@@ -622,15 +622,15 @@ private class NativeFormsPublisherTest {
             'postSubmitAutoLinkEnabled' => true,
             'postSubmitUrlMode' => 'formula',
             'postSubmitUrlFormula' => 'IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")',
-            'secretCodeVerificationEnabled' => true,
-            'secretCodeMatchField' => 'Email',
-            'secretCodeIntroText' => 'Enter your email to continue.',
-            'secretCodeSentMessage' => 'We sent a code.',
-            'secretCodeInvalidMessage' => 'Invalid code.',
-            'secretCodeVerifiedMessage' => 'Code verified.',
-            'secretCodeSendButtonLabel' => 'Send Code',
-            'secretCodeVerifyButtonLabel' => 'Verify Code',
-            'secretCodeResendButtonLabel' => 'Resend Verification Number',
+            'userVerificationEnabled' => true,
+            'userVerificationMatchField' => 'Email',
+            'userVerificationIntroText' => 'Enter your email to continue.',
+            'userVerificationSentMessage' => 'We sent a code.',
+            'userVerificationInvalidMessage' => 'Invalid code.',
+            'userVerificationVerifiedMessage' => 'Code verified.',
+            'userVerificationSendButtonLabel' => 'Send Code',
+            'userVerificationVerifyButtonLabel' => 'Verify Code',
+            'userVerificationResendButtonLabel' => 'Resend Verification Number',
             'submissionPdfEnabled' => true,
             'submissionPdfAttachToRecord' => true,
             'submissionPdfTargetSubmitActionKey' => 'submitAction3',

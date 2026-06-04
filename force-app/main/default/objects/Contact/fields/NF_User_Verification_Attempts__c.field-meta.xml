@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>NativeForms_Secret_Code_Attempts__c</fullName>
+    <fullName>NF_User_Verification_Attempts__c</fullName>
     <description>How many failed verification attempts were made against the latest NativeForms verification number.</description>
     <externalId>false</externalId>
     <inlineHelpText>Failed attempts for the latest NativeForms verification number.</inlineHelpText>

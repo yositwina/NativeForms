@@ -209,7 +209,7 @@ Cover:
 - `NativeFormsSetupController`
 - `NativeFormsHomeController`
 - `NativeFormsAdminController`
-- `NativeFormsSecretCodeApi`
+- `NativeFormsUserVerificationApi`
 
 Focus:
 

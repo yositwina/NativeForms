@@ -295,7 +295,7 @@ Show the current feature flags:
 - advanced submit modes
 - formula fields
 - post-submit auto link
-- secret code auth
+- verification number auth
 - load file
 
 For each feature show:

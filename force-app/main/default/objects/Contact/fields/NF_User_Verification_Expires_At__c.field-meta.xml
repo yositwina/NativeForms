@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>NativeForms_Secret_Code_Expires_At__c</fullName>
+    <fullName>NF_User_Verification_Expires_At__c</fullName>
     <description>When the latest NativeForms verification number expires.</description>
     <externalId>false</externalId>
     <inlineHelpText>Expiration date/time for the latest NativeForms verification number.</inlineHelpText>

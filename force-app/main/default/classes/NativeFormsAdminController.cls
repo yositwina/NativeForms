@@ -6,7 +6,7 @@ public with sharing class NativeFormsAdminController {
         @AuraEnabled public Boolean enableProAdvancedSubmitModes { get; set; }
         @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
-        @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
+        @AuraEnabled public Boolean enableProUserVerification { get; set; }
         @AuraEnabled public Boolean enableProLoadFile { get; set; }
         @AuraEnabled public String captchaSiteKey { get; set; }
         @AuraEnabled public String captchaSecretKey { get; set; }
@@ -22,7 +22,7 @@ public with sharing class NativeFormsAdminController {
         settings.enableProAdvancedSubmitModes = config != null && config.Enable_Pro_Advanced_Submit_Modes__c;
         settings.enableProFormulaFields = config != null && config.Enable_Pro_Formula_Fields__c;
         settings.enableProPostSubmitAutoLink = config != null && config.Enable_Pro_Post_Submit_Auto_Link__c;
-        settings.enableProSfSecretCodeAuth = config != null && config.Enable_Pro_SF_Secret_Code_Auth__c;
+        settings.enableProUserVerification = config != null && config.Enable_Pro_User_Verification__c;
         settings.enableProLoadFile = config != null && config.Enable_Pro_Load_File__c;
         settings.captchaSiteKey = NativeFormsPublisher.getSharedCaptchaSiteKey();
         settings.captchaSecretKey = '';
@@ -44,7 +44,7 @@ public with sharing class NativeFormsAdminController {
         config.Enable_Pro_Advanced_Submit_Modes__c = inputValue != null && inputValue.enableProAdvancedSubmitModes == true;
         config.Enable_Pro_Formula_Fields__c = inputValue != null && inputValue.enableProFormulaFields == true;
         config.Enable_Pro_Post_Submit_Auto_Link__c = inputValue != null && inputValue.enableProPostSubmitAutoLink == true;
-        config.Enable_Pro_SF_Secret_Code_Auth__c = inputValue != null && inputValue.enableProSfSecretCodeAuth == true;
+        config.Enable_Pro_User_Verification__c = inputValue != null && inputValue.enableProUserVerification == true;
         config.Enable_Pro_Load_File__c = inputValue != null && inputValue.enableProLoadFile == true;
         if (config.Id == null) {
             insert as user config;

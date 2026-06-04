@@ -24,7 +24,7 @@ private class NativeFormsActionControllersTest {
             'enableProPageLayoutClone' => true,
             'enableProFormulaFields' => true,
             'enableProPostSubmitAutoLink' => true,
-            'enableProSfSecretCodeAuth' => true,
+            'enableProUserVerification' => true,
             'enableProLoadFile' => true
         };
         snapshot.effectiveLimits = new Map<String, Object>{

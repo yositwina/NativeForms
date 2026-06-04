@@ -23,7 +23,7 @@ $items = @(
         enableProPageLayoutClone = @{ BOOL = $false }
         enableProFormulaFields = @{ BOOL = $false }
         enableProPostSubmitAutoLink = @{ BOOL = $false }
-        enableProSfSecretCodeAuth = @{ BOOL = $false }
+        enableProUserVerification = @{ BOOL = $false }
         enableProLoadFile = @{ BOOL = $false }
         enableProElectronicSignature = @{ BOOL = $false }
         enableProSubmissionPdf = @{ BOOL = $false }
@@ -60,7 +60,7 @@ $items = @(
         enableProPageLayoutClone = @{ BOOL = $true }
         enableProFormulaFields = @{ BOOL = $true }
         enableProPostSubmitAutoLink = @{ BOOL = $true }
-        enableProSfSecretCodeAuth = @{ BOOL = $true }
+        enableProUserVerification = @{ BOOL = $true }
         enableProLoadFile = @{ BOOL = $true }
         enableProElectronicSignature = @{ BOOL = $true }
         enableProSubmissionPdf = @{ BOOL = $true }
@@ -97,7 +97,7 @@ $items = @(
         enableProPageLayoutClone = @{ BOOL = $false }
         enableProFormulaFields = @{ BOOL = $false }
         enableProPostSubmitAutoLink = @{ BOOL = $false }
-        enableProSfSecretCodeAuth = @{ BOOL = $false }
+        enableProUserVerification = @{ BOOL = $false }
         enableProLoadFile = @{ BOOL = $false }
         enableProElectronicSignature = @{ BOOL = $false }
         enableProSubmissionPdf = @{ BOOL = $false }
@@ -134,7 +134,7 @@ $items = @(
         enableProPageLayoutClone = @{ BOOL = $true }
         enableProFormulaFields = @{ BOOL = $true }
         enableProPostSubmitAutoLink = @{ BOOL = $true }
-        enableProSfSecretCodeAuth = @{ BOOL = $true }
+        enableProUserVerification = @{ BOOL = $true }
         enableProLoadFile = @{ BOOL = $true }
         enableProElectronicSignature = @{ BOOL = $true }
         enableProSubmissionPdf = @{ BOOL = $true }

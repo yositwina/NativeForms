@@ -30,19 +30,19 @@ V1 decision:
 - Avoid changing AWS runtime contracts for V1 unless a customer-facing multilingual gap cannot be solved in Salesforce publish output.
 - Keep all base dictionaries inside the Salesforce package for V1.
 - Republish only test forms first after each slice; do not assume older published forms pick up changes automatically.
-- Pause for manual testing after the high-risk slices: basic runtime text, validation text, file upload, and secret code.
+- Pause for manual testing after the high-risk slices: basic runtime text, validation text, file upload, and verification number.
 - When a string is already per-form configurable, do not duplicate it into the packaged dictionary unless it is needed as a fallback.
 
 ## Scope
 ### In scope for V1
 - Published form runtime text
 - Validation text shown during normal form usage
-- Secret-code public flow text
+- User-verification public flow text
 - File-upload public flow text
 - Repeat-group customer-facing action text
 - Result-panel titles and generic customer-facing result text
 - Locale-sensitive date hint text
-- Designer secret-code preview text
+- Designer user-verification preview text
 - Form-level language selection in Salesforce
 - New Designer element default labels in the selected form language
 - Create-from-Salesforce-page-layout language selection, using Salesforce UI API translated layout/field labels where Translation Workbench provides them
@@ -63,13 +63,13 @@ Examples:
 - submit button label
 - submit success message
 - post-submit button label
-- secret-code intro text
-- secret-code sent message
-- secret-code invalid message
-- secret-code verified message
-- secret-code send button label
-- secret-code verify button label
-- secret-code resend button label
+- user-verification intro text
+- user-verification sent message
+- user-verification invalid message
+- user-verification verified message
+- user-verification send button label
+- user-verification verify button label
+- user-verification resend button label
 
 Rule for V1:
 - if these fields are blank or still match a packaged default from another language, the runtime should resolve them to the current form language instead of keeping stale English text
@@ -97,7 +97,7 @@ Some text should not exist at all in V1 because the UI is clear without it.
 
 Examples:
 - `Locked Until Verified`
-- `Secret Code Verification`
+- `User Verification Verification`
 - `Code step appears after the user presses Enter`
 - `Choose a file to upload`
 
@@ -124,7 +124,7 @@ Examples:
 - deep technical error detail blocks
 
 ### C. Prefer to remove instead of translate
-- decorative secret-code headings/badges
+- decorative user-verification headings/badges
 - extra helper headlines when a field label already explains the element
 
 ## Recommended Architecture
@@ -208,7 +208,7 @@ Example published config fragment:
 - backend exception detail returned only for troubleshooting
 
 ### What we should remove instead of translate
-- decorative secret-code badge/title/helper text
+- decorative user-verification badge/title/helper text
 - extra helper headlines for file upload when the field label already explains the action
 - generic seeded English filler values such as `Enter text`, `Enter longer text`, `Enter number`, `name@example.com`, `Phone number`, and `https://example.com`
 
@@ -289,7 +289,7 @@ Dictionary:
 Remove:
 - `Choose a file to upload`
 
-### Secret code
+### User Verification
 Per-form configurable:
 - intro text
 - sent message
@@ -303,7 +303,7 @@ Remove:
 - badge/title/helper text not required for the flow
 
 Validation text:
-- `Verify the secret code before continuing.` should move to dictionary
+- `Verify the verification number before continuing.` should move to dictionary
 
 ## Detailed Delivery Plan
 ### Phase 1. Define string inventory and ownership
@@ -377,7 +377,7 @@ Move customer-facing validation strings into dictionary-backed functions:
 - date before/after range
 - review date fields
 - CAPTCHA required
-- secret-code required-before-submit
+- user-verification required-before-submit
 - upload required/waiting/review text
 
 Keep deep technical debug detail in English.
@@ -393,8 +393,8 @@ Move file-upload action/status/meta strings into the dictionary:
 
 Keep upload surface minimal and language-safe.
 
-### Phase 8. Finish secret-code multilingual cleanup
-Ensure secret-code public flow uses:
+### Phase 8. Finish user-verification multilingual cleanup
+Ensure user-verification public flow uses:
 - configurable messages
 - configurable button labels
 - no extra decorative English-only text
@@ -404,14 +404,14 @@ Move any remaining generic validation prompts to the dictionary.
 ### Phase 9. Update designer preview
 Ensure designer preview matches multilingual-safe rules:
 - no fixed English decorative copy
-- preview respects configurable secret-code button labels
+- preview respects configurable user-verification button labels
 - preview aligns with selected language direction where relevant
 
 ### Phase 10. Hebrew QA pass
 Verify:
 - RTL layout
 - label placement left/right/above/none
-- secret-code flow
+- user-verification flow
 - file-upload flow
 - repeat groups
 - result panels
@@ -564,7 +564,7 @@ Concrete tasks:
   - date invalid/min/max messages
   - review-date-fields prompt
   - CAPTCHA-required message
-  - secret-code-required-before-submit
+  - user-verification-required-before-submit
   - upload required/waiting/review prompts
 - move date placeholders/hints to locale-aware helpers
 - keep technical submit-debug details in English
@@ -606,9 +606,9 @@ User testing gate:
 - yes, required
 - this should be tested on the working public upload form before continuing
 
-### Phase 7. Secret-code multilingual slice
+### Phase 7. User-verification multilingual slice
 Objective:
-- complete the multilingual secret-code flow cleanly
+- complete the multilingual user-verification flow cleanly
 
 Primary files:
 - [NativeFormsPublisher.cls](/c:/Users/Yosi/NativeFormsAWS/force-app/main/default/classes/NativeFormsPublisher.cls)
@@ -620,13 +620,13 @@ Concrete tasks:
 - ensure public runtime uses:
   - configurable intro/sent/invalid/verified messages
   - configurable send/verify/resend button labels
-- remove any remaining unnecessary fixed English secret-code labels/placeholders
-- move remaining generic secret-code validation prompts into `runtimeText`
+- remove any remaining unnecessary fixed English user-verification labels/placeholders
+- move remaining generic user-verification validation prompts into `runtimeText`
 - keep designer preview aligned with the runtime structure
 
 Definition of done:
-- secret-code flow contains no decorative fixed English copy
-- public secret-code actions are multilingual-safe
+- user-verification flow contains no decorative fixed English copy
+- public user-verification actions are multilingual-safe
 - per-form overrides still work
 
 User testing gate:
@@ -648,7 +648,7 @@ Concrete tasks:
   - button alignment
   - label placement left/right/above/none
   - file upload
-  - secret code
+  - verification number
   - repeat groups
   - result panels
   - validation messages
@@ -696,7 +696,7 @@ Reason:
 
 4. After Phase 7
 Reason:
-- secret code is sensitive and should be checked in the browser, not only by code review
+- verification number is sensitive and should be checked in the browser, not only by code review
 
 5. After Phase 8
 Reason:
@@ -707,7 +707,7 @@ Use a small fixed set of forms during implementation:
 - one simple contact form with no advanced features
 - one repeat-group form
 - one file-upload form
-- one secret-code-protected form
+- one user-verification-protected form
 
 Do not use too many forms during the build. Reuse the same forms for faster regression checking.
 
@@ -751,7 +751,7 @@ Protection:
 - high-visibility runtime strings migrated
 - validation strings migrated
 - file-upload flow migrated
-- secret-code flow migrated
+- user-verification flow migrated
 - Hebrew manual QA completed
 - Spanish scaffold present
 - doc updated with final key list and any deliberate English fallbacks
@@ -764,7 +764,7 @@ Protection:
 - `repeatAddRow`
 - `postSubmitContinuingIn`
 - `captchaRequired`
-- `secretVerifyRequiredBeforeSubmit`
+- `userVerifyRequiredBeforeSubmit`
 - `dateInvalid`
 - `dateMin`
 - `dateMax`
@@ -798,7 +798,7 @@ Protection:
 ## Acceptance Criteria
 - Each form can choose `en` or `he` in Form Settings.
 - Published forms show no fixed English customer-facing UI text in the covered V1 areas when set to Hebrew.
-- Secret-code flow has no decorative English-only text.
+- User-verification flow has no decorative English-only text.
 - File-upload flow has no unnecessary English helper headline.
 - Validation text in covered flows follows selected language.
 - Published runtime does not fetch translations after publish.
@@ -811,7 +811,7 @@ Protection:
 4. High-visibility runtime strings
 5. Validation strings
 6. File upload
-7. Secret code
+7. User Verification
 8. Hebrew QA
 9. Spanish scaffold
 

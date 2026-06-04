@@ -1,7 +1,7 @@
-﻿import { LightningElement, track } from 'lwc';
+import { LightningElement, track } from 'lwc';
 import getWorkspace from '@salesforce/apex/NativeFormsDesignerController.getWorkspace';
 import updateFormSettings from '@salesforce/apex/NativeFormsDesignerController.updateFormSettings';
-import updateSecretCodeSessionMode from '@salesforce/apex/NativeFormsDesignerController.updateSecretCodeSessionMode';
+import updateUserVerificationSessionMode from '@salesforce/apex/NativeFormsDesignerController.updateUserVerificationSessionMode';
 import updateVersionPostSubmitRedirectSettings from '@salesforce/apex/NativeFormsDesignerController.updateVersionPostSubmitRedirectSettings';
 import updateVersionSubmissionPdfSettings from '@salesforce/apex/NativeFormsDesignerController.updateVersionSubmissionPdfSettings';
 import updateVersionCustomJs from '@salesforce/apex/NativeFormsDesignerController.updateVersionCustomJs';
@@ -34,7 +34,7 @@ const DESIGNER_FORM_KEY = 'nativeforms:selectedFormId';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
 const MAX_UNDO_STEPS = 5;
 const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
-const SECRET_CODE_ELEMENT_ID = '__secretCode__';
+const USER_VERIFICATION_ELEMENT_ID = '__userVerification__';
 const MAX_EMBEDDED_IMAGE_BYTES = 69 * 1024;
 const MAX_EMBEDDED_IMAGE_LABEL = '69 KB';
 
@@ -67,19 +67,19 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedVersionPostSubmitUrlFormula = '';
     selectedVersionPostSubmitButtonLabel = 'Continue';
     selectedVersionPostSubmitDelaySeconds = 0;
-    selectedVersionSecretCodeVerificationEnabled = false;
-    selectedVersionSecretCodeMatchField = 'Email';
-    selectedVersionSecretCodeIntroText = '';
-    selectedVersionSecretCodeSentMessage = '';
-    selectedVersionSecretCodeInvalidMessage = '';
-    selectedVersionSecretCodeVerifiedMessage = '';
-    selectedVersionSecretCodeSendButtonLabel = 'Enter';
-    selectedVersionSecretCodeVerifyButtonLabel = 'Verify';
-    selectedVersionSecretCodeResendButtonLabel = 'Resend Verification Number';
-    selectedVersionSecretCodeExpiryMinutes = 10;
-    selectedVersionSecretCodeMaxAttempts = 5;
-    selectedVersionSecretCodeAllowResend = true;
-    selectedVersionSecretCodeSessionMode = 'short';
+    selectedVersionUserVerificationEnabled = false;
+    selectedVersionUserVerificationMatchField = 'Email';
+    selectedVersionUserVerificationIntroText = '';
+    selectedVersionUserVerificationSentMessage = '';
+    selectedVersionUserVerificationInvalidMessage = '';
+    selectedVersionUserVerificationVerifiedMessage = '';
+    selectedVersionUserVerificationSendButtonLabel = 'Enter';
+    selectedVersionUserVerificationVerifyButtonLabel = 'Verify';
+    selectedVersionUserVerificationResendButtonLabel = 'Resend Verification Number';
+    selectedVersionUserVerificationExpiryMinutes = 10;
+    selectedVersionUserVerificationMaxAttempts = 5;
+    selectedVersionUserVerificationAllowResend = true;
+    selectedVersionUserVerificationSessionMode = 'short';
     selectedVersionSubmitConditionalEnabled = false;
     selectedVersionSubmitConditionalFieldKey = '';
     selectedVersionSubmitConditionalOperator = 'equals';
@@ -103,19 +103,19 @@ export default class NativeFormsDesigner extends LightningElement {
     draftPostSubmitUrlFormulaError = '';
     draftPostSubmitButtonLabel = 'Continue';
     draftPostSubmitDelaySeconds = 0;
-    draftSecretCodeVerificationEnabled = false;
-    draftSecretCodeMatchField = 'Email';
-    draftSecretCodeIntroText = '';
-    draftSecretCodeSentMessage = '';
-    draftSecretCodeInvalidMessage = '';
-    draftSecretCodeVerifiedMessage = '';
-    draftSecretCodeSendButtonLabel = 'Enter';
-    draftSecretCodeVerifyButtonLabel = 'Verify';
-    draftSecretCodeResendButtonLabel = 'Resend Verification Number';
-    draftSecretCodeExpiryMinutes = 10;
-    draftSecretCodeMaxAttempts = 5;
-    draftSecretCodeAllowResend = true;
-    draftSecretCodeSessionMode = 'short';
+    draftUserVerificationEnabled = false;
+    draftUserVerificationMatchField = 'Email';
+    draftUserVerificationIntroText = '';
+    draftUserVerificationSentMessage = '';
+    draftUserVerificationInvalidMessage = '';
+    draftUserVerificationVerifiedMessage = '';
+    draftUserVerificationSendButtonLabel = 'Enter';
+    draftUserVerificationVerifyButtonLabel = 'Verify';
+    draftUserVerificationResendButtonLabel = 'Resend Verification Number';
+    draftUserVerificationExpiryMinutes = 10;
+    draftUserVerificationMaxAttempts = 5;
+    draftUserVerificationAllowResend = true;
+    draftUserVerificationSessionMode = 'short';
     draftSubmitConditionalEnabled = false;
     draftSubmitConditionalFieldKey = '';
     draftSubmitConditionalOperator = 'equals';
@@ -198,7 +198,7 @@ export default class NativeFormsDesigner extends LightningElement {
     enableProLocationFields = false;
     enableProFormulaFields = false;
     enableProPostSubmitAutoLink = false;
-    enableProSfSecretCodeAuth = false;
+    enableProUserVerification = false;
     enableProAdvancedSubmitModes = false;
     enableProPageLayoutClone = false;
     enableProCustomJs = false;
@@ -525,8 +525,8 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElement() {
-        if (this.selectedElementId === SECRET_CODE_ELEMENT_ID) {
-            return this.buildSecretCodeCanvasElement();
+        if (this.selectedElementId === USER_VERIFICATION_ELEMENT_ID) {
+            return this.buildUserVerificationCanvasElement();
         }
         if (this.selectedElementId === SUBMIT_BUTTON_ELEMENT_ID) {
             return this.buildSubmitButtonCanvasElement();
@@ -535,7 +535,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementFieldKey() {
-        if (this.selectedElementIsSubmitButton || this.selectedElementIsSecretCode) {
+        if (this.selectedElementIsSubmitButton || this.selectedElementIsUserVerification) {
             return '';
         }
         return this.selectedElement?.fieldKey || '';
@@ -558,7 +558,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get rightPaneTitle() {
-        if (this.selectedElementIsSecretCode) {
+        if (this.selectedElementIsUserVerification) {
             return 'User Verification';
         }
         return this.showFormSettingsPanel ? 'Form Settings' : 'Element Properties';
@@ -907,8 +907,8 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorElementType === 'button';
     }
 
-    get selectedElementIsSecretCode() {
-        return this.selectedElement?.elementType === 'secretCode';
+    get selectedElementIsUserVerification() {
+        return this.selectedElement?.elementType === 'userVerification';
     }
 
     get selectedElementIsGroup() {
@@ -1419,11 +1419,11 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get enableSubmitHelpText() {
-        return 'Sends this field’s value to a Submit action.';
+        return 'Sends this field�s value to a Submit action.';
     }
 
     get submitActionHelpText() {
-        return 'Choose which saved-record action should receive this field’s value.';
+        return 'Choose which saved-record action should receive this field�s value.';
     }
 
     get postSubmitRedirectHelpText() {
@@ -1484,28 +1484,28 @@ export default class NativeFormsDesigner extends LightningElement {
         return 'Inserts the selected token at the current cursor position.';
     }
 
-    get secretCodeEmailTemplateHelpText() {
+    get userVerificationEmailTemplateHelpText() {
         return 'Default Salesforce email template: TwinaForms User Verification Default. You can edit or replace it later in Salesforce.';
     }
 
-    get secretCodeExpiryHelpText() {
+    get userVerificationExpiryHelpText() {
         return 'How many minutes the verification code stays valid.';
     }
 
-    get secretCodeMaxAttemptsHelpText() {
+    get userVerificationMaxAttemptsHelpText() {
         return 'Maximum number of code attempts allowed before the user must request a new one.';
     }
 
-    get secretCodeAllowResendHelpText() {
+    get userVerificationAllowResendHelpText() {
         return 'Lets the user request another verification code if needed.';
     }
 
-    get secretCodeSameTabSessionHelpText() {
+    get userVerificationSameTabSessionHelpText() {
         return 'Keeps the verified session after refresh in this browser tab until local midnight, capped at 12 hours.';
     }
 
-    get draftSecretCodeKeepSessionUntilMidnight() {
-        return this.draftSecretCodeSessionMode === 'sameTabUntilMidnight';
+    get draftUserVerificationKeepSessionUntilMidnight() {
+        return this.draftUserVerificationSessionMode === 'sameTabUntilMidnight';
     }
 
     get projectNameHelpText() {
@@ -1639,11 +1639,11 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get showSpecialElementOptions() {
-        return this.enableProSfSecretCodeAuth || this.availableSpecialElementOptions.length > 0;
+        return this.enableProUserVerification || this.availableSpecialElementOptions.length > 0;
     }
 
     get showUserVerificationSpecialElement() {
-        return this.enableProSfSecretCodeAuth;
+        return this.enableProUserVerification;
     }
 
     get availableSpecialElementOptions() {
@@ -1659,14 +1659,14 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get userVerificationPaletteActionLabel() {
-        return this.draftSecretCodeVerificationEnabled ? 'Added' : 'Add';
+        return this.draftUserVerificationEnabled ? 'Added' : 'Add';
     }
 
     get userVerificationPaletteActionDisabled() {
-        return this.isSelectedVersionReadOnly || this.draftSecretCodeVerificationEnabled;
+        return this.isSelectedVersionReadOnly || this.draftUserVerificationEnabled;
     }
 
-    secretCodeLanguageDefaults(languageCode = this.draftLanguageCode || this.selectedVersionLanguageCode || 'en') {
+    userVerificationLanguageDefaults(languageCode = this.draftLanguageCode || this.selectedVersionLanguageCode || 'en') {
         switch ((languageCode || 'en').toLowerCase()) {
         case 'he':
             return {
@@ -1680,32 +1680,32 @@ export default class NativeFormsDesigner extends LightningElement {
             };
         case 'es':
             return {
-                introText: 'Introduce tu correo y pulsa Entrar. Te enviaremos un código de 6 dígitos antes de continuar.',
-                sentMessage: 'Si encontramos un contacto coincidente, enviamos un código de 6 dígitos a ese correo.',
-                invalidMessage: 'El código no es válido o ya expiró. Inténtalo otra vez o solicita uno nuevo.',
-                verifiedMessage: 'Código verificado. Ya puedes continuar con el formulario.',
+                introText: 'Introduce tu correo y pulsa Entrar. Te enviaremos un c?digo de 6 d?gitos antes de continuar.',
+                sentMessage: 'Si encontramos un contacto coincidente, enviamos un c?digo de 6 d?gitos a ese correo.',
+                invalidMessage: 'El c?digo no es v?lido o ya expir?. Int?ntalo otra vez o solicita uno nuevo.',
+                verifiedMessage: 'C?digo verificado. Ya puedes continuar con el formulario.',
                 sendButtonLabel: 'Enviar',
                 verifyButtonLabel: 'Verificar',
-                resendButtonLabel: 'Reenviar código'
+                resendButtonLabel: 'Reenviar c?digo'
             };
         case 'de':
             return {
-                introText: 'Geben Sie Ihre E-Mail-Adresse ein und klicken Sie auf Eingabe. Wir senden Ihnen einen 6-stelligen Code, bevor Sie fortfahren können.',
+                introText: 'Geben Sie Ihre E-Mail-Adresse ein und klicken Sie auf Eingabe. Wir senden Ihnen einen 6-stelligen Code, bevor Sie fortfahren k?nnen.',
                 sentMessage: 'Wenn wir einen passenden Kontakt gefunden haben, senden wir einen 6-stelligen Code an diese E-Mail-Adresse.',
-                invalidMessage: 'Der Code ist ungültig oder abgelaufen. Versuchen Sie es erneut oder fordern Sie einen neuen Code an.',
-                verifiedMessage: 'Code bestätigt. Sie können jetzt mit dem Formular fortfahren.',
+                invalidMessage: 'Der Code ist ung?ltig oder abgelaufen. Versuchen Sie es erneut oder fordern Sie einen neuen Code an.',
+                verifiedMessage: 'Code best?tigt. Sie k?nnen jetzt mit dem Formular fortfahren.',
                 sendButtonLabel: 'Senden',
-                verifyButtonLabel: 'Bestätigen',
+                verifyButtonLabel: 'Best?tigen',
                 resendButtonLabel: 'Code erneut senden'
             };
         case 'fr':
             return {
-                introText: 'Saisissez votre adresse e-mail et cliquez sur Entrée. Nous vous enverrons un code à 6 chiffres avant de continuer.',
-                sentMessage: 'Si nous trouvons un contact correspondant, nous envoyons un code à 6 chiffres à cette adresse e-mail.',
-                invalidMessage: 'Le code est invalide ou a expiré. Réessayez ou demandez un nouveau code.',
-                verifiedMessage: 'Code vérifié. Vous pouvez maintenant continuer le formulaire.',
+                introText: 'Saisissez votre adresse e-mail et cliquez sur Entr?e. Nous vous enverrons un code ? 6 chiffres avant de continuer.',
+                sentMessage: 'Si nous trouvons un contact correspondant, nous envoyons un code ? 6 chiffres ? cette adresse e-mail.',
+                invalidMessage: 'Le code est invalide ou a expir?. R?essayez ou demandez un nouveau code.',
+                verifiedMessage: 'Code v?rifi?. Vous pouvez maintenant continuer le formulaire.',
                 sendButtonLabel: 'Envoyer',
-                verifyButtonLabel: 'Vérifier',
+                verifyButtonLabel: 'V?rifier',
                 resendButtonLabel: 'Renvoyer le code'
             };
         default:
@@ -1721,21 +1721,21 @@ export default class NativeFormsDesigner extends LightningElement {
         }
     }
 
-    isDefaultSecretCodeValue(value, key) {
+    isDefaultUserVerificationValue(value, key) {
         const trimmedValue = String(value || '').trim();
         if (!trimmedValue) {
             return true;
         }
         return ['en', 'he', 'es', 'de', 'fr'].some((languageCode) => {
-            const defaults = this.secretCodeLanguageDefaults(languageCode);
+            const defaults = this.userVerificationLanguageDefaults(languageCode);
             return String(defaults[key] || '').trim() === trimmedValue;
         });
     }
 
-    normalizeSecretCodeValue(value, key, languageCode = this.draftLanguageCode || this.selectedVersionLanguageCode || 'en') {
-        const defaults = this.secretCodeLanguageDefaults(languageCode);
+    normalizeUserVerificationValue(value, key, languageCode = this.draftLanguageCode || this.selectedVersionLanguageCode || 'en') {
+        const defaults = this.userVerificationLanguageDefaults(languageCode);
         const trimmedValue = String(value || '').trim();
-        if (!trimmedValue || this.isDefaultSecretCodeValue(trimmedValue, key)) {
+        if (!trimmedValue || this.isDefaultUserVerificationValue(trimmedValue, key)) {
             return defaults[key] || '';
         }
         return trimmedValue;
@@ -1756,24 +1756,24 @@ export default class NativeFormsDesigner extends LightningElement {
                 browseSingle: 'Buscar archivo',
                 browseMultiple: 'Buscar archivos',
                 allowedTypes: 'Permitidos: {types}',
-                maxSize: 'Tamaño máximo: {size} MB',
+                maxSize: 'Tama?o m?ximo: {size} MB',
                 multipleAllowed: 'Se permiten varios archivos'
             };
         case 'de':
             return {
-                browseSingle: 'Datei auswählen',
-                browseMultiple: 'Dateien auswählen',
+                browseSingle: 'Datei ausw?hlen',
+                browseMultiple: 'Dateien ausw?hlen',
                 allowedTypes: 'Erlaubt: {types}',
-                maxSize: 'Maximale Größe: {size} MB',
+                maxSize: 'Maximale Gr??e: {size} MB',
                 multipleAllowed: 'Mehrere Dateien erlaubt'
             };
         case 'fr':
             return {
                 browseSingle: 'Choisir un fichier',
                 browseMultiple: 'Choisir des fichiers',
-                allowedTypes: 'Autorisés : {types}',
+                allowedTypes: 'Autoris?s : {types}',
                 maxSize: 'Taille maximale : {size} MB',
-                multipleAllowed: 'Plusieurs fichiers autorisés'
+                multipleAllowed: 'Plusieurs fichiers autoris?s'
             };
         default:
             return {
@@ -1825,15 +1825,15 @@ export default class NativeFormsDesigner extends LightningElement {
             return {
                 text: 'Introducir texto',
                 textarea: 'Introducir texto largo',
-                number: 'Introducir número',
+                number: 'Introducir n?mero',
                 email: 'name@example.com',
-                tel: 'Número de teléfono',
+                tel: 'N?mero de tel?fono',
                 url: 'https://example.com'
             };
         case 'de':
             return {
                 text: 'Text eingeben',
-                textarea: 'Längeren Text eingeben',
+                textarea: 'L?ngeren Text eingeben',
                 number: 'Nummer eingeben',
                 email: 'name@example.com',
                 tel: 'Telefonnummer',
@@ -1845,7 +1845,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 textarea: 'Saisir un texte plus long',
                 number: 'Saisir un nombre',
                 email: 'name@example.com',
-                tel: 'Numéro de téléphone',
+                tel: 'Num?ro de t?l?phone',
                 url: 'https://example.com'
             };
         default:
@@ -1877,7 +1877,7 @@ export default class NativeFormsDesigner extends LightningElement {
         case 'es':
             return {
                 submitLabel: 'Enviar',
-                submitSuccessMessage: 'Tu formulario se envió correctamente.',
+                submitSuccessMessage: 'Tu formulario se envi? correctamente.',
                 postSubmitButtonLabel: 'Continuar'
             };
         case 'de':
@@ -1889,7 +1889,7 @@ export default class NativeFormsDesigner extends LightningElement {
         case 'fr':
             return {
                 submitLabel: 'Envoyer',
-                submitSuccessMessage: 'Votre formulaire a été envoyé avec succès.',
+                submitSuccessMessage: 'Votre formulaire a ?t? envoy? avec succ?s.',
                 postSubmitButtonLabel: 'Continuer'
             };
         default:
@@ -1901,24 +1901,24 @@ export default class NativeFormsDesigner extends LightningElement {
         }
     }
 
-    get secretCodePreviewData() {
+    get userVerificationPreviewData() {
         return {
-            introText: this.normalizeSecretCodeValue(this.draftSecretCodeIntroText, 'introText', this.draftLanguageCode),
-            sentMessage: this.normalizeSecretCodeValue(this.draftSecretCodeSentMessage, 'sentMessage', this.draftLanguageCode),
-            verifiedMessage: this.normalizeSecretCodeValue(this.draftSecretCodeVerifiedMessage, 'verifiedMessage', this.draftLanguageCode),
-            sendButtonLabel: this.normalizeSecretCodeValue(this.draftSecretCodeSendButtonLabel, 'sendButtonLabel', this.draftLanguageCode),
-            verifyButtonLabel: this.normalizeSecretCodeValue(this.draftSecretCodeVerifyButtonLabel, 'verifyButtonLabel', this.draftLanguageCode),
-            resendButtonLabel: this.normalizeSecretCodeValue(this.draftSecretCodeResendButtonLabel, 'resendButtonLabel', this.draftLanguageCode),
-            allowResend: this.draftSecretCodeAllowResend
+            introText: this.normalizeUserVerificationValue(this.draftUserVerificationIntroText, 'introText', this.draftLanguageCode),
+            sentMessage: this.normalizeUserVerificationValue(this.draftUserVerificationSentMessage, 'sentMessage', this.draftLanguageCode),
+            verifiedMessage: this.normalizeUserVerificationValue(this.draftUserVerificationVerifiedMessage, 'verifiedMessage', this.draftLanguageCode),
+            sendButtonLabel: this.normalizeUserVerificationValue(this.draftUserVerificationSendButtonLabel, 'sendButtonLabel', this.draftLanguageCode),
+            verifyButtonLabel: this.normalizeUserVerificationValue(this.draftUserVerificationVerifyButtonLabel, 'verifyButtonLabel', this.draftLanguageCode),
+            resendButtonLabel: this.normalizeUserVerificationValue(this.draftUserVerificationResendButtonLabel, 'resendButtonLabel', this.draftLanguageCode),
+            allowResend: this.draftUserVerificationAllowResend
         };
     }
 
-    get showCanvasSecretCodePreview() {
-        return this.draftSecretCodeVerificationEnabled;
+    get showCanvasUserVerificationPreview() {
+        return this.draftUserVerificationEnabled;
     }
 
-    get secretCodePreviewClass() {
-        return `designer-secret-preview${this.selectedElementIsSecretCode ? ' designer-secret-preview--selected' : ''}`;
+    get userVerificationPreviewClass() {
+        return `designer-user-verification-preview${this.selectedElementIsUserVerification ? ' designer-user-verification-preview--selected' : ''}`;
     }
 
     get postSubmitFormFieldTokenOptions() {
@@ -2316,23 +2316,23 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedVersionPostSubmitDelaySeconds = Number.isFinite(Number(workspace.selectedVersionPostSubmitDelaySeconds))
                 ? Math.max(0, Number(workspace.selectedVersionPostSubmitDelaySeconds))
                 : 0;
-            this.selectedVersionSecretCodeVerificationEnabled = !!workspace.selectedVersionSecretCodeVerificationEnabled;
-            this.selectedVersionSecretCodeMatchField = workspace.selectedVersionSecretCodeMatchField || 'Email';
-            this.selectedVersionSecretCodeIntroText = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeIntroText, 'introText', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeSentMessage = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeSentMessage, 'sentMessage', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeInvalidMessage = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeInvalidMessage, 'invalidMessage', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeVerifiedMessage = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeVerifiedMessage, 'verifiedMessage', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeSendButtonLabel = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeSendButtonLabel, 'sendButtonLabel', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeVerifyButtonLabel = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeVerifyButtonLabel, 'verifyButtonLabel', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeResendButtonLabel = this.normalizeSecretCodeValue(workspace.selectedVersionSecretCodeResendButtonLabel, 'resendButtonLabel', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeExpiryMinutes = Number.isFinite(Number(workspace.selectedVersionSecretCodeExpiryMinutes))
-                ? Math.max(1, Number(workspace.selectedVersionSecretCodeExpiryMinutes))
+            this.selectedVersionUserVerificationEnabled = !!workspace.selectedVersionUserVerificationEnabled;
+            this.selectedVersionUserVerificationMatchField = workspace.selectedVersionUserVerificationMatchField || 'Email';
+            this.selectedVersionUserVerificationIntroText = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationIntroText, 'introText', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationSentMessage = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationSentMessage, 'sentMessage', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationInvalidMessage = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationInvalidMessage, 'invalidMessage', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationVerifiedMessage = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationVerifiedMessage, 'verifiedMessage', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationSendButtonLabel = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationSendButtonLabel, 'sendButtonLabel', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationVerifyButtonLabel = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationVerifyButtonLabel, 'verifyButtonLabel', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationResendButtonLabel = this.normalizeUserVerificationValue(workspace.selectedVersionUserVerificationResendButtonLabel, 'resendButtonLabel', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationExpiryMinutes = Number.isFinite(Number(workspace.selectedVersionUserVerificationExpiryMinutes))
+                ? Math.max(1, Number(workspace.selectedVersionUserVerificationExpiryMinutes))
                 : 10;
-            this.selectedVersionSecretCodeMaxAttempts = Number.isFinite(Number(workspace.selectedVersionSecretCodeMaxAttempts))
-                ? Math.max(1, Number(workspace.selectedVersionSecretCodeMaxAttempts))
+            this.selectedVersionUserVerificationMaxAttempts = Number.isFinite(Number(workspace.selectedVersionUserVerificationMaxAttempts))
+                ? Math.max(1, Number(workspace.selectedVersionUserVerificationMaxAttempts))
                 : 5;
-            this.selectedVersionSecretCodeAllowResend = workspace.selectedVersionSecretCodeAllowResend !== false;
-            this.selectedVersionSecretCodeSessionMode = workspace.selectedVersionSecretCodeSessionMode === 'sameTabUntilMidnight'
+            this.selectedVersionUserVerificationAllowResend = workspace.selectedVersionUserVerificationAllowResend !== false;
+            this.selectedVersionUserVerificationSessionMode = workspace.selectedVersionUserVerificationSessionMode === 'sameTabUntilMidnight'
                 ? 'sameTabUntilMidnight'
                 : 'short';
             this.selectedVersionSubmitConditionalEnabled = !!workspace.selectedVersionSubmitConditionalEnabled;
@@ -2365,19 +2365,19 @@ export default class NativeFormsDesigner extends LightningElement {
             this.draftPostSubmitUrlFormula = this.selectedVersionPostSubmitUrlFormula;
             this.draftPostSubmitButtonLabel = this.selectedVersionPostSubmitButtonLabel;
             this.draftPostSubmitDelaySeconds = this.selectedVersionPostSubmitDelaySeconds;
-            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
-            this.draftSecretCodeMatchField = this.selectedVersionSecretCodeMatchField || 'Email';
-            this.draftSecretCodeIntroText = this.selectedVersionSecretCodeIntroText;
-            this.draftSecretCodeSentMessage = this.selectedVersionSecretCodeSentMessage;
-            this.draftSecretCodeInvalidMessage = this.selectedVersionSecretCodeInvalidMessage;
-            this.draftSecretCodeVerifiedMessage = this.selectedVersionSecretCodeVerifiedMessage;
-            this.draftSecretCodeSendButtonLabel = this.selectedVersionSecretCodeSendButtonLabel;
-            this.draftSecretCodeVerifyButtonLabel = this.selectedVersionSecretCodeVerifyButtonLabel;
-            this.draftSecretCodeResendButtonLabel = this.selectedVersionSecretCodeResendButtonLabel;
-            this.draftSecretCodeExpiryMinutes = this.selectedVersionSecretCodeExpiryMinutes;
-            this.draftSecretCodeMaxAttempts = this.selectedVersionSecretCodeMaxAttempts;
-            this.draftSecretCodeAllowResend = this.selectedVersionSecretCodeAllowResend;
-            this.draftSecretCodeSessionMode = this.selectedVersionSecretCodeSessionMode;
+            this.draftUserVerificationEnabled = this.selectedVersionUserVerificationEnabled;
+            this.draftUserVerificationMatchField = this.selectedVersionUserVerificationMatchField || 'Email';
+            this.draftUserVerificationIntroText = this.selectedVersionUserVerificationIntroText;
+            this.draftUserVerificationSentMessage = this.selectedVersionUserVerificationSentMessage;
+            this.draftUserVerificationInvalidMessage = this.selectedVersionUserVerificationInvalidMessage;
+            this.draftUserVerificationVerifiedMessage = this.selectedVersionUserVerificationVerifiedMessage;
+            this.draftUserVerificationSendButtonLabel = this.selectedVersionUserVerificationSendButtonLabel;
+            this.draftUserVerificationVerifyButtonLabel = this.selectedVersionUserVerificationVerifyButtonLabel;
+            this.draftUserVerificationResendButtonLabel = this.selectedVersionUserVerificationResendButtonLabel;
+            this.draftUserVerificationExpiryMinutes = this.selectedVersionUserVerificationExpiryMinutes;
+            this.draftUserVerificationMaxAttempts = this.selectedVersionUserVerificationMaxAttempts;
+            this.draftUserVerificationAllowResend = this.selectedVersionUserVerificationAllowResend;
+            this.draftUserVerificationSessionMode = this.selectedVersionUserVerificationSessionMode;
             this.draftSubmitConditionalEnabled = this.selectedVersionSubmitConditionalEnabled;
             this.draftSubmitConditionalFieldKey = this.selectedVersionSubmitConditionalFieldKey;
             this.draftSubmitConditionalOperator = this.selectedVersionSubmitConditionalOperator;
@@ -2403,7 +2403,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.enableProLocationFields = !!workspace.enableProLocationFields;
             this.enableProFormulaFields = !!workspace.enableProFormulaFields;
             this.enableProPostSubmitAutoLink = !!workspace.enableProPostSubmitAutoLink;
-            this.enableProSfSecretCodeAuth = !!workspace.enableProSfSecretCodeAuth;
+            this.enableProUserVerification = !!workspace.enableProUserVerification;
             this.enableProAdvancedSubmitModes = !!workspace.enableProAdvancedSubmitModes;
             this.enableProPageLayoutClone = !!workspace.enableProPageLayoutClone;
             this.enableProCustomJs = !!workspace.enableProCustomJs;
@@ -2617,17 +2617,17 @@ export default class NativeFormsDesigner extends LightningElement {
         };
     }
 
-    buildSecretCodeCanvasElement() {
-        const selected = this.selectedElementId === SECRET_CODE_ELEMENT_ID;
+    buildUserVerificationCanvasElement() {
+        const selected = this.selectedElementId === USER_VERIFICATION_ELEMENT_ID;
         return {
-            id: SECRET_CODE_ELEMENT_ID,
-            elementId: SECRET_CODE_ELEMENT_ID,
+            id: USER_VERIFICATION_ELEMENT_ID,
+            elementId: USER_VERIFICATION_ELEMENT_ID,
             label: 'User Verification',
-            elementType: 'secretCode',
+            elementType: 'userVerification',
             fieldKey: '',
             configJson: JSON.stringify({ systemElement: true }),
             isSystemElement: true,
-            cardClass: `designer-secret-preview${selected ? ' designer-secret-preview--selected' : ''}`
+            cardClass: `designer-user-verification-preview${selected ? ' designer-user-verification-preview--selected' : ''}`
         };
     }
 
@@ -3157,7 +3157,7 @@ export default class NativeFormsDesigner extends LightningElement {
             if (config.allowMultiple === true) {
                 parts.push(defaults.multipleAllowed);
             }
-            return parts.join(' ג€¢ ');
+            return parts.join(' • ');
         }
         const parts = [];
         if (config.minValue !== null && config.minValue !== undefined && String(config.minValue) !== '') {
@@ -3166,7 +3166,7 @@ export default class NativeFormsDesigner extends LightningElement {
         if (config.maxValue !== null && config.maxValue !== undefined && String(config.maxValue) !== '') {
             parts.push(`Max ${config.maxValue}`);
         }
-        return parts.join(' ג€¢ ');
+        return parts.join(' • ');
     }
 
     conditionalSummary(item) {
@@ -3916,19 +3916,19 @@ export default class NativeFormsDesigner extends LightningElement {
             postSubmitUrlFormula: this.draftPostSubmitUrlFormula,
             postSubmitButtonLabel: this.draftPostSubmitButtonLabel,
             postSubmitDelaySeconds: 0,
-            secretCodeVerificationEnabled: this.draftSecretCodeVerificationEnabled,
-            secretCodeMatchField: this.draftSecretCodeMatchField || 'Email',
-            secretCodeIntroText: this.draftSecretCodeIntroText,
-            secretCodeSentMessage: this.draftSecretCodeSentMessage,
-            secretCodeInvalidMessage: this.draftSecretCodeInvalidMessage,
-            secretCodeVerifiedMessage: this.draftSecretCodeVerifiedMessage,
-            secretCodeSendButtonLabel: this.draftSecretCodeSendButtonLabel,
-            secretCodeVerifyButtonLabel: this.draftSecretCodeVerifyButtonLabel,
-            secretCodeResendButtonLabel: this.draftSecretCodeResendButtonLabel,
-            secretCodeExpiryMinutes: this.draftSecretCodeExpiryMinutes,
-            secretCodeMaxAttempts: this.draftSecretCodeMaxAttempts,
-            secretCodeAllowResend: this.draftSecretCodeAllowResend,
-            secretCodeSessionMode: this.draftSecretCodeSessionMode,
+            userVerificationEnabled: this.draftUserVerificationEnabled,
+            userVerificationMatchField: this.draftUserVerificationMatchField || 'Email',
+            userVerificationIntroText: this.draftUserVerificationIntroText,
+            userVerificationSentMessage: this.draftUserVerificationSentMessage,
+            userVerificationInvalidMessage: this.draftUserVerificationInvalidMessage,
+            userVerificationVerifiedMessage: this.draftUserVerificationVerifiedMessage,
+            userVerificationSendButtonLabel: this.draftUserVerificationSendButtonLabel,
+            userVerificationVerifyButtonLabel: this.draftUserVerificationVerifyButtonLabel,
+            userVerificationResendButtonLabel: this.draftUserVerificationResendButtonLabel,
+            userVerificationExpiryMinutes: this.draftUserVerificationExpiryMinutes,
+            userVerificationMaxAttempts: this.draftUserVerificationMaxAttempts,
+            userVerificationAllowResend: this.draftUserVerificationAllowResend,
+            userVerificationSessionMode: this.draftUserVerificationSessionMode,
             submitLabel: this.draftSubmitLabel,
             submitConditionalEnabled: this.draftSubmitConditionalEnabled,
             submitConditionalFieldKey: this.draftSubmitConditionalFieldKey,
@@ -3959,18 +3959,18 @@ export default class NativeFormsDesigner extends LightningElement {
                 postSubmitUrlTemplate: mergedValues.postSubmitUrlTemplate || '',
                 postSubmitButtonLabel: mergedValues.postSubmitButtonLabel || '',
                 postSubmitDelaySeconds: 0,
-                secretCodeVerificationEnabled: !!mergedValues.secretCodeVerificationEnabled,
-                secretCodeMatchField: mergedValues.secretCodeMatchField || 'Email',
-                secretCodeIntroText: mergedValues.secretCodeIntroText || '',
-                secretCodeSentMessage: mergedValues.secretCodeSentMessage || '',
-                secretCodeInvalidMessage: mergedValues.secretCodeInvalidMessage || '',
-                secretCodeVerifiedMessage: mergedValues.secretCodeVerifiedMessage || '',
-                secretCodeSendButtonLabel: mergedValues.secretCodeSendButtonLabel || '',
-                secretCodeVerifyButtonLabel: mergedValues.secretCodeVerifyButtonLabel || '',
-                secretCodeResendButtonLabel: mergedValues.secretCodeResendButtonLabel || '',
-                secretCodeExpiryMinutes: Number(mergedValues.secretCodeExpiryMinutes) || 10,
-                secretCodeMaxAttempts: Number(mergedValues.secretCodeMaxAttempts) || 5,
-                secretCodeAllowResend: mergedValues.secretCodeAllowResend !== false,
+                userVerificationEnabled: !!mergedValues.userVerificationEnabled,
+                userVerificationMatchField: mergedValues.userVerificationMatchField || 'Email',
+                userVerificationIntroText: mergedValues.userVerificationIntroText || '',
+                userVerificationSentMessage: mergedValues.userVerificationSentMessage || '',
+                userVerificationInvalidMessage: mergedValues.userVerificationInvalidMessage || '',
+                userVerificationVerifiedMessage: mergedValues.userVerificationVerifiedMessage || '',
+                userVerificationSendButtonLabel: mergedValues.userVerificationSendButtonLabel || '',
+                userVerificationVerifyButtonLabel: mergedValues.userVerificationVerifyButtonLabel || '',
+                userVerificationResendButtonLabel: mergedValues.userVerificationResendButtonLabel || '',
+                userVerificationExpiryMinutes: Number(mergedValues.userVerificationExpiryMinutes) || 10,
+                userVerificationMaxAttempts: Number(mergedValues.userVerificationMaxAttempts) || 5,
+                userVerificationAllowResend: mergedValues.userVerificationAllowResend !== false,
                 submitLabel: mergedValues.submitLabel || '',
                 submitConditionalEnabled: !!mergedValues.submitConditionalEnabled,
                 submitConditionalFieldKey: mergedValues.submitConditionalFieldKey || '',
@@ -3996,19 +3996,19 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedVersionPostSubmitUrlFormula = (mergedValues.postSubmitUrlFormula || '').trim();
             this.selectedVersionPostSubmitButtonLabel = mergedValues.postSubmitButtonLabel || formUiDefaults.postSubmitButtonLabel;
             this.selectedVersionPostSubmitDelaySeconds = 0;
-            this.selectedVersionSecretCodeVerificationEnabled = !!mergedValues.secretCodeVerificationEnabled;
-            this.selectedVersionSecretCodeMatchField = mergedValues.secretCodeMatchField || 'Email';
-            this.selectedVersionSecretCodeIntroText = this.normalizeSecretCodeValue(mergedValues.secretCodeIntroText, 'introText', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeSentMessage = this.normalizeSecretCodeValue(mergedValues.secretCodeSentMessage, 'sentMessage', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeInvalidMessage = this.normalizeSecretCodeValue(mergedValues.secretCodeInvalidMessage, 'invalidMessage', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeVerifiedMessage = this.normalizeSecretCodeValue(mergedValues.secretCodeVerifiedMessage, 'verifiedMessage', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeSendButtonLabel = this.normalizeSecretCodeValue(mergedValues.secretCodeSendButtonLabel, 'sendButtonLabel', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeVerifyButtonLabel = this.normalizeSecretCodeValue(mergedValues.secretCodeVerifyButtonLabel, 'verifyButtonLabel', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeResendButtonLabel = this.normalizeSecretCodeValue(mergedValues.secretCodeResendButtonLabel, 'resendButtonLabel', this.selectedVersionLanguageCode);
-            this.selectedVersionSecretCodeExpiryMinutes = Math.max(1, Number(mergedValues.secretCodeExpiryMinutes) || 10);
-            this.selectedVersionSecretCodeMaxAttempts = Math.max(1, Number(mergedValues.secretCodeMaxAttempts) || 5);
-            this.selectedVersionSecretCodeAllowResend = mergedValues.secretCodeAllowResend !== false;
-            this.selectedVersionSecretCodeSessionMode = mergedValues.secretCodeSessionMode === 'sameTabUntilMidnight'
+            this.selectedVersionUserVerificationEnabled = !!mergedValues.userVerificationEnabled;
+            this.selectedVersionUserVerificationMatchField = mergedValues.userVerificationMatchField || 'Email';
+            this.selectedVersionUserVerificationIntroText = this.normalizeUserVerificationValue(mergedValues.userVerificationIntroText, 'introText', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationSentMessage = this.normalizeUserVerificationValue(mergedValues.userVerificationSentMessage, 'sentMessage', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationInvalidMessage = this.normalizeUserVerificationValue(mergedValues.userVerificationInvalidMessage, 'invalidMessage', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationVerifiedMessage = this.normalizeUserVerificationValue(mergedValues.userVerificationVerifiedMessage, 'verifiedMessage', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationSendButtonLabel = this.normalizeUserVerificationValue(mergedValues.userVerificationSendButtonLabel, 'sendButtonLabel', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationVerifyButtonLabel = this.normalizeUserVerificationValue(mergedValues.userVerificationVerifyButtonLabel, 'verifyButtonLabel', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationResendButtonLabel = this.normalizeUserVerificationValue(mergedValues.userVerificationResendButtonLabel, 'resendButtonLabel', this.selectedVersionLanguageCode);
+            this.selectedVersionUserVerificationExpiryMinutes = Math.max(1, Number(mergedValues.userVerificationExpiryMinutes) || 10);
+            this.selectedVersionUserVerificationMaxAttempts = Math.max(1, Number(mergedValues.userVerificationMaxAttempts) || 5);
+            this.selectedVersionUserVerificationAllowResend = mergedValues.userVerificationAllowResend !== false;
+            this.selectedVersionUserVerificationSessionMode = mergedValues.userVerificationSessionMode === 'sameTabUntilMidnight'
                 ? 'sameTabUntilMidnight'
                 : 'short';
             this.selectedVersionSubmitConditionalEnabled = !!mergedValues.submitConditionalEnabled;
@@ -4036,19 +4036,19 @@ export default class NativeFormsDesigner extends LightningElement {
             this.updatePostSubmitFormulaPreview();
             this.draftPostSubmitButtonLabel = this.selectedVersionPostSubmitButtonLabel;
             this.draftPostSubmitDelaySeconds = this.selectedVersionPostSubmitDelaySeconds;
-            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
-            this.draftSecretCodeMatchField = this.selectedVersionSecretCodeMatchField;
-            this.draftSecretCodeIntroText = this.selectedVersionSecretCodeIntroText;
-            this.draftSecretCodeSentMessage = this.selectedVersionSecretCodeSentMessage;
-            this.draftSecretCodeInvalidMessage = this.selectedVersionSecretCodeInvalidMessage;
-            this.draftSecretCodeVerifiedMessage = this.selectedVersionSecretCodeVerifiedMessage;
-            this.draftSecretCodeSendButtonLabel = this.selectedVersionSecretCodeSendButtonLabel;
-            this.draftSecretCodeVerifyButtonLabel = this.selectedVersionSecretCodeVerifyButtonLabel;
-            this.draftSecretCodeResendButtonLabel = this.selectedVersionSecretCodeResendButtonLabel;
-            this.draftSecretCodeExpiryMinutes = this.selectedVersionSecretCodeExpiryMinutes;
-            this.draftSecretCodeMaxAttempts = this.selectedVersionSecretCodeMaxAttempts;
-            this.draftSecretCodeAllowResend = this.selectedVersionSecretCodeAllowResend;
-            this.draftSecretCodeSessionMode = this.selectedVersionSecretCodeSessionMode;
+            this.draftUserVerificationEnabled = this.selectedVersionUserVerificationEnabled;
+            this.draftUserVerificationMatchField = this.selectedVersionUserVerificationMatchField;
+            this.draftUserVerificationIntroText = this.selectedVersionUserVerificationIntroText;
+            this.draftUserVerificationSentMessage = this.selectedVersionUserVerificationSentMessage;
+            this.draftUserVerificationInvalidMessage = this.selectedVersionUserVerificationInvalidMessage;
+            this.draftUserVerificationVerifiedMessage = this.selectedVersionUserVerificationVerifiedMessage;
+            this.draftUserVerificationSendButtonLabel = this.selectedVersionUserVerificationSendButtonLabel;
+            this.draftUserVerificationVerifyButtonLabel = this.selectedVersionUserVerificationVerifyButtonLabel;
+            this.draftUserVerificationResendButtonLabel = this.selectedVersionUserVerificationResendButtonLabel;
+            this.draftUserVerificationExpiryMinutes = this.selectedVersionUserVerificationExpiryMinutes;
+            this.draftUserVerificationMaxAttempts = this.selectedVersionUserVerificationMaxAttempts;
+            this.draftUserVerificationAllowResend = this.selectedVersionUserVerificationAllowResend;
+            this.draftUserVerificationSessionMode = this.selectedVersionUserVerificationSessionMode;
             this.draftSubmitConditionalEnabled = this.selectedVersionSubmitConditionalEnabled;
             this.draftSubmitConditionalFieldKey = this.selectedVersionSubmitConditionalFieldKey;
             this.draftSubmitConditionalOperator = this.selectedVersionSubmitConditionalOperator;
@@ -4176,22 +4176,22 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async handleAddUserVerification() {
-        if (!this.enableProSfSecretCodeAuth || this.draftSecretCodeVerificationEnabled || this.isSelectedVersionReadOnly) {
+        if (!this.enableProUserVerification || this.draftUserVerificationEnabled || this.isSelectedVersionReadOnly) {
             return;
         }
-        this.draftSecretCodeVerificationEnabled = true;
+        this.draftUserVerificationEnabled = true;
         const saved = await this.saveFormSettings({}, null, { skipReload: true });
         if (!saved) {
-            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
+            this.draftUserVerificationEnabled = this.selectedVersionUserVerificationEnabled;
             return;
         }
-        this.selectedElementId = SECRET_CODE_ELEMENT_ID;
+        this.selectedElementId = USER_VERIFICATION_ELEMENT_ID;
         this.syncSelectedState();
         this.showToast('User Verification added', 'Visitors will verify their email before accessing the published form.', 'success');
     }
 
     async handleRemoveUserVerification() {
-        if (!this.draftSecretCodeVerificationEnabled || this.isSelectedVersionReadOnly) {
+        if (!this.draftUserVerificationEnabled || this.isSelectedVersionReadOnly) {
             return;
         }
         const confirmed = await LightningConfirm.open({
@@ -4202,10 +4202,10 @@ export default class NativeFormsDesigner extends LightningElement {
         if (!confirmed) {
             return;
         }
-        this.draftSecretCodeVerificationEnabled = false;
+        this.draftUserVerificationEnabled = false;
         const saved = await this.saveFormSettings({}, null, { skipReload: true });
         if (!saved) {
-            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
+            this.draftUserVerificationEnabled = this.selectedVersionUserVerificationEnabled;
             return;
         }
         this.selectedElementId = null;
@@ -4213,133 +4213,133 @@ export default class NativeFormsDesigner extends LightningElement {
         this.showToast('User Verification removed', 'Visitors will no longer be asked to verify their email for this form.', 'success');
     }
 
-    handleSecretCodeIntroTextInput(event) {
-        this.draftSecretCodeIntroText = event.target.value || '';
+    handleUserVerificationIntroTextInput(event) {
+        this.draftUserVerificationIntroText = event.target.value || '';
     }
 
-    async handleSecretCodeIntroTextBlur(event) {
-        this.draftSecretCodeIntroText = event.target.value || '';
-        if ((this.draftSecretCodeIntroText || '').trim() === (this.selectedVersionSecretCodeIntroText || '').trim()) {
+    async handleUserVerificationIntroTextBlur(event) {
+        this.draftUserVerificationIntroText = event.target.value || '';
+        if ((this.draftUserVerificationIntroText || '').trim() === (this.selectedVersionUserVerificationIntroText || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    handleSecretCodeSentMessageInput(event) {
-        this.draftSecretCodeSentMessage = event.target.value || '';
+    handleUserVerificationSentMessageInput(event) {
+        this.draftUserVerificationSentMessage = event.target.value || '';
     }
 
-    async handleSecretCodeSentMessageBlur(event) {
-        this.draftSecretCodeSentMessage = event.target.value || '';
-        if ((this.draftSecretCodeSentMessage || '').trim() === (this.selectedVersionSecretCodeSentMessage || '').trim()) {
+    async handleUserVerificationSentMessageBlur(event) {
+        this.draftUserVerificationSentMessage = event.target.value || '';
+        if ((this.draftUserVerificationSentMessage || '').trim() === (this.selectedVersionUserVerificationSentMessage || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    handleSecretCodeInvalidMessageInput(event) {
-        this.draftSecretCodeInvalidMessage = event.target.value || '';
+    handleUserVerificationInvalidMessageInput(event) {
+        this.draftUserVerificationInvalidMessage = event.target.value || '';
     }
 
-    async handleSecretCodeInvalidMessageBlur(event) {
-        this.draftSecretCodeInvalidMessage = event.target.value || '';
-        if ((this.draftSecretCodeInvalidMessage || '').trim() === (this.selectedVersionSecretCodeInvalidMessage || '').trim()) {
+    async handleUserVerificationInvalidMessageBlur(event) {
+        this.draftUserVerificationInvalidMessage = event.target.value || '';
+        if ((this.draftUserVerificationInvalidMessage || '').trim() === (this.selectedVersionUserVerificationInvalidMessage || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    handleSecretCodeVerifiedMessageInput(event) {
-        this.draftSecretCodeVerifiedMessage = event.target.value || '';
+    handleUserVerificationVerifiedMessageInput(event) {
+        this.draftUserVerificationVerifiedMessage = event.target.value || '';
     }
 
-    async handleSecretCodeVerifiedMessageBlur(event) {
-        this.draftSecretCodeVerifiedMessage = event.target.value || '';
-        if ((this.draftSecretCodeVerifiedMessage || '').trim() === (this.selectedVersionSecretCodeVerifiedMessage || '').trim()) {
+    async handleUserVerificationVerifiedMessageBlur(event) {
+        this.draftUserVerificationVerifiedMessage = event.target.value || '';
+        if ((this.draftUserVerificationVerifiedMessage || '').trim() === (this.selectedVersionUserVerificationVerifiedMessage || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    handleSecretCodeSendButtonLabelInput(event) {
-        this.draftSecretCodeSendButtonLabel = event.target.value || '';
+    handleUserVerificationSendButtonLabelInput(event) {
+        this.draftUserVerificationSendButtonLabel = event.target.value || '';
     }
 
-    async handleSecretCodeSendButtonLabelBlur(event) {
-        this.draftSecretCodeSendButtonLabel = event.target.value || '';
-        if ((this.draftSecretCodeSendButtonLabel || '').trim() === (this.selectedVersionSecretCodeSendButtonLabel || '').trim()) {
+    async handleUserVerificationSendButtonLabelBlur(event) {
+        this.draftUserVerificationSendButtonLabel = event.target.value || '';
+        if ((this.draftUserVerificationSendButtonLabel || '').trim() === (this.selectedVersionUserVerificationSendButtonLabel || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    handleSecretCodeVerifyButtonLabelInput(event) {
-        this.draftSecretCodeVerifyButtonLabel = event.target.value || '';
+    handleUserVerificationVerifyButtonLabelInput(event) {
+        this.draftUserVerificationVerifyButtonLabel = event.target.value || '';
     }
 
-    async handleSecretCodeVerifyButtonLabelBlur(event) {
-        this.draftSecretCodeVerifyButtonLabel = event.target.value || '';
-        if ((this.draftSecretCodeVerifyButtonLabel || '').trim() === (this.selectedVersionSecretCodeVerifyButtonLabel || '').trim()) {
+    async handleUserVerificationVerifyButtonLabelBlur(event) {
+        this.draftUserVerificationVerifyButtonLabel = event.target.value || '';
+        if ((this.draftUserVerificationVerifyButtonLabel || '').trim() === (this.selectedVersionUserVerificationVerifyButtonLabel || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    handleSecretCodeResendButtonLabelInput(event) {
-        this.draftSecretCodeResendButtonLabel = event.target.value || '';
+    handleUserVerificationResendButtonLabelInput(event) {
+        this.draftUserVerificationResendButtonLabel = event.target.value || '';
     }
 
-    async handleSecretCodeResendButtonLabelBlur(event) {
-        this.draftSecretCodeResendButtonLabel = event.target.value || '';
-        if ((this.draftSecretCodeResendButtonLabel || '').trim() === (this.selectedVersionSecretCodeResendButtonLabel || '').trim()) {
+    async handleUserVerificationResendButtonLabelBlur(event) {
+        this.draftUserVerificationResendButtonLabel = event.target.value || '';
+        if ((this.draftUserVerificationResendButtonLabel || '').trim() === (this.selectedVersionUserVerificationResendButtonLabel || '').trim()) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    async handleSecretCodeExpiryMinutesBlur(event) {
-        this.draftSecretCodeExpiryMinutes = Math.max(1, Number(event.target.value) || 10);
-        if (this.draftSecretCodeExpiryMinutes === this.selectedVersionSecretCodeExpiryMinutes) {
+    async handleUserVerificationExpiryMinutesBlur(event) {
+        this.draftUserVerificationExpiryMinutes = Math.max(1, Number(event.target.value) || 10);
+        if (this.draftUserVerificationExpiryMinutes === this.selectedVersionUserVerificationExpiryMinutes) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    async handleSecretCodeMaxAttemptsBlur(event) {
-        this.draftSecretCodeMaxAttempts = Math.max(1, Number(event.target.value) || 5);
-        if (this.draftSecretCodeMaxAttempts === this.selectedVersionSecretCodeMaxAttempts) {
+    async handleUserVerificationMaxAttemptsBlur(event) {
+        this.draftUserVerificationMaxAttempts = Math.max(1, Number(event.target.value) || 5);
+        if (this.draftUserVerificationMaxAttempts === this.selectedVersionUserVerificationMaxAttempts) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    async handleSecretCodeAllowResendChange(event) {
-        this.draftSecretCodeAllowResend = !!event.target.checked;
-        if (this.draftSecretCodeAllowResend === this.selectedVersionSecretCodeAllowResend) {
+    async handleUserVerificationAllowResendChange(event) {
+        this.draftUserVerificationAllowResend = !!event.target.checked;
+        if (this.draftUserVerificationAllowResend === this.selectedVersionUserVerificationAllowResend) {
             return;
         }
         await this.saveFormSettings({}, null, { skipReload: true });
     }
 
-    async handleSecretCodeSessionModeChange(event) {
+    async handleUserVerificationSessionModeChange(event) {
         const nextMode = event.target.checked ? 'sameTabUntilMidnight' : 'short';
-        this.draftSecretCodeSessionMode = nextMode;
-        if (nextMode === this.selectedVersionSecretCodeSessionMode) {
+        this.draftUserVerificationSessionMode = nextMode;
+        if (nextMode === this.selectedVersionUserVerificationSessionMode) {
             return;
         }
         this.isSavingFormSettings = true;
         this.errorMessage = '';
         try {
-            await updateSecretCodeSessionMode({
+            await updateUserVerificationSessionMode({
                 formId: this.selectedFormId,
                 versionId: this.selectedVersionId,
-                secretCodeSessionMode: nextMode
+                userVerificationSessionMode: nextMode
             });
-            this.selectedVersionSecretCodeSessionMode = nextMode;
-            this.draftSecretCodeSessionMode = nextMode;
+            this.selectedVersionUserVerificationSessionMode = nextMode;
+            this.draftUserVerificationSessionMode = nextMode;
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
-            this.draftSecretCodeSessionMode = this.selectedVersionSecretCodeSessionMode;
+            this.draftUserVerificationSessionMode = this.selectedVersionUserVerificationSessionMode;
         } finally {
             this.isSavingFormSettings = false;
         }
@@ -4872,13 +4872,13 @@ export default class NativeFormsDesigner extends LightningElement {
         this.syncSelectedState();
     }
 
-    handleSecretCodePreviewKeydown(event) {
+    handleUserVerificationPreviewKeydown(event) {
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
         event.preventDefault();
         event.stopPropagation();
-        this.selectedElementId = SECRET_CODE_ELEMENT_ID;
+        this.selectedElementId = USER_VERIFICATION_ELEMENT_ID;
         this.syncSelectedState();
     }
 
@@ -6025,7 +6025,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async handleDeleteSelected() {
-        if (!this.selectedElementId || this.isSelectedVersionReadOnly || this.selectedElementIsSubmitButton || this.selectedElementIsSecretCode) {
+        if (!this.selectedElementId || this.isSelectedVersionReadOnly || this.selectedElementIsSubmitButton || this.selectedElementIsUserVerification) {
             return;
         }
 
@@ -6146,7 +6146,7 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
 
-        if (this.selectedElementIsSecretCode) {
+        if (this.selectedElementIsUserVerification) {
             this.editorLabel = '';
             this.editorElementType = '';
             this.picklistFieldOptions = [];
@@ -6876,7 +6876,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     applyEditorDraft(shouldAutoSave = true, preserveConditionalDraft = false) {
-        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsUserVerification || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
             return;
         }
         if (!this.pendingElementEditUndoSnapshot) {
@@ -6931,7 +6931,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     scheduleAutoSave() {
-        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsUserVerification || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
@@ -6939,7 +6939,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     flushEditorDraftSave() {
-        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsUserVerification || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
@@ -6947,7 +6947,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async persistVisualSettings(showToast) {
-        if (!this.selectedElement || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton) {
+        if (!this.selectedElement || this.selectedElementIsUserVerification || this.selectedElementIsSubmitButton) {
             return;
         }
         try {

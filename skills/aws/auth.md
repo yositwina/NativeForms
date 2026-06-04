@@ -10,7 +10,7 @@ Use for Lambda auth, tenant registration, bearer-secret flows, connected app or 
 - Keep tenant trust separate from public form trust.
 - Salesforce package/admin calls use Bootstrap V2 HMAC signatures. Public HTML never uses package service credentials.
 - Public runtime uses `formId` plus per-form `publishToken`, then resolves tenant ownership indirectly through the stored form record.
-- Secret-code same-tab verification sessions are public runtime tokens only. AWS must derive the allowed session mode from the published form config, not from the browser request, and cap same-tab expiry at 12 hours even when the browser asks for local midnight.
+- User-verification same-tab verification sessions are public runtime tokens only. AWS must derive the allowed session mode from the published form config, not from the browser request, and cap same-tab expiry at 12 hours even when the browser asks for local midnight.
 - Store tenant-specific Salesforce connection data per org, but do not store subscriber-entered OAuth client credentials per tenant.
 - The packaged External Client App uses one TwinaForms-owned OAuth client id/secret configured centrally in AWS, preferably in Secrets Manager with Lambda env var `SALESFORCE_OAUTH_CLIENT_SECRET_NAME`.
 - `NativeFormsBackend`, `NativeForms-PrefillForm`, and `NativeForms-SubmitForm` must all be able to read that central OAuth client secret.

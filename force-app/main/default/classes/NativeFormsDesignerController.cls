@@ -140,19 +140,19 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedVersionPostSubmitUrlFormula { get; set; }
         @AuraEnabled public String selectedVersionPostSubmitButtonLabel { get; set; }
         @AuraEnabled public Integer selectedVersionPostSubmitDelaySeconds { get; set; }
-        @AuraEnabled public Boolean selectedVersionSecretCodeVerificationEnabled { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeMatchField { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeIntroText { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeSentMessage { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeInvalidMessage { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeVerifiedMessage { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeSendButtonLabel { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeVerifyButtonLabel { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeResendButtonLabel { get; set; }
-        @AuraEnabled public Integer selectedVersionSecretCodeExpiryMinutes { get; set; }
-        @AuraEnabled public Integer selectedVersionSecretCodeMaxAttempts { get; set; }
-        @AuraEnabled public Boolean selectedVersionSecretCodeAllowResend { get; set; }
-        @AuraEnabled public String selectedVersionSecretCodeSessionMode { get; set; }
+        @AuraEnabled public Boolean selectedVersionUserVerificationEnabled { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationMatchField { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationIntroText { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationSentMessage { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationInvalidMessage { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationVerifiedMessage { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationSendButtonLabel { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationVerifyButtonLabel { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationResendButtonLabel { get; set; }
+        @AuraEnabled public Integer selectedVersionUserVerificationExpiryMinutes { get; set; }
+        @AuraEnabled public Integer selectedVersionUserVerificationMaxAttempts { get; set; }
+        @AuraEnabled public Boolean selectedVersionUserVerificationAllowResend { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationSessionMode { get; set; }
         @AuraEnabled public Boolean selectedVersionSubmitConditionalEnabled { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalFieldKey { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalOperator { get; set; }
@@ -185,7 +185,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean enableProLocationFields { get; set; }
         @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
-        @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
+        @AuraEnabled public Boolean enableProUserVerification { get; set; }
         @AuraEnabled public Boolean enableProAdvancedSubmitModes { get; set; }
         @AuraEnabled public Boolean enableProPageLayoutClone { get; set; }
         @AuraEnabled public Boolean enableProCustomJs { get; set; }
@@ -456,7 +456,7 @@ public with sharing class NativeFormsDesignerController {
         workspace.enableProLocationFields = NativeFormsFeatureFlags.isProLocationFieldsEnabled();
         workspace.enableProFormulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         workspace.enableProPostSubmitAutoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
-        workspace.enableProSfSecretCodeAuth = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
+        workspace.enableProUserVerification = NativeFormsFeatureFlags.isProSfUserVerificationAuthEnabled();
         workspace.enableProAdvancedSubmitModes = NativeFormsFeatureFlags.isProAdvancedSubmitModesEnabled();
         workspace.enableProPageLayoutClone = NativeFormsFeatureFlags.isProPageLayoutCloneEnabled();
         workspace.enableProCustomJs = NativeFormsFeatureFlags.isProCustomJsEnabled();
@@ -645,49 +645,49 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedVersionPostSubmitDelaySeconds = defaultPostSubmitDelaySeconds(
             versionUiSettings.get('postSubmitDelaySeconds')
         );
-        workspace.selectedVersionSecretCodeVerificationEnabled = booleanValue(versionUiSettings.get('secretCodeVerificationEnabled'));
-        workspace.selectedVersionSecretCodeMatchField = defaultSecretCodeMatchField(
-            stringValue(versionUiSettings.get('secretCodeMatchField'))
+        workspace.selectedVersionUserVerificationEnabled = booleanValue(versionUiSettings.get('userVerificationEnabled'));
+        workspace.selectedVersionUserVerificationMatchField = defaultUserVerificationMatchField(
+            stringValue(versionUiSettings.get('userVerificationMatchField'))
         );
-        workspace.selectedVersionSecretCodeIntroText = defaultSecretCodeIntroText(
-            stringValue(versionUiSettings.get('secretCodeIntroText')),
+        workspace.selectedVersionUserVerificationIntroText = defaultUserVerificationIntroText(
+            stringValue(versionUiSettings.get('userVerificationIntroText')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeSentMessage = defaultSecretCodeSentMessage(
-            stringValue(versionUiSettings.get('secretCodeSentMessage')),
+        workspace.selectedVersionUserVerificationSentMessage = defaultUserVerificationSentMessage(
+            stringValue(versionUiSettings.get('userVerificationSentMessage')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeInvalidMessage = defaultSecretCodeInvalidMessage(
-            stringValue(versionUiSettings.get('secretCodeInvalidMessage')),
+        workspace.selectedVersionUserVerificationInvalidMessage = defaultUserVerificationInvalidMessage(
+            stringValue(versionUiSettings.get('userVerificationInvalidMessage')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeVerifiedMessage = defaultSecretCodeVerifiedMessage(
-            stringValue(versionUiSettings.get('secretCodeVerifiedMessage')),
+        workspace.selectedVersionUserVerificationVerifiedMessage = defaultUserVerificationVerifiedMessage(
+            stringValue(versionUiSettings.get('userVerificationVerifiedMessage')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeSendButtonLabel = defaultSecretCodeSendButtonLabel(
-            stringValue(versionUiSettings.get('secretCodeSendButtonLabel')),
+        workspace.selectedVersionUserVerificationSendButtonLabel = defaultUserVerificationSendButtonLabel(
+            stringValue(versionUiSettings.get('userVerificationSendButtonLabel')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeVerifyButtonLabel = defaultSecretCodeVerifyButtonLabel(
-            stringValue(versionUiSettings.get('secretCodeVerifyButtonLabel')),
+        workspace.selectedVersionUserVerificationVerifyButtonLabel = defaultUserVerificationVerifyButtonLabel(
+            stringValue(versionUiSettings.get('userVerificationVerifyButtonLabel')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeResendButtonLabel = defaultSecretCodeResendButtonLabel(
-            stringValue(versionUiSettings.get('secretCodeResendButtonLabel')),
+        workspace.selectedVersionUserVerificationResendButtonLabel = defaultUserVerificationResendButtonLabel(
+            stringValue(versionUiSettings.get('userVerificationResendButtonLabel')),
             workspace.selectedVersionLanguageCode
         );
-        workspace.selectedVersionSecretCodeExpiryMinutes = defaultSecretCodeExpiryMinutes(
-            versionUiSettings.get('secretCodeExpiryMinutes')
+        workspace.selectedVersionUserVerificationExpiryMinutes = defaultUserVerificationExpiryMinutes(
+            versionUiSettings.get('userVerificationExpiryMinutes')
         );
-        workspace.selectedVersionSecretCodeMaxAttempts = defaultSecretCodeMaxAttempts(
-            versionUiSettings.get('secretCodeMaxAttempts')
+        workspace.selectedVersionUserVerificationMaxAttempts = defaultUserVerificationMaxAttempts(
+            versionUiSettings.get('userVerificationMaxAttempts')
         );
-        workspace.selectedVersionSecretCodeAllowResend = defaultSecretCodeAllowResend(
-            versionUiSettings.get('secretCodeAllowResend')
+        workspace.selectedVersionUserVerificationAllowResend = defaultUserVerificationAllowResend(
+            versionUiSettings.get('userVerificationAllowResend')
         );
-        workspace.selectedVersionSecretCodeSessionMode = defaultSecretCodeSessionMode(
-            stringValue(versionUiSettings.get('secretCodeSessionMode'))
+        workspace.selectedVersionUserVerificationSessionMode = defaultUserVerificationSessionMode(
+            stringValue(versionUiSettings.get('userVerificationSessionMode'))
         );
         workspace.selectedVersionSubmitConditionalEnabled = booleanValue(versionUiSettings.get('submitConditionalEnabled'));
         workspace.selectedVersionSubmitConditionalFieldKey = stringValue(versionUiSettings.get('submitConditionalFieldKey'));
@@ -792,18 +792,18 @@ public with sharing class NativeFormsDesignerController {
         String postSubmitUrlTemplate,
         String postSubmitButtonLabel,
         Integer postSubmitDelaySeconds,
-        Boolean secretCodeVerificationEnabled,
-        String secretCodeMatchField,
-        String secretCodeIntroText,
-        String secretCodeSentMessage,
-        String secretCodeInvalidMessage,
-        String secretCodeVerifiedMessage,
-        String secretCodeSendButtonLabel,
-        String secretCodeVerifyButtonLabel,
-        String secretCodeResendButtonLabel,
-        Integer secretCodeExpiryMinutes,
-        Integer secretCodeMaxAttempts,
-        Boolean secretCodeAllowResend,
+        Boolean userVerificationEnabled,
+        String userVerificationMatchField,
+        String userVerificationIntroText,
+        String userVerificationSentMessage,
+        String userVerificationInvalidMessage,
+        String userVerificationVerifiedMessage,
+        String userVerificationSendButtonLabel,
+        String userVerificationVerifyButtonLabel,
+        String userVerificationResendButtonLabel,
+        Integer userVerificationExpiryMinutes,
+        Integer userVerificationMaxAttempts,
+        Boolean userVerificationAllowResend,
         String submitLabel,
         Boolean submitConditionalEnabled,
         String submitConditionalFieldKey,
@@ -859,18 +859,18 @@ public with sharing class NativeFormsDesignerController {
             uiSettings.put('postSubmitUrlTemplate', defaultPostSubmitUrlTemplate(postSubmitUrlTemplate));
             uiSettings.put('postSubmitButtonLabel', defaultPostSubmitButtonLabel(postSubmitButtonLabel, normalizedLanguageCode));
             uiSettings.put('postSubmitDelaySeconds', defaultPostSubmitDelaySeconds(postSubmitDelaySeconds));
-            uiSettings.put('secretCodeVerificationEnabled', secretCodeVerificationEnabled == true);
-            uiSettings.put('secretCodeMatchField', defaultSecretCodeMatchField(secretCodeMatchField));
-            uiSettings.put('secretCodeIntroText', defaultSecretCodeIntroText(secretCodeIntroText, normalizedLanguageCode));
-            uiSettings.put('secretCodeSentMessage', defaultSecretCodeSentMessage(secretCodeSentMessage, normalizedLanguageCode));
-            uiSettings.put('secretCodeInvalidMessage', defaultSecretCodeInvalidMessage(secretCodeInvalidMessage, normalizedLanguageCode));
-            uiSettings.put('secretCodeVerifiedMessage', defaultSecretCodeVerifiedMessage(secretCodeVerifiedMessage, normalizedLanguageCode));
-            uiSettings.put('secretCodeSendButtonLabel', defaultSecretCodeSendButtonLabel(secretCodeSendButtonLabel, normalizedLanguageCode));
-            uiSettings.put('secretCodeVerifyButtonLabel', defaultSecretCodeVerifyButtonLabel(secretCodeVerifyButtonLabel, normalizedLanguageCode));
-            uiSettings.put('secretCodeResendButtonLabel', defaultSecretCodeResendButtonLabel(secretCodeResendButtonLabel, normalizedLanguageCode));
-            uiSettings.put('secretCodeExpiryMinutes', defaultSecretCodeExpiryMinutes(secretCodeExpiryMinutes));
-            uiSettings.put('secretCodeMaxAttempts', defaultSecretCodeMaxAttempts(secretCodeMaxAttempts));
-            uiSettings.put('secretCodeAllowResend', defaultSecretCodeAllowResend(secretCodeAllowResend));
+            uiSettings.put('userVerificationEnabled', userVerificationEnabled == true);
+            uiSettings.put('userVerificationMatchField', defaultUserVerificationMatchField(userVerificationMatchField));
+            uiSettings.put('userVerificationIntroText', defaultUserVerificationIntroText(userVerificationIntroText, normalizedLanguageCode));
+            uiSettings.put('userVerificationSentMessage', defaultUserVerificationSentMessage(userVerificationSentMessage, normalizedLanguageCode));
+            uiSettings.put('userVerificationInvalidMessage', defaultUserVerificationInvalidMessage(userVerificationInvalidMessage, normalizedLanguageCode));
+            uiSettings.put('userVerificationVerifiedMessage', defaultUserVerificationVerifiedMessage(userVerificationVerifiedMessage, normalizedLanguageCode));
+            uiSettings.put('userVerificationSendButtonLabel', defaultUserVerificationSendButtonLabel(userVerificationSendButtonLabel, normalizedLanguageCode));
+            uiSettings.put('userVerificationVerifyButtonLabel', defaultUserVerificationVerifyButtonLabel(userVerificationVerifyButtonLabel, normalizedLanguageCode));
+            uiSettings.put('userVerificationResendButtonLabel', defaultUserVerificationResendButtonLabel(userVerificationResendButtonLabel, normalizedLanguageCode));
+            uiSettings.put('userVerificationExpiryMinutes', defaultUserVerificationExpiryMinutes(userVerificationExpiryMinutes));
+            uiSettings.put('userVerificationMaxAttempts', defaultUserVerificationMaxAttempts(userVerificationMaxAttempts));
+            uiSettings.put('userVerificationAllowResend', defaultUserVerificationAllowResend(userVerificationAllowResend));
             uiSettings.put('submitLabel', defaultSubmitLabel(submitLabel, normalizedLanguageCode));
             uiSettings.put('submitConditionalEnabled', submitConditionalEnabled == true);
             uiSettings.put('submitConditionalFieldKey', stringValue(submitConditionalFieldKey));
@@ -898,7 +898,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
-    public static void updateSecretCodeSessionMode(Id formId, Id versionId, String secretCodeSessionMode) {
+    public static void updateUserVerificationSessionMode(Id formId, Id versionId, String userVerificationSessionMode) {
         if (formId == null || versionId == null) {
             throw new AuraHandledException('Form and version are required.');
         }
@@ -912,7 +912,7 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('Selected version does not belong to the selected form.');
         }
         Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
-        uiSettings.put('secretCodeSessionMode', defaultSecretCodeSessionMode(secretCodeSessionMode));
+        uiSettings.put('userVerificationSessionMode', defaultUserVerificationSessionMode(userVerificationSessionMode));
         update as user new NF_Form_Version__c(
             Id = versionRecord.Id,
             UI_Settings_JSON__c = JSON.serializePretty(uiSettings)
@@ -1178,7 +1178,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         Boolean secureMode = normalizedMode != 'create';
-        if (secureMode && !NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled()) {
+        if (secureMode && !NativeFormsFeatureFlags.isProSfUserVerificationAuthEnabled()) {
             throw new AuraHandledException('Secure page-layout forms require User Verification with Contact/email matching on your Pro plan.');
         }
 
@@ -3589,19 +3589,19 @@ public with sharing class NativeFormsDesignerController {
             'submitSuccessMessage' => localizedFormSettingDefault('submitSuccessMessage', normalizedLanguageCode, 'Your form was submitted successfully.'),
             'submitLabel' => localizedFormSettingDefault('submitLabel', normalizedLanguageCode, 'Submit'),
             'rtlEnabled' => normalizedLanguageCode == 'he',
-            'secretCodeVerificationEnabled' => secureMode == true,
-            'secretCodeMatchField' => 'Email',
-            'secretCodeIntroText' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeIntroText', ''),
-            'secretCodeSentMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeSentMessage', ''),
-            'secretCodeInvalidMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeInvalidMessage', ''),
-            'secretCodeVerifiedMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeVerifiedMessage', ''),
-            'secretCodeSendButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeSendButtonLabel', ''),
-            'secretCodeVerifyButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeVerifyButtonLabel', ''),
-            'secretCodeResendButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'secretCodeResendButtonLabel', ''),
-            'secretCodeExpiryMinutes' => 10,
-            'secretCodeMaxAttempts' => 5,
-            'secretCodeAllowResend' => true,
-            'secretCodeSessionMode' => 'short'
+            'userVerificationEnabled' => secureMode == true,
+            'userVerificationMatchField' => 'Email',
+            'userVerificationIntroText' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationIntroText', ''),
+            'userVerificationSentMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationSentMessage', ''),
+            'userVerificationInvalidMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationInvalidMessage', ''),
+            'userVerificationVerifiedMessage' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationVerifiedMessage', ''),
+            'userVerificationSendButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationSendButtonLabel', ''),
+            'userVerificationVerifyButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationVerifyButtonLabel', ''),
+            'userVerificationResendButtonLabel' => NativeFormsRuntimeI18n.text(normalizedLanguageCode, 'userVerificationResendButtonLabel', ''),
+            'userVerificationExpiryMinutes' => 10,
+            'userVerificationMaxAttempts' => 5,
+            'userVerificationAllowResend' => true,
+            'userVerificationSessionMode' => 'short'
         };
         return JSON.serializePretty(uiSettings);
     }
@@ -3695,74 +3695,74 @@ public with sharing class NativeFormsDesignerController {
         return String.isNotBlank(value) && value.trim().toLowerCase() == 'formula' ? 'formula' : 'template';
     }
 
-    private static String defaultSecretCodeMatchField(String value) {
+    private static String defaultUserVerificationMatchField(String value) {
         return 'Email';
     }
 
-    private static String defaultSecretCodeIntroText(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationIntroText(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeIntroText',
+            'userVerificationIntroText',
             'Enter your email and click Enter. We will send you a 6-digit code before you can continue.'
         );
     }
 
-    private static String defaultSecretCodeSentMessage(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationSentMessage(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeSentMessage',
+            'userVerificationSentMessage',
             'If we found a matching contact, we sent a 6-digit code to that email.'
         );
     }
 
-    private static String defaultSecretCodeInvalidMessage(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationInvalidMessage(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeInvalidMessage',
+            'userVerificationInvalidMessage',
             'The code is invalid or expired. Try again or request a new code.'
         );
     }
 
-    private static String defaultSecretCodeVerifiedMessage(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationVerifiedMessage(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeVerifiedMessage',
+            'userVerificationVerifiedMessage',
             'Code verified. You can continue with the form now.'
         );
     }
 
-    private static String defaultSecretCodeSendButtonLabel(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationSendButtonLabel(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeSendButtonLabel',
+            'userVerificationSendButtonLabel',
             'Enter'
         );
     }
 
-    private static String defaultSecretCodeVerifyButtonLabel(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationVerifyButtonLabel(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeVerifyButtonLabel',
+            'userVerificationVerifyButtonLabel',
             'Verify'
         );
     }
 
-    private static String defaultSecretCodeResendButtonLabel(String value, String languageCode) {
-        return localizedSecretCodeValue(
+    private static String defaultUserVerificationResendButtonLabel(String value, String languageCode) {
+        return localizedUserVerificationValue(
             value,
             languageCode,
-            'secretCodeResendButtonLabel',
+            'userVerificationResendButtonLabel',
             'Resend Verification Number'
         );
     }
 
-    private static String localizedSecretCodeValue(String value, String languageCode, String key, String fallback) {
+    private static String localizedUserVerificationValue(String value, String languageCode, String key, String fallback) {
         String trimmedValue = String.isBlank(value) ? '' : value.trim();
         if (String.isBlank(trimmedValue) || NativeFormsRuntimeI18n.matchesAnyLanguageValue(key, trimmedValue)) {
             return NativeFormsRuntimeI18n.text(languageCode, key, fallback);
@@ -3770,21 +3770,21 @@ public with sharing class NativeFormsDesignerController {
         return trimmedValue;
     }
 
-    private static Integer defaultSecretCodeExpiryMinutes(Object value) {
+    private static Integer defaultUserVerificationExpiryMinutes(Object value) {
         Integer parsedValue = integerValue(value);
         return parsedValue == null || parsedValue < 1 ? 10 : parsedValue;
     }
 
-    private static Integer defaultSecretCodeMaxAttempts(Object value) {
+    private static Integer defaultUserVerificationMaxAttempts(Object value) {
         Integer parsedValue = integerValue(value);
         return parsedValue == null || parsedValue < 1 ? 5 : parsedValue;
     }
 
-    private static Boolean defaultSecretCodeAllowResend(Object value) {
+    private static Boolean defaultUserVerificationAllowResend(Object value) {
         return value == null ? true : booleanValue(value);
     }
 
-    private static String defaultSecretCodeSessionMode(String value) {
+    private static String defaultUserVerificationSessionMode(String value) {
         String normalized = String.isBlank(value) ? 'short' : value.trim();
         return normalized == 'sameTabUntilMidnight' ? 'sameTabUntilMidnight' : 'short';
     }

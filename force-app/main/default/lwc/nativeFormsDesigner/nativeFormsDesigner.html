@@ -276,28 +276,28 @@
                                     </div>
                                 </template>
                                 <div class="designer-canvas" onclick={handleCanvasClick}>
-                                <template if:true={showCanvasSecretCodePreview}>
+                                <template if:true={showCanvasUserVerificationPreview}>
                                     <article
-                                        class={secretCodePreviewClass}
-                                        data-id="__secretCode__"
+                                        class={userVerificationPreviewClass}
+                                        data-id="__userVerification__"
                                         role="button"
                                         tabindex="0"
                                         onclick={handleSelectElement}
-                                        onkeydown={handleSecretCodePreviewKeydown}>
-                                        <p class="designer-secret-preview__copy">{secretCodePreviewData.introText}</p>
-                                        <div class="designer-secret-preview__row">
+                                        onkeydown={handleUserVerificationPreviewKeydown}>
+                                        <p class="designer-user-verification-preview__copy">{userVerificationPreviewData.introText}</p>
+                                        <div class="designer-user-verification-preview__row">
                                             <input type="email" disabled />
-                                            <button type="button" disabled>{secretCodePreviewData.sendButtonLabel}</button>
+                                            <button type="button" disabled>{userVerificationPreviewData.sendButtonLabel}</button>
                                         </div>
-                                        <p class="designer-secret-preview__hint">{secretCodePreviewData.sentMessage}</p>
-                                        <div class="designer-secret-preview__row designer-secret-preview__row--ghost">
+                                        <p class="designer-user-verification-preview__hint">{userVerificationPreviewData.sentMessage}</p>
+                                        <div class="designer-user-verification-preview__row designer-user-verification-preview__row--ghost">
                                             <input type="text" disabled />
-                                            <button type="button" disabled>{secretCodePreviewData.verifyButtonLabel}</button>
+                                            <button type="button" disabled>{userVerificationPreviewData.verifyButtonLabel}</button>
                                         </div>
-                                        <template if:true={secretCodePreviewData.allowResend}>
-                                            <button type="button" class="designer-secret-preview__resend" disabled>{secretCodePreviewData.resendButtonLabel}</button>
+                                        <template if:true={userVerificationPreviewData.allowResend}>
+                                            <button type="button" class="designer-user-verification-preview__resend" disabled>{userVerificationPreviewData.resendButtonLabel}</button>
                                         </template>
-                                        <p class="designer-secret-preview__verified">{secretCodePreviewData.verifiedMessage}</p>
+                                        <p class="designer-user-verification-preview__verified">{userVerificationPreviewData.verifiedMessage}</p>
                                     </article>
                                 </template>
                                 <template for:each={canvasRows} for:item="row">
@@ -932,7 +932,7 @@
                         </template>
                         <template if:true={selectedElement}>
                             <template if:false={isSelectedVersionReadOnly}>
-                            <template if:true={selectedElementIsSecretCode}>
+                            <template if:true={selectedElementIsUserVerification}>
                             <template if:true={isSavingFormSettings}>
                                 <div class="settings-saving" role="status">
                                     <lightning-spinner
@@ -951,13 +951,13 @@
 
                                 <div class="selection-label-row selection-label-row--flush">
                                     <p class="field-inline-label">Contact Match Field</p>
-                                    <lightning-helptext content={secretCodeEmailTemplateHelpText}></lightning-helptext>
+                                    <lightning-helptext content={userVerificationEmailTemplateHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="text"
                                     variant="label-hidden"
                                     label="Contact Match Field"
-                                    value={draftSecretCodeMatchField}
+                                    value={draftUserVerificationMatchField}
                                     disabled>
                                 </lightning-input>
                             </div>
@@ -966,30 +966,30 @@
                                 <p class="selection-label">Messages</p>
                                 <lightning-textarea
                                     label="Verification Intro Text"
-                                    value={draftSecretCodeIntroText}
-                                    oninput={handleSecretCodeIntroTextInput}
-                                    onblur={handleSecretCodeIntroTextBlur}>
+                                    value={draftUserVerificationIntroText}
+                                    oninput={handleUserVerificationIntroTextInput}
+                                    onblur={handleUserVerificationIntroTextBlur}>
                                 </lightning-textarea>
 
                                 <lightning-textarea
                                     label="Verification Number Sent Message"
-                                    value={draftSecretCodeSentMessage}
-                                    oninput={handleSecretCodeSentMessageInput}
-                                    onblur={handleSecretCodeSentMessageBlur}>
+                                    value={draftUserVerificationSentMessage}
+                                    oninput={handleUserVerificationSentMessageInput}
+                                    onblur={handleUserVerificationSentMessageBlur}>
                                 </lightning-textarea>
 
                                 <lightning-textarea
                                     label="Invalid Verification Number Message"
-                                    value={draftSecretCodeInvalidMessage}
-                                    oninput={handleSecretCodeInvalidMessageInput}
-                                    onblur={handleSecretCodeInvalidMessageBlur}>
+                                    value={draftUserVerificationInvalidMessage}
+                                    oninput={handleUserVerificationInvalidMessageInput}
+                                    onblur={handleUserVerificationInvalidMessageBlur}>
                                 </lightning-textarea>
 
                                 <lightning-textarea
                                     label="Verified Message"
-                                    value={draftSecretCodeVerifiedMessage}
-                                    oninput={handleSecretCodeVerifiedMessageInput}
-                                    onblur={handleSecretCodeVerifiedMessageBlur}>
+                                    value={draftUserVerificationVerifiedMessage}
+                                    oninput={handleUserVerificationVerifiedMessageInput}
+                                    onblur={handleUserVerificationVerifiedMessageBlur}>
                                 </lightning-textarea>
                             </div>
 
@@ -998,25 +998,25 @@
                                 <lightning-input
                                     type="text"
                                     label="Send Button Label"
-                                    value={draftSecretCodeSendButtonLabel}
-                                    oninput={handleSecretCodeSendButtonLabelInput}
-                                    onblur={handleSecretCodeSendButtonLabelBlur}>
+                                    value={draftUserVerificationSendButtonLabel}
+                                    oninput={handleUserVerificationSendButtonLabelInput}
+                                    onblur={handleUserVerificationSendButtonLabelBlur}>
                                 </lightning-input>
 
                                 <lightning-input
                                     type="text"
                                     label="Verify Button Label"
-                                    value={draftSecretCodeVerifyButtonLabel}
-                                    oninput={handleSecretCodeVerifyButtonLabelInput}
-                                    onblur={handleSecretCodeVerifyButtonLabelBlur}>
+                                    value={draftUserVerificationVerifyButtonLabel}
+                                    oninput={handleUserVerificationVerifyButtonLabelInput}
+                                    onblur={handleUserVerificationVerifyButtonLabelBlur}>
                                 </lightning-input>
 
                                 <lightning-input
                                     type="text"
                                     label="Resend Button Label"
-                                    value={draftSecretCodeResendButtonLabel}
-                                    oninput={handleSecretCodeResendButtonLabelInput}
-                                    onblur={handleSecretCodeResendButtonLabelBlur}>
+                                    value={draftUserVerificationResendButtonLabel}
+                                    oninput={handleUserVerificationResendButtonLabelInput}
+                                    onblur={handleUserVerificationResendButtonLabelBlur}>
                                 </lightning-input>
                             </div>
 
@@ -1024,52 +1024,52 @@
                                 <p class="selection-label">Rules</p>
                                 <div class="selection-label-row selection-label-row--flush">
                                     <p class="field-inline-label">Verification Number Expiry Minutes</p>
-                                    <lightning-helptext content={secretCodeExpiryHelpText}></lightning-helptext>
+                                    <lightning-helptext content={userVerificationExpiryHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="number"
                                     variant="label-hidden"
                                     label="Verification Number Expiry Minutes"
-                                    value={draftSecretCodeExpiryMinutes}
+                                    value={draftUserVerificationExpiryMinutes}
                                     min="1"
-                                    onblur={handleSecretCodeExpiryMinutesBlur}>
+                                    onblur={handleUserVerificationExpiryMinutesBlur}>
                                 </lightning-input>
 
                                 <div class="selection-label-row selection-label-row--flush">
                                     <p class="field-inline-label">Max Attempts</p>
-                                    <lightning-helptext content={secretCodeMaxAttemptsHelpText}></lightning-helptext>
+                                    <lightning-helptext content={userVerificationMaxAttemptsHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="number"
                                     variant="label-hidden"
                                     label="Max Attempts"
-                                    value={draftSecretCodeMaxAttempts}
+                                    value={draftUserVerificationMaxAttempts}
                                     min="1"
-                                    onblur={handleSecretCodeMaxAttemptsBlur}>
+                                    onblur={handleUserVerificationMaxAttemptsBlur}>
                                 </lightning-input>
 
                                 <div class="selection-label-row selection-label-row--flush">
                                     <p class="field-inline-label">Allow Resend Verification Number</p>
-                                    <lightning-helptext content={secretCodeAllowResendHelpText}></lightning-helptext>
+                                    <lightning-helptext content={userVerificationAllowResendHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="checkbox"
                                     variant="label-hidden"
                                     label="Allow Resend Verification Number"
-                                    checked={draftSecretCodeAllowResend}
-                                    onchange={handleSecretCodeAllowResendChange}>
+                                    checked={draftUserVerificationAllowResend}
+                                    onchange={handleUserVerificationAllowResendChange}>
                                 </lightning-input>
 
                                 <div class="selection-label-row selection-label-row--flush">
                                     <p class="field-inline-label">Keep Session Until Midnight</p>
-                                    <lightning-helptext content={secretCodeSameTabSessionHelpText}></lightning-helptext>
+                                    <lightning-helptext content={userVerificationSameTabSessionHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="checkbox"
                                     variant="label-hidden"
                                     label="Keep verified session until midnight in this browser tab"
-                                    checked={draftSecretCodeKeepSessionUntilMidnight}
-                                    onchange={handleSecretCodeSessionModeChange}>
+                                    checked={draftUserVerificationKeepSessionUntilMidnight}
+                                    onchange={handleUserVerificationSessionModeChange}>
                                 </lightning-input>
                             </div>
                             <div class="selection-card selection-card--danger">
@@ -1087,7 +1087,7 @@
                             </div>
                             </template>
 
-                            <template if:false={selectedElementIsSecretCode}>
+                            <template if:false={selectedElementIsUserVerification}>
                             <template if:true={selectedElementIsSubmitButton}>
                             <div class="selection-card">
                                 <p class="selection-label">Display Settings</p>

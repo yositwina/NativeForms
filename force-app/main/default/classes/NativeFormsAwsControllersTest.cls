@@ -469,7 +469,7 @@ private class NativeFormsAwsControllersTest {
         enabledSettings.enableProAdvancedSubmitModes = true;
         enabledSettings.enableProFormulaFields = true;
         enabledSettings.enableProPostSubmitAutoLink = true;
-        enabledSettings.enableProSfSecretCodeAuth = true;
+        enabledSettings.enableProUserVerification = true;
         enabledSettings.enableProLoadFile = true;
 
         NativeFormsAdminController.FeatureSettings savedEnabledSettings =

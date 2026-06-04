@@ -12,7 +12,7 @@ private class NativeFormsDesignerBuilderTest {
         Boolean enableFormulaFields,
         Boolean enableConditionLogic,
         Boolean enablePostSubmitAutoLink,
-        Boolean enableSecretCode,
+        Boolean enableUserVerification,
         Boolean enablePrefillAliasReferences,
         Boolean enableAdvancedSubmitModes,
         Boolean enableCustomJs
@@ -28,7 +28,7 @@ private class NativeFormsDesignerBuilderTest {
             'enableProFormulaFields' => enableFormulaFields == true,
             'enableProConditionLogic' => enableConditionLogic == true,
             'enableProPostSubmitAutoLink' => enablePostSubmitAutoLink == true,
-            'enableProSfSecretCodeAuth' => enableSecretCode == true,
+            'enableProUserVerification' => enableUserVerification == true,
             'enableProPrefillAliasReferences' => enablePrefillAliasReferences == true,
             'enableProAdvancedSubmitModes' => enableAdvancedSubmitModes == true,
             'enableProPageLayoutClone' => enableAdvancedSubmitModes == true,
@@ -470,7 +470,7 @@ private class NativeFormsDesignerBuilderTest {
             JSON.serialize(conditionalConditions),
             ''
         );
-        NativeFormsDesignerController.updateSecretCodeSessionMode(
+        NativeFormsDesignerController.updateUserVerificationSessionMode(
             createResult.formId,
             createResult.versionId,
             'sameTabUntilMidnight'
@@ -523,8 +523,8 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('https://example.com/thanks?id={email1}', String.valueOf(updatedUiSettings.get('postSubmitUrlTemplate')));
         System.assertEquals('IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")', String.valueOf(updatedUiSettings.get('postSubmitUrlFormula')));
         System.assertEquals(true, updatedUiSettings.get('submitConditionalEnabled'));
-        System.assertEquals(false, updatedUiSettings.get('secretCodeAllowResend'));
-        System.assertEquals('sameTabUntilMidnight', String.valueOf(updatedUiSettings.get('secretCodeSessionMode')));
+        System.assertEquals(false, updatedUiSettings.get('userVerificationAllowResend'));
+        System.assertEquals('sameTabUntilMidnight', String.valueOf(updatedUiSettings.get('userVerificationSessionMode')));
         System.assertEquals('window.TwinaForms.setValue("text6","+972");', updatedVersion.Custom_JS__c);
 
         NativeFormsDesignerController.DesignerWorkspace updatedWorkspace = NativeFormsDesignerController.getWorkspace(
@@ -540,7 +540,7 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('formula', updatedWorkspace.selectedVersionPostSubmitUrlMode);
         System.assertEquals('https://example.com/thanks?id={email1}', updatedWorkspace.selectedVersionPostSubmitUrlTemplate);
         System.assertEquals('IF({email1} != "", CONCAT("https://example.com/thanks?email=", URLENCODE({email1})), "")', updatedWorkspace.selectedVersionPostSubmitUrlFormula);
-        System.assertEquals('sameTabUntilMidnight', updatedWorkspace.selectedVersionSecretCodeSessionMode);
+        System.assertEquals('sameTabUntilMidnight', updatedWorkspace.selectedVersionUserVerificationSessionMode);
         System.assertEquals(true, updatedWorkspace.selectedVersionSubmitConditionalEnabled);
         System.assertEquals('email1', updatedWorkspace.selectedVersionSubmitConditionalFieldKey);
         System.assertEquals('window.TwinaForms.setValue("text6","+972");', updatedWorkspace.selectedVersionCustomJs);
@@ -589,8 +589,8 @@ private class NativeFormsDesignerBuilderTest {
         Map<String, Object> uiSettings = jsonMap(versionRecord.UI_Settings_JSON__c);
         System.assertEquals('he', String.valueOf(uiSettings.get('languageCode')));
         System.assertEquals(true, uiSettings.get('rtlEnabled'));
-        System.assertEquals(true, uiSettings.get('secretCodeVerificationEnabled'));
-        System.assertEquals('Email', String.valueOf(uiSettings.get('secretCodeMatchField')));
+        System.assertEquals(true, uiSettings.get('userVerificationEnabled'));
+        System.assertEquals('Email', String.valueOf(uiSettings.get('userVerificationMatchField')));
         System.assert(versionRecord.Prefill_Params_JSON__c.contains('recordId'));
         System.assertEquals(result.versionId, [
             SELECT Current_Draft_Version__c

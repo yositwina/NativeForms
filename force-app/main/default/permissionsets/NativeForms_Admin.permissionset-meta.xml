@@ -64,7 +64,7 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>NativeFormsSecretCodeApi</apexClass>
+        <apexClass>NativeFormsUserVerificationApi</apexClass>
         <enabled>true</enabled>
     </classAccesses>
 
@@ -148,22 +148,22 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Contact.NativeForms_Secret_Code__c</field>
+        <field>Contact.NativeForms_User_Verification_Number__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Contact.NativeForms_Secret_Code_Attempts__c</field>
+        <field>Contact.NF_User_Verification_Attempts__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Contact.NativeForms_Secret_Code_Expires_At__c</field>
+        <field>Contact.NF_User_Verification_Expires_At__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Contact.NativeForms_Secret_Code_Verified_At__c</field>
+        <field>Contact.NF_User_Verification_Verified_At__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

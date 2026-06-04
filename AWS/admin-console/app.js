@@ -27,7 +27,7 @@ const FEATURE_FLAG_METADATA = {
     label: "Post Submit Auto Link",
     description: "Automatically link related Salesforce records after submission based on configured matching rules."
   },
-  enableProSfSecretCodeAuth: {
+  enableProUserVerification: {
     label: "User Verification",
     description: "Add an email-based verification number step for more sensitive workflows."
   },

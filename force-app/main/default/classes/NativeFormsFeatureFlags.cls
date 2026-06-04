@@ -27,8 +27,8 @@ public with sharing class NativeFormsFeatureFlags {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProPostSubmitAutoLink');
     }
 
-    public static Boolean isProSfSecretCodeAuthEnabled() {
-        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSfSecretCodeAuth');
+    public static Boolean isProSfUserVerificationAuthEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProUserVerification');
     }
 
     public static Boolean isProLoadFileEnabled() {

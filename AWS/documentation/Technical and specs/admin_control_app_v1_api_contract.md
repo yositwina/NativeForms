@@ -138,7 +138,7 @@ Used in lists and overview panels.
     "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
-    "enableProSfSecretCodeAuth": false,
+    "enableProUserVerification": false,
     "enableProLoadFile": false
   },
   "planOverrides": {
@@ -186,7 +186,7 @@ Used in lists and overview panels.
     "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
-    "enableProSfSecretCodeAuth": false,
+    "enableProUserVerification": false,
     "enableProLoadFile": false
   }
 }
@@ -350,7 +350,7 @@ Load the tenant detail page.
         "enableProPageLayoutClone": false,
         "enableProFormulaFields": false,
         "enableProPostSubmitAutoLink": false,
-        "enableProSfSecretCodeAuth": false,
+        "enableProUserVerification": false,
         "enableProLoadFile": false
       },
       "planOverrides": {
@@ -412,7 +412,7 @@ Load all plan definitions.
           "enableProPageLayoutClone": false,
           "enableProFormulaFields": false,
           "enableProPostSubmitAutoLink": false,
-          "enableProSfSecretCodeAuth": false,
+          "enableProUserVerification": false,
           "enableProLoadFile": false
         }
       }
