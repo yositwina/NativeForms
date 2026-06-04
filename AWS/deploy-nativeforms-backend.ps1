@@ -79,7 +79,7 @@ if (![string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
   $variables["UPLOAD_STAGING_BUCKET"] = $UploadStagingBucket
   $environmentJson = @{ Variables = $variables } | ConvertTo-Json -Compress
   $environmentPath = Join-Path $tempRoot "lambda-environment.json"
-  $environmentJson | Set-Content -Path $environmentPath -Encoding UTF8
+  $environmentJson | Set-Content -Path $environmentPath -Encoding Ascii
 
   aws lambda update-function-configuration `
     --function-name NativeFormsBackend `

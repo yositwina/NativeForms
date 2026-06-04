@@ -79,9 +79,13 @@ const FEATURE_FLAG_METADATA = {
     label: "Post Submit Auto Link",
     description: "Automatically link related Salesforce records after submission based on configured matching rules."
   },
+  enableProSfSecretCodeAuth: {
+    label: "Secret Code Verification",
+    description: "Add an extra verification step with a secret code for more sensitive workflows."
+  },
   enableProUserVerification: {
-    label: "User Verification Verification",
-    description: "Add an extra verification step with a verification number for more sensitive workflows."
+    label: "User Verification",
+    description: "Compatibility flag for 0.9 packages that use the original User Verification entitlement name."
   },
   enableProLoadFile: {
     label: "File Uploads",
@@ -140,6 +144,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
+      enableProSfSecretCodeAuth: false,
       enableProUserVerification: false,
       enableProLoadFile: false,
       enableProElectronicSignature: false,
@@ -170,6 +175,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
+      enableProSfSecretCodeAuth: true,
       enableProUserVerification: true,
       enableProLoadFile: true,
       enableProElectronicSignature: true,
@@ -200,6 +206,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
+      enableProSfSecretCodeAuth: false,
       enableProUserVerification: false,
       enableProLoadFile: false,
       enableProElectronicSignature: false,
@@ -230,6 +237,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
+      enableProSfSecretCodeAuth: true,
       enableProUserVerification: true,
       enableProLoadFile: true,
       enableProElectronicSignature: true,
@@ -979,6 +987,7 @@ function hasAdvancedProFeatures(featureFlags) {
     "enableProPageLayoutClone",
     "enableProFormulaFields",
     "enableProPostSubmitAutoLink",
+    "enableProSfSecretCodeAuth",
     "enableProUserVerification",
     "enableProLoadFile",
     "enableProElectronicSignature",
@@ -2827,7 +2836,7 @@ export const handler = async (event) => {
           storageMode: planResult.storageMode,
           retentionDays: limits?.submissionLogRetentionDays ?? null,
           detailedLogsIncluded: featureFlags?.enableDetailedSubmissionLogs === true,
-          advancedSecurityIncluded: featureFlags?.enableProUserVerification === true,
+          advancedSecurityIncluded: featureFlags?.enableProSfSecretCodeAuth === true || featureFlags?.enableProUserVerification === true,
           limits,
           featureFlags
         },
@@ -3372,7 +3381,7 @@ export const handler = async (event) => {
         lookupDefinition: payload.lookupDefinition && typeof payload.lookupDefinition === "object" ? payload.lookupDefinition : { fields: {} },
         locationDefinition: payload.locationDefinition && typeof payload.locationDefinition === "object" ? payload.locationDefinition : { fields: {} },
         submissionPdf: payload.submissionPdf && typeof payload.submissionPdf === "object" ? payload.submissionPdf : null,
-        userVerificationConfig: payload.userVerificationConfig || null,
+        secretCodeConfig: payload.secretCodeConfig || payload.userVerificationConfig || null,
         prefillPolicy: payload.prefillPolicy,
         submitPolicy: payload.submitPolicy,
         prefillDefinition: payload.prefillDefinition,

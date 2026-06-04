@@ -1209,15 +1209,15 @@ function streamToBuffer(streamBody) {
   });
 }
 
-function normalizeUserVerificationConfig(formSecurity) {
-  const raw = formSecurity?.userVerificationConfig;
+function normalizeSecretCodeConfig(formSecurity) {
+  const raw = formSecurity?.secretCodeConfig || formSecurity?.userVerificationConfig;
   if (!raw || typeof raw !== "object") {
     return {
       enabled: false,
       expiryMinutes: 10,
       maxAttempts: 5,
       allowResend: true,
-      sessionMode: USER_VERIFICATION_SESSION_MODE_SHORT
+      sessionMode: SECRET_SESSION_MODE_SHORT
     };
   }
 
@@ -1229,7 +1229,7 @@ function normalizeUserVerificationConfig(formSecurity) {
     expiryMinutes,
     maxAttempts,
     allowResend: raw.allowResend !== false,
-    sessionMode: normalizeUserVerificationSessionMode(raw.sessionMode),
+    sessionMode: normalizeSecretSessionMode(raw.sessionMode),
     introText: typeof raw.introText === "string" ? raw.introText : "",
     sentMessage: typeof raw.sentMessage === "string" ? raw.sentMessage : "",
     invalidMessage: typeof raw.invalidMessage === "string" ? raw.invalidMessage : "",
@@ -1237,18 +1237,20 @@ function normalizeUserVerificationConfig(formSecurity) {
   };
 }
 
-function normalizeUserVerificationAction(action) {
+function normalizeSecretCodeAction(action) {
   const normalized = String(action || "").trim();
   return normalized === "sendCode" || normalized === "verifyCode" ? normalized : "";
 }
 
-const USER_VERIFICATION_APEX_REST_PATHS = [
+const SECRET_CODE_APEX_REST_PATHS = [
+  "/services/apexrest/nativeforms/secret-code",
+  "/services/apexrest/twinaforms/nativeforms/secret-code",
   "/services/apexrest/nativeforms/user-verification",
   "/services/apexrest/twinaforms/nativeforms/user-verification"
 ];
-const USER_VERIFICATION_SESSION_MODE_SHORT = "short";
-const USER_VERIFICATION_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT = "sameTabUntilMidnight";
-const USER_VERIFICATION_SESSION_SAME_TAB_MAX_MS = 12 * 60 * 60 * 1000;
+const SECRET_SESSION_MODE_SHORT = "short";
+const SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT = "sameTabUntilMidnight";
+const SECRET_SESSION_SAME_TAB_MAX_MS = 12 * 60 * 60 * 1000;
 
 async function callSalesforceApex(instanceUrl, accessToken, path, payload) {
   const url = new URL(instanceUrl);
@@ -1310,14 +1312,14 @@ async function callSalesforceApexWithFallback(instanceUrl, accessToken, paths, p
   throw lastError;
 }
 
-function buildUserVerificationSigningSecret(secret, tenantRecord) {
-  return String(secret?.userVerificationSigningSecret || tenantRecord?.secret || "");
+function buildSecretVerificationSigningSecret(secret, tenantRecord) {
+  return String(secret?.secretVerificationSigningSecret || secret?.userVerificationSigningSecret || tenantRecord?.secret || "");
 }
 
-function normalizeUserVerificationSessionMode(value) {
-  return String(value || "").trim() === USER_VERIFICATION_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT
-    ? USER_VERIFICATION_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT
-    : USER_VERIFICATION_SESSION_MODE_SHORT;
+function normalizeSecretSessionMode(value) {
+  return String(value || "").trim() === SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT
+    ? SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT
+    : SECRET_SESSION_MODE_SHORT;
 }
 
 function parseSessionExpiresAt(value) {
@@ -1325,15 +1327,15 @@ function parseSessionExpiresAt(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
 }
 
-function userVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt) {
+function secretVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt) {
   const nowMs = Date.now();
-  const config = normalizeUserVerificationConfig(formSecurity);
-  const normalizedMode = normalizeUserVerificationSessionMode(sessionMode || config.sessionMode);
-  if (normalizedMode === USER_VERIFICATION_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT) {
+  const config = normalizeSecretCodeConfig(formSecurity);
+  const normalizedMode = normalizeSecretSessionMode(sessionMode || config.sessionMode);
+  if (normalizedMode === SECRET_SESSION_MODE_SAME_TAB_UNTIL_MIDNIGHT) {
     const requestedMs = parseSessionExpiresAt(requestedExpiresAt);
     const cappedMs = Math.min(
-      requestedMs && requestedMs > nowMs ? requestedMs : nowMs + USER_VERIFICATION_SESSION_SAME_TAB_MAX_MS,
-      nowMs + USER_VERIFICATION_SESSION_SAME_TAB_MAX_MS
+      requestedMs && requestedMs > nowMs ? requestedMs : nowMs + SECRET_SESSION_SAME_TAB_MAX_MS,
+      nowMs + SECRET_SESSION_SAME_TAB_MAX_MS
     );
     return Math.max(cappedMs, nowMs + 60000);
   }
@@ -1341,22 +1343,22 @@ function userVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt)
   return nowMs + (expiryMinutes * 60 * 1000);
 }
 
-function createUserVerificationToken(formSecurity, email, sessionId, secret, tenantRecord, sessionMode, requestedExpiresAt) {
-  const signingSecret = buildUserVerificationSigningSecret(secret, tenantRecord);
+function createSecretVerificationToken(formSecurity, email, sessionId, secret, tenantRecord, sessionMode, requestedExpiresAt) {
+  const signingSecret = buildSecretVerificationSigningSecret(secret, tenantRecord);
   if (!signingSecret) {
-    throw buildFailureError("User Verification signing secret is missing", 500, "system");
+    throw buildFailureError("Secret verification signing secret is missing", 500, "system");
   }
 
-  const expiresAtMs = userVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt);
+  const expiresAtMs = secretVerificationExpiryMs(formSecurity, sessionMode, requestedExpiresAt);
   const payload = {
-    kind: "userVerification",
+    kind: "secretVerification",
     orgId: formSecurity.orgId,
     formId: formSecurity.formId,
     publishedVersionId: formSecurity.publishedVersionId || null,
     email: String(email || "").trim().toLowerCase(),
     sessionId: String(sessionId || "").trim(),
     exp: Math.floor(expiresAtMs / 1000),
-    sessionMode: normalizeUserVerificationSessionMode(sessionMode || normalizeUserVerificationConfig(formSecurity).sessionMode)
+    sessionMode: normalizeSecretSessionMode(sessionMode || normalizeSecretCodeConfig(formSecurity).sessionMode)
   };
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signature = crypto
@@ -1372,8 +1374,8 @@ function createUserVerificationToken(formSecurity, email, sessionId, secret, ten
   };
 }
 
-function verifyUserVerificationToken(formSecurity, token, sessionId, secret, tenantRecord, email) {
-  const signingSecret = buildUserVerificationSigningSecret(secret, tenantRecord);
+function verifySecretVerificationToken(formSecurity, token, sessionId, secret, tenantRecord, email) {
+  const signingSecret = buildSecretVerificationSigningSecret(secret, tenantRecord);
   if (!signingSecret) {
     return false;
   }
@@ -1404,7 +1406,7 @@ function verifyUserVerificationToken(formSecurity, token, sessionId, secret, ten
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   return (
-    payload?.kind === "userVerification" &&
+    (payload?.kind === "secretVerification" || payload?.kind === "userVerification") &&
     payload?.orgId === formSecurity.orgId &&
     payload?.formId === formSecurity.formId &&
     String(payload?.publishedVersionId || "") === String(formSecurity.publishedVersionId || "") &&
@@ -1414,12 +1416,12 @@ function verifyUserVerificationToken(formSecurity, token, sessionId, secret, ten
   );
 }
 
-function ensureUserVerificationAllowed(formSecurity) {
-  const userVerificationConfig = normalizeUserVerificationConfig(formSecurity);
-  if (!userVerificationConfig.enabled) {
-    throw buildFailureError("User Verification is not enabled for this form.", 403, "validation");
+function ensureSecretVerificationAllowed(formSecurity) {
+  const secretCodeConfig = normalizeSecretCodeConfig(formSecurity);
+  if (!secretCodeConfig.enabled) {
+    throw buildFailureError("Secret code verification is not enabled for this form.", 403, "validation");
   }
-  return userVerificationConfig;
+  return secretCodeConfig;
 }
 
 function escapeSoqlValue(value) {
@@ -3484,10 +3486,10 @@ export const handler = async (event) => {
       });
     }
 
-    const requestedUserVerificationAction = normalizeUserVerificationAction(inputPayload.action);
+    const requestedSecretAction = normalizeSecretCodeAction(inputPayload.action);
     formSecurity = await getFormSecurityRecord(inputPayload.formId);
     ensureFormToken(formSecurity, inputPayload.publishToken, {
-      requireSubmitDefinition: !requestedUserVerificationAction
+      requireSubmitDefinition: !requestedSecretAction
     });
     tenantRecord = await getTenantRecord(formSecurity.orgId);
     const runtimeStatus = deriveTenantRuntimeStatus(tenantRecord);
@@ -3517,36 +3519,37 @@ export const handler = async (event) => {
     const loginBaseUrl = tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com";
     const accessToken = await refreshAccessToken(secret, loginBaseUrl);
 
-    if (requestedUserVerificationAction) {
-      const userVerificationConfig = ensureUserVerificationAllowed(formSecurity);
+    if (requestedSecretAction) {
+      const secretCodeConfig = ensureSecretVerificationAllowed(formSecurity);
       const apexPayload = {
-        action: requestedUserVerificationAction,
+        action: requestedSecretAction,
         publishedVersionId: inputPayload.publishedVersionId || formSecurity.publishedVersionId,
         email: inputPayload.email || inputPayload?.input?.email || "",
         code: inputPayload.code || inputPayload?.input?.code || "",
-        expiryMinutes: userVerificationConfig.expiryMinutes,
-        maxAttempts: userVerificationConfig.maxAttempts
+        expiryMinutes: secretCodeConfig.expiryMinutes,
+        maxAttempts: secretCodeConfig.maxAttempts
       };
       const apexResult = await callSalesforceApexWithFallback(
         secret.instance_url,
         accessToken,
-        USER_VERIFICATION_APEX_REST_PATHS,
+        SECRET_CODE_APEX_REST_PATHS,
         apexPayload
       );
 
-      if (requestedUserVerificationAction === "verifyCode" && apexResult.approved === true) {
+      if (requestedSecretAction === "verifyCode" && apexResult.approved === true) {
         const normalizedEmail = String(apexResult.normalizedEmail || apexPayload.email || "").trim().toLowerCase();
         const sessionId =
           inputPayload.sessionId ||
+          inputPayload.secretVerificationSessionId ||
           inputPayload.userVerificationSessionId ||
           crypto.randomUUID();
-        const verificationToken = createUserVerificationToken(
+        const verificationToken = createSecretVerificationToken(
           formSecurity,
           normalizedEmail,
           sessionId,
           secret,
           tenantRecord,
-          userVerificationConfig.sessionMode,
+          secretCodeConfig.sessionMode,
           inputPayload.sessionExpiresAt
         );
 
@@ -3556,7 +3559,11 @@ export const handler = async (event) => {
           normalizedEmail,
           message: apexResult.message || "Code verified successfully.",
           verificationToken: verificationToken.token,
+          secretVerificationToken: verificationToken.token,
+          userVerificationToken: verificationToken.token,
           sessionId,
+          secretVerificationSessionId: sessionId,
+          userVerificationSessionId: sessionId,
           expiresAt: verificationToken.expiresAt
         });
       }
@@ -3568,7 +3575,7 @@ export const handler = async (event) => {
         normalizedEmail: apexResult.normalizedEmail || apexPayload.email || "",
         lockedOut: apexResult.lockedOut === true,
         expired: apexResult.expired === true,
-        message: apexResult.message || (requestedUserVerificationAction === "sendCode"
+        message: apexResult.message || (requestedSecretAction === "sendCode"
           ? "If we found a matching contact, a code was sent."
           : "The verification code is invalid.")
       });
@@ -3576,23 +3583,29 @@ export const handler = async (event) => {
 
     await verifyCaptcha(formSecurity, inputPayload, event);
     const submitCommands = formSecurity.submitDefinition.commands;
-    const userVerificationConfig = normalizeUserVerificationConfig(formSecurity);
-    if (userVerificationConfig.enabled) {
+    const secretCodeConfig = normalizeSecretCodeConfig(formSecurity);
+    if (secretCodeConfig.enabled) {
       const verifiedEmail =
+        inputPayload?.input?.secretVerificationEmail ||
+        inputPayload?.secretVerificationEmail ||
         inputPayload?.input?.userVerificationEmail ||
         inputPayload?.userVerificationEmail ||
         "";
       const sessionId =
+        inputPayload?.input?.secretVerificationSessionId ||
+        inputPayload?.secretVerificationSessionId ||
         inputPayload?.input?.userVerificationSessionId ||
         inputPayload?.userVerificationSessionId ||
         "";
       const verificationToken =
+        inputPayload?.input?.secretVerificationToken ||
+        inputPayload?.secretVerificationToken ||
         inputPayload?.input?.userVerificationToken ||
         inputPayload?.userVerificationToken ||
         "";
-      if (!verifyUserVerificationToken(formSecurity, verificationToken, sessionId, secret, tenantRecord, verifiedEmail)) {
+      if (!verifySecretVerificationToken(formSecurity, verificationToken, sessionId, secret, tenantRecord, verifiedEmail)) {
         throw buildFailureError(
-          userVerificationConfig.invalidMessage || "Verify the verification number before continuing.",
+          secretCodeConfig.invalidMessage || "Verify the secret code before continuing.",
           403,
           "validation"
         );

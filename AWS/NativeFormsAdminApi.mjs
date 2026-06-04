@@ -57,9 +57,13 @@ const FEATURE_FLAG_METADATA = {
     label: "Post Submit Auto Link",
     description: "Automatically link related Salesforce records after submission based on configured matching rules."
   },
+  enableProSfSecretCodeAuth: {
+    label: "Secret Code Verification",
+    description: "Add an extra verification step with a secret code for more sensitive workflows."
+  },
   enableProUserVerification: {
-    label: "User Verification Verification",
-    description: "Add an extra verification step with a verification number for more sensitive workflows."
+    label: "User Verification",
+    description: "Compatibility flag for 0.9 packages that use the original User Verification entitlement name."
   },
   enableProLoadFile: {
     label: "File Uploads",
@@ -128,6 +132,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
+      enableProSfSecretCodeAuth: false,
       enableProUserVerification: false,
       enableProLoadFile: false,
       enableProElectronicSignature: false,
@@ -162,6 +167,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
+      enableProSfSecretCodeAuth: true,
       enableProUserVerification: true,
       enableProLoadFile: true,
       enableProElectronicSignature: true,
@@ -196,6 +202,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: false,
       enableProFormulaFields: false,
       enableProPostSubmitAutoLink: false,
+      enableProSfSecretCodeAuth: false,
       enableProUserVerification: false,
       enableProLoadFile: false,
       enableProElectronicSignature: false,
@@ -230,6 +237,7 @@ const DEFAULT_PLANS = [
       enableProPageLayoutClone: true,
       enableProFormulaFields: true,
       enableProPostSubmitAutoLink: true,
+      enableProSfSecretCodeAuth: true,
       enableProUserVerification: true,
       enableProLoadFile: true,
       enableProElectronicSignature: true,
