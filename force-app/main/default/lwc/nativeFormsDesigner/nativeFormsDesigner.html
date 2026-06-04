@@ -65,6 +65,15 @@
                             </lightning-button>
                         </div>
                         </template>
+                        <div class="designer-topbar__action">
+                            <lightning-button
+                                variant="neutral"
+                                label={undoLabel}
+                                icon-name="utility:undo"
+                                disabled={undoDisabled}
+                                onclick={handleUndo}>
+                            </lightning-button>
+                        </div>
 
                         <template if:true={isSelectedVersionReadOnly}>
                             <div class="designer-topbar__result designer-topbar__result--error">
@@ -75,7 +84,7 @@
                             </div>
                         </template>
 
-                        <template if:true={publishResult}>
+                        <template if:true={showPublishResult}>
                             <div class={publishResultInlineClass}>
                                 <span>{publishResultInlineMessage}</span>
                                 <template if:true={publishResult.publicUrl}>
@@ -92,23 +101,44 @@
                                 <a href={upgradeUrl} target="_blank" rel="noopener">Upgrade plan</a>
                             </div>
                         </template>
-                        <lightning-button
-                            variant="brand-outline"
-                            label="Clone Form"
-                            onclick={handleOpenCloneFormModal}
-                            disabled={cloneFormDisabled}>
-                        </lightning-button>
-                        <lightning-button
-                            variant="brand-outline"
-                            label="Create From Layout"
-                            onclick={handleOpenLayoutImportModal}
-                            disabled={layoutImportDisabled}>
-                        </lightning-button>
-                        <lightning-button
-                            variant="brand-outline"
-                            label="+ New Form"
-                            onclick={handleOpenNewFormModal}>
-                        </lightning-button>
+                        <lightning-button-menu
+                            alternative-text="Form actions"
+                            label="Actions"
+                            variant="border-filled"
+                            menu-alignment="right"
+                            onselect={handleFormActionMenuSelect}>
+                            <lightning-menu-item
+                                label="New Form"
+                                value="newForm"
+                                prefix-icon-name="utility:add"
+                                disabled={newFormActionDisabled}>
+                            </lightning-menu-item>
+                            <lightning-menu-item
+                                label="Create Project"
+                                value="createProject"
+                                prefix-icon-name="utility:open_folder">
+                            </lightning-menu-item>
+                            <lightning-menu-item
+                                label="Create From Layout"
+                                value="createFromLayout"
+                                prefix-icon-name="utility:layout"
+                                disabled={layoutImportDisabled}>
+                            </lightning-menu-item>
+                            <lightning-menu-item
+                                label="Clone Form"
+                                value="cloneForm"
+                                prefix-icon-name="utility:copy"
+                                disabled={cloneFormDisabled}>
+                            </lightning-menu-item>
+                            <template if:true={showRestorePublishedAction}>
+                                <lightning-menu-item
+                                    label="Restore From This Published Version"
+                                    value="restoreFromPublished"
+                                    prefix-icon-name="utility:refresh"
+                                    disabled={restorePublishedDisabled}>
+                                </lightning-menu-item>
+                            </template>
+                        </lightning-button-menu>
                     </div>
                 </section>
 
@@ -141,12 +171,54 @@
                             </div>
                         </div>
 
+                        <template if:true={showSpecialElementOptions}>
+                            <div class="add-block">
+                                <h3>Special Elements</h3>
+                                <div class="builder-list" role="list">
+                                    <template if:true={showUserVerificationSpecialElement}>
+                                    <div class="builder-list__row" role="listitem">
+                                        <span class="builder-list__label">
+                                            <lightning-icon icon-name="utility:identity" size="x-small" alternative-text=""></lightning-icon>
+                                            <span>User Verification</span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            class="builder-list__action"
+                                            disabled={userVerificationPaletteActionDisabled}
+                                            onclick={handleAddUserVerification}>
+                                            {userVerificationPaletteActionLabel}
+                                        </button>
+                                    </div>
+                                    </template>
+                                    <template for:each={availableSpecialElementOptions} for:item="option">
+                                        <div key={option.value} class="builder-list__row" role="listitem">
+                                            <span class="builder-list__label">
+                                                <lightning-icon icon-name={option.iconName} size="x-small" alternative-text=""></lightning-icon>
+                                                <span>{option.label}</span>
+                                            </span>
+                                            <button
+                                                type="button"
+                                                class="builder-list__action"
+                                                data-type={option.value}
+                                                disabled={isSelectedVersionReadOnly}
+                                                onclick={handleQuickAddField}>
+                                                Add
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
                         <div class="add-block">
                             <h3>Display Element</h3>
                             <div class="builder-list" role="list">
                                 <template for:each={availableDisplayElementOptions} for:item="option">
                                     <div key={option.value} class="builder-list__row" role="listitem">
-                                        <span class="builder-list__label">{option.label}</span>
+                                        <span class="builder-list__label">
+                                            <lightning-icon icon-name={option.iconName} size="x-small" alternative-text=""></lightning-icon>
+                                            <span>{option.label}</span>
+                                        </span>
                                         <button
                                             type="button"
                                             class="builder-list__action"
@@ -361,6 +433,11 @@
                                                                                     </ol>
                                                                                 </div>
                                                                             </template>
+                                                                            <template lwc:elseif={child.isButton}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <button type="button" class="preview-button" disabled>{child.previewButtonLabel}</button>
+                                                                                </div>
+                                                                            </template>
                                                                             <template lwc:elseif={child.isSignature}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
@@ -420,6 +497,18 @@
                                                                                     </div>
                                                                                 </div>
                                                                             </template>
+                                                                            <template lwc:elseif={child.isLocation}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <template if:true={child.showLabel}>
+                                                                                        <label class={child.labelClass}>{child.displayLabel}</label>
+                                                                                    </template>
+                                                                                    <div class={child.previewLocationInputsClass}>
+                                                                                        <template for:each={child.previewLocationParts} for:item="part">
+                                                                                            <input key={part.key} type="text" value={part.label} disabled />
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
                                                                             <template lwc:elseif={child.isTextarea}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
@@ -465,6 +554,9 @@
                                                         <span>Records List</span>
                                                         <template if:true={row.item.repeatSourceAlias}>
                                                             <span>Source: {row.item.repeatSourceAlias}</span>
+                                                        </template>
+                                                        <template if:true={row.item.showRepeatSourceWarning}>
+                                                            <span class="preview-repeat-group__warning">{row.item.repeatSourceWarningText}</span>
                                                         </template>
                                                     </div>
                                                 </div>
@@ -549,6 +641,11 @@
                                                                                     <template if:true={child.validationPattern}>
                                                                                         <div class="preview-validation-hint">{child.validationPattern}</div>
                                                                                     </template>
+                                                                                </div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isButton}>
+                                                                                <div class={child.fieldPreviewClass}>
+                                                                                    <button type="button" class="preview-button" disabled>{child.previewButtonLabel}</button>
                                                                                 </div>
                                                                             </template>
                                                                             <template lwc:elseif={child.isSignature}>
@@ -698,6 +795,12 @@
                                             </div>
                                         </template>
 
+                                        <template lwc:elseif={row.item.isButton}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <button type="button" class="preview-button" disabled>{row.item.previewButtonLabel}</button>
+                                            </div>
+                                        </template>
+
                                         <template lwc:elseif={row.item.isSignature}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
@@ -767,6 +870,19 @@
                                             </div>
                                         </template>
 
+                                        <template lwc:elseif={row.item.isLocation}>
+                                            <div class={row.item.fieldPreviewClass}>
+                                                <template if:true={row.item.showLabel}>
+                                                    <label class={row.item.labelClass}>{row.item.displayLabel}</label>
+                                                </template>
+                                                <div class={row.item.previewLocationInputsClass}>
+                                                    <template for:each={row.item.previewLocationParts} for:item="part">
+                                                        <input key={part.key} type="text" value={part.label} disabled />
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+
                                         <template lwc:elseif={row.item.isTextarea}>
                                             <div class={row.item.fieldPreviewClass}>
                                                 <template if:true={row.item.showLabel}>
@@ -820,7 +936,7 @@
                             <template if:true={isSavingFormSettings}>
                                 <div class="settings-saving" role="status">
                                     <lightning-spinner
-                                        alternative-text="Saving secret code settings"
+                                        alternative-text="Saving user verification settings"
                                         size="xx-small">
                                     </lightning-spinner>
                                     <span>Saving...</span>
@@ -830,7 +946,7 @@
                             <div class="selection-card">
                                 <p class="selection-label">Access Settings</p>
                                 <p class="selection-hint selection-hint--compact">
-                                    This verification step protects the whole form. Enable or disable it from Form Settings.
+                                    This verification step protects the whole form before visitors can view or submit it.
                                 </p>
 
                                 <div class="selection-label-row selection-label-row--flush">
@@ -856,14 +972,14 @@
                                 </lightning-textarea>
 
                                 <lightning-textarea
-                                    label="Code Sent Message"
+                                    label="Verification Number Sent Message"
                                     value={draftSecretCodeSentMessage}
                                     oninput={handleSecretCodeSentMessageInput}
                                     onblur={handleSecretCodeSentMessageBlur}>
                                 </lightning-textarea>
 
                                 <lightning-textarea
-                                    label="Invalid Code Message"
+                                    label="Invalid Verification Number Message"
                                     value={draftSecretCodeInvalidMessage}
                                     oninput={handleSecretCodeInvalidMessageInput}
                                     onblur={handleSecretCodeInvalidMessageBlur}>
@@ -907,13 +1023,13 @@
                             <div class="selection-card">
                                 <p class="selection-label">Rules</p>
                                 <div class="selection-label-row selection-label-row--flush">
-                                    <p class="field-inline-label">Code Expiry Minutes</p>
+                                    <p class="field-inline-label">Verification Number Expiry Minutes</p>
                                     <lightning-helptext content={secretCodeExpiryHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="number"
                                     variant="label-hidden"
-                                    label="Code Expiry Minutes"
+                                    label="Verification Number Expiry Minutes"
                                     value={draftSecretCodeExpiryMinutes}
                                     min="1"
                                     onblur={handleSecretCodeExpiryMinutesBlur}>
@@ -933,13 +1049,13 @@
                                 </lightning-input>
 
                                 <div class="selection-label-row selection-label-row--flush">
-                                    <p class="field-inline-label">Allow Resend Code</p>
+                                    <p class="field-inline-label">Allow Resend Verification Number</p>
                                     <lightning-helptext content={secretCodeAllowResendHelpText}></lightning-helptext>
                                 </div>
                                 <lightning-input
                                     type="checkbox"
                                     variant="label-hidden"
-                                    label="Allow Resend Code"
+                                    label="Allow Resend Verification Number"
                                     checked={draftSecretCodeAllowResend}
                                     onchange={handleSecretCodeAllowResendChange}>
                                 </lightning-input>
@@ -955,6 +1071,19 @@
                                     checked={draftSecretCodeKeepSessionUntilMidnight}
                                     onchange={handleSecretCodeSessionModeChange}>
                                 </lightning-input>
+                            </div>
+                            <div class="selection-card selection-card--danger">
+                                <p class="selection-label">Danger Zone</p>
+                                <p class="selection-hint selection-hint--compact">
+                                    Removing User Verification allows visitors to access and submit this form without email verification.
+                                </p>
+                                <div class="selection-actions">
+                                    <lightning-button
+                                        variant="destructive-text"
+                                        label="Remove User Verification"
+                                        onclick={handleRemoveUserVerification}>
+                                    </lightning-button>
+                                </div>
                             </div>
                             </template>
 
@@ -1076,6 +1205,119 @@
                                 </div>
                             </div>
 
+                            <template if:true={selectedElementIsButton}>
+                                <div class="selection-card">
+                                    <p class="selection-label">Portal Navigation</p>
+                                    <lightning-combobox
+                                        label="Destination"
+                                        value={editorButtonDestinationType}
+                                        options={buttonDestinationTypeOptions}
+                                        onchange={handleButtonDestinationTypeChange}>
+                                    </lightning-combobox>
+                                    <template if:true={buttonDestinationIsForm}>
+                                        <lightning-combobox
+                                            label="Published Form"
+                                            value={editorButtonTargetFormId}
+                                            options={publishedButtonTargets}
+                                            onchange={handleButtonTargetFormChange}>
+                                        </lightning-combobox>
+                                    </template>
+                                    <template if:true={buttonDestinationIsExternal}>
+                                        <lightning-combobox
+                                            label="External URL Mode"
+                                            value={editorButtonExternalUrlMode}
+                                            options={buttonExternalUrlModeOptions}
+                                            onchange={handleButtonExternalUrlModeChange}>
+                                        </lightning-combobox>
+                                        <template if:true={buttonExternalUrlUsesFormula}>
+                                            <lightning-textarea
+                                                label="Formula URL"
+                                                value={editorButtonExternalUrlFormula}
+                                                placeholder="'https://portal.example.com/request?id=' &amp; {recordId}"
+                                                onblur={handleButtonExternalUrlFormulaCommit}>
+                                            </lightning-textarea>
+                                        </template>
+                                        <template if:false={buttonExternalUrlUsesFormula}>
+                                            <lightning-input
+                                                label="URL Template"
+                                                value={editorButtonExternalUrlTemplate}
+                                                placeholder="https://portal.example.com/request/field-value-token"
+                                                onblur={handleButtonExternalUrlTemplateCommit}>
+                                            </lightning-input>
+                                        </template>
+                                    </template>
+                                    <div class="settings-divider"></div>
+                                    <p class="selection-label">Query Parameters</p>
+                                    <template for:each={editorButtonQueryParameters} for:item="parameter" for:index="parameterIndex">
+                                        <div key={parameter.key} class="button-query-parameter">
+                                            <lightning-input
+                                                label="Parameter Name"
+                                                data-index={parameterIndex}
+                                                value={parameter.name}
+                                                onblur={handleButtonQueryParameterNameCommit}>
+                                            </lightning-input>
+                                            <lightning-combobox
+                                                label="Value Source"
+                                                data-index={parameterIndex}
+                                                value={parameter.valueMode}
+                                                options={buttonParameterModeOptions}
+                                                onchange={handleButtonQueryParameterModeChange}>
+                                            </lightning-combobox>
+                                            <template if:true={parameter.usesFormula}>
+                                                <div class="selection-label-row selection-label-row--flush">
+                                                    <p class="field-inline-label">Value Formula</p>
+                                                    <lightning-helptext content={buttonParameterFormulaHelpText}></lightning-helptext>
+                                                    <a
+                                                        class="formula-help-link"
+                                                        href={formulaHelpUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer">
+                                                        Learn formulas
+                                                    </a>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    class="post-submit-token-row__button"
+                                                    data-index={parameterIndex}
+                                                    onclick={handleOpenButtonParameterFormulaModal}>
+                                                    Edit Formula
+                                                </button>
+                                            </template>
+                                            <template if:false={parameter.usesFormula}>
+                                                <lightning-combobox
+                                                    label="Value From Field"
+                                                    data-index={parameterIndex}
+                                                    value={parameter.valueTemplate}
+                                                    placeholder="Select a field"
+                                                    options={buttonParameterFieldOptions}
+                                                    onchange={handleButtonQueryParameterTemplateChange}>
+                                                </lightning-combobox>
+                                            </template>
+                                            <lightning-button
+                                                label="Remove Parameter"
+                                                data-index={parameterIndex}
+                                                onclick={handleRemoveButtonQueryParameter}>
+                                            </lightning-button>
+                                        </div>
+                                    </template>
+                                    <lightning-button
+                                        label="Add Query Parameter"
+                                        onclick={handleAddButtonQueryParameter}>
+                                    </lightning-button>
+                                    <template if:true={selectedButtonInsideRepeatGroup}>
+                                        <p class="selection-hint">Row Buttons may use explicit row value tokens and cannot submit the form.</p>
+                                    </template>
+                                    <template if:false={selectedButtonInsideRepeatGroup}>
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Submit Form Before Navigation"
+                                            checked={editorButtonSubmitBeforeNavigation}
+                                            onchange={handleButtonSubmitBeforeNavigationChange}>
+                                        </lightning-input>
+                                    </template>
+                                </div>
+                            </template>
+
                             <div class="selection-card">
                                 <p class="selection-label">Label</p>
 
@@ -1172,6 +1414,20 @@
                                         value={editorPlaceholder}
                                         onblur={handleEditorPlaceholderCommit}>
                                     </lightning-input>
+                                </template>
+
+                                <template if:true={selectedElementIsTextarea}>
+                                    <lightning-input
+                                        type="number"
+                                        label="Maximum Characters"
+                                        min="1"
+                                        placeholder="254"
+                                        value={editorTextareaMaxLength}
+                                        onblur={handleEditorTextareaMaxLengthCommit}>
+                                    </lightning-input>
+                                    <p class="selection-hint selection-hint--compact">
+                                        Use 254 for regular Salesforce Text fields. Clear this for long text fields.
+                                    </p>
                                 </template>
 
                                 <template if:true={selectedElementIsDate}>
@@ -1507,6 +1763,87 @@
                                     </lightning-input>
                                 </template>
 
+                                <template if:true={selectedElementIsLocation}>
+                                    <lightning-combobox
+                                        label="Location Mode"
+                                        value={editorLocationMode}
+                                        options={locationModeOptions}
+                                        onchange={handleEditorLocationModeChange}>
+                                    </lightning-combobox>
+                                    <lightning-combobox
+                                        label="Location Layout"
+                                        value={editorLocationLayout}
+                                        options={locationLayoutOptions}
+                                        onchange={handleEditorLocationLayoutChange}>
+                                    </lightning-combobox>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Require Country"
+                                        checked={editorLocationRequiredCountry}
+                                        onchange={handleEditorLocationRequiredCountryChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Require State/Region"
+                                        checked={editorLocationRequiredRegion}
+                                        onchange={handleEditorLocationRequiredRegionChange}>
+                                    </lightning-input>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Require City"
+                                        checked={editorLocationRequiredCity}
+                                        onchange={handleEditorLocationRequiredCityChange}>
+                                    </lightning-input>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <p class="field-inline-label">Default Search Country</p>
+                                        <lightning-helptext content={locationDefaultCountryHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-input
+                                        variant="label-hidden"
+                                        label="Default Search Country"
+                                        value={editorLocationDefaultCountryCode}
+                                        placeholder="US"
+                                        onblur={handleEditorLocationDefaultCountryCommit}>
+                                    </lightning-input>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <p class="field-inline-label">Allowed Search Countries</p>
+                                        <lightning-helptext content={locationAllowedCountriesHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-input
+                                        variant="label-hidden"
+                                        label="Allowed Search Countries"
+                                        value={editorLocationAllowedCountriesText}
+                                        placeholder="US, CA, IL"
+                                        onblur={handleEditorLocationAllowedCountriesCommit}>
+                                    </lightning-input>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <p class="field-inline-label">Minimum Search Characters</p>
+                                        <lightning-helptext content={locationMinSearchLengthHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-input
+                                        type="number"
+                                        variant="label-hidden"
+                                        label="Minimum Search Characters"
+                                        min="1"
+                                        max="10"
+                                        value={editorLocationMinSearchLength}
+                                        onblur={handleEditorLocationMinSearchLengthCommit}>
+                                    </lightning-input>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <p class="field-inline-label">Result Limit</p>
+                                        <lightning-helptext content={locationResultLimitHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-input
+                                        type="number"
+                                        variant="label-hidden"
+                                        label="Result Limit"
+                                        min="1"
+                                        max="25"
+                                        value={editorLocationResultLimit}
+                                        onblur={handleEditorLocationResultLimitCommit}>
+                                    </lightning-input>
+                                </template>
+
                                 <template if:true={selectedElementSupportsSurveyChoices}>
                                     <div class="selection-label-row">
                                         <p class="field-inline-label">{surveyChoicesTitle}</p>
@@ -1548,11 +1885,11 @@
                                     </div>
                                 </template>
 
-                                <template if:true={selectedElementIsDisplayText}>
+                                <template if:true={selectedElementIsRichTextDisplay}>
                                     <div class="selection-actions">
                                         <lightning-button
                                             variant="neutral"
-                                            label="Edit Display Text"
+                                            label={displayTextModalTitle}
                                             onclick={handleOpenDisplayTextModal}>
                                         </lightning-button>
                                     </div>
@@ -1604,15 +1941,18 @@
                                         message-when-bad-input="Use comma-separated values like pdf, jpg, png"
                                         onblur={handleEditorAllowedExtensionsCommit}>
                                     </lightning-input>
-                                    <lightning-input
-                                        type="number"
-                                        label="Max File Size (MB)"
-                                        min="1"
-                                        value={editorMaxFileSizeMb}
-                                        onblur={handleEditorMaxFileSizeCommit}>
-                                    </lightning-input>
-                                    <lightning-combobox
-                                        label="Target Submit Action"
+                                            <lightning-input
+                                                type="number"
+                                                label="Max File Size (MB)"
+                                                min="1"
+                                                value={editorMaxFileSizeMb}
+                                                onblur={handleEditorMaxFileSizeCommit}>
+                                            </lightning-input>
+                                            <div class="selection-hint selection-hint--compact">
+                                                Security: uploaded files are scanned by AWS for malware before they are attached to Salesforce.
+                                            </div>
+                                            <lightning-combobox
+                                                label="Target Submit Action"
                                         value={editorTargetSubmitActionKey}
                                         options={fileUploadTargetActionOptions}
                                         onchange={handleEditorTargetSubmitActionChange}>
@@ -1630,12 +1970,25 @@
                                         value={editorClearButtonLabel}
                                         onblur={handleEditorClearButtonLabelCommit}>
                                     </lightning-input>
-                                    <lightning-combobox
-                                        label="Target Submit Action"
-                                        value={editorTargetSubmitActionKey}
-                                        options={fileUploadTargetActionOptions}
-                                        onchange={handleEditorTargetSubmitActionChange}>
-                                    </lightning-combobox>
+                                    <template if:true={selectedElementIsInsideRepeatGroup}>
+                                        <p class="selection-hint selection-hint--compact">
+                                            This Signature is captured once per submitted row and included in the Submission PDF.
+                                        </p>
+                                        <lightning-input
+                                            type="checkbox"
+                                            label="Attach signature file to saved row record"
+                                            checked={editorRowSignatureAttachToRowRecord}
+                                            onchange={handleEditorRowSignatureAttachToRowRecordChange}>
+                                        </lightning-input>
+                                    </template>
+                                    <template if:false={selectedElementIsInsideRepeatGroup}>
+                                        <lightning-combobox
+                                            label="Target Submit Action"
+                                            value={editorTargetSubmitActionKey}
+                                            options={fileUploadTargetActionOptions}
+                                            onchange={handleEditorTargetSubmitActionChange}>
+                                        </lightning-combobox>
+                                    </template>
                                 </template>
 
                                 <template if:true={selectedElementIsRepeatGroup}>
@@ -1650,6 +2003,9 @@
                                         options={prefillAliasOptions}
                                         onchange={handleEditorRepeatSourceAliasChange}>
                                     </lightning-combobox>
+                                    <template if:true={selectedRepeatGroupSourceWarning}>
+                                        <p class="selection-hint selection-hint--error">{selectedRepeatGroupSourceWarning}</p>
+                                    </template>
                                     <lightning-input
                                         type="checkbox"
                                         label="Allow Add Rows"
@@ -1668,53 +2024,6 @@
                                         options={repeatLabelModeOptions}
                                         onchange={handleEditorRepeatLabelModeChange}>
                                     </lightning-combobox>
-                                    <div class="settings-divider"></div>
-                                    <div class="selection-label-row">
-                                        <p class="field-inline-label">Row Signature + PDF</p>
-                                        <lightning-helptext content="Require a physical signature on each Records List row and include those signatures in the Submission PDF."></lightning-helptext>
-                                    </div>
-                                    <template if:true={rowSignatureFeatureAvailable}>
-                                        <lightning-input
-                                            type="checkbox"
-                                            label="Require row signatures"
-                                            checked={editorRowSignatureEnabled}
-                                            onchange={handleEditorRowSignatureEnabledChange}>
-                                        </lightning-input>
-                                        <template if:true={editorRowSignatureEnabled}>
-                                            <lightning-input
-                                                type="checkbox"
-                                                label="Signature required on every submitted row"
-                                                checked={editorRowSignatureRequired}
-                                                onchange={handleEditorRowSignatureRequiredChange}>
-                                            </lightning-input>
-                                            <lightning-input
-                                                label="Signature Label"
-                                                value={editorRowSignatureLabel}
-                                                oninput={handleEditorRowSignatureLabelInput}
-                                                onblur={handleEditorRowSignatureLabelCommit}>
-                                            </lightning-input>
-                                            <lightning-input
-                                                label="Signature Help Text"
-                                                value={editorRowSignatureHelpText}
-                                                oninput={handleEditorRowSignatureHelpTextInput}
-                                                onblur={handleEditorRowSignatureHelpTextCommit}>
-                                            </lightning-input>
-                                            <lightning-input
-                                                type="checkbox"
-                                                label="Attach each row signature file to its saved row record"
-                                                checked={editorRowSignatureAttachToRowRecord}
-                                                onchange={handleEditorRowSignatureAttachToRowRecordChange}>
-                                            </lightning-input>
-                                            <p class="selection-hint selection-hint--compact">
-                                                Submission PDF is enabled automatically. The PDF title and attachment target are configured in Form Settings > Submission PDF.
-                                            </p>
-                                        </template>
-                                    </template>
-                                    <template if:false={rowSignatureFeatureAvailable}>
-                                        <p class="selection-hint selection-hint--compact">
-                                            Available on Pro when Electronic Signature, Submission PDF, and Records List Row Signature + PDF are enabled.
-                                        </p>
-                                    </template>
                                 </template>
                             </div>
 
@@ -1786,14 +2095,42 @@
                                             options={prefillAliasOptions}
                                             onchange={handleEditorPrefillAliasChange}>
                                         </lightning-combobox>
-                                        <div class="selection-card__tail-field">
-                                            <lightning-combobox
-                                                label="Salesforce Field"
-                                                value={editorPrefillFieldPath}
-                                                options={prefillFieldOptions}
-                                                onchange={handleEditorPrefillFieldChange}>
-                                            </lightning-combobox>
-                                        </div>
+                                        <template if:true={selectedElementIsLocation}>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="Country Salesforce Field"
+                                                    value={editorLocationCountryPrefillFieldPath}
+                                                    options={prefillFieldOptions}
+                                                    onchange={handleEditorLocationCountryPrefillFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="State/Region Salesforce Field"
+                                                    value={editorLocationRegionPrefillFieldPath}
+                                                    options={prefillFieldOptions}
+                                                    onchange={handleEditorLocationRegionPrefillFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="City Salesforce Field"
+                                                    value={editorLocationCityPrefillFieldPath}
+                                                    options={prefillFieldOptions}
+                                                    onchange={handleEditorLocationCityPrefillFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                        </template>
+                                        <template if:false={selectedElementIsLocation}>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="Salesforce Field"
+                                                    value={editorPrefillFieldPath}
+                                                    options={prefillFieldOptions}
+                                                    onchange={handleEditorPrefillFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                        </template>
                                     </template>
 
                                     <div class="settings-divider"></div>
@@ -1820,6 +2157,33 @@
                                             options={submitActionOptions}
                                             onchange={handleEditorSubmitActionChange}>
                                         </lightning-combobox>
+                                        <template if:true={selectedElementIsLocation}>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="Country Salesforce Field"
+                                                    value={editorLocationCountrySubmitFieldPath}
+                                                    options={submitFieldOptions}
+                                                    onchange={handleEditorLocationCountrySubmitFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="State/Region Salesforce Field"
+                                                    value={editorLocationRegionSubmitFieldPath}
+                                                    options={submitFieldOptions}
+                                                    onchange={handleEditorLocationRegionSubmitFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                            <div class="selection-card__tail-field">
+                                                <lightning-combobox
+                                                    label="City Salesforce Field"
+                                                    value={editorLocationCitySubmitFieldPath}
+                                                    options={submitFieldOptions}
+                                                    onchange={handleEditorLocationCitySubmitFieldChange}>
+                                                </lightning-combobox>
+                                            </div>
+                                        </template>
+                                        <template if:false={selectedElementIsLocation}>
                                         <div class="selection-card__tail-field">
                                             <lightning-combobox
                                                 label="Salesforce Field"
@@ -1828,6 +2192,7 @@
                                             onchange={handleEditorSubmitFieldChange}>
                                             </lightning-combobox>
                                         </div>
+                                        </template>
                                     </template>
                                     <div class="selection-card__bottom-lines" aria-hidden="true">&nbsp;</div>
                                 </div>
@@ -2019,10 +2384,17 @@
                                             type="checkbox"
                                             label="Generate PDF"
                                             checked={draftSubmissionPdfEnabled}
+                                            disabled={submissionPdfRequiredByRecordsListSignature}
                                             onchange={handleSubmissionPdfEnabledChange}>
                                         </lightning-input>
                                         <lightning-helptext content="Generate a readable PDF copy of the submitted response. V1 includes fields, display text, and images in the published form order."></lightning-helptext>
                                     </div>
+
+                                    <template if:true={submissionPdfRequiredByRecordsListSignature}>
+                                        <p class="selection-hint selection-hint--compact">
+                                            Required because this form contains a Signature inside a Records List. Remove the row Signature to disable Submission PDF.
+                                        </p>
+                                    </template>
 
                                     <template if:true={draftSubmissionPdfEnabled}>
                                         <lightning-input
@@ -2106,29 +2478,6 @@
                                     onchange={handleFormCaptchaChange}>
                                 </lightning-input>
 
-                                <template if:true={showSecretCodeVerificationSettings}>
-                                    <div class="settings-divider"></div>
-
-                                    <div class="selection-label-row">
-                                        <p class="field-inline-label">Enable Secret Code Verification</p>
-                                        <lightning-helptext content={secretCodeVerificationHelpText}></lightning-helptext>
-                                    </div>
-                                    <lightning-input
-                                        type="checkbox"
-                                        variant="label-hidden"
-                                        label="Enable Secret Code Verification"
-                                        checked={draftSecretCodeVerificationEnabled}
-                                        onchange={handleSecretCodeVerificationEnabledChange}
-                                        onblur={handleSecretCodeVerificationEnabledCommit}>
-                                    </lightning-input>
-
-                                    <template if:true={draftSecretCodeVerificationEnabled}>
-                                        <p class="selection-hint selection-hint--compact">{secretCodeSettingsHint}</p>
-                                    </template>
-                                    <template if:false={draftSecretCodeVerificationEnabled}>
-                                        <p class="selection-hint selection-hint--compact">{secretCodeSettingsHint}</p>
-                                    </template>
-                                </template>
                             </div>
 
                             <div class="selection-card selection-card--danger">
@@ -2214,6 +2563,42 @@
                                     class="slds-m-left_small"
                                     disabled={newFormCreateDisabled}
                                     onclick={handleCreateNewForm}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showCreateProjectModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="create-project-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-new-form-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="create-project-modal-heading" class="slds-modal__title slds-hyphenate">Create Project</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <lightning-input
+                                    type="text"
+                                    label="Project Name"
+                                    value={newProjectName}
+                                    onchange={handleCreateProjectNameChange}
+                                    max-length="80">
+                                </lightning-input>
+                                <p class="designer-new-form-help">Creates an empty project for organizing forms.</p>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    disabled={isCreatingProject}
+                                    onclick={handleCloseCreateProjectModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Create Project"
+                                    class="slds-m-left_small"
+                                    disabled={createProjectDisabled}
+                                    onclick={handleCreateProject}>
                                 </lightning-button>
                             </footer>
                         </div>
@@ -2455,14 +2840,38 @@
                     <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="display-text-modal-heading" class="slds-modal slds-fade-in-open">
                         <div class="slds-modal__container designer-display-text-modal">
                             <header class="slds-modal__header">
-                                <h2 id="display-text-modal-heading" class="slds-modal__title slds-hyphenate">Edit Display Text</h2>
+                                <h2 id="display-text-modal-heading" class="slds-modal__title slds-hyphenate">{displayTextModalTitle}</h2>
                             </header>
                             <div class="slds-modal__content slds-p-around_medium">
                                 <lightning-input-rich-text
-                                    label="Display Text"
+                                    label={displayTextModalLabel}
                                     value={modalDisplayText}
+                                    formats={displayTextRichTextFormats}
                                     onchange={handleModalDisplayTextChange}>
                                 </lightning-input-rich-text>
+                                <template if:true={selectedElementIsMergedDocument}>
+                                    <div class="selection-token-row">
+                                        <lightning-combobox
+                                            label="Prefill Alias"
+                                            value={modalMergeAlias}
+                                            options={prefillAliasOptions}
+                                            onchange={handleModalMergeAliasChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            label="Salesforce Field"
+                                            value={modalMergeFieldPath}
+                                            options={modalMergeFieldOptions}
+                                            onchange={handleModalMergeFieldPathChange}>
+                                        </lightning-combobox>
+                                        <lightning-button
+                                            variant="neutral"
+                                            label="Insert value"
+                                            disabled={cannotInsertMergedDocumentToken}
+                                            onclick={handleInsertMergedDocumentToken}>
+                                        </lightning-button>
+                                    </div>
+                                    <p class="selection-hint">Insert values as tokens like &#123;&#123;Contact.FirstName&#125;&#125;. Published forms resolve them from prefill results.</p>
+                                </template>
                             </div>
                             <footer class="slds-modal__footer">
                                 <lightning-button
@@ -2626,6 +3035,77 @@
                                     label="Save"
                                     class="slds-m-left_small"
                                     onclick={handleSaveFieldFormulaModal}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showButtonParameterFormulaModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="button-parameter-formula-modal-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-custom-js-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="button-parameter-formula-modal-heading" class="slds-modal__title slds-hyphenate">Edit Button Parameter Formula</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Formula Expression</p>
+                                    <lightning-helptext content={buttonParameterFormulaHelpText}></lightning-helptext>
+                                    <a
+                                        class="selection-inline-link"
+                                        href={formulaHelpUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer">
+                                        Learn formulas
+                                    </a>
+                                </div>
+                                <p class="selection-hint">Build the value sent for this query parameter. Use fields directly or functions such as CONCAT and URLENCODE.</p>
+                                <div class="post-submit-token-row">
+                                    <lightning-combobox
+                                        variant="label-hidden"
+                                        label="Insert Field"
+                                        value={selectedButtonParameterFormulaFieldToken}
+                                        options={buttonParameterFormulaFieldTokenOptions}
+                                        placeholder="Insert field"
+                                        onchange={handleButtonParameterFormulaFieldTokenChange}>
+                                    </lightning-combobox>
+                                    <div class="post-submit-token-row__action">
+                                        <button
+                                            type="button"
+                                            class="post-submit-token-row__button"
+                                            onclick={handleInsertButtonParameterFormulaFieldToken}>
+                                            Insert
+                                        </button>
+                                        <lightning-helptext content={insertTokenButtonHelpText}></lightning-helptext>
+                                    </div>
+                                </div>
+                                <div class={buttonParameterFormulaExpressionShellClass}>
+                                    <textarea
+                                        class="slds-textarea post-submit-formula-modal__textarea"
+                                        data-id="button-parameter-formula"
+                                        rows="6"
+                                        oninput={handleButtonParameterFormulaInput}
+                                        spellcheck="false"></textarea>
+                                </div>
+                                <template if:true={modalButtonParameterFormulaError}>
+                                    <p class="selection-hint selection-hint--error">{modalButtonParameterFormulaError}</p>
+                                </template>
+                                <template if:true={modalButtonParameterFormulaPreviewValue}>
+                                    <p class="selection-hint">Preview: {buttonParameterModalFormulaPreviewText}</p>
+                                </template>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    onclick={handleCloseButtonParameterFormulaModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Save"
+                                    class="slds-m-left_small"
+                                    onclick={handleSaveButtonParameterFormulaModal}>
                                 </lightning-button>
                             </footer>
                         </div>

@@ -61,7 +61,9 @@ public without sharing class NativeFormsBootstrapV2Signer {
     }
 
     @TestVisible
+    @SuppressWarnings('PMD.ApexCRUDViolation')
     static String getOrCreateSigningSecretB64() {
+        // Package-controlled secret storage must not depend on subscriber user CRUD/FLS.
         NativeForms_Protected_Config__c config = NativeForms_Protected_Config__c.getOrgDefaults();
         if (config != null && String.isNotBlank(config.Bootstrap_V2_Signing_Secret__c)) {
             return config.Bootstrap_V2_Signing_Secret__c;

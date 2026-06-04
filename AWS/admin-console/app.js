@@ -28,8 +28,8 @@ const FEATURE_FLAG_METADATA = {
     description: "Automatically link related Salesforce records after submission based on configured matching rules."
   },
   enableProSfSecretCodeAuth: {
-    label: "Secret Code Verification",
-    description: "Add an extra verification step with a secret code for more sensitive workflows."
+    label: "User Verification",
+    description: "Add an email-based verification number step for more sensitive workflows."
   },
   enableProLoadFile: {
     label: "File Uploads",
@@ -42,6 +42,10 @@ const FEATURE_FLAG_METADATA = {
   enableProSubmissionPdf: {
     label: "Submission PDF",
     description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
+  },
+  enableProMergedDocument: {
+    label: "Merged Document",
+    description: "Create document-style rich text that inserts prefilled Salesforce values such as contact names or agreement details."
   },
   enableProSurveyFields: {
     label: "Survey Fields",

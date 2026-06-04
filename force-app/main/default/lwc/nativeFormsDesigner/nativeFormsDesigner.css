@@ -734,6 +734,13 @@
     background: rgba(15, 108, 189, 0.08);
 }
 
+.preview-repeat-group__meta .preview-repeat-group__warning {
+    background: #fdeff1;
+    border: 1px solid #f0b8c1;
+    color: #8f1d2c;
+    font-weight: 700;
+}
+
 .preview-section__title {
     font-size: var(--nf-theme-section-size, 1rem);
     font-weight: 700;
@@ -910,6 +917,15 @@
     appearance: none;
     -webkit-appearance: none;
     opacity: 1;
+}
+
+.preview-location-inputs {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.preview-location-inputs--inline {
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
 }
 
 .preview-file-upload {
@@ -1229,6 +1245,14 @@
     margin-top: 0.8rem;
 }
 
+.button-query-parameter {
+    margin: 0.55rem 0 0.75rem 0.4rem;
+    padding: 0.55rem;
+    border: 1px solid #d5e1ee;
+    border-radius: 0.55rem;
+    background: #f8fbff;
+}
+
 .selection-card--salesforce {
     margin-bottom: 0.95rem;
 }
@@ -1511,6 +1535,7 @@
 .preview-field--right > input,
 .preview-field--right > textarea,
 .preview-field--right > select,
+.preview-field--right > .preview-location-inputs,
 .preview-field--right > .preview-radio-group {
     order: 1;
     flex: 1 1 auto;
@@ -1553,6 +1578,7 @@
 .designer-form-surface--rtl .preview-field--left > input,
 .designer-form-surface--rtl .preview-field--left > textarea,
 .designer-form-surface--rtl .preview-field--left > select,
+.designer-form-surface--rtl .preview-field--left > .preview-location-inputs,
 .designer-form-surface--rtl .preview-field--left > .preview-radio-group,
 .designer-form-surface--rtl .preview-field--left > .preview-checkbox__control {
     order: 1;
@@ -1582,6 +1608,7 @@
 .designer-form-surface--rtl .preview-field--right > input,
 .designer-form-surface--rtl .preview-field--right > textarea,
 .designer-form-surface--rtl .preview-field--right > select,
+.designer-form-surface--rtl .preview-field--right > .preview-location-inputs,
 .designer-form-surface--rtl .preview-field--right > .preview-radio-group,
 .designer-form-surface--rtl .preview-field--right > .preview-checkbox__control {
     order: 0;
@@ -2105,4 +2132,12 @@
 
 .conditional-editor__add {
     justify-self: start;
+}
+
+.selection-token-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    align-items: end;
+    margin-top: 0.8rem;
 }

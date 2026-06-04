@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GeoLocationsTableSetup",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem"
+      ],
+      "Resource": "arn:aws:dynamodb:eu-north-1:355617663345:table/NativeFormsGeoLocations"
+    }
+  ]
+}

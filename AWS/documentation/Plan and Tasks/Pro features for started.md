@@ -75,6 +75,7 @@ But it is not the authoritative entitlement decision for public runtime behavior
 - final storage as Salesforce Files
 - admin-selected target submit action per upload field
 - customer-safe upload validation and failure messages
+- mandatory AWS malware scanning before an uploaded file may be attached to Salesforce
 
 ### Explicitly not in V1
 - repeat-group file uploads
@@ -115,6 +116,7 @@ The runtime should show:
 - a file list after selection
 - per-file states:
   - uploading
+  - checking file safety
   - ready
   - failed
 - remove / retry before submit
@@ -126,6 +128,17 @@ Customer-safe examples:
 - `We could not upload this file. Please try again.`
 
 Technical detail should stay in admin logs rather than public runtime copy.
+
+### File safety rule
+Malware scanning belongs to the existing `File Uploads` capability and does not receive a separate feature flag or per-element toggle.
+
+- Every uploaded file must be scanned by AWS before attachment to Salesforce.
+- Only a clean scan result may proceed to Salesforce finalization.
+- The Designer may explain this behavior on File Upload properties after implementation is deployed.
+- Marketing and help content may state this benefit only after the production path is verified.
+
+Detailed implementation plan:
+- `AWS/documentation/Technical and specs/NativeForms_File_Upload_Malware_Scanning_Plan.md`
 
 ---
 
@@ -147,11 +160,12 @@ Actual file transfer happens on selection, not only on final submit.
    - `enableProLoadFile`
    - field rules
 4. File uploads into temporary AWS staging storage.
-5. Runtime stores upload references locally for submit.
-6. Final submit sends upload references, not raw file bytes.
-7. Submit Lambda validates those references belong to the same form, session, and field.
-8. After the chosen submit action succeeds and returns a usable record id, runtime finalizes the staged file into Salesforce Files linked to that record.
-9. If submit fails, staged files are not finalized to Salesforce.
+5. AWS malware scanning evaluates the staged file.
+6. Runtime stores only clean, ready upload references locally for submit.
+7. Final submit sends upload references, not raw file bytes.
+8. Submit Lambda validates those references belong to the same form, session, and field and independently confirms the clean scan result.
+9. After the chosen submit action succeeds and returns a usable record id, runtime finalizes the staged file into Salesforce Files linked to that record.
+10. If submit fails or scanning is not clean, staged files are not finalized to Salesforce.
 
 ### Required bucket CORS
 Because Pro V1 uses browser-to-S3 presigned `PUT` uploads from `https://forms.twinaforms.com`, the `nativeformspublish` bucket must allow CORS for that origin.
@@ -210,6 +224,7 @@ Server-side enforcement must cover:
 - multiplicity rules
 - upload token expiry
 - upload reference ownership by form/session/field
+- accepted malware scan result before Salesforce finalization
 
 ---
 
@@ -227,7 +242,8 @@ Server-side enforcement must cover:
 
 ### AWS side
 - add upload-init capability for published forms
-- stage uploaded files temporarily in AWS
+- stage uploaded files temporarily in a private AWS upload-staging bucket
+- scan staged uploaded files through AWS malware protection before allowing finalization
 - enforce `enableProLoadFile` on upload-init and on final submit-linked file acceptance
 - finalize files to Salesforce Files only after successful submit target completion
 

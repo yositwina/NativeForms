@@ -19,6 +19,11 @@ Define the first supported scope for the NativeForms Salesforce builder so devel
 - republish a version
 - unpublish a version
 - track publication history
+- restore from the selected published version by creating a new draft version on the same form
+
+### Planned recovery UX
+- undo up to 5 recent Designer canvas edits by restoring an element snapshot for the current draft version
+- keep restore safer than undo by never overwriting the damaged draft; the selected published copy becomes a new draft version
 
 ### Supported UI element types
 - heading
@@ -34,6 +39,10 @@ Define the first supported scope for the NativeForms Salesforce builder so devel
 - columns
 - hidden
 - repeatGroup
+- button (Pro portal navigation action displayed under Input Field; no submitted field value)
+- User Verification (virtual Special Element representing the form-level email-code gate; not persisted as submitted field data)
+- signature (Pro input; supports one positioned Signature inside each Records List and automatically requires Submission PDF there)
+- mergedDocument (Pro display element; rich document text with prefill alias merge tokens such as `{{Contact.FirstName}}`)
 
 ### Supported input styles in V1
 - text

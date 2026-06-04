@@ -48,6 +48,11 @@ Current Bootstrap V2 behavior:
 - retrieves a per-org signing secret from protected package storage after OAuth succeeds
 - signs protected package-to-AWS calls with Bootstrap V2 HMAC headers
 
+Salesforce protected-storage exception:
+- `NativeFormsBootstrapV2Signer` creates/updates the org HMAC secret in the protected `NativeForms_Protected_Config__c` hierarchy setting in system context. This is intentionally not changed to user-mode CRUD/FLS, because the secret is package-controlled trust material rather than subscriber-editable data.
+- `NativeFormsSubmissionLogsController` creates/reads the sealed submission-log private key and its protected wrapping secret in system context. `Sealed_Log_Data__c` is intentionally not granted to normal users; changing these operations to user mode would either break decryption or require exposing confidential key storage.
+- Salesforce Code Analyzer `ApexCRUDViolation` suppressions for these methods are allowed only with this narrow protected-key-storage rationale; customer form records and other subscriber data continue to use user-mode access.
+
 Admin/server package calls such as form registration must send:
 - Bootstrap V2 HMAC headers
 - `orgId` in the request body when required by the endpoint

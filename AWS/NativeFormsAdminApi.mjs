@@ -73,6 +73,10 @@ const FEATURE_FLAG_METADATA = {
     label: "Submission PDF",
     description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
   },
+  enableProMergedDocument: {
+    label: "Merged Document",
+    description: "Create document-style rich text that inserts prefilled Salesforce values such as contact names or agreement details."
+  },
   enableProSurveyFields: {
     label: "Survey Fields",
     description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
@@ -128,6 +132,7 @@ const DEFAULT_PLANS = [
       enableProLoadFile: false,
       enableProElectronicSignature: false,
       enableProSubmissionPdf: false,
+      enableProMergedDocument: false,
       enableProSurveyFields: false,
       enableProLocationFields: false,
       enableProCustomJs: false,
@@ -161,6 +166,7 @@ const DEFAULT_PLANS = [
       enableProLoadFile: true,
       enableProElectronicSignature: true,
       enableProSubmissionPdf: true,
+      enableProMergedDocument: true,
       enableProSurveyFields: true,
       enableProLocationFields: true,
       enableProCustomJs: true,
@@ -194,6 +200,7 @@ const DEFAULT_PLANS = [
       enableProLoadFile: false,
       enableProElectronicSignature: false,
       enableProSubmissionPdf: false,
+      enableProMergedDocument: false,
       enableProSurveyFields: false,
       enableProLocationFields: false,
       enableProCustomJs: false,
@@ -227,6 +234,7 @@ const DEFAULT_PLANS = [
       enableProLoadFile: true,
       enableProElectronicSignature: true,
       enableProSubmissionPdf: true,
+      enableProMergedDocument: true,
       enableProSurveyFields: true,
       enableProLocationFields: true,
       enableProCustomJs: true,

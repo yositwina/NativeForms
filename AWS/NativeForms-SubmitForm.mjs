@@ -98,9 +98,12 @@ import https from "https";
 import querystring from "querystring";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand, GetObjectTaggingCommand } from "@aws-sdk/client-s3";
 import crypto from "crypto";
 import PDFDocument from "pdfkit";
+import path from "path";
+import { existsSync } from "fs";
+import { fileURLToPath } from "url";
 
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
@@ -108,12 +111,18 @@ const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const CAPTCHA_SECRET_KEY = String(process.env.CAPTCHA_SECRET_KEY || "").trim();
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "nativeformspublish";
+const UPLOAD_STAGING_BUCKET = process.env.UPLOAD_STAGING_BUCKET || "";
 const SALESFORCE_API_VERSION = "v60.0";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
 const SALESFORCE_OAUTH_CLIENT_ID = process.env.SALESFORCE_OAUTH_CLIENT_ID || "";
 const SALESFORCE_OAUTH_CLIENT_SECRET = process.env.SALESFORCE_OAUTH_CLIENT_SECRET || "";
 const SUBMISSION_LOG_SCHEMA_VERSION = "v2";
+const MALWARE_SCAN_STATUS_TAG_KEY = "GuardDutyMalwareScanStatus";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PDF_UNICODE_FONT_NAME = "TwinaFormsUnicode";
+const PDF_UNICODE_FONT_PATH = path.join(__dirname, "assets", "fonts", "NotoSansHebrew-Regular.ttf");
 
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
@@ -987,8 +996,8 @@ function defaultFeatureFlagsForPlan(planCode) {
   return {
     enableProElectronicSignature: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
     enableProSubmissionPdf: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
-    enableProRecordsListRowSignaturePdf: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
-    enableProSurveyFields: normalizedPlanCode === "trial" || normalizedPlanCode === "pro"
+    enableProSurveyFields: normalizedPlanCode === "trial" || normalizedPlanCode === "pro",
+    enableProLocationFields: normalizedPlanCode === "trial" || normalizedPlanCode === "pro"
   };
 }
 
@@ -999,6 +1008,11 @@ function formUsesSurveyFields(formSecurity) {
     const presentation = String(item?.presentation || "");
     return type === "ranking" || ["stars", "nps", "likert", "satisfaction"].includes(presentation);
   });
+}
+
+function formUsesLocationFields(formSecurity) {
+  const fields = formSecurity?.locationDefinition?.fields;
+  return !!(fields && typeof fields === "object" && Object.keys(fields).length > 0);
 }
 
 function getUploadFieldDefinition(formSecurity, fieldKey) {
@@ -1056,11 +1070,10 @@ async function validateSubmittedRecordsListRowSignatures({
   const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
   const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
   if (
-    effectiveFeatureFlags.enableProRecordsListRowSignaturePdf !== true ||
     effectiveFeatureFlags.enableProElectronicSignature !== true ||
     effectiveFeatureFlags.enableProSubmissionPdf !== true
   ) {
-    throw buildFailureError("Records List Row Signature + PDF is not available for this tenant.", 403, "validation");
+    throw buildFailureError("A Signature inside a Records List requires Electronic Signature and Submission PDF.", 403, "validation");
   }
 
   const pdfConfig = normalizeSubmissionPdfConfig(formSecurity);
@@ -1100,6 +1113,25 @@ function normalizeSubmittedUploadMap(fileUploads) {
   return fileUploads;
 }
 
+async function requireCleanUploadedFileScan(objectKey) {
+  if (!UPLOAD_STAGING_BUCKET) {
+    throw buildFailureError("File upload security scanning is not configured.", 500, "validation");
+  }
+  const tags = await s3Client.send(new GetObjectTaggingCommand({
+    Bucket: UPLOAD_STAGING_BUCKET,
+    Key: objectKey
+  }));
+  const scanTag = (tags.TagSet || []).find((item) => item.Key === MALWARE_SCAN_STATUS_TAG_KEY);
+  const scanStatus = String(scanTag?.Value || "").trim();
+  if (scanStatus !== "NO_THREATS_FOUND") {
+    throw buildFailureError(
+      "One of the uploaded files could not be safely processed. Please upload another file or try again.",
+      400,
+      "validation"
+    );
+  }
+}
+
 function normalizeSubmittedSignatureMap(signatures) {
   if (!signatures || typeof signatures !== "object" || Array.isArray(signatures)) {
     return {};
@@ -1123,25 +1155,49 @@ function decodeSignaturePng(dataUrl) {
   return buffer;
 }
 
+function firstSavedRecordId(result) {
+  if (result?.id) {
+    return result.id;
+  }
+  if (result?.record?.Id) {
+    return result.record.Id;
+  }
+  if (Array.isArray(result?.createdIds) && result.createdIds.length > 0) {
+    return result.createdIds[0];
+  }
+  if (Array.isArray(result?.updatedIds) && result.updatedIds.length > 0) {
+    return result.updatedIds[0];
+  }
+  if (Array.isArray(result?.rowResults)) {
+    const rowResult = result.rowResults.find((item) => item?.id);
+    if (rowResult?.id) {
+      return rowResult.id;
+    }
+  }
+  return null;
+}
+
 function resolveUploadTargetRecordId(targetSubmitActionKey, results) {
   if (!targetSubmitActionKey) {
     return null;
   }
 
-  const exactMatch = (results || []).find((result) => result?.commandKey === targetSubmitActionKey && result?.id);
-  if (exactMatch?.id) {
-    return exactMatch.id;
+  const exactMatch = (results || []).find((result) => result?.commandKey === targetSubmitActionKey);
+  const exactRecordId = firstSavedRecordId(exactMatch);
+  if (exactRecordId) {
+    return exactRecordId;
   }
 
-  const createFallback = (results || []).find((result) => result?.commandKey === `${targetSubmitActionKey}_create` && result?.id);
-  if (createFallback?.id) {
-    return createFallback.id;
+  const createFallback = (results || []).find((result) => result?.commandKey === `${targetSubmitActionKey}_create`);
+  const createRecordId = firstSavedRecordId(createFallback);
+  if (createRecordId) {
+    return createRecordId;
   }
 
   const prefixFallback = [...(results || [])]
     .reverse()
-    .find((result) => String(result?.commandKey || "").startsWith(`${targetSubmitActionKey}`) && result?.id);
-  return prefixFallback?.id || null;
+    .find((result) => String(result?.commandKey || "").startsWith(`${targetSubmitActionKey}`) && firstSavedRecordId(result));
+  return firstSavedRecordId(prefixFallback);
 }
 
 function streamToBuffer(streamBody) {
@@ -1656,6 +1712,10 @@ async function coerceFieldsForSalesforce(instanceUrl, accessToken, objectApiName
     }
 
     const fieldType = fieldTypeByName[fieldName];
+    if (value && typeof value === "object" && !Array.isArray(value) && ["string", "textarea"].includes(fieldType)) {
+      coerced[fieldName] = JSON.stringify(value);
+      continue;
+    }
     if (fieldType === "date") {
       const parsed = parseFlexibleDateString(value);
       if (parsed) {
@@ -1933,8 +1993,9 @@ async function finalizeUploadedFiles({
         throw buildFailureError("One of the uploaded files is missing its staged object reference.", 400, "validation");
       }
 
+      await requireCleanUploadedFileScan(objectKey);
       const s3Object = await s3Client.send(new GetObjectCommand({
-        Bucket: PUBLISH_BUCKET,
+        Bucket: UPLOAD_STAGING_BUCKET,
         Key: objectKey
       }));
       const fileBuffer = await streamToBuffer(s3Object.Body);
@@ -1965,7 +2026,7 @@ async function finalizeUploadedFiles({
 
       try {
         await s3Client.send(new DeleteObjectCommand({
-          Bucket: PUBLISH_BUCKET,
+          Bucket: UPLOAD_STAGING_BUCKET,
           Key: objectKey
         }));
       } catch (error) {
@@ -2063,6 +2124,8 @@ async function finalizeRecordsListRowSignatures({
   formSecurity,
   inputPayload,
   results,
+  submittedAt,
+  event,
   sf
 }) {
   const configs = normalizeRecordsListRowSignatureConfigs(formSecurity);
@@ -2075,7 +2138,8 @@ async function finalizeRecordsListRowSignatures({
     const rows = submittedRepeatRows(inputPayload, config.groupKey);
     const upsertResult = findUpsertManyResultForGroup(results, config.groupKey);
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-      const submittedSignature = rows[rowIndex]?._rowSignature || {};
+      const row = rows[rowIndex] || {};
+      const submittedSignature = row?._rowSignature || {};
       if (!submittedSignature.dataUrl) {
         continue;
       }
@@ -2085,13 +2149,6 @@ async function finalizeRecordsListRowSignatures({
         ? upsertResult.rowResults.find((item) => Number(item?.rowIndex) === rowIndex)
         : null;
       const rowRecordId = rowResult?.id || null;
-      if (config.attachToRowRecord && !rowRecordId) {
-        throw buildFailureError(
-          `No saved row record was available for row signature '${config.groupKey}' row ${rowIndex + 1}.`,
-          400,
-          "mapping"
-        );
-      }
 
       const safeFileName = String(submittedSignature.fileName || `${config.groupKey}-row-${rowIndex + 1}-signature.png`)
         .replace(/[\\/:*?"<>|]+/g, "-")
@@ -2100,8 +2157,10 @@ async function finalizeRecordsListRowSignatures({
       const signedAt = typeof submittedSignature.signedAt === "string" ? submittedSignature.signedAt : new Date().toISOString();
       const sha256 = crypto.createHash("sha256").update(imageBuffer).digest("hex");
       let contentVersionId = null;
+      let pdfContentVersionId = null;
+      let pdfFileName = null;
 
-      if (config.attachToRowRecord) {
+      if (config.attachToRowRecord && rowRecordId) {
         const versionResult = await createSalesforceFileVersion(
           sf.instanceUrl,
           sf.accessToken,
@@ -2113,6 +2172,32 @@ async function finalizeRecordsListRowSignatures({
           }
         );
         contentVersionId = versionResult.id;
+
+        const rowPdfBuffer = await buildRecordsListRowSignaturePdfBuffer({
+          formSecurity,
+          groupKey: config.groupKey,
+          row,
+          rowIndex,
+          submittedSignature,
+          submittedAt,
+          event
+        });
+        if (rowPdfBuffer.length) {
+          pdfFileName = safeFileName
+            .replace(/\.png$/i, "")
+            .replace(/-signature$/i, "-signed-row") + ".pdf";
+          const pdfVersionResult = await createSalesforceFileVersion(
+            sf.instanceUrl,
+            sf.accessToken,
+            {
+              Title: pdfFileName.replace(/\.pdf$/i, ""),
+              PathOnClient: pdfFileName,
+              VersionData: rowPdfBuffer.toString("base64"),
+              FirstPublishLocationId: rowRecordId
+            }
+          );
+          pdfContentVersionId = pdfVersionResult.id;
+        }
       }
 
       finalizedRowSignatures.push({
@@ -2122,6 +2207,9 @@ async function finalizeRecordsListRowSignatures({
         fileName,
         rowRecordId,
         contentVersionId,
+        pdfFileName,
+        pdfContentVersionId,
+        rowAttachmentSkipped: config.attachToRowRecord && !rowRecordId,
         signedAt,
         sha256
       });
@@ -2139,6 +2227,7 @@ function normalizeSubmissionPdfConfig(formSecurity) {
       attachToRecord: true,
       targetSubmitActionKey: "",
       title: "Submitted Response",
+      rtlEnabled: false,
       includeEmptyFields: true,
       schema: []
     };
@@ -2149,6 +2238,7 @@ function normalizeSubmissionPdfConfig(formSecurity) {
     attachToRecord: raw.attachToRecord !== false,
     targetSubmitActionKey: String(raw.targetSubmitActionKey || "").trim(),
     title: String(raw.title || "Submitted Response").trim() || "Submitted Response",
+    rtlEnabled: raw.rtlEnabled === true,
     includeEmptyFields: raw.includeEmptyFields !== false,
     schema: Array.isArray(raw.schema) ? raw.schema.filter((item) => item && typeof item === "object") : []
   };
@@ -2169,6 +2259,38 @@ function stripHtmlForPdf(value) {
     .replace(/[ \t\v\f\r]+/g, " ")
     .replace(/\n\s+/g, "\n")
     .trim();
+}
+
+function readMergedDocumentPath(source, path) {
+  if (!source || !path) {
+    return source;
+  }
+  return String(path).split(".").reduce((current, segment) => {
+    if (current == null) {
+      return undefined;
+    }
+    return current[segment];
+  }, source);
+}
+
+function resolveMergedDocumentTextForPdf(template, inputPayload) {
+  const aliases = inputPayload?.prefillSnapshot?.aliases && typeof inputPayload.prefillSnapshot.aliases === "object"
+    ? inputPayload.prefillSnapshot.aliases
+    : {};
+  return String(template || "").replace(/\{\{\s*([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_.]*?)\s*\}\}/g, (_, alias, path) => {
+    const value = readMergedDocumentPath(aliases[alias], path);
+    if (value == null) {
+      return "";
+    }
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch (error) {
+        return "";
+      }
+    }
+    return String(value);
+  });
 }
 
 function decodeImageDataUrl(dataUrl, allowedTypes = ["image/png", "image/jpeg", "image/jpg"]) {
@@ -2334,18 +2456,30 @@ function clampPdfColumn(value, maxColumns) {
   return Math.min(Math.max(1, parsed), Math.max(1, maxColumns || 1));
 }
 
+function pdfColumnIndex(value, maxColumns, rtl = false) {
+  const oneBased = clampPdfColumn(value, maxColumns);
+  return rtl ? Math.max(1, maxColumns || 1) - oneBased : oneBased - 1;
+}
+
 function isPdfContainer(schemaItem) {
   return ["section", "sectionBreak", "group", "repeatGroup"].includes(String(schemaItem?.type || ""));
 }
 
 function isPdfDisplayText(schemaItem) {
-  return ["heading", "paragraph", "richText"].includes(String(schemaItem?.type || ""));
+  return ["heading", "paragraph", "richText", "mergedDocument"].includes(String(schemaItem?.type || ""));
+}
+
+function isPdfHiddenItem(schemaItem) {
+  return String(schemaItem?.type || "") === "hidden" || String(schemaItem?.fieldBehavior || "") === "hidden" || schemaItem?.hidden === true;
 }
 
 function buildPdfSchemaTree(schema) {
   const byParent = new Map();
   const byElementId = new Map();
   for (const item of Array.isArray(schema) ? schema : []) {
+    if (isPdfHiddenItem(item)) {
+      continue;
+    }
     const elementId = String(item?.elementId || "").trim();
     if (elementId) {
       byElementId.set(elementId, item);
@@ -2364,34 +2498,88 @@ function buildPdfSchemaTree(schema) {
   return { byParent, byElementId };
 }
 
-function addPdfFieldAt(doc, label, value, x, y, width) {
-  const safeLabel = String(label || "Field");
-  const safeValue = String(value || "");
-  doc.fontSize(9).fillColor("#486581");
-  const labelHeight = doc.heightOfString(safeLabel, { width });
-  doc.text(safeLabel, x, y, { width });
-  doc.fontSize(11).fillColor("#102a43");
+function configurePdfFonts(doc) {
+  if (!doc || !existsSync(PDF_UNICODE_FONT_PATH)) {
+    return;
+  }
+  try {
+    doc.registerFont(PDF_UNICODE_FONT_NAME, PDF_UNICODE_FONT_PATH);
+  } catch (error) {
+    console.warn("Submission PDF Unicode font could not be loaded:", error?.message || error);
+  }
+}
+
+function containsHebrewText(value) {
+  return /[\u0590-\u05FF]/u.test(String(value || ""));
+}
+
+function normalizePdfText(value) {
+  return String(value == null ? "" : value)
+    .replace(/\u00A0/g, " ")
+    .replace(/[ \t\v\f\r]+/g, " ");
+}
+
+function preparePdfText(value, rtl = false) {
+  const text = normalizePdfText(value);
+  if (!rtl || !containsHebrewText(text)) {
+    return text;
+  }
+  return text.replace(/ (?=[\u0590-\u05FF])/gu, "\u00A0");
+}
+
+function pdfTextOptions(width, rtl = false, extra = {}) {
+  return {
+    ...extra,
+    width,
+    align: rtl ? "right" : (extra.align || "left")
+  };
+}
+
+function usePdfFont(doc, text = "") {
+  if (!doc) {
+    return doc;
+  }
+  if (!containsHebrewText(text) || !existsSync(PDF_UNICODE_FONT_PATH)) {
+    return doc.font("Helvetica");
+  }
+  try {
+    return doc.font(PDF_UNICODE_FONT_NAME);
+  } catch (error) {
+    return doc.font("Helvetica");
+  }
+}
+
+function addPdfFieldAt(doc, label, value, x, y, width, rtl = false) {
+  const safeLabel = preparePdfText(label || "Field", rtl);
+  const safeValue = preparePdfText(value || "", rtl);
+  const labelOptions = pdfTextOptions(width, rtl);
+  const valueOptions = pdfTextOptions(width, rtl);
+  usePdfFont(doc, safeLabel).fontSize(9).fillColor("#486581");
+  const labelHeight = doc.heightOfString(safeLabel, labelOptions);
+  doc.text(safeLabel, x, y, labelOptions);
+  usePdfFont(doc, safeValue).fontSize(11).fillColor("#102a43");
   const valueY = y + labelHeight + 2;
-  const valueHeight = Math.max(14, doc.heightOfString(safeValue || " ", { width }));
-  doc.text(safeValue, x, valueY, { width });
+  const valueHeight = Math.max(14, doc.heightOfString(safeValue || " ", valueOptions));
+  doc.text(safeValue, x, valueY, valueOptions);
   return valueY + valueHeight + 9;
 }
 
-function addPdfDisplayTextAt(doc, text, x, y, width) {
-  const safeText = stripHtmlForPdf(text);
+function addPdfDisplayTextAt(doc, text, x, y, width, rtl = false) {
+  const safeText = preparePdfText(stripHtmlForPdf(text), rtl);
   if (!safeText) {
     return y;
   }
-  doc.fontSize(11).fillColor("#102a43");
-  const textHeight = doc.heightOfString(safeText, { width });
-  doc.text(safeText, x, y, { width });
+  usePdfFont(doc, safeText).fontSize(11).fillColor("#102a43");
+  const textOptions = pdfTextOptions(width, rtl);
+  const textHeight = doc.heightOfString(safeText, textOptions);
+  doc.text(safeText, x, y, textOptions);
   return y + textHeight + 10;
 }
 
-function addPdfImageAt(doc, imageDataUrl, altText, x, y, width, maxHeight = 150) {
+function addPdfImageAt(doc, imageDataUrl, altText, x, y, width, maxHeight = 150, rtl = false) {
   const image = decodeImageDataUrl(imageDataUrl);
   if (!image) {
-    return altText ? addPdfFieldAt(doc, "Image", altText, x, y, width) : y;
+    return altText ? addPdfFieldAt(doc, "Image", altText, x, y, width, rtl) : y;
   }
   try {
     doc.image(image.buffer, x, y, {
@@ -2400,8 +2588,17 @@ function addPdfImageAt(doc, imageDataUrl, altText, x, y, width, maxHeight = 150)
     });
     return y + maxHeight + 10;
   } catch (error) {
-    return addPdfFieldAt(doc, "Image", altText || "Image could not be rendered in PDF.", x, y, width);
+    return addPdfFieldAt(doc, "Image", altText || "Image could not be rendered in PDF.", x, y, width, rtl);
   }
+}
+
+function addPdfSignatureAt(doc, label, imageDataUrl, x, y, width, rtl = false) {
+  const safeLabel = preparePdfText(label || "Signature", rtl);
+  const labelOptions = pdfTextOptions(width, rtl);
+  usePdfFont(doc, safeLabel).fontSize(9).fillColor("#486581");
+  const labelHeight = doc.heightOfString(safeLabel, labelOptions);
+  doc.text(safeLabel, x, y, labelOptions);
+  return addPdfImageAt(doc, imageDataUrl, "", x, y + labelHeight + 2, Math.min(width, 140), 55, rtl);
 }
 
 function renderPdfSchemaItemAt({
@@ -2413,11 +2610,18 @@ function renderPdfSchemaItemAt({
   inputPayload,
   finalizedFiles,
   finalizedSignatures,
-  includeEmptyFields
+  includeEmptyFields,
+  rtl
 }) {
   const type = String(schemaItem?.type || "text");
+  if (isPdfHiddenItem(schemaItem)) {
+    return y;
+  }
   if (isPdfDisplayText(schemaItem)) {
-    return addPdfDisplayTextAt(doc, schemaItem.text || schemaItem.html || schemaItem.label || "", x, y, width);
+    const displayText = type === "mergedDocument"
+      ? resolveMergedDocumentTextForPdf(schemaItem.html || schemaItem.text || schemaItem.label || "", inputPayload)
+      : schemaItem.text || schemaItem.html || schemaItem.label || "";
+    return addPdfDisplayTextAt(doc, displayText, x, y, width, rtl);
   }
   if (type === "image") {
     return addPdfImageAt(
@@ -2427,7 +2631,8 @@ function renderPdfSchemaItemAt({
       x,
       y,
       Math.min(width, Math.max(160, Math.round((Number(schemaItem.imageWidthPercent) || 100) * width / 100))),
-      150
+      150,
+      rtl
     );
   }
 
@@ -2444,11 +2649,11 @@ function renderPdfSchemaItemAt({
     return y;
   }
 
-  let nextY = addPdfFieldAt(doc, schemaItem.label || fieldKey, value, x, y, width);
+  let nextY = addPdfFieldAt(doc, schemaItem.label || fieldKey, value, x, y, width, rtl);
   if (type === "signature") {
     const submitted = inputPayload?.input?.signatures?.[fieldKey];
     if (submitted?.dataUrl) {
-      nextY = addPdfImageAt(doc, submitted.dataUrl, "", x, nextY, Math.min(width, 280), 120);
+      nextY = addPdfImageAt(doc, submitted.dataUrl, "", x, nextY, Math.min(width, 280), 120, rtl);
     }
   }
   return nextY;
@@ -2459,7 +2664,8 @@ function renderPdfRepeatGroup({
   container,
   children,
   inputPayload,
-  includeEmptyFields
+  includeEmptyFields,
+  rtl
 }) {
   const groupKey = String(container?.fieldKey || "").trim();
   const rows = submittedRepeatRows(inputPayload, groupKey);
@@ -2469,6 +2675,7 @@ function renderPdfRepeatGroup({
   const rowSignature = container?.rowSignature && typeof container.rowSignature === "object"
     ? container.rowSignature
     : null;
+  const rowSignatureChild = (children || []).find((child) => String(child?.type || "") === "signature");
   const rowSignatureLabel = String(rowSignature?.label || "Signature").trim() || "Signature";
   const columns = Math.min(Math.max(Number.parseInt(String(container?.columns || 2), 10) || 2, 1), 10);
   const columnGap = 14;
@@ -2477,26 +2684,26 @@ function renderPdfRepeatGroup({
   ensurePdfSpace(doc, 120);
   if (title) {
     doc.moveDown(0.4);
-    doc.fontSize(13).fillColor("#102a43").text(title, pageLeft, doc.y, { width: pageWidth });
+    const titleText = preparePdfText(title, rtl);
+    usePdfFont(doc, titleText).fontSize(13).fillColor("#102a43").text(titleText, pageLeft, doc.y, pdfTextOptions(pageWidth, rtl));
     doc.moveDown(0.25);
   }
   if (!rows.length) {
-    doc.fontSize(10).fillColor("#627d98").text("No rows submitted.", pageLeft, doc.y, { width: pageWidth });
+    const emptyRowsMessage = "No rows submitted.";
+    usePdfFont(doc, emptyRowsMessage).fontSize(10).fillColor("#627d98").text(emptyRowsMessage, pageLeft, doc.y, pdfTextOptions(pageWidth, rtl));
     doc.moveDown(0.5);
     return;
   }
 
   rows.forEach((row, rowIndex) => {
-    ensurePdfSpace(doc, rowSignature ? 210 : 130);
+    ensurePdfSpace(doc, 130);
     const rowTop = doc.y + 8;
     const padding = 12;
     let cursorY = rowTop + padding;
-    doc.fontSize(10).fillColor("#102a43").text(`Row ${rowIndex + 1}`, pageLeft + padding, cursorY, { width: pageWidth - padding * 2 });
-    cursorY += 18;
 
     const columnY = Array.from({ length: columns }, () => cursorY);
     for (const child of children || []) {
-      if (isPdfContainer(child) || isPdfDisplayText(child) || String(child?.type || "") === "fileUpload") {
+      if (isPdfContainer(child) || isPdfDisplayText(child) || ["fileUpload", "signature"].includes(String(child?.type || "")) || isPdfHiddenItem(child)) {
         continue;
       }
       const fieldKey = String(child?.fieldKey || "").trim();
@@ -2511,7 +2718,7 @@ function renderPdfRepeatGroup({
       if (!includeEmptyFields && !value) {
         continue;
       }
-      const columnIndex = clampPdfColumn(child?.sectionColumn, columns) - 1;
+      const columnIndex = pdfColumnIndex(child?.sectionColumn, columns, rtl);
       const x = pageLeft + padding + columnIndex * (columnWidth + columnGap);
       columnY[columnIndex] = addPdfFieldAt(
         doc,
@@ -2519,15 +2726,26 @@ function renderPdfRepeatGroup({
         value,
         x,
         columnY[columnIndex],
-        columnWidth - padding
+        columnWidth - padding,
+        rtl
       );
     }
 
     let rowBottom = Math.max(...columnY, cursorY);
     const submittedSignature = row?._rowSignature;
     if (rowSignature && submittedSignature?.dataUrl) {
-      rowBottom = addPdfFieldAt(doc, rowSignatureLabel, submittedSignature.signedAt ? `Signed at ${submittedSignature.signedAt}` : "Signature captured", pageLeft + padding, rowBottom + 4, pageWidth - padding * 2);
-      rowBottom = addPdfImageAt(doc, submittedSignature.dataUrl, "", pageLeft + padding, rowBottom, Math.min(pageWidth - padding * 2, 280), 110);
+      const signatureColumnIndex = pdfColumnIndex(rowSignatureChild?.sectionColumn, columns, rtl);
+      const signatureX = pageLeft + padding + signatureColumnIndex * (columnWidth + columnGap);
+      columnY[signatureColumnIndex] = addPdfSignatureAt(
+        doc,
+        rowSignatureLabel,
+        submittedSignature.dataUrl,
+        signatureX,
+        columnY[signatureColumnIndex],
+        columnWidth - padding,
+        rtl
+      );
+      rowBottom = Math.max(...columnY, cursorY);
     }
 
     const cardBottom = rowBottom + padding;
@@ -2541,6 +2759,127 @@ function renderPdfRepeatGroup({
   });
 }
 
+function recordsListPdfSchemaContext(formSecurity, groupKey) {
+  const config = normalizeSubmissionPdfConfig(formSecurity);
+  const schema = Array.isArray(config.schema) ? config.schema : [];
+  const group = schema.find((item) =>
+    String(item?.type || "") === "repeatGroup" &&
+    String(item?.fieldKey || "").trim() === String(groupKey || "").trim()
+  ) || null;
+  const parentElementId = String(group?.elementId || "").trim();
+  const children = parentElementId
+    ? schema
+      .filter((item) => String(item?.parentElementId || "").trim() === parentElementId)
+      .sort((left, right) => Number(left?.order || 0) - Number(right?.order || 0))
+    : [];
+  return { config, group, children };
+}
+
+async function buildRecordsListRowSignaturePdfBuffer({
+  formSecurity,
+  groupKey,
+  row,
+  rowIndex,
+  submittedSignature,
+  submittedAt,
+  event
+}) {
+  const { config, group, children } = recordsListPdfSchemaContext(formSecurity, groupKey);
+  const rtl = config.rtlEnabled === true;
+  const groupLabel = String(group?.label || groupKey || "Record").trim();
+  const title = `${groupLabel} - Row ${rowIndex + 1}`;
+  const doc = new PDFDocument({
+    size: "A4",
+    margin: 48,
+    info: {
+      Title: title,
+      Subject: "TwinaForms signed records-list row"
+    }
+  });
+  configurePdfFonts(doc);
+
+  const titleText = preparePdfText(title, rtl);
+  usePdfFont(doc, titleText).fontSize(18).fillColor("#102a43").text(titleText, pdfTextOptions(500, rtl));
+  doc.moveDown(0.3);
+  const submittedText = `Submitted: ${submittedAt || new Date().toISOString()}`;
+  usePdfFont(doc, submittedText).fontSize(9).fillColor("#627d98").text(submittedText, pdfTextOptions(500, rtl));
+  const clientIp = getClientIp(event);
+  const userAgent = getUserAgent(event);
+  if (clientIp) {
+    const ipText = `IP Address: ${clientIp}`;
+    usePdfFont(doc, ipText).fontSize(9).fillColor("#627d98").text(ipText, pdfTextOptions(500, rtl));
+  }
+  if (userAgent) {
+    const browserText = `Browser: ${parseBrowserForDisplay(userAgent)}`;
+    usePdfFont(doc, browserText).fontSize(9).fillColor("#627d98").text(browserText, pdfTextOptions(500, rtl));
+  }
+  doc.moveDown(0.8);
+
+  const pageLeft = doc.page.margins.left;
+  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const padding = 14;
+  const sectionTop = doc.y;
+  const columns = Math.min(Math.max(Number.parseInt(String(group?.columns || 2), 10) || 2, 1), 10);
+  const columnGap = 14;
+  const columnWidth = (pageWidth - padding * 2 - columnGap * (columns - 1)) / columns;
+  const columnY = Array.from({ length: columns }, () => sectionTop + padding);
+
+  for (const child of children) {
+    if (isPdfContainer(child) || isPdfDisplayText(child) || ["fileUpload", "signature"].includes(String(child?.type || "")) || isPdfHiddenItem(child)) {
+      continue;
+    }
+    const fieldKey = String(child?.fieldKey || "").trim();
+    if (!fieldKey) {
+      continue;
+    }
+    const rawValue = row?.[fieldKey];
+    if (!config.includeEmptyFields && pdfValueIsEmpty(rawValue)) {
+      continue;
+    }
+    const value = formatPdfRowValue(child, rawValue);
+    if (!config.includeEmptyFields && !value) {
+      continue;
+    }
+    const columnIndex = pdfColumnIndex(child?.sectionColumn, columns, rtl);
+    const x = pageLeft + padding + columnIndex * (columnWidth + columnGap);
+    columnY[columnIndex] = addPdfFieldAt(
+      doc,
+      child.label || fieldKey,
+      value,
+      x,
+      columnY[columnIndex],
+      columnWidth,
+      rtl
+    );
+  }
+
+  const signatureChild = children.find((child) => String(child?.type || "") === "signature");
+  const signatureLabel = String(signatureChild?.label || group?.rowSignature?.label || "Signature").trim() || "Signature";
+  if (submittedSignature?.dataUrl) {
+    const signatureColumnIndex = pdfColumnIndex(signatureChild?.sectionColumn, columns, rtl);
+    const signatureX = pageLeft + padding + signatureColumnIndex * (columnWidth + columnGap);
+    columnY[signatureColumnIndex] = addPdfSignatureAt(
+      doc,
+      signatureLabel,
+      submittedSignature.dataUrl,
+      signatureX,
+      columnY[signatureColumnIndex],
+      columnWidth,
+      rtl
+    );
+  }
+
+  const sectionBottom = Math.max(...columnY, sectionTop + padding) + padding;
+  doc.save();
+  doc.roundedRect(pageLeft, sectionTop, pageWidth, sectionBottom - sectionTop, 8)
+    .strokeColor("#c9d8ea")
+    .lineWidth(0.8)
+    .stroke();
+  doc.restore();
+
+  return pdfDocumentToBuffer(doc);
+}
+
 function renderPdfSection({
   doc,
   container,
@@ -2550,7 +2889,8 @@ function renderPdfSection({
   finalizedFiles,
   finalizedSignatures,
   finalizedRowSignatures,
-  includeEmptyFields
+  includeEmptyFields,
+  rtl
 }) {
   if (String(container?.type || "") === "repeatGroup") {
     renderPdfRepeatGroup({
@@ -2559,7 +2899,8 @@ function renderPdfSection({
       children,
       inputPayload,
       finalizedRowSignatures,
-      includeEmptyFields
+      includeEmptyFields,
+      rtl
     });
     return;
   }
@@ -2576,11 +2917,12 @@ function renderPdfSection({
   let cursorY = sectionTop + padding;
 
   if (title) {
-    doc.fontSize(11).fillColor("#102a43").text(title, sectionX + padding, cursorY, { width: sectionWidth - padding * 2 });
+    const titleText = preparePdfText(title, rtl);
+    usePdfFont(doc, titleText).fontSize(11).fillColor("#102a43").text(titleText, sectionX + padding, cursorY, pdfTextOptions(sectionWidth - padding * 2, rtl));
     cursorY += 20;
   }
   if (container?.text && String(container.text).trim() && String(container.text).trim() !== "Section description") {
-    cursorY = addPdfDisplayTextAt(doc, container.text, sectionX + padding, cursorY, sectionWidth - padding * 2);
+    cursorY = addPdfDisplayTextAt(doc, container.text, sectionX + padding, cursorY, sectionWidth - padding * 2, rtl);
   }
 
   const columns = Math.min(Math.max(Number.parseInt(String(container?.columns || 2), 10) || 2, 1), 10);
@@ -2600,7 +2942,8 @@ function renderPdfSection({
         finalizedFiles,
         finalizedSignatures,
         finalizedRowSignatures,
-        includeEmptyFields
+        includeEmptyFields,
+        rtl
       });
       const next = doc.y;
       for (let index = 0; index < columnY.length; index += 1) {
@@ -2609,7 +2952,10 @@ function renderPdfSection({
       continue;
     }
 
-    const columnIndex = clampPdfColumn(child?.sectionColumn, columns) - 1;
+    if (isPdfHiddenItem(child)) {
+      continue;
+    }
+    const columnIndex = pdfColumnIndex(child?.sectionColumn, columns, rtl);
     const x = sectionX + padding + columnIndex * (columnWidth + columnGap);
     columnY[columnIndex] = renderPdfSchemaItemAt({
       doc,
@@ -2620,7 +2966,8 @@ function renderPdfSection({
       inputPayload,
       finalizedFiles,
       finalizedSignatures,
-      includeEmptyFields
+      includeEmptyFields,
+      rtl
     });
   }
 
@@ -2654,17 +3001,23 @@ async function buildSubmissionPdfBuffer({
       Subject: "TwinaForms submitted response"
     }
   });
+  configurePdfFonts(doc);
 
-  doc.fontSize(18).fillColor("#102a43").text(config.title, { width: 500 });
+  const rtl = config.rtlEnabled === true;
+  const titleText = preparePdfText(config.title, rtl);
+  usePdfFont(doc, titleText).fontSize(18).fillColor("#102a43").text(titleText, pdfTextOptions(500, rtl));
   doc.moveDown(0.3);
-  doc.fontSize(9).fillColor("#627d98").text(`Submitted: ${submittedAt || new Date().toISOString()}`);
+  const submittedText = `Submitted: ${submittedAt || new Date().toISOString()}`;
+  usePdfFont(doc, submittedText).fontSize(9).fillColor("#627d98").text(submittedText, pdfTextOptions(500, rtl));
   const clientIp = getClientIp(event);
   const userAgent = getUserAgent(event);
   if (clientIp) {
-    doc.fontSize(9).fillColor("#627d98").text(`IP Address: ${clientIp}`);
+    const ipText = `IP Address: ${clientIp}`;
+    usePdfFont(doc, ipText).fontSize(9).fillColor("#627d98").text(ipText, pdfTextOptions(500, rtl));
   }
   if (userAgent) {
-    doc.fontSize(9).fillColor("#627d98").text(`Browser: ${parseBrowserForDisplay(userAgent)}`);
+    const browserText = `Browser: ${parseBrowserForDisplay(userAgent)}`;
+    usePdfFont(doc, browserText).fontSize(9).fillColor("#627d98").text(browserText, pdfTextOptions(500, rtl));
   }
   doc.moveDown(0.5);
 
@@ -2681,8 +3034,12 @@ async function buildSubmissionPdfBuffer({
         finalizedFiles,
         finalizedSignatures,
         finalizedRowSignatures,
-        includeEmptyFields: config.includeEmptyFields
+        includeEmptyFields: config.includeEmptyFields,
+        rtl
       });
+      continue;
+    }
+    if (isPdfHiddenItem(schemaItem)) {
       continue;
     }
 
@@ -2698,7 +3055,8 @@ async function buildSubmissionPdfBuffer({
       inputPayload,
       finalizedFiles,
       finalizedSignatures,
-      includeEmptyFields: config.includeEmptyFields
+      includeEmptyFields: config.includeEmptyFields,
+      rtl
     });
     doc.y = nextY;
   }
@@ -2738,9 +3096,15 @@ async function finalizeSubmissionPdf({
     };
   }
 
-  const targetRecordId = resolveUploadTargetRecordId(config.targetSubmitActionKey, results);
+  let targetRecordId = resolveUploadTargetRecordId(config.targetSubmitActionKey, results);
+  if (!targetRecordId && !config.targetSubmitActionKey) {
+    targetRecordId = extractPrimaryRecordId(results);
+  }
   if (!targetRecordId) {
-    throw buildFailureError("No saved record was available for the Submission PDF.", 400, "mapping");
+    const targetMessage = config.targetSubmitActionKey
+      ? `No saved record was available for the Submission PDF target action '${config.targetSubmitActionKey}'.`
+      : "No saved record was available for the Submission PDF.";
+    throw buildFailureError(targetMessage, 400, "mapping");
   }
 
   const pdfBuffer = await buildSubmissionPdfBuffer({
@@ -2875,6 +3239,9 @@ function buildFindOneSoql(command, resolvedWhere) {
   const fieldsToReturn = Array.isArray(command.fieldsToReturn) && command.fieldsToReturn.length > 0
     ? command.fieldsToReturn
     : ["Id"];
+  if (!fieldsToReturn.some((fieldName) => String(fieldName || "").trim().toLowerCase() === "id")) {
+    fieldsToReturn.unshift("Id");
+  }
 
   const whereClause = command.whereClause
     ? interpolateWhereClause(command.whereClause, resolvedWhere)
@@ -3138,6 +3505,13 @@ export const handler = async (event) => {
         throw buildFailureError("Survey Fields are not available for this tenant.", 403, "validation");
       }
     }
+    if (formUsesLocationFields(formSecurity)) {
+      const planDefinition = await getPlanDefinition(tenantRecord?.planCode);
+      const effectiveFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, planDefinition);
+      if (effectiveFeatureFlags.enableProLocationFields !== true) {
+        throw buildFailureError("Country / State / City is not available for this tenant.", 403, "validation");
+      }
+    }
     const secret = await getSecret(getSalesforceConnectionSecretName(formSecurity.orgId));
     assertSecret(secret);
     const loginBaseUrl = tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com";
@@ -3296,7 +3670,7 @@ export const handler = async (event) => {
           commandKey: command.commandKey || null,
           type: command.type,
           objectApiName: result.objectApiName || null,
-          id: result.id || null,
+          id: result.id || result.record?.Id || null,
           found: result.type === "findOne" ? !!result.record : undefined,
           repeatGroupKey: result.repeatGroupKey || null,
           processedCount: result.processedCount,
@@ -3395,6 +3769,8 @@ export const handler = async (event) => {
       formSecurity,
       inputPayload,
       results,
+      submittedAt,
+      event,
       sf: {
         instanceUrl: secret.instance_url,
         accessToken

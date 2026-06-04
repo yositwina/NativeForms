@@ -27,8 +27,9 @@ $items = @(
         enableProLoadFile = @{ BOOL = $false }
         enableProElectronicSignature = @{ BOOL = $false }
         enableProSubmissionPdf = @{ BOOL = $false }
-        enableProRecordsListRowSignaturePdf = @{ BOOL = $false }
+        enableProMergedDocument = @{ BOOL = $false }
         enableProSurveyFields = @{ BOOL = $false }
+        enableProLocationFields = @{ BOOL = $false }
         enableProCustomJs = @{ BOOL = $false }
         enableDetailedSubmissionLogs = @{ BOOL = $false }
       }
@@ -63,8 +64,9 @@ $items = @(
         enableProLoadFile = @{ BOOL = $true }
         enableProElectronicSignature = @{ BOOL = $true }
         enableProSubmissionPdf = @{ BOOL = $true }
-        enableProRecordsListRowSignaturePdf = @{ BOOL = $true }
+        enableProMergedDocument = @{ BOOL = $true }
         enableProSurveyFields = @{ BOOL = $true }
+        enableProLocationFields = @{ BOOL = $true }
         enableProCustomJs = @{ BOOL = $true }
         enableDetailedSubmissionLogs = @{ BOOL = $true }
       }
@@ -99,8 +101,9 @@ $items = @(
         enableProLoadFile = @{ BOOL = $false }
         enableProElectronicSignature = @{ BOOL = $false }
         enableProSubmissionPdf = @{ BOOL = $false }
-        enableProRecordsListRowSignaturePdf = @{ BOOL = $false }
+        enableProMergedDocument = @{ BOOL = $false }
         enableProSurveyFields = @{ BOOL = $false }
+        enableProLocationFields = @{ BOOL = $false }
         enableProCustomJs = @{ BOOL = $false }
         enableDetailedSubmissionLogs = @{ BOOL = $true }
       }
@@ -135,8 +138,9 @@ $items = @(
         enableProLoadFile = @{ BOOL = $true }
         enableProElectronicSignature = @{ BOOL = $true }
         enableProSubmissionPdf = @{ BOOL = $true }
-        enableProRecordsListRowSignaturePdf = @{ BOOL = $true }
+        enableProMergedDocument = @{ BOOL = $true }
         enableProSurveyFields = @{ BOOL = $true }
+        enableProLocationFields = @{ BOOL = $true }
         enableProCustomJs = @{ BOOL = $true }
         enableDetailedSubmissionLogs = @{ BOOL = $true }
       }

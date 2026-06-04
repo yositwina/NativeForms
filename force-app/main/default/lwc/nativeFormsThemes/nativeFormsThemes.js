@@ -8,6 +8,9 @@ import deleteTheme from '@salesforce/apex/NativeFormsThemesController.deleteThem
 import uploadLogo from '@salesforce/apex/NativeFormsThemesController.uploadLogo';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
+const MAX_EMBEDDED_IMAGE_BYTES = 69 * 1024;
+const MAX_EMBEDDED_IMAGE_LABEL = '69 KB';
+
 export default class NativeFormsThemes extends LightningElement {
     isLoading = true;
     errorMessage = '';
@@ -312,6 +315,10 @@ export default class NativeFormsThemes extends LightningElement {
         if (!file || !this.selectedThemeId) {
             return;
         }
+        if (!this.validateEmbeddedImageFile(file, 'Logo image')) {
+            event.target.value = null;
+            return;
+        }
         this.isLoading = true;
         try {
             const base64Data = await this.readFileAsBase64(file);
@@ -354,6 +361,18 @@ export default class NativeFormsThemes extends LightningElement {
             reader.onerror = () => reject(new Error('Could not read the selected logo file.'));
             reader.readAsDataURL(file);
         });
+    }
+
+    validateEmbeddedImageFile(file, label = 'Image') {
+        if (!file) {
+            return false;
+        }
+        if (file.size > MAX_EMBEDDED_IMAGE_BYTES) {
+            this.errorMessage = `${label} is too large. Please upload an optimized image under ${MAX_EMBEDDED_IMAGE_LABEL}.`;
+            this.showToast('Image too large', `Please upload an optimized image under ${MAX_EMBEDDED_IMAGE_LABEL}.`, 'error');
+            return false;
+        }
+        return true;
     }
 
     normalizeError(error) {

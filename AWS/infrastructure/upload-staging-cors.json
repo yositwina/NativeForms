@@ -1,0 +1,19 @@
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": [
+        "*"
+      ],
+      "AllowedMethods": [
+        "PUT"
+      ],
+      "AllowedOrigins": [
+        "https://forms.twinaforms.com"
+      ],
+      "ExposeHeaders": [
+        "ETag"
+      ],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}

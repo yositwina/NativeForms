@@ -1,4 +1,6 @@
 public with sharing class NativeFormsThemesController {
+    private static final Integer MAX_EMBEDDED_IMAGE_BYTES = 70656;
+
     public class ThemeOption {
         @AuraEnabled public Id value { get; set; }
         @AuraEnabled public String label { get; set; }
@@ -229,11 +231,15 @@ public with sharing class NativeFormsThemesController {
         if (String.isBlank(fileName) || String.isBlank(base64Data)) {
             throw new AuraHandledException('Choose an image file first.');
         }
+        Blob imageBlob = EncodingUtil.base64Decode(base64Data);
+        if (imageBlob.size() > MAX_EMBEDDED_IMAGE_BYTES) {
+            throw new AuraHandledException('Logo image is too large. Please upload an optimized image under 69 KB.');
+        }
 
         ContentVersion versionRecord = new ContentVersion(
             Title = titleFromFileName(fileName),
             PathOnClient = fileName,
-            VersionData = EncodingUtil.base64Decode(base64Data),
+            VersionData = imageBlob,
             FirstPublishLocationId = themeId
         );
         insert as user versionRecord;

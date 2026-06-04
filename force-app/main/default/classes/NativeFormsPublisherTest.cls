@@ -95,9 +95,10 @@ private class NativeFormsPublisherTest {
             'enableProLoadFile' => true,
             'enableProElectronicSignature' => true,
             'enableProSubmissionPdf' => true,
-            'enableProRecordsListRowSignaturePdf' => true,
             'enableProSurveyFields' => true,
-            'enableProCustomJs' => true
+            'enableProCustomJs' => true,
+            'enableProButtonElements' => true,
+            'enableProMergedDocument' => true
         };
         snapshot.effectiveLimits = new Map<String, Object>{
             'maxForms' => 1000,
@@ -160,6 +161,97 @@ private class NativeFormsPublisherTest {
             NativeFormsPublisher.buildInternalFormId(UserInfo.getOrganizationId().substring(0, 15), readonlyVersion.Form__c).startsWith('nf-'),
             'Internal form ids should use the native publish prefix.'
         );
+
+        NativeFormsTenantEntitlements.EntitlementSnapshot starterSnapshot = buildProEntitlementsSnapshot();
+        starterSnapshot.planCode = 'starter';
+        starterSnapshot.effectiveFeatureFlags.put('enableProMergedDocument', false);
+        NativeFormsTenantEntitlements.setCachedSnapshot(starterSnapshot);
+        NF_Form_Version__c mergedDocumentBlockedVersion = createBaseVersion(
+            'Blocked Merged Document Form',
+            'blocked-merged-document-form',
+            'Draft',
+            'Never Published',
+            false,
+            NativeFormsTestConfigFactory.basicUiSettingsJson()
+        );
+        NativeFormsTestDataFactory.createElement(
+            mergedDocumentBlockedVersion.Id,
+            'mergedDocument',
+            'Merged Document',
+            'mergedDocument1',
+            1,
+            10,
+            json(new Map<String, Object>{ 'html' => '<p>{{Contact.FirstName}}</p>' }),
+            null
+        );
+        NativeFormsPublisher.PublishResult mergedDocumentBlockedResult = NativeFormsPublisher.publishVersion(mergedDocumentBlockedVersion.Id);
+        System.assertEquals(false, mergedDocumentBlockedResult.success, 'Merged Document should be blocked when the plan flag is disabled.');
+        System.assertEquals('Merged Document is not available on your current TwinaForms plan.', mergedDocumentBlockedResult.message);
+
+        setAllProFlagsEnabled();
+        NF_Form_Version__c brokenRowSignatureVersion = createBaseVersion(
+            'Broken Row Signature Form',
+            'broken-row-signature-form',
+            'Draft',
+            'Never Published',
+            false,
+            NativeFormsTestConfigFactory.basicUiSettingsJson()
+        );
+        NF_Form_Element__c brokenRecordsList = NativeFormsTestDataFactory.createElement(
+            brokenRowSignatureVersion.Id,
+            'repeatGroup',
+            'Timesheets',
+            'timesheets',
+            1,
+            10,
+            json(new Map<String, Object>{
+                'allowAddRows' => true,
+                'columns' => 2
+            }),
+            null
+        );
+        NativeFormsTestDataFactory.createElement(
+            brokenRowSignatureVersion.Id,
+            'signature',
+            'Row Signature',
+            'rowSignature',
+            2,
+            20,
+            json(new Map<String, Object>{
+                'labelPosition' => 'above',
+                'attachToRowRecord' => true
+            }),
+            brokenRecordsList.Element_Id__c
+        );
+        NativeFormsTestDataFactory.createAction(
+            brokenRowSignatureVersion.Id,
+            'Submit',
+            'Contact',
+            'submitContact',
+            'savedContact',
+            'findAndUpdate',
+            10,
+            json(new Map<String, Object>{
+                'conditions' => new List<Object>{
+                    new Map<String, Object>{
+                        'fieldApiName' => 'Email',
+                        'operator' => 'eq',
+                        'valueSource' => 'fixed',
+                        'valueText' => 'nobody@example.com'
+                    }
+                },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1',
+                'onNotFound' => 'error'
+            })
+        );
+
+        NativeFormsPublisher.PublishResult brokenRowSignatureResult = NativeFormsPublisher.publishVersion(brokenRowSignatureVersion.Id);
+        System.assertEquals(false, brokenRowSignatureResult.success, 'Row signature attachment should require a records-list save action.');
+        System.assert(
+            brokenRowSignatureResult.message.contains('Save records list'),
+            'Guard message should explain that a Records List save action is required.'
+        );
         }
     }
 
@@ -188,8 +280,11 @@ private class NativeFormsPublisherTest {
         System.assertEquals(1, mock.uploadCalls, 'Publish should upload the generated HTML exactly once.');
         System.assertEquals(1, mock.registerCalls, 'Publish should register the published form exactly once.');
         System.assert(String.isNotBlank(mock.uploadedHtml), 'Successful publish should upload generated HTML.');
-        System.assert(mock.uploadedHtml.contains('nf-secret-verify'), 'Generated HTML should include the secret-code verification section when enabled.');
+        System.assert(mock.uploadedHtml.contains('nf-secret-verify'), 'Generated HTML should include the User Verification section when enabled.');
         System.assert(mock.uploadedHtml.contains('data-formula-target="true"'), 'Generated HTML should include formula metadata for formula fields.');
+        System.assert(mock.uploadedHtml.contains('uploadStatusUrl'), 'Generated HTML should publish the upload scan status endpoint.');
+        System.assert(mock.uploadedHtml.contains('waitForSafeUpload'), 'Generated HTML should wait for malware scan completion before accepting uploaded files.');
+        System.assert(mock.uploadedHtml.contains('Uploaded files are checked for safety'), 'Generated HTML should explain that uploaded files are checked before attachment.');
         System.assert(mock.uploadedHtml.contains('postSubmitUrlMode'), 'Generated HTML should include the post-submit redirect URL mode.');
         System.assert(mock.uploadedHtml.contains('postSubmitUrlFormula'), 'Generated HTML should include the post-submit redirect formula setting.');
         System.assert(mock.uploadedHtml.contains('resolveFormulaPostSubmitUrl'), 'Generated HTML should include formula redirect resolution.');
@@ -197,9 +292,20 @@ private class NativeFormsPublisherTest {
         System.assert(mock.uploadedHtml.contains('data-nativeforms-time="true"'), 'Generated HTML should render Time fields as TwinaForms-controlled text inputs.');
         System.assert(mock.uploadedHtml.contains('data-time-format="24h"'), 'Generated HTML should include the configured Time display format.');
         System.assert(mock.uploadedHtml.contains('value="09:30"'), 'Generated HTML should keep plain HH:mm default values for Time fields.');
+        System.assert(mock.uploadedHtml.contains('salesforceTimeMatch'), 'Generated HTML should normalize Salesforce Time prefill values with seconds or milliseconds.');
+        System.assert(!mock.uploadedHtml.contains('maxlength="254"'), 'Generated HTML should warn and validate textarea character limits without hard-blocking typing.');
+        System.assert(mock.uploadedHtml.contains('data-character-limit="254"'), 'Generated HTML should include textarea character limit metadata.');
+        System.assert(mock.uploadedHtml.contains('data-character-counter="true"'), 'Generated HTML should show a textarea character counter.');
         System.assert(mock.uploadedHtml.contains('data-nativeforms-multi-checkbox="true"'), 'Generated HTML should render Multi Checkbox options as checkbox controls.');
         System.assert(mock.uploadedHtml.contains('readMultiCheckboxValue'), 'Generated HTML should collect Multi Checkbox values as semicolon strings.');
         System.assert(mock.uploadedHtml.contains('validateMultiCheckboxGroups()'), 'Generated HTML should validate required Multi Checkbox groups before submit.');
+        System.assert(mock.uploadedHtml.contains('<span>★★★★★</span>'), 'Generated HTML should render 1-5 Star Rating labels as star icons.');
+        System.assert(!mock.uploadedHtml.contains('<span>stars 5</span>'), 'Generated HTML should not expose the stored star option text label.');
+        System.assert(mock.uploadedHtml.contains('data-lookup-input="true"'), 'Generated HTML should render the visible Lookup input.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-lookup="true" data-lookup-field-key="accountId" data-lookup-required="false" data-lookup-min-length="2" data-lock-on-prefill="true"'), 'Locked Lookup fields should mark the compound lookup control for runtime locking.');
+        System.assert(mock.uploadedHtml.contains('lookupEl.dataset.lookupLocked=hasLookupValue?"true":"false"'), 'Locked Lookup fields should lock the compound lookup control after prefill.');
+        System.assert(mock.uploadedHtml.contains('input.readOnly=hasLookupValue'), 'Locked Lookup fields should make the visible lookup input read-only after prefill.');
+        System.assert(mock.uploadedHtml.contains('clear.disabled=hasLookupValue'), 'Locked Lookup fields should disable the clear button after prefill.');
         System.assert(mock.uploadedHtml.contains('https://example.com/theme-logo.png'), 'Generated HTML should include the theme logo URL.');
         System.assert(mock.uploadedHtml.contains('https://twinaforms.com/help/formulas'), 'Generated HTML should preserve rich text links.');
         System.assert(mock.uploadedHtml.contains('data:image/png;base64,'), 'Generated HTML should inline image assets when contentVersionId is present.');
@@ -212,6 +318,12 @@ private class NativeFormsPublisherTest {
         System.assert(mock.uploadedHtml.contains('data-nativeforms-row-signature="true"'), 'Generated HTML should render records-list row signature pads.');
         System.assert(mock.uploadedHtml.contains('validateRepeatRowSignatures()'), 'Generated HTML should validate required row signatures before submit.');
         System.assert(mock.uploadedHtml.contains('_rowSignature'), 'Generated HTML should collect row signature payloads per records-list row.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-button="true"'), 'Generated HTML should render Portal Buttons as action controls.');
+        System.assert(mock.uploadedHtml.contains('activeButtonNavigationUrl'), 'Generated HTML should support submit-before-navigation destination precedence.');
+        System.assert(mock.uploadedHtml.contains('{{row.caseId}}'), 'Records List Buttons should publish explicit row-scoped navigation tokens.');
+        System.assert(mock.uploadedHtml.contains('data-merged-document-template'), 'Generated HTML should render Merged Document template metadata.');
+        System.assert(mock.uploadedHtml.contains('resolveMergedDocumentHtml'), 'Generated HTML should include Merged Document runtime resolution.');
+        System.assert(mock.uploadedHtml.contains('{{PrefilAccount.Name}}'), 'Generated HTML should preserve Merged Document alias tokens for runtime resolution.');
         System.assert(mock.uploadedHtml.contains('.nf-section__grid--10{grid-template-columns:repeat(10,minmax(0,1fr));}'), 'Generated HTML should support section grids up to 10 columns.');
         System.assert(mock.uploadedHtml.contains('nf-repeat--has-header'), 'Records List should support table-header label mode on desktop.');
         System.assert(mock.uploadedHtml.contains('nf-repeat-mobile-label'), 'Records List header mode should keep row labels available for mobile.');
@@ -229,12 +341,15 @@ private class NativeFormsPublisherTest {
         System.assert(String.isNotBlank(String.valueOf(captcha.get('siteKey'))), 'Register payload should include the shared CAPTCHA site key.');
 
         Map<String, Object> secretCodeConfig = (Map<String, Object>) registerPayload.get('secretCodeConfig');
-        System.assertEquals(true, secretCodeConfig.get('enabled'), 'Register payload should include secret-code settings when enabled.');
-        System.assertEquals('Email', String.valueOf(secretCodeConfig.get('matchField')), 'Register payload should preserve the configured secret-code match field.');
-        System.assertEquals('short', String.valueOf(secretCodeConfig.get('sessionMode')), 'Secret-code sessions should default to short mode.');
+        System.assertEquals(true, secretCodeConfig.get('enabled'), 'Register payload should include User Verification settings when enabled.');
+        System.assertEquals('Email', String.valueOf(secretCodeConfig.get('matchField')), 'Register payload should preserve the configured User Verification match field.');
+        System.assertEquals('short', String.valueOf(secretCodeConfig.get('sessionMode')), 'User Verification sessions should default to short mode.');
         Map<String, Object> submissionPdfConfig = (Map<String, Object>) registerPayload.get('submissionPdf');
+        System.assertEquals(true, submissionPdfConfig.get('rtlEnabled'), 'Submission PDF config should preserve the form RTL setting.');
         List<Object> submissionPdfSchema = (List<Object>) submissionPdfConfig.get('schema');
         Boolean foundMultiCheckboxSchema = false;
+        Boolean foundHiddenCaseIdSchema = false;
+        Boolean foundMergedDocumentSchema = false;
         for (Object schemaValue : submissionPdfSchema) {
             Map<String, Object> schemaItem = (Map<String, Object>) schemaValue;
             if (String.valueOf(schemaItem.get('fieldKey')) == 'needs1') {
@@ -242,8 +357,17 @@ private class NativeFormsPublisherTest {
                 System.assertEquals('multiCheckbox', String.valueOf(schemaItem.get('type')), 'Submission PDF schema should preserve Multi Checkbox type.');
                 System.assertEquals(2, ((List<Object>) schemaItem.get('options')).size(), 'Submission PDF schema should include Multi Checkbox option labels.');
             }
+            if (String.valueOf(schemaItem.get('type')) == 'mergedDocument') {
+                foundMergedDocumentSchema = true;
+                System.assert(String.valueOf(schemaItem.get('text')).contains('{{PrefilAccount.Name}}'), 'Submission PDF schema should preserve Merged Document token text for runtime resolution.');
+            }
+            if (String.valueOf(schemaItem.get('fieldKey')) == 'caseId') {
+                foundHiddenCaseIdSchema = true;
+            }
         }
         System.assertEquals(true, foundMultiCheckboxSchema, 'Submission PDF schema should include top-level Multi Checkbox fields.');
+        System.assertEquals(true, foundMergedDocumentSchema, 'Submission PDF schema should include Merged Document fields.');
+        System.assertEquals(false, foundHiddenCaseIdSchema, 'Submission PDF schema should exclude fields with hidden behavior.');
 
         List<Object> uploadFields = (List<Object>) registerPayload.get('uploadFields');
         System.assertEquals(1, uploadFields.size(), 'Register payload should expose upload field metadata for file-upload controls.');
@@ -257,13 +381,23 @@ private class NativeFormsPublisherTest {
         System.assertEquals(true, rowSignatureConfig.get('attachToRowRecord'), 'Row signature config should preserve child-row file attachment mode.');
 
         Map<String, Object> prefillDefinition = (Map<String, Object>) registerPayload.get('prefillDefinition');
-        System.assertEquals(1, ((List<Object>) prefillDefinition.get('commands')).size(), 'Prefill definition should include the configured prefill command.');
+        List<Object> prefillCommands = (List<Object>) prefillDefinition.get('commands');
+        System.assertEquals(2, prefillCommands.size(), 'Prefill definition should include field and Merged Document alias references.');
+        Boolean foundMergedDocumentPrefillAlias = false;
+        for (Object prefillCommandValue : prefillCommands) {
+            Map<String, Object> prefillCommand = (Map<String, Object>) prefillCommandValue;
+            if (String.valueOf(prefillCommand.get('storeResultAs')) == 'PrefilAccount') {
+                foundMergedDocumentPrefillAlias = true;
+            }
+        }
+        System.assertEquals(true, foundMergedDocumentPrefillAlias, 'Merged Document tokens should keep their referenced prefill aliases.');
 
         Map<String, Object> submitDefinition = (Map<String, Object>) registerPayload.get('submitDefinition');
         List<Object> submitCommands = (List<Object>) submitDefinition.get('commands');
-        System.assertEquals(4, submitCommands.size(), 'Submit definition should expand find-and-update and records-list commands.');
+        System.assertEquals(5, submitCommands.size(), 'Submit definition should include field-mapped commands plus the Submission PDF target action.');
         Map<String, Object> updateContactCommand;
         Map<String, Object> createContactCommand;
+        Map<String, Object> pdfTargetFindCommand;
         for (Object commandValue : submitCommands) {
             Map<String, Object> command = (Map<String, Object>) commandValue;
             if (String.valueOf(command.get('commandKey')) == 'submitAction1') {
@@ -272,7 +406,12 @@ private class NativeFormsPublisherTest {
             if (String.valueOf(command.get('commandKey')) == 'submitAction1_create') {
                 createContactCommand = command;
             }
+            if (String.valueOf(command.get('commandKey')) == 'submitAction3_find') {
+                pdfTargetFindCommand = command;
+            }
         }
+        System.assertNotEquals(null, pdfTargetFindCommand, 'Submission PDF target-only actions should publish their find command.');
+        System.assertEquals('SubmitPdfContact', String.valueOf(pdfTargetFindCommand.get('storeResultAs')), 'PDF target find command should preserve its result alias.');
         Map<String, Object> updateFields = (Map<String, Object>) updateContactCommand.get('fields');
         Map<String, Object> updateCreateOnlyFields = (Map<String, Object>) updateContactCommand.get('createOnlyFields');
         Map<String, Object> createFields = (Map<String, Object>) createContactCommand.get('fields');
@@ -332,8 +471,8 @@ private class NativeFormsPublisherTest {
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :successorDraft.Id
         ];
-        System.assertEquals(23, successorElementCount, 'Successor draft should clone all publishable elements.');
-        System.assertEquals(3, successorActionCount, 'Successor draft should clone all configured actions.');
+        System.assertEquals(28, successorElementCount, 'Successor draft should clone all publishable elements including Merged Document, survey fields, Portal Buttons, and row Signature.');
+        System.assertEquals(5, successorActionCount, 'Successor draft should clone all configured actions.');
         }
     }
 
@@ -396,6 +535,49 @@ private class NativeFormsPublisherTest {
         }
     }
 
+    @IsTest
+    static void publishLocalizesDefaultSignatureLabel() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllProFlagsEnabled();
+        PublisherCalloutMock mock = new PublisherCalloutMock();
+        Test.setMock(HttpCalloutMock.class, mock);
+
+        NF_Form_Version__c version = createBaseVersion(
+            'Hebrew Signature Form',
+            'hebrew-signature-form',
+            'Draft',
+            'Never Published',
+            false,
+            NativeFormsTestConfigFactory.json(new Map<String, Object>{
+                'languageCode' => 'he',
+                'rtlEnabled' => true,
+                'submitLabel' => '\u05E9\u05DC\u05D7',
+                'submitSuccessMessage' => '\u05D4\u05D8\u05D5\u05E4\u05E1 \u05E0\u05E9\u05DC\u05D7 \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4'
+            })
+        );
+        NativeFormsTestDataFactory.createElement(
+            version.Id,
+            'signature',
+            'Signature',
+            'signature1',
+            1,
+            10,
+            NativeFormsTestConfigFactory.signatureConfigJson(null),
+            null
+        );
+
+        Test.startTest();
+        NativeFormsPublisher.PublishResult result = NativeFormsPublisher.publishVersion(version.Id);
+        Test.stopTest();
+
+        System.assertEquals(true, result.success, 'Publish should succeed for a Hebrew signature form.');
+        System.assert(
+            mock.uploadedHtml.contains('<label for="signature1-canvas">\u05D7\u05EA\u05D9\u05DE\u05D4</label>'),
+            'Published HTML should localize the default Signature element label.'
+        );
+        }
+    }
+
     private static NF_Form_Version__c createBaseVersion(
         String descriptionValue,
         String formKey,
@@ -448,12 +630,13 @@ private class NativeFormsPublisherTest {
             'secretCodeVerifiedMessage' => 'Code verified.',
             'secretCodeSendButtonLabel' => 'Send Code',
             'secretCodeVerifyButtonLabel' => 'Verify Code',
-            'secretCodeResendButtonLabel' => 'Resend Code',
+            'secretCodeResendButtonLabel' => 'Resend Verification Number',
             'submissionPdfEnabled' => true,
             'submissionPdfAttachToRecord' => true,
-            'submissionPdfTargetSubmitActionKey' => 'submitAction1',
+            'submissionPdfTargetSubmitActionKey' => 'submitAction3',
             'submissionPdfTitle' => 'Submitted Response',
-            'submissionPdfIncludeEmptyFields' => true
+            'submissionPdfIncludeEmptyFields' => true,
+            'rtlEnabled' => true
         };
         NF_Form_Version__c versionRecord = createBaseVersion(
             'Rich Publish Form',
@@ -509,6 +692,28 @@ private class NativeFormsPublisherTest {
         );
         NativeFormsTestDataFactory.createAction(
             versionRecord.Id,
+            'Prefill',
+            'Account',
+            'prefillAction2',
+            'PrefilAccount',
+            'findOne',
+            15,
+            json(new Map<String, Object>{
+                'conditions' => new List<Object>{
+                    new Map<String, Object>{
+                        'fieldApiName' => 'Id',
+                        'operator' => 'eq',
+                        'valueSource' => 'param',
+                        'valueText' => 'accountId'
+                    }
+                },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1',
+                'onNotFound' => 'ignore'
+            })
+        );
+        NativeFormsTestDataFactory.createAction(
+            versionRecord.Id,
             'Submit',
             'Contact',
             'submitAction1',
@@ -545,6 +750,28 @@ private class NativeFormsPublisherTest {
                 'allowDelete' => true
             })
         );
+        NativeFormsTestDataFactory.createAction(
+            versionRecord.Id,
+            'Submit',
+            'Contact',
+            'submitAction3',
+            'SubmitPdfContact',
+            'findAndUpdate',
+            35,
+            json(new Map<String, Object>{
+                'conditions' => new List<Object>{
+                    new Map<String, Object>{
+                        'fieldApiName' => 'Email',
+                        'operator' => 'eq',
+                        'valueSource' => 'field',
+                        'valueText' => 'email1'
+                    }
+                },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1',
+                'onNotFound' => 'error'
+            })
+        );
 
         NF_Form_Element__c section = NativeFormsTestDataFactory.createElement(
             versionRecord.Id,
@@ -575,6 +802,7 @@ private class NativeFormsPublisherTest {
         );
 
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'heading', 'Display Text', 'displayText1', 3, 30, withSectionColumn(json(new Map<String, Object>{ 'html' => '<p><a href="https://twinaforms.com/help/formulas">Learn more</a></p>' }), 1), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'mergedDocument', 'Merged Document', 'mergedDocument1', 29, 35, withSectionColumn(json(new Map<String, Object>{ 'html' => '<p>I, {{PrefilContact.FirstName}} from {{PrefilAccount.Name}}, agree.</p>' }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'image', 'Hero Image', 'image1', 4, 40, withSectionColumn(json(new Map<String, Object>{ 'contentVersionId' => String.valueOf(imageVersion.Id), 'altText' => 'Hero image', 'imageFit' => 'center', 'imageWidthPercent' => 50 }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'email', 'Email', 'email1', 5, 50, withSectionColumn(fieldConfig('above', false, true, 'PrefilContact', 'Email', true, 'submitAction1', 'Email'), 1), groupElement.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'tel', 'Phone', 'phone1', 6, 60, withSectionColumn(fieldConfig('above', false, false, null, null, true, 'submitAction1', 'Phone'), 1), groupElement.Element_Id__c);
@@ -593,7 +821,7 @@ private class NativeFormsPublisherTest {
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'time', 'Start Time', 'time1', 19, 75, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'defaultValue' => '09:30', 'placeholder' => '19:00', 'timeFormat' => '24h' }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'checkbox', 'Accept Terms', 'checkbox1', 8, 80, withSectionColumn(NativeFormsTestConfigFactory.checkboxConfigJson(false), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'text', 'Formula Text', 'formulaText1', 9, 90, withSectionColumn(NativeFormsTestConfigFactory.formulaFieldConfigJson('IF({checkbox1} == true, "Yes", "No")'), 2), section.Element_Id__c);
-        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'textarea', 'Notes', 'notes1', 10, 100, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'rows' => 4 }), 1), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'textarea', 'Notes', 'notes1', 10, 100, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'rows' => 4, 'maxLength' => 254 }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'url', 'Website', 'website1', 11, 110, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'fieldBehavior' => 'editable', 'placeholderText' => 'https://example.com' }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'select', 'Priority', 'priority1', 12, 120, withSectionColumn(optionFieldConfig('above', selectOptions()), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'multiCheckbox', 'Needs', 'needs1', 23, 125, withSectionColumn(json(new Map<String, Object>{
@@ -610,8 +838,30 @@ private class NativeFormsPublisherTest {
             'submitFieldPath' => 'Needs__c'
         }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'radio', 'Title', 'title1', 13, 130, withSectionColumn(optionFieldConfig('above', radioOptions()), 2), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'radio', 'Satisfaction', 'rating1', 28, 135, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'fieldBehavior' => 'editable',
+            'presentation' => 'stars',
+            'options' => starRatingOptions(),
+            'defaultValue' => '5'
+        }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'fileUpload', 'Attachment', 'file1', 14, 140, withSectionColumn(json(new Map<String, Object>{ 'labelPosition' => 'above', 'allowMultiple' => true, 'allowedExtensions' => 'pdf,png', 'maxFileSizeMb' => 10, 'targetSubmitActionKey' => 'submitAction1' }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'signature', 'Signature', 'signature1', 21, 145, withSectionColumn(NativeFormsTestConfigFactory.signatureConfigJson('submitAction1'), 2), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'button', 'View Request', null, 25, 147, withSectionColumn(json(new Map<String, Object>{
+            'destinationType' => 'external',
+            'externalUrlMode' => 'template',
+            'externalUrlTemplate' => 'https://portal.example.com/request',
+            'externalUrlFormula' => '',
+            'queryParameters' => new List<Object>{
+                new Map<String, Object>{
+                    'name' => 'email',
+                    'valueMode' => 'template',
+                    'valueTemplate' => '{{field.email1}}',
+                    'valueFormula' => ''
+                }
+            },
+            'submitBeforeNavigation' => true
+        }), 1), section.Element_Id__c);
 
         NF_Form_Element__c repeatGroup = NativeFormsTestDataFactory.createElement(
             versionRecord.Id,
@@ -626,15 +876,19 @@ private class NativeFormsPublisherTest {
                 'repeatSourceAlias' => 'PrefilCase',
                 'allowAddRows' => true,
                 'allowDeleteRows' => true,
-                'showLabelsOnEachRow' => false,
-                'rowSignatureEnabled' => true,
-                'rowSignatureRequired' => true,
-                'rowSignatureLabel' => 'Row Signature',
-                'rowSignatureAttachToRowRecord' => true
+                'showLabelsOnEachRow' => false
             }),
             null
         );
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'text', 'Case Subject', 'subject', 16, 160, withSectionColumn(fieldConfig('above', false, true, 'PrefilCase', 'Subject', true, 'submitAction2', 'Subject'), 1), repeatGroup.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'signature', 'Row Signature', 'rowSignature', 27, 165, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'required' => true,
+            'helpText' => '',
+            'clearButtonLabel' => 'Clear',
+            'targetSubmitActionKey' => '',
+            'attachToRowRecord' => true
+        }), 2), repeatGroup.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'select', 'Case Priority', 'casePriority', 17, 170, withSectionColumn(json(new Map<String, Object>{
             'labelPosition' => 'above',
             'options' => selectOptions(),
@@ -665,6 +919,21 @@ private class NativeFormsPublisherTest {
             'submitEnabled' => true,
             'submitActionKey' => 'submitAction2',
             'submitFieldPath' => 'Id'
+        }), 2), repeatGroup.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'button', 'Open Case', null, 26, 190, withSectionColumn(json(new Map<String, Object>{
+            'destinationType' => 'external',
+            'externalUrlMode' => 'template',
+            'externalUrlTemplate' => 'https://portal.example.com/case',
+            'externalUrlFormula' => '',
+            'queryParameters' => new List<Object>{
+                new Map<String, Object>{
+                    'name' => 'caseId',
+                    'valueMode' => 'template',
+                    'valueTemplate' => '{{row.caseId}}',
+                    'valueFormula' => ''
+                }
+            },
+            'submitBeforeNavigation' => false
         }), 2), repeatGroup.Element_Id__c);
 
         return versionRecord;
@@ -728,6 +997,16 @@ private class NativeFormsPublisherTest {
         return new List<Object>{
             new Map<String, Object>{ 'label' => 'Mr.', 'value' => 'mr' },
             new Map<String, Object>{ 'label' => 'Ms.', 'value' => 'ms' }
+        };
+    }
+
+    private static List<Object> starRatingOptions() {
+        return new List<Object>{
+            new Map<String, Object>{ 'label' => 'star 1', 'value' => '1' },
+            new Map<String, Object>{ 'label' => 'stars 2', 'value' => '2' },
+            new Map<String, Object>{ 'label' => 'stars 3', 'value' => '3' },
+            new Map<String, Object>{ 'label' => 'stars 4', 'value' => '4' },
+            new Map<String, Object>{ 'label' => 'stars 5', 'value' => '5' }
         };
     }
 }

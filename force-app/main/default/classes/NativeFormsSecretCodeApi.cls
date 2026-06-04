@@ -154,7 +154,7 @@ global with sharing class NativeFormsSecretCodeApi {
 
         Map<String, Object> uiSettings = loadUiSettings(normalized.publishedVersionId);
         if (!booleanValue(uiSettings.get('secretCodeVerificationEnabled'))) {
-            throw buildHandledException('Secret code verification is not enabled for this form.', 403);
+            throw buildHandledException('User Verification is not enabled for this form.', 403);
         }
 
         return normalized;
@@ -242,7 +242,7 @@ global with sharing class NativeFormsSecretCodeApi {
     private static ResponsePayload errorResponse(String message) {
         ResponsePayload response = baseResponse();
         response.success = false;
-        response.message = String.isBlank(message) ? 'Secret code verification failed.' : message;
+        response.message = String.isBlank(message) ? 'User Verification failed.' : message;
         return response;
     }
 

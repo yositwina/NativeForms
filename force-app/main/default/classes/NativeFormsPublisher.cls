@@ -154,6 +154,11 @@ public with sharing class NativeFormsPublisher {
             result.message = 'Country / State / City is not available on your current TwinaForms plan.';
             return result;
         }
+        if (containsMergedDocumentElement(publishElements) && !NativeFormsFeatureFlags.isProMergedDocumentEnabled()) {
+            result.success = false;
+            result.message = 'Merged Document is not available on your current TwinaForms plan.';
+            return result;
+        }
         String locationPlacementError = validateLocationFieldPlacement(publishElements);
         if (String.isNotBlank(locationPlacementError)) {
             result.success = false;
@@ -378,6 +383,9 @@ public with sharing class NativeFormsPublisher {
                         referencedAliases.add(aliasValue);
                     }
                 }
+                if (elementRecord.Element_Type__c == 'mergedDocument') {
+                    referencedAliases.addAll(mergedDocumentAliasReferences(config));
+                }
             }
         }
 
@@ -398,6 +406,22 @@ public with sharing class NativeFormsPublisher {
             }
         }
         return filtered;
+    }
+
+    private static Set<String> mergedDocumentAliasReferences(Map<String, Object> config) {
+        Set<String> aliases = new Set<String>();
+        String html = stringValue(config == null ? null : config.get('html'));
+        if (String.isBlank(html)) {
+            html = stringValue(config == null ? null : config.get('text'));
+        }
+        if (String.isBlank(html)) {
+            return aliases;
+        }
+        Matcher matcher = Pattern.compile('\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*)\\.[A-Za-z][A-Za-z0-9_\\.]*\\s*\\}\\}').matcher(html);
+        while (matcher.find()) {
+            aliases.add(matcher.group(1));
+        }
+        return aliases;
     }
 
     private static Map<String, NF_Form_Element__c> elementsByElementId(List<NF_Form_Element__c> elements) {
@@ -554,6 +578,18 @@ public with sharing class NativeFormsPublisher {
     private static Boolean containsButtonElement(List<NF_Form_Element__c> elements) {
         for (NF_Form_Element__c elementRecord : elements) {
             if (elementRecord != null && elementRecord.Element_Type__c == 'button') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Boolean containsMergedDocumentElement(List<NF_Form_Element__c> elements) {
+        if (elements == null) {
+            return false;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null && elementRecord.Element_Type__c == 'mergedDocument') {
                 return true;
             }
         }
@@ -853,6 +889,7 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(aliasValue)) {
             return new List<String>(collectedFields);
         }
+        response.put('aliases.' + aliasValue, '{' + aliasValue + '}');
 
         Map<String, NF_Form_Element__c> recordsByElementId = elementsByElementId(elements);
 
@@ -1823,6 +1860,8 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-field--hidden > label{display:none;}';
         html += '.nf-field input,.nf-field textarea,.nf-field select{width:100%;padding:12px 14px;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);font:inherit;box-sizing:border-box;background:var(--nf-input-bg);color:var(--nf-text);box-shadow:none;}';
         html += '.nf-field textarea{min-height:120px;resize:vertical;}';
+        html += '.nf-char-counter{margin-top:4px;font-size:12px;color:#627d98;text-align:right;}';
+        html += '.nf-char-counter--over{color:#b42318;font-weight:700;}';
         html += '.nf-lookup{position:relative;display:grid;gap:8px;}';
         html += '.nf-location{position:relative;display:grid;gap:8px;}';
         html += '.nf-location__inputs{display:grid;gap:8px;}';
@@ -2186,13 +2225,15 @@ public with sharing class NativeFormsPublisher {
         html += 'function readSecretVerificationEmail(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-email]"):null;return input?String(input.value||"").trim().toLowerCase():"";}';
         html += 'function readSecretVerificationCode(){const input=secretVerifyEl?secretVerifyEl.querySelector("[data-secret-code]"):null;return input?String(input.value||"").trim():"";}';
         html += 'async function runPrefillWithParams(params){if(!config.prefillUrl||!params||Object.keys(params).length===0){return null;}emitTwinaFormsEvent("prefill:before",{params:params});const response=await withTimeout(fetch(config.prefillUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({publishToken:config.publishToken,request:{formId:config.formId,params:params}})}),PREFILL_TIMEOUT_MS,t("prefillTimeout","Loading saved details took too long."));const data=await response.json();if(!response.ok||data.success===false){const errorMessage=(data.error&&data.error.message)||data.error||"Prefill failed";emitTwinaFormsEvent("prefill:error",{params:params,message:errorMessage,response:data});throw new Error(errorMessage);}applyPrefillPayload(data);emitTwinaFormsEvent("prefill:after",{params:params,payload:data});return data;}';
-        html += 'async function sendSecretCodeRequest(action,payload){const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,formId:config.formId,publishToken:config.publishToken,publishedVersionId:config.versionId},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"Secret code request failed");}return data;}';
+        html += 'async function sendSecretCodeRequest(action,payload){const response=await fetch(config.submitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,formId:config.formId,publishToken:config.publishToken,publishedVersionId:config.versionId},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error((data.error&&data.error.message)||data.error||"User Verification request failed");}return data;}';
         html += 'function sameTabSecretSessionEnabled(){return secretCodeEnabled&&secretCodeSessionMode==="sameTabUntilMidnight"&&window.sessionStorage;}function secretSessionStorageKey(){return "twinaforms.secretSession."+String(config.formId||"")+"."+String(config.versionId||"");}function clearStoredSecretVerificationSession(){if(!sameTabSecretSessionEnabled()){return;}try{window.sessionStorage.removeItem(secretSessionStorageKey());}catch(error){}}function secretSessionExpiresAtForRequest(){const expiresAt=new Date();expiresAt.setHours(24,0,0,0);return expiresAt.toISOString();}function storeSecretVerificationSession(data,email){if(!sameTabSecretSessionEnabled()||!data||!data.verificationToken){return;}const expiresAt=String(data.expiresAt||"");if(!expiresAt){return;}try{window.sessionStorage.setItem(secretSessionStorageKey(),JSON.stringify({token:data.verificationToken,email:String(email||data.normalizedEmail||"").trim().toLowerCase(),sessionId:data.sessionId||secretVerificationSessionId,expiresAt:expiresAt}));}catch(error){}}async function continueAfterSecretVerification(email){setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.verifiedMessage||t("secretCodeVerifiedMessage","Code verified. You can continue with the form now."),"success");setSecretGatedState(true);setSecretVerificationSectionVisible(false);setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const prefillData=await runPrefillWithParams(Object.assign({},getPrefillParams(),{email:email}));if(!hasPrefillData(prefillData)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(prefillError){setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}function restoreSecretVerificationSession(){if(!sameTabSecretSessionEnabled()){return false;}let stored=null;try{stored=JSON.parse(window.sessionStorage.getItem(secretSessionStorageKey())||"null");}catch(error){clearStoredSecretVerificationSession();return false;}if(!stored||!stored.token||!stored.sessionId||!stored.email||!stored.expiresAt){clearStoredSecretVerificationSession();return false;}if(new Date(stored.expiresAt).getTime()<=Date.now()){clearStoredSecretVerificationSession();return false;}secretVerificationToken=stored.token;secretVerificationSessionId=stored.sessionId;secretVerifiedEmail=stored.email;continueAfterSecretVerification(secretVerifiedEmail).catch(function(){clearStoredSecretVerificationSession();});return true;}function isSecretVerificationExpiredResponse(data){const message=String((data&&data.error&&data.error.message)||data&&data.error||"").toLowerCase();return message.includes("secret")&&message.includes("code")&&message.includes("verify");}';
         html += 'function clearPostSubmitRedirect(){if(postSubmitRedirectTimer){window.clearTimeout(postSubmitRedirectTimer);postSubmitRedirectTimer=null;}if(postSubmitRedirectCountdownTimer){window.clearInterval(postSubmitRedirectCountdownTimer);postSubmitRedirectCountdownTimer=null;}activePostSubmitRedirectUrl="";}';
         html += 'function clearResult(){if(!resultEl){return;}clearPostSubmitRedirect();resultEl.hidden=true;resultEl.innerHTML="";form.hidden=false;form.style.display="";if(shellEl){shellEl.classList.remove("nf-shell--result-only");}}';
         html += 'function setSubmitting(isSubmitting){const submitButton=form.querySelector("button[type=\'submit\']");if(submitButton){submitButton.disabled=!!isSubmitting;submitButton.textContent=isSubmitting?t("submitting","Submitting..."):defaultSubmitLabel;}form.querySelectorAll("[data-nativeforms-button=\'true\']").forEach(function(button){button.disabled=!!isSubmitting;});}';
         html += 'function failureBucket(errorPayload){const message=String((errorPayload&&errorPayload.message)||errorPayload||"").toLowerCase();const commandType=String((errorPayload&&errorPayload.commandType)||"").toLowerCase();const isConfigIssue=message.includes("mapping")||message.includes("definition")||message.includes("not allowed")||message.includes("not configured")||message.includes("missing required field")||message.includes("invalid publish token")||message.includes("form is not published")||message.includes("prefill policy")||message.includes("submit policy")||message.includes("unauthorized");const isSalesforceIssue=message.includes("create failed")||message.includes("update failed")||message.includes("delete failed")||message.includes("query failed")||message.includes("describe failed")||message.includes("status:")||["create","update","delete","findone","findmany","getbyid"].includes(commandType);if(isSalesforceIssue&&!isConfigIssue){return{label:"Salesforce rejected the request",detail:"Salesforce could not accept this submission. Check required fields, validation rules, or object permissions."};}return{label:"Form logic/configuration issue",detail:"This submit could not complete because of a form or runtime configuration issue."};}';
         html += 'function readPathValue(source,path){if(!source||!path){return source;}return String(path).split(".").reduce(function(current,segment){if(current==null){return undefined;}return current[segment];},source);}';
+        html += 'function resolveMergedDocumentHtml(template,prefillPayload){const aliases=(prefillPayload&&prefillPayload.aliases&&typeof prefillPayload.aliases==="object")?prefillPayload.aliases:{};return String(template||"").replace(/\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*)\\.([A-Za-z][A-Za-z0-9_\\.]*?)\\s*\\}\\}/g,function(_,alias,path){const rawValue=readPathValue(aliases[alias],path);if(rawValue===undefined||rawValue===null){return "";}if(typeof rawValue==="object"){try{return escapeHtml(JSON.stringify(rawValue));}catch(error){return "";}}return escapeHtml(String(rawValue));});}';
+        html += 'function renderMergedDocuments(prefillPayload){form.querySelectorAll("[data-merged-document-template]").forEach(function(el){el.innerHTML=resolveMergedDocumentHtml(el.dataset.mergedDocumentTemplate||"",prefillPayload);});}';
         html += 'function isAbsoluteHttpUrl(value){try{const parsed=new URL(value);return parsed.protocol==="http:"||parsed.protocol==="https:";}catch(error){return false;}}';
         html += 'function resolvePostSubmitUrl(template,fieldValues,prefillPayload){const sourceTemplate=String(template||"").trim();if(!sourceTemplate){return "";}const aliases=(prefillPayload&&prefillPayload.aliases&&typeof prefillPayload.aliases==="object")?prefillPayload.aliases:{};const resolved=sourceTemplate.replace(/\\{\\{\\s*(field|prefill)\\.([^}]+?)\\s*\\}\\}/g,function(_,kind,path){let rawValue="";if(kind==="field"){rawValue=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,path)?fieldValues[path]:"";}else{const pieces=String(path||"").split(".");const aliasName=pieces.shift();rawValue=readPathValue(aliases[aliasName],pieces.join("."));}if(rawValue===undefined||rawValue===null){return "";}if(typeof rawValue==="object"){try{return encodeURIComponent(JSON.stringify(rawValue));}catch(error){return "";}}return encodeURIComponent(String(rawValue));});return isAbsoluteHttpUrl(resolved)?resolved:"";}';
         html += 'function resolveFormulaPostSubmitUrl(expression,fieldValues){const sourceExpression=normalizeFormulaExpression(expression||"");if(!sourceExpression||!formulaParser){return "";}const variableMap={};let normalizedExpression=sourceExpression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=fieldValues&&Object.prototype.hasOwnProperty.call(fieldValues,fieldKey)?fieldValues[fieldKey]:"";});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const resolved=formulaToText(rawValue).trim();return resolved&&isAbsoluteHttpUrl(resolved)?resolved:"";}catch(error){console.error("TwinaForms redirect formula failed",error);return "";}}';
@@ -2258,12 +2299,14 @@ public with sharing class NativeFormsPublisher {
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
         html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let lookupEl=null;if(control.matches&&control.matches("[data-nativeforms-lookup=\'true\']")){lookupEl=control;}if(!lookupEl&&control.closest){lookupEl=control.closest("[data-nativeforms-lookup=\'true\']");}if(!lookupEl&&control.querySelector){lookupEl=control.querySelector("[data-nativeforms-lookup=\'true\']");}if(lookupEl){const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const hasLookupValue=!!(hidden&&String(hidden.value||"").trim());lookupEl.dataset.lookupLocked=hasLookupValue?"true":"false";if(input){input.readOnly=hasLookupValue;input.setAttribute("aria-readonly",hasLookupValue?"true":"false");}if(clear){clear.disabled=hasLookupValue;}if(hasLookupValue){renderLookupResults(lookupEl,[]);}return;}let hasValue=false;if(control.dataset.nativeformsMultiCheckbox==="true"){const group=control.closest("[data-nativeforms-multi-checkbox-group=\'true\']");const boxes=group?Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']")):[control];hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.disabled=hasValue;});return;}if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
         html += 'function applyLockedFields(){form.querySelectorAll("[data-lock-on-prefill=\'true\']").forEach(function(control){applyLockState(control);});}';
-        html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});evaluateAllFormulaFields();applyLockedFields();evaluateConditions();}';
+        html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});renderMergedDocuments(payload);evaluateAllFormulaFields();applyLockedFields();evaluateConditions();}';
         html += 'async function runInitialPrefill(){const params=getPrefillParams();if(!hasPrefillParams(params)||secretCodeEnabled){return;}setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const data=await runPrefillWithParams(params);if(!hasPrefillData(data)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(error){emitTwinaFormsEvent("prefill:error",{message:error&&error.message?error.message:t("prefillLoadFailed","We could not load prefill data for this form.")});setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
         html += 'function applyDateConstraints(){form.querySelectorAll("[data-nativeforms-date=\'true\']").forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
-        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}if(el.dataset.nativeformsTime==="true"){const valid=validateTimeField(el,true);if(valid&&el.value){el.value=formatTimeForField(el.value,el);}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
-        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}const events=(el.dataset.nativeformsDate==="true"||el.dataset.nativeformsTime==="true")?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
+        html += 'function updateCharacterCounter(el){const max=parseInt(el&&el.dataset?el.dataset.characterLimit:"",10);const field=el?el.closest(".nf-field"):null;const counter=field?field.querySelector("[data-character-counter]"):null;if(!counter||!Number.isFinite(max)||max<=0){return;}const used=String(el.value||"").length;counter.textContent=used+"/"+max+" "+t("characters","characters");counter.classList.toggle("nf-char-counter--over",used>max);}';
+        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}updateCharacterCounter(el);const max=parseInt(el.dataset?el.dataset.characterLimit:"",10);if(Number.isFinite(max)&&max>0&&String(el.value||"").length>max){el.setCustomValidity(interpolate(t("textTooLong","Keep this field under {max} characters."),{max:String(max)}));}else if(el.dataset&&el.dataset.characterLimit){el.setCustomValidity("");}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}if(el.dataset.nativeformsTime==="true"){const valid=validateTimeField(el,true);if(valid&&el.value){el.value=formatTimeForField(el.value,el);}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
+        html += 'function validateAllFields(){const fields=Array.from(form.querySelectorAll("input,textarea,select")).filter(function(el){return el.type!=="hidden";});let valid=true;fields.forEach(function(el){if(!validateField(el)){valid=false;}});return valid;}';
+        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}updateCharacterCounter(el);const events=(el.dataset.nativeformsDate==="true"||el.dataset.nativeformsTime==="true")?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
         html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!validateDateField(el,true)){return{success:false,message:el.validationMessage||t("dateReview","Please review the date fields and try again."),values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
         html += 'function collectNormalizedTimeValues(){const values={};const timeFields=form.querySelectorAll("[data-nativeforms-time=\'true\']");for(let index=0;index<timeFields.length;index+=1){const el=timeFields[index];if(!validateTimeField(el,true)){return{success:false,message:el.validationMessage||t("timeReview","Please review the time fields and try again."),values:{}};}const parsed=parseTimeValue(el.value||"",el.dataset.timeFormat||"24h");if(parsed&&el.name){values[el.name]=parsed;el.value=formatTimeForField(parsed,el);}}return{success:true,message:"",values:values};}';
         html += 'function setElementVisibilityState(elementId,visible){const key=String(elementId||"");if(!key){return;}manualVisibilityState[key]=visible!==false;evaluateConditions();}';
@@ -2291,11 +2334,12 @@ public with sharing class NativeFormsPublisher {
         html += 'setSecretCodeStepVisible(false);';
         html += 'restoreSecretVerificationSession();';
         html += 'emitTwinaFormsEvent("form:ready",{versionId:config.versionId,formId:config.formId});';
-        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and code first."),"error");return;}verifyButton.disabled=true;try{const verifyPayload={email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId,sessionMode:secretCodeSessionMode};if(secretCodeSessionMode==="sameTabUntilMidnight"){verifyPayload.sessionExpiresAt=secretSessionExpiresAtForRequest();}const data=await sendSecretCodeRequest("verifyCode",verifyPayload);if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;secretVerificationSessionId=data.sessionId||secretVerificationSessionId;storeSecretVerificationSession(data,secretVerifiedEmail);await continueAfterSecretVerification(secretVerifiedEmail);}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The code is invalid or expired. Try again or request a new code."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the code right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit code to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the code right now."),"error");}finally{resendButton.disabled=false;}});}}';
+        html += 'if(secretCodeEnabled&&secretVerifyEl){const sendButton=secretVerifyEl.querySelector("[data-secret-send]");const verifyButton=secretVerifyEl.querySelector("[data-secret-verify]");const resendButton=secretVerifyEl.querySelector("[data-secret-resend]");if(sendButton){sendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit verification number to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the verification number right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();const code=readSecretVerificationCode();if(!email||!code){setSecretVerificationMessage(t("secretCodeEnterEmailAndCodeFirst","Enter your email and verification number first."),"error");return;}verifyButton.disabled=true;try{const verifyPayload={email:email,code:code,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts,sessionId:secretVerificationSessionId,sessionMode:secretCodeSessionMode};if(secretCodeSessionMode==="sameTabUntilMidnight"){verifyPayload.sessionExpiresAt=secretSessionExpiresAtForRequest();}const data=await sendSecretCodeRequest("verifyCode",verifyPayload);if(data.approved){secretVerificationToken=data.verificationToken||"";secretVerifiedEmail=data.normalizedEmail||email;secretVerificationSessionId=data.sessionId||secretVerificationSessionId;storeSecretVerificationSession(data,secretVerifiedEmail);await continueAfterSecretVerification(secretVerifiedEmail);}else{setSecretCodeStepVisible(true);setSecretVerificationMessage((data&&data.message)||secretCodeConfig.invalidMessage||t("secretCodeInvalidMessage","The verification number is invalid or expired. Try again or request a new one."),"error");}}catch(error){setSecretCodeStepVisible(true);setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeVerifyFailed","We could not verify the number right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readSecretVerificationEmail();if(!email){setSecretVerificationMessage(t("secretCodeEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{await sendSecretCodeRequest("sendCode",{email:email,expiryMinutes:secretCodeConfig.expiryMinutes,maxAttempts:secretCodeConfig.maxAttempts});setSecretCodeStepVisible(true);setSecretVerificationMessage(secretCodeConfig.sentMessage||t("secretCodeSentMessage","If we found a matching contact, we sent a 6-digit verification number to that email."),"");const codeInput=secretVerifyEl.querySelector("[data-secret-code]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setSecretVerificationMessage(error&&error.message?error.message:t("secretCodeSendFailed","We could not send the verification number right now."),"error");}finally{resendButton.disabled=false;}});}}';
+        html += 'renderMergedDocuments(null);';
         html += 'runInitialPrefill();';
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
-        html += 'if(secretCodeEnabled&&!secretVerificationApproved){activeButtonNavigationUrl="";setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Verify the secret code before continuing."));return;}';
+        html += 'if(secretCodeEnabled&&!secretVerificationApproved){activeButtonNavigationUrl="";setStatus("error",secretCodeConfig.invalidMessage||t("secretVerifyRequiredBeforeSubmit","Complete User Verification before continuing."));return;}';
         html += 'if(!form.reportValidity()){activeButtonNavigationUrl="";return;}';
         html += 'const multiCheckboxValidation=validateMultiCheckboxGroups();if(!multiCheckboxValidation.valid){activeButtonNavigationUrl="";setStatus("error",multiCheckboxValidation.message||t("multiCheckboxReview","Please review the checkbox groups and try again."));return;}';
         html += 'const lookupValidation=validateLookupFields();if(!lookupValidation.valid){activeButtonNavigationUrl="";setStatus("error",lookupValidation.message||t("lookupReview","Please review the lookup fields and try again."));return;}';
@@ -2319,7 +2363,7 @@ public with sharing class NativeFormsPublisher {
         html += 'const data=await response.json();';
         html += 'if(!response.ok||data.success===false){activeButtonNavigationUrl="";emitTwinaFormsEvent("submit:error",{response:data,error:data&&data.error?data.error:null});if(secretCodeEnabled&&isSecretVerificationExpiredResponse(data)){clearStoredSecretVerificationSession();secretVerificationToken="";secretVerifiedEmail="";setSecretGatedState(false);setSecretVerificationSectionVisible(true);setSecretCodeStepVisible(false);}renderResult("error",{errorPayload:data.error,submissionRef:data&&data.submissionRef?data.submissionRef:"",detailsText:JSON.stringify(data,null,2)});if(captchaEnabled){resetCaptcha();}return;}';
         html += 'const resolvedPostSubmitUrl=activeButtonNavigationUrl||(postSubmitAutoLinkEnabled?(postSubmitUrlMode==="formula"?resolveFormulaPostSubmitUrl(postSubmitUrlFormula,input):resolvePostSubmitUrl(postSubmitUrlTemplate,input,lastPrefillPayload)):"");activeButtonNavigationUrl="";';
-        html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();clearAllSignatures();lastPrefillPayload=null;resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
+        html += 'emitTwinaFormsEvent("submit:after",{response:data,submissionRef:data&&data.submissionRef?data.submissionRef:""});form.dataset.submitCompleted="true";form.reset();clearRepeatGroups();clearAllUploadedFiles();clearAllSignatures();lastPrefillPayload=null;renderMergedDocuments(null);resetCaptcha();if(resolvedPostSubmitUrl){window.location.assign(resolvedPostSubmitUrl);return;}renderResult("success",{message:submitSuccessMessage,submissionRef:data&&data.submissionRef?data.submissionRef:""});';
         html += '}catch(error){activeButtonNavigationUrl="";emitTwinaFormsEvent("submit:error",{error:{message:error&&error.message?error.message:"Submit failed"}});renderResult("error",{errorPayload:{message:"' + escapeJsString(localizedFormUiDefault('submitFailedMessage', languageCode, 'We could not submit this form right now. Please try again.')) + '"},detailsText:JSON.stringify({success:false,error:{message:error&&error.message?error.message:"Submit failed"}},null,2)});if(captchaEnabled){resetCaptcha();}}finally{setSubmitting(false);}';
         html += '});';
         html += '})();</script>';
@@ -2513,10 +2557,16 @@ public with sharing class NativeFormsPublisher {
             return sectionHtml;
         }
 
-        if (typeValue == 'heading') {
+        if (typeValue == 'heading' || typeValue == 'mergedDocument') {
             String richHtml = config.containsKey('html') ? String.valueOf(config.get('html')) : '';
             if (String.isNotBlank(richHtml)) {
+                if (typeValue == 'mergedDocument') {
+                    return '<div class="nf-richtext nf-merged-document" data-element-id="' + safeElementId + '" data-merged-document-template="' + escapeHtml(richHtml) + '"' + wrapperAttrs + '>' + richHtml + '</div>';
+                }
                 return '<div class="nf-richtext" data-element-id="' + safeElementId + '"' + wrapperAttrs + '>' + richHtml + '</div>';
+            }
+            if (typeValue == 'mergedDocument') {
+                return '<div class="nf-richtext nf-merged-document" data-element-id="' + safeElementId + '" data-merged-document-template="&lt;p&gt;Merged document text&lt;/p&gt;"' + wrapperAttrs + '><p>Merged document text</p></div>';
             }
             return '<div class="nf-richtext" data-element-id="' + safeElementId + '"' + wrapperAttrs + '><p>' + safeLabel + '</p></div>';
         }
@@ -2557,8 +2607,14 @@ public with sharing class NativeFormsPublisher {
         }
 
         if (typeValue == 'textarea') {
+            Integer maxLength = booleanValue(config.get('maxLengthDisabled')) ? null : integerValue(config.get('maxLength'));
+            if (maxLength == null || maxLength <= 0) {
+                maxLength = booleanValue(config.get('maxLengthDisabled')) ? null : 254;
+            }
+            String maxLengthAttr = maxLength != null && maxLength > 0 ? ' data-character-limit="' + String.valueOf(maxLength) + '"' : '';
+            String counterHtml = maxLength != null && maxLength > 0 ? '<div class="nf-char-counter" data-character-counter="true">0/' + String.valueOf(maxLength) + ' ' + escapeHtml(runtimeTextValue(languageCode, 'characters', 'characters')) + '</div>' : '';
             String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
-            String controlHtml = '<textarea id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + placeholderAttr + requiredAttr + patternAttr + '></textarea>';
+            String controlHtml = '<textarea id="' + safeName + '" name="' + safeName + '"' + lockOnPrefillAttr + placeholderAttr + requiredAttr + patternAttr + maxLengthAttr + '></textarea>' + counterHtml;
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
         if (typeValue == 'select' && config.containsKey('options')) {
@@ -2651,7 +2707,7 @@ public with sharing class NativeFormsPublisher {
             if (minSearchLength == null || minSearchLength <= 0) {
                 minSearchLength = 2;
             }
-            String controlHtml = '<div class="nf-lookup" data-nativeforms-lookup="true" data-lookup-field-key="' + safeName + '" data-lookup-required="' + String.valueOf(required).toLowerCase() + '" data-lookup-min-length="' + String.valueOf(minSearchLength) + '">';
+            String controlHtml = '<div class="nf-lookup" data-nativeforms-lookup="true" data-lookup-field-key="' + safeName + '" data-lookup-required="' + String.valueOf(required).toLowerCase() + '" data-lookup-min-length="' + String.valueOf(minSearchLength) + '"' + lockOnPrefillAttr + '>';
             controlHtml += '<input type="hidden" name="' + safeName + '" data-lookup-hidden="true"' + lockOnPrefillAttr + '>';
             controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '-lookup" autocomplete="off" data-lookup-input="true"' + placeholderAttr + '>';
             controlHtml += '<button type="button" class="nf-lookup__clear" data-lookup-clear hidden aria-label="Clear selection">Clear</button>';
@@ -2784,8 +2840,11 @@ public with sharing class NativeFormsPublisher {
         String baseId = escapeHtml(fieldKey);
         Boolean hiddenByBehavior = isHiddenBehavior(config);
 
-        if (typeValue == 'heading') {
+        if (typeValue == 'heading' || typeValue == 'mergedDocument') {
             String richHtml = config.containsKey('html') ? String.valueOf(config.get('html')) : '<p>' + escapeHtml(label) + '</p>';
+            if (typeValue == 'mergedDocument') {
+                return '<div class="nf-richtext nf-merged-document" data-merged-document-template="' + escapeHtml(richHtml) + '">' + richHtml + '</div>';
+            }
             return '<div class="nf-richtext">' + richHtml + '</div>';
         }
 
@@ -2803,8 +2862,14 @@ public with sharing class NativeFormsPublisher {
         }
 
         if (typeValue == 'textarea') {
+            Integer maxLength = booleanValue(config.get('maxLengthDisabled')) ? null : integerValue(config.get('maxLength'));
+            if (maxLength == null || maxLength <= 0) {
+                maxLength = booleanValue(config.get('maxLengthDisabled')) ? null : 254;
+            }
+            String maxLengthAttr = maxLength != null && maxLength > 0 ? ' data-character-limit="' + String.valueOf(maxLength) + '"' : '';
+            String counterHtml = maxLength != null && maxLength > 0 ? '<div class="nf-char-counter" data-character-counter="true">0/' + String.valueOf(maxLength) + ' ' + escapeHtml(runtimeTextValue(languageCode, 'characters', 'characters')) + '</div>' : '';
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
-            String controlHtml = '<textarea id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + requiredAttr + '></textarea>';
+            String controlHtml = '<textarea id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + requiredAttr + maxLengthAttr + '></textarea>' + counterHtml;
             return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
@@ -3697,7 +3762,7 @@ public with sharing class NativeFormsPublisher {
                         'attachToRowRecord' => booleanValue(rowSignatureConfig.get('attachToRowRecord'))
                     });
                 }
-            } else if (elementType == 'heading' || elementType == 'paragraph' || elementType == 'richText') {
+            } else if (elementType == 'heading' || elementType == 'paragraph' || elementType == 'richText' || elementType == 'mergedDocument') {
                 String html = stringValue(config.get('html'));
                 if (String.isBlank(html)) {
                     html = stringValue(config.get('text'));
@@ -3787,7 +3852,7 @@ public with sharing class NativeFormsPublisher {
             'verifiedMessage' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeVerifiedMessage', normalizedLanguageCode, 'Code verified. You can continue with the form now.'),
             'sendButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeSendButtonLabel', normalizedLanguageCode, 'Enter'),
             'verifyButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeVerifyButtonLabel', normalizedLanguageCode, 'Verify'),
-            'resendButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeResendButtonLabel', normalizedLanguageCode, 'Resend Code'),
+            'resendButtonLabel' => localizedSecretCodeConfigValue(uiSettings, 'secretCodeResendButtonLabel', normalizedLanguageCode, 'Resend Verification Number'),
             'expiryMinutes' => integerValue(uiSettings.get('secretCodeExpiryMinutes')) == null ? 10 : Math.max(1, integerValue(uiSettings.get('secretCodeExpiryMinutes'))),
             'maxAttempts' => integerValue(uiSettings.get('secretCodeMaxAttempts')) == null ? 5 : Math.max(1, integerValue(uiSettings.get('secretCodeMaxAttempts'))),
             'allowResend' => uiSettings.containsKey('secretCodeAllowResend') ? booleanValue(uiSettings.get('secretCodeAllowResend')) : true,

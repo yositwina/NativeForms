@@ -14,6 +14,7 @@ Use for AppExchange Security Review preparation, Salesforce Code Analyzer, PMD/C
   - Make the customer-facing permission set grant the object and field permissions needed by those user-mode operations. User-mode Apex will fail at runtime if the permission set does not match the data the code reads or writes.
   - Do not update raw queried sObjects when they include required/master-detail relationship fields or fields the running user cannot update. Build a minimal update sObject with only `Id` and the fields that should change, then run `update as user`.
   - For tests, assign the relevant permission set in test setup and run the exercised code under `System.runAs(...)` so the permission assignment is active. Keep assertions focused on durable behavior, not exact low-level platform or AWS error wording.
+  - Narrow documented exception: `NativeFormsBootstrapV2Signer` and the encrypted-key persistence methods in `NativeFormsSubmissionLogsController` intentionally use system-context access for package-controlled secret storage. Their `PMD.ApexCRUDViolation` suppression is justified in `AWS/documentation/Technical and specs/Security Protocols.md`; do not extend that exception to customer form or submission data.
   - After fixes, verify with Salesforce Code Analyzer on `force-app` and confirm `ApexCRUDViolation` is zero before packaging.
 - For AppExchange preparation, keep both SAST and DAST evidence:
   - SAST: Salesforce Code Analyzer AppExchange/security rules, PMD-style Apex checks, dependency/security scans where relevant.

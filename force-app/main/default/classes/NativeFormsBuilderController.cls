@@ -206,7 +206,7 @@ public with sharing class NativeFormsBuilderController {
         if (String.isBlank(elementType)) {
             throw new AuraHandledException('Element type is required.');
         }
-        if (!new Set<String>{ 'text', 'input', 'textarea', 'time', 'select', 'checkbox', 'radio', 'hidden' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'input', 'textarea', 'time', 'select', 'checkbox', 'radio', 'hidden', 'mergedDocument' }.contains(elementType)) {
             throw new AuraHandledException('Only basic input elements are supported in this builder version.');
         }
 
@@ -269,6 +269,7 @@ public with sharing class NativeFormsBuilderController {
 
         NF_Form_Element__c elementRecord = [
             SELECT Id,
+                   Form_Version__c,
                    Name,
                    Element_Id__c,
                    Element_Type__c,
@@ -300,6 +301,9 @@ public with sharing class NativeFormsBuilderController {
             if (inputValue.elementType == 'signature' && !NativeFormsFeatureFlags.isProElectronicSignatureEnabled()) {
                 throw new AuraHandledException('Electronic Signature is not available on your current TwinaForms plan.');
             }
+            if (inputValue.elementType == 'button' && !NativeFormsFeatureFlags.isProButtonElementsEnabled()) {
+                throw new AuraHandledException('Portal Buttons are not available on your current TwinaForms plan.');
+            }
             if (inputValue.elementType == 'fileUpload' && String.isNotBlank(elementRecord.Parent_Element_Id__c)) {
                 List<NF_Form_Element__c> parentRows = [
                     SELECT Id, Element_Type__c
@@ -312,7 +316,11 @@ public with sharing class NativeFormsBuilderController {
                 }
             }
             elementRecord.Element_Type__c = inputValue.elementType;
+            if (inputValue.elementType == 'button') {
+                elementRecord.Field_Key__c = null;
+            }
         }
+        normalizeRecordsListSignatureBeforeSave(elementRecord);
         validateElementBeforeSave(elementRecord);
         update as user new NF_Form_Element__c(
             Id = elementRecord.Id,
@@ -458,6 +466,7 @@ public with sharing class NativeFormsBuilderController {
     private static String defaultLabelForType(String elementType) {
         Map<String, String> labelsByType = new Map<String, String>{
             'heading' => 'Section Heading',
+            'mergedDocument' => 'Merged Document',
             'text' => 'Text Field',
             'input' => 'Input Field',
             'textarea' => 'Long Text',
@@ -466,6 +475,7 @@ public with sharing class NativeFormsBuilderController {
             'checkbox' => 'Checkbox',
             'radio' => 'Radio Group',
             'image' => 'Image',
+            'button' => 'Continue',
             'section' => 'Section',
             'columns' => 'Columns',
             'hidden' => 'Hidden Field',
@@ -475,7 +485,7 @@ public with sharing class NativeFormsBuilderController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex) {
-        Set<String> nonInputTypes = new Set<String>{ 'heading', 'image', 'section', 'columns' };
+        Set<String> nonInputTypes = new Set<String>{ 'heading', 'mergedDocument', 'image', 'button', 'section', 'columns' };
         if (nonInputTypes.contains(elementType)) {
             return null;
         }
@@ -523,12 +533,27 @@ public with sharing class NativeFormsBuilderController {
         if (elementType == 'heading') {
             config.put('text', 'Add a helpful heading for this section');
         }
+        if (elementType == 'mergedDocument') {
+            config.put('html', '<p>Merged document text</p>');
+        }
         if (elementType == 'section') {
             config.put('text', 'Use this section to group related fields together.');
         }
         if (elementType == 'repeatGroup') {
             config.put('maxRows', 10);
             config.put('allowDelete', true);
+        }
+        if (elementType == 'button') {
+            config.put('destinationType', 'form');
+            config.put('targetFormId', '');
+            config.put('externalUrlMode', 'template');
+            config.put('externalUrlTemplate', '');
+            config.put('externalUrlFormula', '');
+            config.put('queryParameters', new List<Object>());
+            config.put('submitBeforeNavigation', false);
+            config.put('conditionalEnabled', false);
+            config.put('conditionalConditions', new List<Object>());
+            config.put('conditionalExpression', '');
         }
 
         return JSON.serializePretty(config);
@@ -542,6 +567,25 @@ public with sharing class NativeFormsBuilderController {
         Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(
             String.isBlank(elementRecord.Config_JSON__c) ? '{}' : elementRecord.Config_JSON__c
         );
+
+        if (elementRecord.Element_Type__c == 'button') {
+            if (!NativeFormsFeatureFlags.isProButtonElementsEnabled()) {
+                throw new AuraHandledException('Portal Buttons are not available on your current TwinaForms plan.');
+            }
+            if (String.isNotBlank(elementRecord.Parent_Element_Id__c)
+                && booleanValue(config.get('submitBeforeNavigation'))) {
+                List<NF_Form_Element__c> parentRows = [
+                    SELECT Id, Element_Type__c
+                    FROM NF_Form_Element__c
+                    WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
+                    WITH USER_MODE LIMIT 1
+                ];
+                if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
+                    throw new AuraHandledException('Buttons inside Records Lists cannot submit the form in Pro V1.');
+                }
+            }
+            return;
+        }
 
         if (booleanValue(config.get('isFormula'))) {
             if (!NativeFormsFeatureFlags.isProFormulaFieldsEnabled()) {
@@ -569,17 +613,6 @@ public with sharing class NativeFormsBuilderController {
         if (elementRecord.Element_Type__c == 'signature') {
             if (String.isBlank(elementRecord.Field_Key__c)) {
                 throw new AuraHandledException('Signature fields must keep a field key.');
-            }
-            if (String.isNotBlank(elementRecord.Parent_Element_Id__c)) {
-                List<NF_Form_Element__c> parentRows = [
-                    SELECT Id, Element_Type__c
-                    FROM NF_Form_Element__c
-                    WHERE Element_Id__c = :elementRecord.Parent_Element_Id__c
-                    WITH USER_MODE LIMIT 1
-                ];
-                if (!parentRows.isEmpty() && parentRows[0].Element_Type__c == 'repeatGroup') {
-                    throw new AuraHandledException('Signature fields are not supported inside repeat groups in Pro V1.');
-                }
             }
             return;
         }
@@ -706,5 +739,68 @@ public with sharing class NativeFormsBuilderController {
             return 'V' + String.valueOf(Integer.valueOf(String.valueOf(versionNumber)));
         }
         return fallbackName;
+    }
+
+    private static void normalizeRecordsListSignatureBeforeSave(NF_Form_Element__c elementRecord) {
+        if (elementRecord == null || elementRecord.Element_Type__c != 'signature'
+            || String.isBlank(elementRecord.Parent_Element_Id__c)) {
+            return;
+        }
+        List<NF_Form_Element__c> parentRows = [
+            SELECT Id, Element_Id__c, Element_Type__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :elementRecord.Form_Version__c
+              AND Element_Id__c = :elementRecord.Parent_Element_Id__c
+            WITH USER_MODE LIMIT 1
+        ];
+        if (parentRows.isEmpty() || parentRows[0].Element_Type__c != 'repeatGroup') {
+            return;
+        }
+        if (!NativeFormsFeatureFlags.isProElectronicSignatureEnabled()
+            || !NativeFormsFeatureFlags.isProSubmissionPdfEnabled()) {
+            throw new AuraHandledException('A Signature inside a Records List requires Electronic Signature and Submission PDF on your Pro plan.');
+        }
+        List<NF_Form_Element__c> existingSignatures = [
+            SELECT Id
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :elementRecord.Form_Version__c
+              AND Parent_Element_Id__c = :elementRecord.Parent_Element_Id__c
+              AND Element_Type__c = 'signature'
+              AND Id != :elementRecord.Id
+            WITH USER_MODE LIMIT 1
+        ];
+        if (!existingSignatures.isEmpty()) {
+            throw new AuraHandledException('A Records List supports one Signature element in this version.');
+        }
+        Map<String, Object> config = (Map<String, Object>) JSON.deserializeUntyped(
+            String.isBlank(elementRecord.Config_JSON__c) ? '{}' : elementRecord.Config_JSON__c
+        );
+        config.put('targetSubmitActionKey', '');
+        if (!config.containsKey('attachToRowRecord')) {
+            config.put('attachToRowRecord', false);
+        }
+        elementRecord.Config_JSON__c = JSON.serializePretty(config);
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :elementRecord.Form_Version__c
+            WITH USER_MODE LIMIT 1
+        ];
+        Map<String, Object> uiSettings = (Map<String, Object>) JSON.deserializeUntyped(
+            String.isBlank(versionRecord.UI_Settings_JSON__c) ? '{}' : versionRecord.UI_Settings_JSON__c
+        );
+        if (!booleanValue(uiSettings.get('submissionPdfEnabled'))) {
+            uiSettings.put('submissionPdfEnabled', true);
+            if (!uiSettings.containsKey('submissionPdfAttachToRecord')) {
+                uiSettings.put('submissionPdfAttachToRecord', true);
+            }
+            if (!uiSettings.containsKey('submissionPdfTitle')) {
+                uiSettings.put('submissionPdfTitle', 'Submitted Response');
+            }
+            if (!uiSettings.containsKey('submissionPdfIncludeEmptyFields')) {
+                uiSettings.put('submissionPdfIncludeEmptyFields', true);
+            }
+            update as user new NF_Form_Version__c(Id = versionRecord.Id, UI_Settings_JSON__c = JSON.serializePretty(uiSettings));
+        }
     }
 }

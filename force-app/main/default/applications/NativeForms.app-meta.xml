@@ -2,6 +2,8 @@
 <CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
     <brand>
         <headerColor>#0F6CBD</headerColor>
+        <logo>TwinaForms_App_Logo</logo>
+        <logoVersion>1</logoVersion>
         <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
     </brand>
     <description>Customer-facing TwinaForms app for onboarding, configuration, and form publishing.</description>

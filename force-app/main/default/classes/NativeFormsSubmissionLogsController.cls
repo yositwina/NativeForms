@@ -139,7 +139,9 @@ public with sharing class NativeFormsSubmissionLogsController {
     }
 
     @AuraEnabled
+    @SuppressWarnings('PMD.ApexCRUDViolation')
     public static SubmissionLogStatus saveSubmissionLogKeyPair(String publicKeyB64, String privateKeyPkcs8B64, String keyVersion) {
+        // The sealed private key is service-owned storage and is not exposed through user FLS.
         if (String.isBlank(publicKeyB64) || String.isBlank(privateKeyPkcs8B64)) {
             throw new AuraHandledException('Submission log keypair is incomplete.');
         }
@@ -357,7 +359,9 @@ public with sharing class NativeFormsSubmissionLogsController {
         return result;
     }
 
+    @SuppressWarnings('PMD.ApexCRUDViolation')
     private static SubmissionLogKeyRecord getSubmissionLogKeyRecord() {
+        // System access is intentional: Sealed_Log_Data__c is withheld from user permissions.
         List<NF_Submission_Log_Key__c> records = [
             SELECT Id, Name, Public_Key__c, Sealed_Log_Data__c, Key_Version__c
             FROM NF_Submission_Log_Key__c
@@ -401,7 +405,9 @@ public with sharing class NativeFormsSubmissionLogsController {
         return plaintext.toString();
     }
 
+    @SuppressWarnings('PMD.ApexCRUDViolation')
     private static Blob getOrCreateSubmissionLogWrapSecret() {
+        // Package-controlled wrapping-secret storage must not depend on subscriber user CRUD/FLS.
         NativeForms_Protected_Config__c config = NativeForms_Protected_Config__c.getOrgDefaults();
         if (config != null && String.isNotBlank(config.Submission_Log_Wrap_Secret__c)) {
             return EncodingUtil.base64Decode(config.Submission_Log_Wrap_Secret__c);

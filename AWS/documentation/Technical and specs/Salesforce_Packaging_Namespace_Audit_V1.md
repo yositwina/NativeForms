@@ -1,25 +1,25 @@
 # Salesforce Packaging Namespace Audit V1
 
-Last updated: 2026-05-19
+Last updated: 2026-06-03
 
 ## Current TwinaForms Managed 2GP Package
 
 - package name: `TwinaForms`
 - package id: `0HogL0000002CUvSAM`
-- latest released package version create request id: `08cgL0000009NobQAE`
-- latest package2 version id: `05igL0000003HifQAE`
-- latest subscriber package version id: `04tgL000000FtXFQA0`
-- latest version number: `0.8.0.1`
-- latest package code coverage: `84%`
-- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000FtXFQA0`
-- latest released note: changes `NF_Form_Element__c.Element_Type__c` to unrestricted so subscriber orgs cannot reject `multiCheckbox` or future internal element values after upgrade
-- latest beta package version create request id: `08cgL0000009NobQAE`
-- latest beta package2 version id: `05igL0000003HifQAE`
-- latest beta subscriber package version id: `04tgL000000FtXFQA0`
-- latest beta version number: `0.8.0.1`
-- latest beta package code coverage: `84%`
-- latest beta sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000FtXFQA0`
-- latest beta note: changes `NF_Form_Element__c.Element_Type__c` to unrestricted so subscriber orgs cannot reject `multiCheckbox` or future internal element values after upgrade
+- latest released package version create request id: `08cgL0000009qtpQAA`
+- latest package2 version id: `05igL0000003VQfQAM`
+- latest subscriber package version id: `04tgL000000GWbpQAG`
+- latest version number: `0.9.0.8`
+- latest package code coverage: `83%`
+- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GWbpQAG`
+- latest released note: includes Merged Document, locked Lookup runtime behavior after prefill, Layout-to-Form picklist source-property preservation, textarea character-limit UX/publish handling, the Pro Button element, Country / State / City autocomplete, updated User Verification and Submission PDF/signature UX, scanned-file-upload support, App Launcher branding, 69 KB embedded image guards for publish stability, and the published 1-5 Star Rating label fix
+- latest beta package version create request id: `08cgL0000009qqbQAA`
+- latest beta package2 version id: `05igL0000003VNRQA2`
+- latest beta subscriber package version id: `04tgL000000GWTlQAO`
+- latest beta version number: `0.9.0.7`
+- latest beta package code coverage: not calculated for this beta package version
+- latest beta sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GWTlQAO`
+- latest beta note: includes Merged Document, locked Lookup runtime behavior after prefill, Layout-to-Form picklist source-property preservation, textarea character-limit UX/publish handling, the Pro Button element, Country / State / City autocomplete, updated User Verification and Submission PDF/signature UX, scanned-file-upload support, App Launcher branding, 69 KB embedded image guards for publish stability, and the published 1-5 Star Rating label fix
 - target namespace: `twinaforms`
 
 ## Packaging Note
@@ -135,7 +135,7 @@ Rule:
 
 ### 5. Lightning App And Tabs
 
-Status: packaging visibility needs validation.
+Status: package-safe main app branding validated in `TwinaFormsDevHub` on 2026-05-27.
 
 The label seen by users can stay friendly:
 
@@ -144,6 +144,7 @@ The label seen by users can stay friendly:
 Rule:
 
 - Ship only the main `TwinaForms` app.
+- Package the TwinaForms icon as the `TwinaForms_App_Logo` `ContentAsset` referenced from the Lightning app brand so the App Launcher does not fall back to an initial-based tile.
 - Keep admin/debug features inside that app as a gated tab/area.
 - Use the AWS admin flag plus `TwinaForms Admin` permission-set access to control who can actually use that area.
 

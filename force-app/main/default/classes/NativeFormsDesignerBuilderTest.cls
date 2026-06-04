@@ -34,9 +34,10 @@ private class NativeFormsDesignerBuilderTest {
             'enableProPageLayoutClone' => enableAdvancedSubmitModes == true,
             'enableProElectronicSignature' => enableLoadFile == true,
             'enableProSubmissionPdf' => enableLoadFile == true,
-            'enableProRecordsListRowSignaturePdf' => enableLoadFile == true,
             'enableProSurveyFields' => enableLoadFile == true,
-            'enableProCustomJs' => enableCustomJs == true
+            'enableProCustomJs' => enableCustomJs == true,
+            'enableProButtonElements' => enableLoadFile == true,
+            'enableProMergedDocument' => enableLoadFile == true
         };
         snapshot.effectiveLimits = new Map<String, Object>{
             'maxForms' => 1000,
@@ -307,6 +308,8 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals(true, workspace.enableProAdvancedSubmitModes);
         System.assertEquals(true, workspace.enableProPageLayoutClone);
         System.assertEquals(true, workspace.enableProCustomJs);
+        System.assertEquals(true, workspace.enableProButtonElements);
+        System.assertEquals(true, workspace.enableProMergedDocument);
         System.assertEquals(1000, workspace.maxForms);
         System.assertEquals(false, workspace.formLimitReached);
         System.assert(String.isNotBlank(workspace.upgradeUrl));
@@ -350,6 +353,81 @@ private class NativeFormsDesignerBuilderTest {
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :cloneResult.versionId
         ]);
+
+        NativeFormsTestDataFactory.createElement(
+            createResult.versionId,
+            'text',
+            'Damaged Draft Field',
+            'damagedField',
+            2,
+            20,
+            NativeFormsTestConfigFactory.textFieldConfigJson(),
+            null
+        );
+        NativeFormsDesignerController.NewFormResult restoreResult =
+            NativeFormsDesignerController.restoreDraftFromPublished(createResult.formId, publishedVersion.Id);
+        NF_Form__c restoredForm = [
+            SELECT Current_Draft_Version__c, Current_Published_Version__c
+            FROM NF_Form__c
+            WHERE Id = :createResult.formId
+        ];
+        NF_Form_Version__c restoredVersion = [
+            SELECT Id, Form__c, Version_Number__c, Version_Status__c, Publish_Status__c, Security_Mode__c, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :restoreResult.versionId
+        ];
+        System.assertEquals(createResult.formId, restoreResult.formId);
+        System.assertEquals(createResult.projectId, restoreResult.projectId);
+        System.assertEquals(restoredVersion.Id, restoredForm.Current_Draft_Version__c);
+        System.assertEquals(publishedVersion.Id, restoredForm.Current_Published_Version__c);
+        System.assertEquals(createResult.formId, restoredVersion.Form__c);
+        System.assertEquals(3, restoredVersion.Version_Number__c);
+        System.assertEquals('Draft', restoredVersion.Version_Status__c);
+        System.assertEquals('Never Published', restoredVersion.Publish_Status__c);
+        System.assertEquals(publishedVersion.Security_Mode__c, restoredVersion.Security_Mode__c);
+        System.assertEquals(1, [
+            SELECT COUNT()
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :restoreResult.versionId
+        ]);
+        System.assertEquals(0, [
+            SELECT COUNT()
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :restoreResult.versionId
+              AND Label__c = 'Damaged Draft Field'
+        ]);
+        System.assertEquals(2, [
+            SELECT COUNT()
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :restoreResult.versionId
+        ]);
+        try {
+            NativeFormsDesignerController.restoreDraftFromPublished(createResult.formId, createResult.versionId);
+            System.assert(false, 'Restore should require selecting a published version.');
+        } catch (AuraHandledException e) {
+            assertAuraHandled(e);
+        }
+
+        NativeFormsDesignerController.ElementSnapshotRecord undoSnapshot = new NativeFormsDesignerController.ElementSnapshotRecord();
+        undoSnapshot.elementId = 'restoredText1';
+        undoSnapshot.elementType = 'text';
+        undoSnapshot.fieldKey = 'restoredText1';
+        undoSnapshot.elementIndex = 99;
+        undoSnapshot.label = 'Undo Restored Field';
+        undoSnapshot.configJson = NativeFormsTestConfigFactory.textFieldConfigJson();
+        undoSnapshot.orderValue = 10;
+        NativeFormsDesignerController.restoreVersionElementsSnapshot(
+            createResult.versionId,
+            JSON.serialize(new List<NativeFormsDesignerController.ElementSnapshotRecord>{ undoSnapshot })
+        );
+        List<NF_Form_Element__c> undoRestoredElements = [
+            SELECT Element_Id__c, Label__c, Element_Type__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :createResult.versionId
+        ];
+        System.assertEquals(1, undoRestoredElements.size());
+        System.assertEquals('restoredText1', undoRestoredElements[0].Element_Id__c);
+        System.assertEquals('Undo Restored Field', undoRestoredElements[0].Label__c);
 
         List<Object> conditionalConditions = new List<Object>{
             new Map<String, Object>{
@@ -520,14 +598,27 @@ private class NativeFormsDesignerBuilderTest {
             WHERE Id = :result.formId
         ].Current_Draft_Version__c);
 
+        NF_Form_Action__c prefillAction = [
+            SELECT Command_Key__c, Store_Result_As__c, Object_Api_Name__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :result.versionId
+              AND Action_Scope__c = 'Prefill'
+            LIMIT 1
+        ];
+        System.assertEquals('Prefill_Contact', prefillAction.Command_Key__c);
+        System.assertEquals('Prefill_Contact', prefillAction.Store_Result_As__c);
+        System.assertEquals('Contact', prefillAction.Object_Api_Name__c);
+
         NF_Form_Action__c submitAction = [
-            SELECT Command_Type__c, Config_JSON__c
+            SELECT Command_Key__c, Store_Result_As__c, Command_Type__c, Config_JSON__c
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :result.versionId
               AND Action_Scope__c = 'Submit'
             LIMIT 1
         ];
         Map<String, Object> submitConfig = jsonMap(submitAction.Config_JSON__c);
+        System.assertEquals('Submit_Contact', submitAction.Command_Key__c);
+        System.assertEquals('Submit_Contact', submitAction.Store_Result_As__c);
         System.assertEquals('updateById', submitAction.Command_Type__c);
         System.assertEquals('create', String.valueOf(submitConfig.get('onNotFound')));
         System.assertEquals('{input.recordId}', String.valueOf(submitConfig.get('recordIdSource')));
@@ -575,6 +666,9 @@ private class NativeFormsDesignerBuilderTest {
         ];
         System.assertEquals(2, (Integer) jsonMap(firstNameElement.Config_JSON__c).get('sectionColumn'));
         System.assertEquals(1, (Integer) jsonMap(emailElement.Config_JSON__c).get('sectionColumn'));
+        Map<String, Object> firstNameConfig = jsonMap(firstNameElement.Config_JSON__c);
+        System.assertEquals('Prefill_Contact', String.valueOf(firstNameConfig.get('prefillAlias')));
+        System.assertEquals('Submit_Contact', String.valueOf(firstNameConfig.get('submitActionKey')));
         Map<String, Object> accountConfig = jsonMap(accountElement.Config_JSON__c);
         System.assertEquals('lookup', accountElement.Element_Type__c);
         System.assertEquals('Account', String.valueOf(accountConfig.get('lookupTargetObject')));
@@ -584,6 +678,8 @@ private class NativeFormsDesignerBuilderTest {
         Map<String, Object> salutationConfig = jsonMap(salutationElement.Config_JSON__c);
         List<Object> salutationOptions = (List<Object>) salutationConfig.get('options');
         System.assertEquals('select', salutationElement.Element_Type__c);
+        System.assertEquals('Contact', String.valueOf(salutationConfig.get('sourceObjectApiName')));
+        System.assertEquals('Salutation', String.valueOf(salutationConfig.get('sourcePicklistFieldApiName')));
         System.assertEquals('\u05DE\u05E8', String.valueOf(((Map<String, Object>) salutationOptions[0]).get('label')));
         System.assertEquals('Mr.', String.valueOf(((Map<String, Object>) salutationOptions[0]).get('value')));
         System.assertEquals(5, result.importedFieldCount);
@@ -779,6 +875,8 @@ private class NativeFormsDesignerBuilderTest {
             '\u05D8\u05DC\u05E4\u05D5\u05DF',
             NativeFormsDesignerController.addElement(hebrewVersion.Id, 'tel').label
         );
+        NativeFormsDesignerController.ElementRecord textareaRecord = NativeFormsDesignerController.addElement(hebrewVersion.Id, 'textarea');
+        System.assertEquals(254, (Integer) jsonMap(textareaRecord.configJson).get('maxLength'), 'Textarea should default to a safe regular Salesforce Text length.');
         System.assertEquals(
             '\u05E8\u05E9\u05D9\u05DE\u05EA \u05D1\u05D7\u05D9\u05E8\u05D4',
             NativeFormsDesignerController.addElement(hebrewVersion.Id, 'select').label
@@ -788,6 +886,10 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('multiCheckbox', multiCheckboxRecord.elementType);
         System.assert(multiCheckboxRecord.fieldKey.startsWith('multiPicklist'));
         System.assert(jsonMap(multiCheckboxRecord.configJson).containsKey('options'), 'Multi Checkbox should start with option config for canvas preview.');
+        NativeFormsDesignerController.ElementRecord buttonRecord = NativeFormsDesignerController.addElement(hebrewVersion.Id, 'button');
+        System.assertEquals('\u05D4\u05DE\u05E9\u05DA', buttonRecord.label, 'Button should receive the localized Continue label.');
+        System.assertEquals(null, buttonRecord.fieldKey, 'Button is an action control and should not create submitted field data.');
+        System.assertEquals(false, jsonMap(buttonRecord.configJson).get('submitBeforeNavigation'), 'Button should default to navigation without submit.');
 
         Map<String, String> expectedDateLabels = new Map<String, String>{
             'en' => 'Date',
@@ -927,13 +1029,29 @@ private class NativeFormsDesignerBuilderTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        try {
+            NativeFormsDesignerController.addElement(versionRecord.Id, 'button');
+            System.assert(false, 'Portal Buttons should be blocked when the feature is disabled.');
+        } catch (AuraHandledException e) {
+            assertAuraHandled(e);
+        }
+        try {
+            NativeFormsDesignerController.addElement(versionRecord.Id, 'mergedDocument');
+            System.assert(false, 'Merged Document should be blocked when the feature is disabled.');
+        } catch (AuraHandledException e) {
+            assertAuraHandled(e);
+        }
 
         setFeatureFlags(true, true, true);
         NativeFormsDesignerController.ElementRecord repeatGroupRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'repeatGroup');
         NativeFormsDesignerController.ElementRecord fileUploadRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'fileUpload');
         NativeFormsDesignerController.ElementRecord signatureRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'signature');
+        NativeFormsDesignerController.ElementRecord buttonRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'button');
+        NativeFormsDesignerController.ElementRecord mergedDocumentRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'mergedDocument');
         NativeFormsDesignerController.ElementRecord sectionRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'section');
         NativeFormsDesignerController.ElementRecord groupRecord = NativeFormsDesignerController.addElement(versionRecord.Id, 'group');
+        System.assertEquals('mergedDocument', mergedDocumentRecord.elementType);
+        System.assertEquals('Merged Document', mergedDocumentRecord.label);
 
         try {
             NativeFormsDesignerController.placeElementInSection(fileUploadRecord.id, repeatGroupRecord.id, 1);
@@ -941,12 +1059,31 @@ private class NativeFormsDesignerBuilderTest {
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        NativeFormsDesignerController.placeElementInSection(signatureRecord.id, repeatGroupRecord.id, 1);
+        NF_Form_Element__c placedSignature = [
+            SELECT Parent_Element_Id__c
+            FROM NF_Form_Element__c
+            WHERE Id = :signatureRecord.id
+        ];
+        System.assertEquals(repeatGroupRecord.elementId, placedSignature.Parent_Element_Id__c, 'A Signature may be placed in a Records List.');
+        NF_Form_Version__c signatureVersion = [SELECT UI_Settings_JSON__c FROM NF_Form_Version__c WHERE Id = :versionRecord.Id];
+        System.assertEquals(true, jsonMap(signatureVersion.UI_Settings_JSON__c).get('submissionPdfEnabled'), 'A row Signature enables Submission PDF.');
+        NativeFormsDesignerController.ElementRecord secondSignature = NativeFormsDesignerController.addElement(versionRecord.Id, 'signature');
         try {
-            NativeFormsDesignerController.placeElementInSection(signatureRecord.id, repeatGroupRecord.id, 1);
-            System.assert(false, 'Signature fields inside records lists should be rejected.');
+            NativeFormsDesignerController.placeElementInSection(secondSignature.id, repeatGroupRecord.id, 1);
+            System.assert(false, 'A second Signature inside one Records List should be rejected.');
         } catch (AuraHandledException e) {
             assertAuraHandled(e);
         }
+        NativeFormsDesignerController.placeElementInSection(buttonRecord.id, repeatGroupRecord.id, 1);
+        NF_Form_Element__c placedButton = [
+            SELECT Parent_Element_Id__c, Field_Key__c, Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Id = :buttonRecord.id
+        ];
+        System.assertEquals(repeatGroupRecord.elementId, placedButton.Parent_Element_Id__c, 'Navigation Buttons may be placed in Records Lists.');
+        System.assertEquals(null, placedButton.Field_Key__c, 'A row Button still has no submitted value.');
+        System.assertEquals(false, jsonMap(placedButton.Config_JSON__c).get('submitBeforeNavigation'), 'A row Button must remain navigation-only.');
 
         try {
             NativeFormsDesignerController.placeElementInSection(groupRecord.id, sectionRecord.id, 1);

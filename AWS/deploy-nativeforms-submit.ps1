@@ -2,7 +2,8 @@ param(
   [string]$FunctionName = "NativeForms-SubmitForm",
   [string]$Region = "eu-north-1",
   [string]$Profile = "nativeforms-codex",
-  [string]$CaptchaSecretKey = ""
+  [string]$CaptchaSecretKey = "",
+  [string]$UploadStagingBucket = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +20,11 @@ if (Test-Path $tempRoot) {
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 Copy-Item $sourceFile (Join-Path $tempRoot "index.mjs")
 Copy-Item (Join-Path $workspaceRoot "package.json") (Join-Path $tempRoot "package.json")
+
+$assetsPath = Join-Path $workspaceRoot "AWS\assets"
+if (Test-Path $assetsPath) {
+  Copy-Item $assetsPath (Join-Path $tempRoot "assets") -Recurse
+}
 
 $nodeModulesPath = Join-Path $workspaceRoot "node_modules"
 if (!(Test-Path $nodeModulesPath)) {
@@ -38,10 +44,15 @@ aws lambda update-function-code `
   --region $Region `
   --profile $Profile
 
-if ([string]::IsNullOrWhiteSpace($CaptchaSecretKey)) {
-  Write-Host "Lambda code updated. CAPTCHA secret was not changed."
+if ([string]::IsNullOrWhiteSpace($CaptchaSecretKey) -and [string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
+  Write-Host "Lambda code updated. Lambda environment was not changed."
   exit 0
 }
+
+aws lambda wait function-updated `
+  --function-name $FunctionName `
+  --region $Region `
+  --profile $Profile
 
 $configurationJson = aws lambda get-function-configuration `
   --function-name $FunctionName `
@@ -61,16 +72,23 @@ if ($null -ne $configuration.Environment -and $null -ne $configuration.Environme
   }
 }
 
-$variables["CAPTCHA_SECRET_KEY"] = $CaptchaSecretKey
+if (![string]::IsNullOrWhiteSpace($CaptchaSecretKey)) {
+  $variables["CAPTCHA_SECRET_KEY"] = $CaptchaSecretKey
+}
+if (![string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
+  $variables["UPLOAD_STAGING_BUCKET"] = $UploadStagingBucket
+}
 
 $environmentJson = @{
   Variables = $variables
 } | ConvertTo-Json -Compress
+$environmentPath = Join-Path $tempRoot "lambda-environment.json"
+$environmentJson | Set-Content -Path $environmentPath -Encoding UTF8
 
 aws lambda update-function-configuration `
   --function-name $FunctionName `
-  --environment $environmentJson `
+  --environment ("file://" + $environmentPath) `
   --region $Region `
   --profile $Profile
 
-Write-Host "Lambda code updated and CAPTCHA_SECRET_KEY was applied."
+Write-Host "Lambda code updated and requested environment settings were applied."

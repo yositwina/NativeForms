@@ -48,8 +48,8 @@ private class NativeFormsSecretCodeApiTest {
             'publishedVersionId' => secretDisabledVersion.Id,
             'email' => 'user@example.com'
         });
-        System.assertEquals(false, disabledResponse.success, 'Secret-code-disabled forms should return an error response.');
-        System.assertEquals('Secret code verification is not enabled for this form.', disabledResponse.message, 'Disabled forms should return the feature-disabled message.');
+        System.assertEquals(false, disabledResponse.success, 'User Verification-disabled forms should return an error response.');
+        System.assertEquals('User Verification is not enabled for this form.', disabledResponse.message, 'Disabled forms should return the feature-disabled message.');
         System.assertEquals(403, RestContext.response.statusCode, 'Disabled forms should set a 403 status code.');
         }
     }
@@ -120,7 +120,7 @@ private class NativeFormsSecretCodeApiTest {
             FROM Contact
             WHERE Id = :target.Id
         ];
-        System.assertEquals(6, String.valueOf(target.NativeForms_Secret_Code__c).length(), 'sendCode should store a six-digit secret code.');
+        System.assertEquals(6, String.valueOf(target.NativeForms_Secret_Code__c).length(), 'sendCode should store a six-digit verification number.');
         System.assert(target.NativeForms_Secret_Code_Expires_At__c > System.now(), 'sendCode should store a future expiry timestamp.');
         System.assertEquals(0, Integer.valueOf(target.NativeForms_Secret_Code_Attempts__c), 'sendCode should reset attempts to zero.');
         System.assertEquals(null, target.NativeForms_Secret_Code_Verified_At__c, 'sendCode should clear any previous verified timestamp.');
@@ -235,7 +235,7 @@ private class NativeFormsSecretCodeApiTest {
     }
 
     private static NF_Form_Version__c createVersionWithSecretCode(Boolean enabled, String uiSettingsJson) {
-        NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Secret Code Form', null, 'secret-code-form');
+        NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('User Verification Form', null, 'user-verification-form');
         NF_Form_Version__c versionRecord = NativeFormsTestDataFactory.createVersion(
             formRecord.Id,
             1,

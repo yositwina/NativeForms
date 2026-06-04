@@ -12,7 +12,7 @@ import {
   QueryCommand,
   ScanCommand
 } from "@aws-sdk/client-dynamodb";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectTaggingCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
@@ -32,6 +32,7 @@ const sesClient = new SESClient({ region: process.env.SES_REGION || process.env.
 const FORM_SECURITY_TABLE = process.env.FORM_SECURITY_TABLE || "NativeFormsFormSecurity";
 const TENANT_TABLE = process.env.TENANT_TABLE || "NativeFormsTenants";
 const PLAN_TABLE = process.env.PLAN_TABLE || "NativeFormsPlans";
+const GEO_LOCATION_TABLE = process.env.GEO_LOCATION_TABLE || "NativeFormsGeoLocations";
 const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSubmissionLogs";
 const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
 const BOOTSTRAP_V2_NONCE_TABLE = process.env.BOOTSTRAP_V2_NONCE_TABLE || "NativeFormsBootstrapV2Nonces";
@@ -44,9 +45,11 @@ const SALESFORCE_API_VERSION = "v60.0";
 const SES_FROM = process.env.SES_FROM || "";
 const DEV_MODE = String(process.env.DEV_MODE || "").toLowerCase() === "true";
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "";
+const UPLOAD_STAGING_BUCKET = process.env.UPLOAD_STAGING_BUCKET || "";
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, "");
 const PRICING_BASE_URL = (process.env.PRICING_BASE_URL || "https://twinaforms.com").replace(/\/+$/, "");
 const BOOTSTRAP_V2_SPIKE_SECRET_B64 = process.env.BOOTSTRAP_V2_SPIKE_SECRET_B64 || "";
+const MALWARE_SCAN_STATUS_TAG_KEY = "GuardDutyMalwareScanStatus";
 const FEATURE_FLAG_METADATA = {
   enableProConditionLogic: {
     label: "Conditional Logic",
@@ -92,13 +95,17 @@ const FEATURE_FLAG_METADATA = {
     label: "Submission PDF",
     description: "Generate a readable PDF copy of submitted responses and attach it to Salesforce records."
   },
-  enableProRecordsListRowSignaturePdf: {
-    label: "Records List Row Signature + PDF",
-    description: "Require signatures on repeated rows and include them in the submitted PDF."
+  enableProMergedDocument: {
+    label: "Merged Document",
+    description: "Create document-style rich text that inserts prefilled Salesforce values such as contact names or agreement details."
   },
   enableProSurveyFields: {
     label: "Survey Fields",
     description: "Add rating, NPS, Likert, ranking, and satisfaction fields to Pro forms."
+  },
+  enableProLocationFields: {
+    label: "Country / State / City",
+    description: "Add AWS-backed country, state/region, and city autocomplete fields to Pro forms."
   },
   enableProCustomJs: {
     label: "Custom JavaScript",
@@ -137,8 +144,9 @@ const DEFAULT_PLANS = [
       enableProLoadFile: false,
       enableProElectronicSignature: false,
       enableProSubmissionPdf: false,
-      enableProRecordsListRowSignaturePdf: false,
+      enableProMergedDocument: false,
       enableProSurveyFields: false,
+      enableProLocationFields: false,
       enableProCustomJs: false
     }
   },
@@ -166,8 +174,9 @@ const DEFAULT_PLANS = [
       enableProLoadFile: true,
       enableProElectronicSignature: true,
       enableProSubmissionPdf: true,
-      enableProRecordsListRowSignaturePdf: true,
+      enableProMergedDocument: true,
       enableProSurveyFields: true,
+      enableProLocationFields: true,
       enableProCustomJs: true
     }
   },
@@ -195,8 +204,9 @@ const DEFAULT_PLANS = [
       enableProLoadFile: false,
       enableProElectronicSignature: false,
       enableProSubmissionPdf: false,
-      enableProRecordsListRowSignaturePdf: false,
+      enableProMergedDocument: false,
       enableProSurveyFields: false,
+      enableProLocationFields: false,
       enableProCustomJs: false
     }
   },
@@ -224,8 +234,9 @@ const DEFAULT_PLANS = [
       enableProLoadFile: true,
       enableProElectronicSignature: true,
       enableProSubmissionPdf: true,
-      enableProRecordsListRowSignaturePdf: true,
+      enableProMergedDocument: true,
       enableProSurveyFields: true,
+      enableProLocationFields: true,
       enableProCustomJs: true
     }
   }
@@ -587,6 +598,29 @@ function findLookupFieldDefinition(formSecurity, fieldKey) {
   return definition && typeof definition === "object" && !Array.isArray(definition) ? definition : null;
 }
 
+function normalizeLocationDefinition(formSecurity) {
+  const definition = formSecurity?.locationDefinition;
+  if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+    return { fields: {} };
+  }
+  return {
+    ...definition,
+    fields: definition.fields && typeof definition.fields === "object" && !Array.isArray(definition.fields)
+      ? definition.fields
+      : {}
+  };
+}
+
+function findLocationFieldDefinition(formSecurity, fieldKey) {
+  const normalizedFieldKey = String(fieldKey || "").trim();
+  if (!normalizedFieldKey) {
+    return null;
+  }
+  const fields = normalizeLocationDefinition(formSecurity).fields;
+  const definition = fields[normalizedFieldKey];
+  return definition && typeof definition === "object" && !Array.isArray(definition) ? definition : null;
+}
+
 function findUploadFieldDefinition(formSecurity, fieldKey) {
   const normalizedFieldKey = String(fieldKey || "").trim();
   if (!normalizedFieldKey) {
@@ -623,6 +657,106 @@ function createUploadReferenceToken(payload, tenantRecord) {
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
   return `${encodedPayload}.${signature}`;
+}
+
+function base64UrlDecodeUtf8(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Buffer.from(padded, "base64").toString("utf8");
+}
+
+function verifyUploadReferenceToken(token, tenantRecord) {
+  const parts = String(token || "").trim().split(".");
+  if (parts.length !== 2) {
+    return null;
+  }
+  const [encodedPayload, suppliedSignature] = parts;
+  const expectedSignature = crypto
+    .createHmac("sha256", getUploadSigningSecret(tenantRecord))
+    .update(encodedPayload)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const suppliedBuffer = Buffer.from(suppliedSignature);
+  if (expectedBuffer.length !== suppliedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+    return null;
+  }
+  try {
+    return JSON.parse(base64UrlDecodeUtf8(encodedPayload));
+  } catch (error) {
+    return null;
+  }
+}
+
+function validateBoundUploadReference(payload, formSecurity, tenantRecord) {
+  const tokenPayload = verifyUploadReferenceToken(payload.uploadToken, tenantRecord);
+  if (!tokenPayload) {
+    const error = new Error("This file upload reference is invalid.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Number(tokenPayload.exp || 0) <= nowSeconds) {
+    const error = new Error("This file upload has expired. Please upload it again.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (
+    tokenPayload.kind !== "fileUpload" ||
+    tokenPayload.orgId !== formSecurity.orgId ||
+    tokenPayload.formId !== formSecurity.formId ||
+    String(tokenPayload.publishedVersionId || "") !== String(formSecurity.publishedVersionId || "") ||
+    String(tokenPayload.fieldKey || "") !== String(payload.fieldKey || "") ||
+    String(tokenPayload.sessionId || "") !== String(payload.sessionId || "")
+  ) {
+    const error = new Error("This file upload does not belong to this form session.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return tokenPayload;
+}
+
+async function getUploadScanStatus(objectKey) {
+  if (!objectKey) {
+    return { status: "unavailable" };
+  }
+  try {
+    const result = await s3Client.send(new GetObjectTaggingCommand({
+      Bucket: UPLOAD_STAGING_BUCKET,
+      Key: objectKey
+    }));
+    const tag = (result.TagSet || []).find((item) => item.Key === MALWARE_SCAN_STATUS_TAG_KEY);
+    const scanStatus = String(tag?.Value || "").trim();
+    if (!scanStatus) {
+      return { status: "pending" };
+    }
+    if (scanStatus === "NO_THREATS_FOUND") {
+      return { status: "ready" };
+    }
+    if (scanStatus === "THREATS_FOUND") {
+      return { status: "rejected" };
+    }
+    return { status: "unavailable" };
+  } catch (error) {
+    console.warn("Unable to retrieve upload scan status", { objectKey, message: error?.message });
+    return { status: "unavailable" };
+  }
+}
+
+async function removeRejectedStagedUpload(objectKey) {
+  if (!objectKey) {
+    return;
+  }
+  try {
+    await s3Client.send(new DeleteObjectCommand({
+      Bucket: UPLOAD_STAGING_BUCKET,
+      Key: objectKey
+    }));
+  } catch (error) {
+    console.warn("Unable to delete rejected staged upload", { objectKey, message: error?.message });
+  }
 }
 
 function buildUploadObjectKey(formSecurity, fieldKey, sessionId, fileName) {
@@ -730,19 +864,22 @@ function getPlanByCode(planDefinitions, planCode) {
   return {
     ...defaultPlan,
     ...storedPlan,
-    featureLabels: {
-      ...Object.fromEntries(Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [key, value.label])),
-      ...(defaultPlan?.featureLabels || {}),
-      ...(storedPlan?.featureLabels || {})
-    },
+    featureLabels: Object.fromEntries(
+      Object.entries(FEATURE_FLAG_METADATA).map(([key, value]) => [
+        key,
+        storedPlan?.featureLabels?.[key] || defaultPlan?.featureLabels?.[key] || value.label
+      ])
+    ),
     limits: {
       ...(defaultPlan?.limits || {}),
       ...(storedPlan?.limits || {})
     },
-    featureFlags: {
-      ...(defaultPlan?.featureFlags || {}),
-      ...(storedPlan?.featureFlags || {})
-    }
+    featureFlags: Object.fromEntries(
+      Object.keys(FEATURE_FLAG_METADATA).map((key) => [
+        key,
+        storedPlan?.featureFlags?.[key] ?? defaultPlan?.featureFlags?.[key] ?? false
+      ])
+    )
   };
 }
 
@@ -846,8 +983,9 @@ function hasAdvancedProFeatures(featureFlags) {
     "enableProLoadFile",
     "enableProElectronicSignature",
     "enableProSubmissionPdf",
-    "enableProRecordsListRowSignaturePdf",
+    "enableProMergedDocument",
     "enableProSurveyFields",
+    "enableProLocationFields",
     "enableProCustomJs"
   ].some((key) => featureFlags?.[key] === true);
 }
@@ -1581,6 +1719,9 @@ function validateFormSecurityPayload(payload) {
   if (payload.lookupDefinition != null && (typeof payload.lookupDefinition !== "object" || Array.isArray(payload.lookupDefinition))) {
     throw new Error("lookupDefinition must be an object when provided");
   }
+  if (payload.locationDefinition != null && (typeof payload.locationDefinition !== "object" || Array.isArray(payload.locationDefinition))) {
+    throw new Error("locationDefinition must be an object when provided");
+  }
   if (payload.submissionPdf != null && (typeof payload.submissionPdf !== "object" || Array.isArray(payload.submissionPdf))) {
     throw new Error("submissionPdf must be an object when provided");
   }
@@ -1608,11 +1749,30 @@ function validateUploadInitPayload(payload) {
   if (!payload?.sessionId) throw new Error("Missing required field: sessionId");
 }
 
+function validateUploadStatusPayload(payload) {
+  if (!payload?.formId) throw new Error("Missing required field: formId");
+  if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
+  if (!payload?.fieldKey) throw new Error("Missing required field: fieldKey");
+  if (!payload?.sessionId) throw new Error("Missing required field: sessionId");
+  if (!payload?.uploadToken) throw new Error("Missing required field: uploadToken");
+}
+
 function validateLookupPayload(payload) {
   if (!payload?.formId) throw new Error("Missing required field: formId");
   if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
   if (!payload?.fieldKey) throw new Error("Missing required field: fieldKey");
   if (!payload?.search && !payload?.recordId) throw new Error("Missing required field: search or recordId");
+}
+
+function validateLocationPayload(payload) {
+  if (!payload?.formId) throw new Error("Missing required field: formId");
+  if (!payload?.publishToken) throw new Error("Missing required field: publishToken");
+  if (!payload?.fieldKey) throw new Error("Missing required field: fieldKey");
+  if (!payload?.kind) throw new Error("Missing required field: kind");
+  if (!payload?.search) throw new Error("Missing required field: search");
+  if (!["country", "region", "city"].includes(String(payload.kind))) {
+    throw new Error("Invalid location search kind");
+  }
 }
 
 function validateSalesforceLayoutPayload(payload) {
@@ -2146,6 +2306,124 @@ async function runLookup(payload, formSecurity) {
     success: true,
     mode: "search",
     records
+  };
+}
+
+function normalizeCountryCode(value) {
+  const code = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(code) ? code : "";
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeLocationConfig(definition) {
+  const mode = ["country", "countryRegion", "countryCity", "countryRegionCity"].includes(String(definition?.mode || ""))
+    ? String(definition.mode)
+    : "countryRegionCity";
+  const allowedCountries = Array.isArray(definition?.allowedCountries)
+    ? definition.allowedCountries.map(normalizeCountryCode).filter(Boolean)
+    : [];
+  return {
+    mode,
+    allowedCountries,
+    minSearchLength: Math.min(Math.max(Number(definition?.minSearchLength) || 2, 1), 10),
+    limit: Math.min(Math.max(Number(definition?.limit) || 10, 1), 25)
+  };
+}
+
+function locationPartitionForPayload(payload) {
+  const kind = String(payload?.kind || "");
+  if (kind === "country") return "country";
+  const countryCode = normalizeCountryCode(payload?.countryCode);
+  if (!countryCode) {
+    const error = new Error("Country is required for this location search.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (kind === "region") return `region#${countryCode}`;
+  const regionCode = String(payload?.regionCode || "").trim();
+  return regionCode ? `city#${countryCode}#${regionCode}` : `city#${countryCode}`;
+}
+
+function formatLocationRecord(item) {
+  return {
+    kind: item.kind || item.type || "",
+    label: item.label || item.displayLabel || item.name || item.cityName || item.countryName || "",
+    countryCode: item.countryCode || item.code || "",
+    countryName: item.countryName || "",
+    regionCode: item.regionCode || "",
+    regionName: item.regionName || "",
+    cityName: item.cityName || item.name || "",
+    geoNameId: item.geoNameId || "",
+    latitude: item.latitude ?? null,
+    longitude: item.longitude ?? null,
+    displayLabel: item.displayLabel || item.label || ""
+  };
+}
+
+async function queryGeoLocations(partition, search, limit) {
+  const result = await dynamoClient.send(new QueryCommand({
+    TableName: GEO_LOCATION_TABLE,
+    KeyConditionExpression: "locationPartition = :partition AND begins_with(searchKey, :search)",
+    ExpressionAttributeValues: {
+      ":partition": { S: partition },
+      ":search": { S: search }
+    },
+    Limit: Math.min(Math.max(limit * 5, limit), 100)
+  }));
+  return (result.Items || []).map(unmarshallItem);
+}
+
+async function runLocationSearch(payload, formSecurity) {
+  const locationDefinition = findLocationFieldDefinition(formSecurity, payload.fieldKey);
+  if (!locationDefinition) {
+    const error = new Error("Location is not configured for this field.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const config = normalizeLocationConfig(locationDefinition);
+  const search = normalizeSearchText(payload.search);
+  if (search.length < (payload.kind === "country" ? 1 : config.minSearchLength)) {
+    return { success: true, mode: "search", records: [] };
+  }
+  if (payload.kind === "region" && !["countryRegion", "countryRegionCity"].includes(config.mode)) {
+    const error = new Error("State/region search is not enabled for this location field.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (payload.kind === "city" && !["countryCity", "countryRegionCity"].includes(config.mode)) {
+    const error = new Error("City search is not enabled for this location field.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const countryCode = normalizeCountryCode(payload.countryCode);
+  if (config.allowedCountries.length && payload.kind !== "country" && !config.allowedCountries.includes(countryCode)) {
+    const error = new Error("This country is not enabled for this location field.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const partition = locationPartitionForPayload(payload);
+  let records = await queryGeoLocations(partition, search, config.limit);
+  if (payload.kind === "country" && config.allowedCountries.length) {
+    records = records.filter((item) => config.allowedCountries.includes(normalizeCountryCode(item.countryCode || item.code)));
+  }
+  records = records.sort((a, b) => {
+    const populationDelta = Number(b.population || 0) - Number(a.population || 0);
+    if (populationDelta) return populationDelta;
+    return String(a.label || a.displayLabel || a.name || "").localeCompare(String(b.label || b.displayLabel || b.name || ""));
+  });
+  return {
+    success: true,
+    mode: "search",
+    records: records.map(formatLocationRecord).filter((item) => item.label || item.displayLabel).slice(0, config.limit)
   };
 }
 
@@ -3092,6 +3370,7 @@ export const handler = async (event) => {
         signatureFields: Array.isArray(payload.signatureFields) ? payload.signatureFields : [],
         recordsListRowSignatures: Array.isArray(payload.recordsListRowSignatures) ? payload.recordsListRowSignatures : [],
         lookupDefinition: payload.lookupDefinition && typeof payload.lookupDefinition === "object" ? payload.lookupDefinition : { fields: {} },
+        locationDefinition: payload.locationDefinition && typeof payload.locationDefinition === "object" ? payload.locationDefinition : { fields: {} },
         submissionPdf: payload.submissionPdf && typeof payload.submissionPdf === "object" ? payload.submissionPdf : null,
         secretCodeConfig: payload.secretCodeConfig || null,
         prefillPolicy: payload.prefillPolicy,
@@ -3252,6 +3531,35 @@ export const handler = async (event) => {
     }
   }
 
+  if (path === "/forms/location/search" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateLocationPayload(payload);
+      const formSecurity = await getFormSecurityRecord(payload.formId);
+      ensurePublishedFormToken(formSecurity, payload.publishToken);
+      const tenantRecord = await getTenantRecord(formSecurity.orgId);
+      assertTenantIsActive(tenantRecord);
+      const planResult = await loadPlanDefinitions();
+      const selectedPlan = getPlanByCode(planResult.items, normalizePlanCode(null, tenantRecord));
+      const effectiveFeatureFlags = getEffectivePlanFeatures(tenantRecord, selectedPlan);
+      if (effectiveFeatureFlags?.enableProLocationFields !== true) {
+        const error = new Error("Country / State / City is not available for this tenant.");
+        error.statusCode = 403;
+        throw error;
+      }
+      const result = await runLocationSearch(payload, formSecurity);
+      return jsonResponse(200, result);
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
   if (path === "/forms/upload/init" && method === "POST") {
     try {
       const payload = event?.body
@@ -3282,8 +3590,8 @@ export const handler = async (event) => {
 
       validateUploadFieldRules(uploadField, payload);
 
-      if (!PUBLISH_BUCKET) {
-        throw new Error("Server misconfigured: PUBLISH_BUCKET is required");
+      if (!UPLOAD_STAGING_BUCKET) {
+        throw new Error("Server misconfigured: UPLOAD_STAGING_BUCKET is required for File Uploads");
       }
 
       const normalizedFileName = normalizeFileName(payload.fileName);
@@ -3291,7 +3599,7 @@ export const handler = async (event) => {
       const contentType = String(payload.contentType || "application/octet-stream").trim() || "application/octet-stream";
       const expiresIn = 900;
       const putCommand = new PutObjectCommand({
-        Bucket: PUBLISH_BUCKET,
+        Bucket: UPLOAD_STAGING_BUCKET,
         Key: objectKey,
         ContentType: contentType
       });
@@ -3320,6 +3628,48 @@ export const handler = async (event) => {
         fieldKey: String(payload.fieldKey),
         contentType,
         fileSize: Number(payload.fileSize)
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/forms/upload/status" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+
+      validateUploadStatusPayload(payload);
+      const formSecurity = await getFormSecurityRecord(payload.formId);
+      ensurePublishedFormToken(formSecurity, payload.publishToken);
+
+      const tenantRecord = await getTenantRecord(formSecurity.orgId);
+      assertTenantIsActive(tenantRecord);
+      const planResult = await loadPlanDefinitions();
+      const selectedPlan = getPlanByCode(planResult.items, normalizePlanCode(null, tenantRecord));
+      const effectiveFeatureFlags = getEffectivePlanFeatures(tenantRecord, selectedPlan);
+      if (effectiveFeatureFlags?.enableProLoadFile !== true) {
+        const error = new Error("File Uploads are not available for this tenant.");
+        error.statusCode = 403;
+        throw error;
+      }
+      if (!UPLOAD_STAGING_BUCKET) {
+        throw new Error("Server misconfigured: UPLOAD_STAGING_BUCKET is required for File Uploads");
+      }
+
+      const tokenPayload = validateBoundUploadReference(payload, formSecurity, tenantRecord);
+      const objectKey = String(tokenPayload.objectKey || "").trim();
+      const scanResult = await getUploadScanStatus(objectKey);
+      if (scanResult.status === "rejected") {
+        await removeRejectedStagedUpload(objectKey);
+      }
+      return jsonResponse(200, {
+        success: true,
+        status: scanResult.status
       });
     } catch (e) {
       return jsonResponse(e.statusCode || 400, {

@@ -5,10 +5,13 @@ import updateSecretCodeSessionMode from '@salesforce/apex/NativeFormsDesignerCon
 import updateVersionPostSubmitRedirectSettings from '@salesforce/apex/NativeFormsDesignerController.updateVersionPostSubmitRedirectSettings';
 import updateVersionSubmissionPdfSettings from '@salesforce/apex/NativeFormsDesignerController.updateVersionSubmissionPdfSettings';
 import updateVersionCustomJs from '@salesforce/apex/NativeFormsDesignerController.updateVersionCustomJs';
+import createProject from '@salesforce/apex/NativeFormsDesignerController.createProject';
 import createFormWithDraftVersion from '@salesforce/apex/NativeFormsDesignerController.createFormWithDraftVersion';
 import createFormFromPageLayout from '@salesforce/apex/NativeFormsDesignerController.createFormFromPageLayout';
 import cloneFormWithDraftVersion from '@salesforce/apex/NativeFormsDesignerController.cloneFormWithDraftVersion';
+import restoreDraftFromPublished from '@salesforce/apex/NativeFormsDesignerController.restoreDraftFromPublished';
 import deleteDesignerForm from '@salesforce/apex/NativeFormsDesignerController.deleteForm';
+import restoreVersionElementsSnapshot from '@salesforce/apex/NativeFormsDesignerController.restoreVersionElementsSnapshot';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPageLayoutImportOptions from '@salesforce/apex/NativeFormsDesignerController.getPageLayoutImportOptions';
 import previewPageLayoutImport from '@salesforce/apex/NativeFormsDesignerController.previewPageLayoutImport';
@@ -23,13 +26,17 @@ import updateSectionColumns from '@salesforce/apex/NativeFormsDesignerController
 import updateElement from '@salesforce/apex/NativeFormsBuilderController.updateElement';
 import publishVersion from '@salesforce/apex/NativeFormsBuilderController.publishVersion';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import LightningConfirm from 'lightning/confirm';
 import { previewFormulaValue, validateFormulaConfig } from './formulaEngine';
 
 const DESIGNER_PROJECT_KEY = 'nativeforms:selectedProjectId';
 const DESIGNER_FORM_KEY = 'nativeforms:selectedFormId';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
+const MAX_UNDO_STEPS = 5;
 const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
 const SECRET_CODE_ELEMENT_ID = '__secretCode__';
+const MAX_EMBEDDED_IMAGE_BYTES = 69 * 1024;
+const MAX_EMBEDDED_IMAGE_LABEL = '69 KB';
 
 export default class NativeFormsDesigner extends LightningElement {
     isLoading = true;
@@ -68,7 +75,7 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedVersionSecretCodeVerifiedMessage = '';
     selectedVersionSecretCodeSendButtonLabel = 'Enter';
     selectedVersionSecretCodeVerifyButtonLabel = 'Verify';
-    selectedVersionSecretCodeResendButtonLabel = 'Resend Code';
+    selectedVersionSecretCodeResendButtonLabel = 'Resend Verification Number';
     selectedVersionSecretCodeExpiryMinutes = 10;
     selectedVersionSecretCodeMaxAttempts = 5;
     selectedVersionSecretCodeAllowResend = true;
@@ -104,7 +111,7 @@ export default class NativeFormsDesigner extends LightningElement {
     draftSecretCodeVerifiedMessage = '';
     draftSecretCodeSendButtonLabel = 'Enter';
     draftSecretCodeVerifyButtonLabel = 'Verify';
-    draftSecretCodeResendButtonLabel = 'Resend Code';
+    draftSecretCodeResendButtonLabel = 'Resend Verification Number';
     draftSecretCodeExpiryMinutes = 10;
     draftSecretCodeMaxAttempts = 5;
     draftSecretCodeAllowResend = true;
@@ -128,7 +135,12 @@ export default class NativeFormsDesigner extends LightningElement {
     dragSectionTarget = null;
     autoSaveTimeoutId = null;
     publishResult = null;
+    publishResultContextVersionId = '';
+    undoStack = [];
+    pendingElementEditUndoSnapshot = null;
+    isUndoing = false;
     showNewFormModal = false;
+    showCreateProjectModal = false;
     showLayoutImportModal = false;
     showLayoutImportResultModal = false;
     showCloneFormModal = false;
@@ -136,11 +148,14 @@ export default class NativeFormsDesigner extends LightningElement {
     showCustomJsModal = false;
     showPostSubmitFormulaModal = false;
     showFieldFormulaModal = false;
+    showButtonParameterFormulaModal = false;
     showDeleteFormModal = false;
     newFormDescription = '';
     newFormProjectId = '';
     newFormProjectName = '';
     isCreatingForm = false;
+    newProjectName = '';
+    isCreatingProject = false;
     layoutImportDescription = '';
     layoutImportProjectId = '';
     layoutImportProjectName = '';
@@ -156,6 +171,7 @@ export default class NativeFormsDesigner extends LightningElement {
     cloneFormProjectId = '';
     cloneFormProjectName = '';
     isCloningForm = false;
+    isRestoringPublished = false;
     deleteFormConfirmText = '';
     isDeletingForm = false;
 
@@ -171,19 +187,23 @@ export default class NativeFormsDesigner extends LightningElement {
     @track prefillAliasDetails = [];
     @track submitActionDetails = [];
     @track editorSurveyOptions = [];
+    @track publishedButtonTargets = [];
+    @track editorButtonQueryParameters = [];
     enableProConditionLogic = false;
     enableProRepeatGroups = false;
     enableProLoadFile = false;
     enableProElectronicSignature = false;
     enableProSubmissionPdf = false;
-    enableProRecordsListRowSignaturePdf = false;
     enableProSurveyFields = false;
+    enableProLocationFields = false;
     enableProFormulaFields = false;
     enableProPostSubmitAutoLink = false;
     enableProSfSecretCodeAuth = false;
     enableProAdvancedSubmitModes = false;
     enableProPageLayoutClone = false;
     enableProCustomJs = false;
+    enableProButtonElements = false;
+    enableProMergedDocument = false;
     currentFormCount = 0;
     maxForms = null;
     formLimitReached = false;
@@ -192,6 +212,7 @@ export default class NativeFormsDesigner extends LightningElement {
     selectedPostSubmitFormToken = '';
     selectedPostSubmitFormulaFieldToken = '';
     selectedFormulaFieldToken = '';
+    selectedButtonParameterFormulaFieldToken = '';
     postSubmitUrlSelectionStart = 0;
     postSubmitUrlSelectionEnd = 0;
     postSubmitTokenInteraction = false;
@@ -228,6 +249,21 @@ export default class NativeFormsDesigner extends LightningElement {
     editorLookupDisplayFieldsText = 'Name';
     editorLookupMinSearchLength = '2';
     editorLookupResultLimit = '10';
+    editorLocationMode = 'countryRegionCity';
+    editorLocationLayout = 'stacked';
+    editorLocationRequiredCountry = true;
+    editorLocationRequiredRegion = false;
+    editorLocationRequiredCity = false;
+    editorLocationDefaultCountryCode = '';
+    editorLocationAllowedCountriesText = '';
+    editorLocationMinSearchLength = '2';
+    editorLocationResultLimit = '10';
+    editorLocationCountryPrefillFieldPath = '';
+    editorLocationRegionPrefillFieldPath = '';
+    editorLocationCityPrefillFieldPath = '';
+    editorLocationCountrySubmitFieldPath = '';
+    editorLocationRegionSubmitFieldPath = '';
+    editorLocationCitySubmitFieldPath = '';
     editorLabelBold = false;
     editorLabelItalic = false;
     editorLabelUnderline = false;
@@ -241,6 +277,7 @@ export default class NativeFormsDesigner extends LightningElement {
     editorConditionalExpression = '';
     editorMinValue = '';
     editorMaxValue = '';
+    editorTextareaMaxLength = '254';
     editorDateDisplayFormat = 'us';
     editorDateGmtOffset = '+00:00';
     editorTimeFormat = '24h';
@@ -261,11 +298,34 @@ export default class NativeFormsDesigner extends LightningElement {
     editorTargetSubmitActionKey = '';
     editorHelpText = '';
     editorClearButtonLabel = 'Clear';
+    editorButtonDestinationType = 'form';
+    editorButtonTargetFormId = '';
+    editorButtonExternalUrlMode = 'template';
+    editorButtonExternalUrlTemplate = '';
+    editorButtonExternalUrlFormula = '';
+    editorButtonSubmitBeforeNavigation = false;
     editorUseFormula = false;
     editorFormulaExpression = '';
     editorFormulaPreviewValue = '';
     editorFormulaError = '';
     modalDisplayText = '';
+    modalMergeAlias = '';
+    modalMergeFieldPath = '';
+    displayTextRichTextFormats = [
+        'font',
+        'size',
+        'bold',
+        'italic',
+        'underline',
+        'strike',
+        'color',
+        'background',
+        'list',
+        'indent',
+        'align',
+        'link',
+        'clean'
+    ];
     modalCustomJs = '';
     modalFormulaExpression = '';
     modalFormulaPreviewValue = '';
@@ -273,6 +333,10 @@ export default class NativeFormsDesigner extends LightningElement {
     modalPostSubmitUrlFormula = '';
     modalPostSubmitUrlFormulaPreviewValue = '';
     modalPostSubmitUrlFormulaError = '';
+    modalButtonParameterFormula = '';
+    modalButtonParameterFormulaPreviewValue = '';
+    modalButtonParameterFormulaError = '';
+    modalButtonParameterIndex = null;
 
     inputFieldOptions = [
         { label: 'Text', value: 'text', iconName: 'utility:text' },
@@ -289,7 +353,13 @@ export default class NativeFormsDesigner extends LightningElement {
         { label: 'Text Area', value: 'textarea', iconName: 'utility:note' },
         { label: 'URL', value: 'url', iconName: 'utility:link' },
         { label: 'File Upload', value: 'fileUpload', iconName: 'utility:upload' },
-        { label: 'Signature', value: 'signature', iconName: 'utility:edit_form' }
+        { label: 'Signature', value: 'signature', iconName: 'utility:edit_form' },
+        { label: 'Button', value: 'button', iconName: 'utility:link' }
+    ];
+
+    specialElementOptions = [
+        { label: 'Country / State / City', value: 'location', iconName: 'utility:location' },
+        { label: 'Merged Document', value: 'mergedDocument', iconName: 'utility:description' }
     ];
 
     surveyFieldOptions = [
@@ -301,15 +371,16 @@ export default class NativeFormsDesigner extends LightningElement {
     ];
 
     displayElementOptions = [
-        { label: 'Section', value: 'section' },
-        { label: 'Group', value: 'group' },
-        { label: 'Records List', value: 'repeatGroup' },
-        { label: 'Display Text', value: 'heading' },
-        { label: 'Image', value: 'image' }
+        { label: 'Section', value: 'section', iconName: 'utility:section' },
+        { label: 'Group', value: 'group', iconName: 'utility:layout' },
+        { label: 'Records List', value: 'repeatGroup', iconName: 'utility:table' },
+        { label: 'Display Text', value: 'heading', iconName: 'utility:text' },
+        { label: 'Image', value: 'image', iconName: 'utility:image' }
     ];
 
     editorElementTypeOptions = [
         ...this.inputFieldOptions,
+        ...this.specialElementOptions,
         { label: 'Ranking', value: 'ranking' },
         ...this.displayElementOptions
     ];
@@ -329,12 +400,39 @@ export default class NativeFormsDesigner extends LightningElement {
         { label: 'Stretch', value: 'stretch' }
     ];
 
+    buttonDestinationTypeOptions = [
+        { label: 'Another TwinaForms Form', value: 'form' },
+        { label: 'External URL', value: 'external' }
+    ];
+
+    buttonExternalUrlModeOptions = [
+        { label: 'URL Template', value: 'template' },
+        { label: 'Formula URL', value: 'formula' }
+    ];
+
+    buttonParameterModeOptions = [
+        { label: 'Field', value: 'template' },
+        { label: 'Formula', value: 'formula' }
+    ];
+
     languageOptions = [
         { label: 'English', value: 'en' },
         { label: 'Hebrew', value: 'he' },
         { label: 'Spanish', value: 'es' },
         { label: 'German', value: 'de' },
         { label: 'French', value: 'fr' }
+    ];
+
+    locationModeOptions = [
+        { label: 'Country only', value: 'country' },
+        { label: 'Country + State/Region', value: 'countryRegion' },
+        { label: 'Country + City', value: 'countryCity' },
+        { label: 'Country + State/Region + City', value: 'countryRegionCity' }
+    ];
+
+    locationLayoutOptions = [
+        { label: 'Stacked', value: 'stacked' },
+        { label: 'Inline', value: 'inline' }
     ];
 
     fieldBehaviorOptions = [
@@ -461,7 +559,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get rightPaneTitle() {
         if (this.selectedElementIsSecretCode) {
-            return 'Secret Code Verification';
+            return 'User Verification';
         }
         return this.showFormSettingsPanel ? 'Form Settings' : 'Element Properties';
     }
@@ -560,6 +658,11 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.publishResult?.success ? 'Open published form' : 'Open form';
     }
 
+    get showPublishResult() {
+        return !!this.publishResult
+            && (!this.publishResultContextVersionId || this.publishResultContextVersionId === this.selectedVersionId);
+    }
+
     get showPublishFormButton() {
         return !this.errorMessage
             && !this.showFormLimitWarning
@@ -584,6 +687,10 @@ export default class NativeFormsDesigner extends LightningElement {
         return !this.selectedFormId || !this.selectedVersionId || this.isCloningForm;
     }
 
+    get newFormActionDisabled() {
+        return this.formLimitReached || this.isCreatingForm;
+    }
+
     get cloneFormCreateDisabled() {
         const projectSelection = String(this.cloneFormProjectId || '').trim();
         const requiresNewProjectName = projectSelection === '__new__';
@@ -594,6 +701,26 @@ export default class NativeFormsDesigner extends LightningElement {
             || !String(this.cloneFormDescription || '').trim()
             || (!projectSelection && !requiresNewProjectName)
             || (requiresNewProjectName && !String(this.cloneFormProjectName || '').trim());
+    }
+
+    get createProjectDisabled() {
+        return this.isCreatingProject || !String(this.newProjectName || '').trim();
+    }
+
+    get selectedVersionOption() {
+        return (this.versionOptions || []).find((option) => option.value === this.selectedVersionId) || null;
+    }
+
+    get selectedVersionIsPublished() {
+        return this.selectedVersionOption?.isPublished === true;
+    }
+
+    get showRestorePublishedAction() {
+        return this.selectedVersionIsPublished;
+    }
+
+    get restorePublishedDisabled() {
+        return !this.selectedFormId || !this.selectedVersionId || !this.selectedVersionIsPublished || this.isRestoringPublished;
     }
 
     get layoutImportDisabled() {
@@ -728,6 +855,18 @@ export default class NativeFormsDesigner extends LightningElement {
         return !this.selectedVersionId || this.isSelectedVersionReadOnly;
     }
 
+    get undoDisabled() {
+        return this.isUndoing
+            || this.isSelectedVersionReadOnly
+            || !this.selectedVersionId
+            || !(this.undoStack || []).length;
+    }
+
+    get undoLabel() {
+        const count = (this.undoStack || []).length;
+        return count > 1 ? `Undo (${count})` : 'Undo';
+    }
+
     get hasCanvasElements() {
         return this.canvasElements.length > 0;
     }
@@ -764,6 +903,10 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.selectedElement?.elementType === 'submitButton';
     }
 
+    get selectedElementIsButton() {
+        return this.editorElementType === 'button';
+    }
+
     get selectedElementIsSecretCode() {
         return this.selectedElement?.elementType === 'secretCode';
     }
@@ -780,20 +923,35 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorShowLabelsOnEachRow ? 'eachRow' : 'tableHeader';
     }
 
-    get rowSignatureFeatureAvailable() {
-        return this.enableProRecordsListRowSignaturePdf
-            && this.enableProElectronicSignature
-            && this.enableProSubmissionPdf;
-    }
-
     get selectedElementIsContainer() {
         return this.selectedElementIsSection || this.selectedElementIsGroup || this.selectedElementIsRepeatGroup;
     }
 
     get availableDisplayElementOptions() {
-        return this.enableProRepeatGroups
-            ? this.displayElementOptions
-            : this.displayElementOptions.filter((option) => option.value !== 'repeatGroup');
+        return this.displayElementOptions.filter((option) => {
+            if (option.value === 'repeatGroup') {
+                return this.enableProRepeatGroups;
+            }
+            if (option.value === 'button') {
+                return this.enableProButtonElements;
+            }
+            if (option.value === 'location') {
+                return this.enableProLocationFields;
+            }
+            return true;
+        });
+    }
+
+    get buttonDestinationIsForm() {
+        return this.editorButtonDestinationType === 'form';
+    }
+
+    get buttonDestinationIsExternal() {
+        return !this.buttonDestinationIsForm;
+    }
+
+    get buttonExternalUrlUsesFormula() {
+        return this.editorButtonExternalUrlMode === 'formula';
     }
 
     get availableInputFieldOptions() {
@@ -803,6 +961,9 @@ export default class NativeFormsDesigner extends LightningElement {
             }
             if (option.value === 'signature') {
                 return this.enableProElectronicSignature;
+            }
+            if (option.value === 'button') {
+                return this.enableProButtonElements;
             }
             return true;
         });
@@ -819,21 +980,32 @@ export default class NativeFormsDesigner extends LightningElement {
     get availableEditorElementTypeOptions() {
         const allowedInputTypes = new Set([
             ...this.availableInputFieldOptions.map((option) => option.value),
+            ...this.availableSpecialElementOptions.map((option) => option.value),
             ...this.availableSurveyFieldOptions.map((option) => option.value)
         ]);
         return this.editorElementTypeOptions.filter((option) => {
-            if (this.inputFieldOptions.some((inputOption) => inputOption.value === option.value)) {
+            if (this.inputFieldOptions.some((inputOption) => inputOption.value === option.value)
+                || this.specialElementOptions.some((specialOption) => specialOption.value === option.value)) {
                 return allowedInputTypes.has(option.value);
             }
             if (option.value === 'ranking') {
                 return this.enableProSurveyFields;
+            }
+            if (option.value === 'button') {
+                return this.enableProButtonElements || this.selectedElementIsButton;
+            }
+            if (option.value === 'location') {
+                return this.enableProLocationFields || this.selectedElementIsLocation;
+            }
+            if (option.value === 'mergedDocument') {
+                return this.enableProMergedDocument || this.selectedElementIsMergedDocument;
             }
             return option.value !== 'repeatGroup' || this.enableProRepeatGroups;
         });
     }
 
     get selectedElementSupportsLabelPosition() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDefaultValue() {
@@ -846,15 +1018,15 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsBoldLabel() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsRequired() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsFieldBehavior() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'group'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'group'].includes(this.editorElementType);
     }
 
     get selectedElementSupportsDisplayFieldBehavior() {
@@ -867,6 +1039,14 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get selectedElementIsDisplayText() {
         return this.editorElementType === 'heading';
+    }
+
+    get selectedElementIsMergedDocument() {
+        return this.editorElementType === 'mergedDocument';
+    }
+
+    get selectedElementIsRichTextDisplay() {
+        return this.selectedElementIsDisplayText || this.selectedElementIsMergedDocument;
     }
 
     get selectedElementIsImage() {
@@ -885,12 +1065,20 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.editorElementType === 'select';
     }
 
+    get selectedElementIsTextarea() {
+        return this.editorElementType === 'textarea';
+    }
+
     get selectedElementIsMultiCheckbox() {
         return this.editorElementType === 'multiCheckbox';
     }
 
     get selectedElementIsLookup() {
         return this.editorElementType === 'lookup';
+    }
+
+    get selectedElementIsLocation() {
+        return this.editorElementType === 'location';
     }
 
     get selectedElementIsCheckbox() {
@@ -973,7 +1161,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsSalesforceMapping() {
-        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking'].includes(this.editorElementType);
+        return ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking'].includes(this.editorElementType);
     }
 
     get selectedRepeatGroupParent() {
@@ -988,6 +1176,25 @@ export default class NativeFormsDesigner extends LightningElement {
         return !!this.selectedRepeatGroupParent;
     }
 
+    get selectedSignatureInsideRepeatGroup() {
+        return this.selectedElementIsSignature && this.selectedElementIsInsideRepeatGroup;
+    }
+
+    get submissionPdfRequiredByRecordsListSignature() {
+        const recordsListIds = new Set(
+            (this.elements || [])
+                .filter((item) => item.elementType === 'repeatGroup')
+                .map((item) => item.elementId)
+        );
+        return (this.elements || []).some((item) =>
+            item.elementType === 'signature' && recordsListIds.has(item.parentElementId)
+        );
+    }
+
+    get selectedButtonInsideRepeatGroup() {
+        return this.selectedElementIsButton && this.selectedElementIsInsideRepeatGroup;
+    }
+
     get selectedRepeatGroupHint() {
         const parent = this.selectedRepeatGroupParent;
         if (!parent) {
@@ -998,6 +1205,15 @@ export default class NativeFormsDesigner extends LightningElement {
             ? `Current repeat source: ${parentConfig.repeatSourceAlias}.`
             : 'No repeat source is set on the parent group yet.';
         return `This field belongs to repeat group "${parent.label}". ${aliasText}`;
+    }
+
+    get selectedRepeatGroupSourceWarning() {
+        if (!this.selectedElementIsRepeatGroup || this.editorRepeatSourceAlias) {
+            return '';
+        }
+        return this.repeatGroupHasRowFields(this.selectedElement)
+            ? 'You need to set an object for this element.'
+            : '';
     }
 
     get selectedElementSupportsRangeValidation() {
@@ -1174,6 +1390,22 @@ export default class NativeFormsDesigner extends LightningElement {
         return 'Loads repeat-group rows from a prefill result.';
     }
 
+    get locationDefaultCountryHelpText() {
+        return 'Preselects or prioritizes one country for autocomplete when the form loads. Enter a two-letter ISO code such as US, IL, or CA. Submitted Salesforce mappings still use country names.';
+    }
+
+    get locationAllowedCountriesHelpText() {
+        return 'Limits autocomplete to these countries. Enter comma-separated two-letter ISO codes such as US, CA, IL. Leave empty to allow all countries. Submitted Salesforce mappings still use country names.';
+    }
+
+    get locationMinSearchLengthHelpText() {
+        return 'How many characters the visitor must type before autocomplete starts. Two characters is recommended.';
+    }
+
+    get locationResultLimitHelpText() {
+        return 'Maximum number of autocomplete results shown to the visitor. Ten is recommended; the maximum is 25.';
+    }
+
     get salesforceIntegrationHelpText() {
         return 'Connect this field to Prefill and Submit actions.';
     }
@@ -1204,6 +1436,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     get postSubmitFormulaHelpText() {
         return 'Use the same formula syntax as Formula Fields. The result must be blank or an absolute http:// or https:// URL.';
+    }
+
+    get buttonParameterFormulaHelpText() {
+        return 'Use a formula to calculate the query parameter value. Reference fields such as {email}; Records List Buttons may also reference {row.contactId}.';
     }
 
     get postSubmitUrlModeIsFormula() {
@@ -1248,12 +1484,8 @@ export default class NativeFormsDesigner extends LightningElement {
         return 'Inserts the selected token at the current cursor position.';
     }
 
-    get secretCodeVerificationHelpText() {
-        return 'Requires email verification before the user can continue with the form.';
-    }
-
     get secretCodeEmailTemplateHelpText() {
-        return 'Default Salesforce email template: NativeForms Secret Code Default. You can edit or replace it later in Salesforce.';
+        return 'Default Salesforce email template: TwinaForms User Verification Default. You can edit or replace it later in Salesforce.';
     }
 
     get secretCodeExpiryHelpText() {
@@ -1406,8 +1638,32 @@ export default class NativeFormsDesigner extends LightningElement {
         return this.enableProPostSubmitAutoLink;
     }
 
-    get showSecretCodeVerificationSettings() {
+    get showSpecialElementOptions() {
+        return this.enableProSfSecretCodeAuth || this.availableSpecialElementOptions.length > 0;
+    }
+
+    get showUserVerificationSpecialElement() {
         return this.enableProSfSecretCodeAuth;
+    }
+
+    get availableSpecialElementOptions() {
+        return this.specialElementOptions.filter((option) => {
+            if (option.value === 'location') {
+                return this.enableProLocationFields;
+            }
+            if (option.value === 'mergedDocument') {
+                return this.enableProMergedDocument;
+            }
+            return true;
+        });
+    }
+
+    get userVerificationPaletteActionLabel() {
+        return this.draftSecretCodeVerificationEnabled ? 'Added' : 'Add';
+    }
+
+    get userVerificationPaletteActionDisabled() {
+        return this.isSelectedVersionReadOnly || this.draftSecretCodeVerificationEnabled;
     }
 
     secretCodeLanguageDefaults(languageCode = this.draftLanguageCode || this.selectedVersionLanguageCode || 'en') {
@@ -1460,7 +1716,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 verifiedMessage: 'Code verified. You can continue with the form now.',
                 sendButtonLabel: 'Enter',
                 verifyButtonLabel: 'Verify',
-                resendButtonLabel: 'Resend Code'
+                resendButtonLabel: 'Resend Verification Number'
             };
         }
     }
@@ -1665,12 +1921,6 @@ export default class NativeFormsDesigner extends LightningElement {
         return `designer-secret-preview${this.selectedElementIsSecretCode ? ' designer-secret-preview--selected' : ''}`;
     }
 
-    get secretCodeSettingsHint() {
-        return this.draftSecretCodeVerificationEnabled
-            ? 'Select the Secret Code block on the canvas to configure messages, buttons, and rules.'
-            : 'Enable this to add a Secret Code block to the canvas.';
-    }
-
     get postSubmitFormFieldTokenOptions() {
         return [{ label: 'Insert form field', value: '' }].concat(
             this.elements
@@ -1702,6 +1952,65 @@ export default class NativeFormsDesigner extends LightningElement {
                     value: `{${item.fieldKey}}`
                 }))
         );
+    }
+
+    get buttonParameterFieldOptions() {
+        const options = [{ label: 'Select a field', value: '' }];
+        (this.elements || [])
+            .filter((item) =>
+                item.fieldKey
+                && ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)
+            )
+            .forEach((item) => {
+                const isRowField = item.parentElementId && this.isElementInsideRepeatGroup(item);
+                if (isRowField && !this.selectedButtonInsideRepeatGroup) {
+                    return;
+                }
+                if (!isRowField) {
+                    options.push({
+                        label: `${item.label} (${item.fieldKey})`,
+                        value: `{{field.${item.fieldKey}}}`
+                    });
+                } else {
+                    options.push({
+                        label: `${item.label} (${item.fieldKey}) - Current Row`,
+                        value: `{{row.${item.fieldKey}}}`
+                    });
+                }
+            });
+        return options;
+    }
+
+    get buttonParameterFormulaFieldTokenOptions() {
+        const options = [{ label: 'Insert field', value: '' }];
+        (this.elements || [])
+            .filter((item) =>
+                item.fieldKey
+                && ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'hidden'].includes(item.elementType)
+            )
+            .forEach((item) => {
+                const isRowField = item.parentElementId && this.isElementInsideRepeatGroup(item);
+                if (isRowField && !this.selectedButtonInsideRepeatGroup) {
+                    return;
+                }
+                options.push({
+                    label: isRowField
+                        ? `${item.label} (${item.fieldKey}) - Current Row`
+                        : `${item.label} (${item.fieldKey})`,
+                    value: isRowField ? `{row.${item.fieldKey}}` : `{${item.fieldKey}}`
+                });
+            });
+        return options;
+    }
+
+    get buttonParameterFormulaExpressionShellClass() {
+        return this.modalButtonParameterFormulaError
+            ? 'formula-editor-shell formula-editor-shell--error'
+            : 'formula-editor-shell';
+    }
+
+    get buttonParameterModalFormulaPreviewText() {
+        return this.modalButtonParameterFormulaPreviewValue || '';
     }
 
     get fieldBehaviorRadioOptions() {
@@ -1905,6 +2214,30 @@ export default class NativeFormsDesigner extends LightningElement {
         return [{ label: 'Select Salesforce field', value: '' }].concat(match?.fieldOptions || []);
     }
 
+    get modalMergeFieldOptions() {
+        if (!this.modalMergeAlias) {
+            return [{ label: 'Select Salesforce field', value: '' }];
+        }
+        const match = this.prefillAliasDetails.find((item) => item.alias === this.modalMergeAlias);
+        return [{ label: 'Select Salesforce field', value: '' }].concat(match?.fieldOptions || []);
+    }
+
+    get canInsertMergedDocumentToken() {
+        return !!this.modalMergeAlias && !!this.modalMergeFieldPath;
+    }
+
+    get cannotInsertMergedDocumentToken() {
+        return !this.canInsertMergedDocumentToken;
+    }
+
+    get displayTextModalTitle() {
+        return this.selectedElementIsMergedDocument ? 'Edit Merged Document' : 'Edit Display Text';
+    }
+
+    get displayTextModalLabel() {
+        return this.selectedElementIsMergedDocument ? 'Merged Document' : 'Display Text';
+    }
+
     get submitActionOptions() {
         return [{ label: 'Select action', value: '' }].concat(
             (this.submitActionDetails || []).map((action) => ({
@@ -1921,6 +2254,17 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         const match = this.submitActionDetails.find((item) => item.actionKey === actionKey);
         return [{ label: 'Select Salesforce field', value: '' }].concat(match?.fieldOptions || []);
+    }
+
+    inferPicklistSourceFromSubmitMapping(config) {
+        if (!config?.submitActionKey || !config?.submitFieldPath) {
+            return { objectApiName: '', fieldApiName: '' };
+        }
+        const submitAction = (this.submitActionDetails || []).find((item) => item.actionKey === config.submitActionKey);
+        return {
+            objectApiName: submitAction?.objectApiName || '',
+            fieldApiName: config.submitFieldPath || ''
+        };
     }
 
     get fileUploadTargetActionOptions() {
@@ -2055,14 +2399,16 @@ export default class NativeFormsDesigner extends LightningElement {
             this.enableProLoadFile = !!workspace.enableProLoadFile;
             this.enableProElectronicSignature = !!workspace.enableProElectronicSignature;
             this.enableProSubmissionPdf = !!workspace.enableProSubmissionPdf;
-            this.enableProRecordsListRowSignaturePdf = !!workspace.enableProRecordsListRowSignaturePdf;
             this.enableProSurveyFields = !!workspace.enableProSurveyFields;
+            this.enableProLocationFields = !!workspace.enableProLocationFields;
             this.enableProFormulaFields = !!workspace.enableProFormulaFields;
             this.enableProPostSubmitAutoLink = !!workspace.enableProPostSubmitAutoLink;
             this.enableProSfSecretCodeAuth = !!workspace.enableProSfSecretCodeAuth;
             this.enableProAdvancedSubmitModes = !!workspace.enableProAdvancedSubmitModes;
             this.enableProPageLayoutClone = !!workspace.enableProPageLayoutClone;
             this.enableProCustomJs = !!workspace.enableProCustomJs;
+            this.enableProButtonElements = !!workspace.enableProButtonElements;
+            this.enableProMergedDocument = !!workspace.enableProMergedDocument;
             this.currentFormCount = workspace.currentFormCount || 0;
             this.maxForms = workspace.maxForms === null || workspace.maxForms === undefined ? null : Number(workspace.maxForms);
             this.formLimitReached = workspace.formLimitReached === true;
@@ -2091,9 +2437,14 @@ export default class NativeFormsDesigner extends LightningElement {
                 label: option.label,
                 value: option.value
             }));
+            this.publishedButtonTargets = (workspace.publishedButtonTargets || []).map((option) => ({
+                label: option.label,
+                value: option.value
+            }));
             this.versionOptions = (workspace.versions || []).map((option) => ({
                 label: option.isPublished ? `${option.label} (Published)` : `${option.label} (${option.status})`,
-                value: option.value
+                value: option.value,
+                isPublished: option.isPublished === true
             }));
             this.themeOptions = [{ label: 'Select Theme', value: '' }].concat(
                 (workspace.themes || []).map((option) => ({
@@ -2271,7 +2622,7 @@ export default class NativeFormsDesigner extends LightningElement {
         return {
             id: SECRET_CODE_ELEMENT_ID,
             elementId: SECRET_CODE_ELEMENT_ID,
-            label: 'Secret Code Verification',
+            label: 'User Verification',
             elementType: 'secretCode',
             fieldKey: '',
             configJson: JSON.stringify({ systemElement: true }),
@@ -2304,6 +2655,7 @@ export default class NativeFormsDesigner extends LightningElement {
             isUrl: effectiveType === 'url',
             isSelect: effectiveType === 'select',
             isMultiCheckbox: effectiveType === 'multiCheckbox',
+            isLocation: effectiveType === 'location',
             isRadio: effectiveType === 'radio',
             isSurveyRadio,
             isRanking: effectiveType === 'ranking',
@@ -2311,8 +2663,10 @@ export default class NativeFormsDesigner extends LightningElement {
             isSignature: effectiveType === 'signature',
             isHidden: item.elementType === 'hidden',
             isFormula: this.isFormulaField(item),
-            isHeading: effectiveType === 'heading',
+            isHeading: effectiveType === 'heading' || effectiveType === 'mergedDocument',
+            isMergedDocument: effectiveType === 'mergedDocument',
             isImage: effectiveType === 'image',
+            isButton: effectiveType === 'button',
             labelPosition: this.labelPosition(item),
             fieldBehavior: this.fieldBehavior(item),
             previewText: this.previewText(item),
@@ -2321,6 +2675,8 @@ export default class NativeFormsDesigner extends LightningElement {
             previewPlaceholder: this.previewPlaceholder(item),
             previewChecked: this.previewChecked(item),
             previewOptions: this.previewOptions(item),
+            previewLocationParts: this.previewLocationParts(item),
+            previewLocationInputsClass: this.previewLocationInputsClass(item),
             previewRankingOptions: this.previewRankingOptions(item),
             previewImageUrl: this.previewImageUrl(item),
             previewImageAlt: this.previewImageAlt(item),
@@ -2357,7 +2713,8 @@ export default class NativeFormsDesigner extends LightningElement {
             previewTextClass: `preview-heading${selected ? ' preview-heading--selected' : ''}`,
             imageFrameClass: `preview-image__frame preview-image__frame--${normalized.previewImageFit || 'original'}`,
             imageClass: `preview-image__img preview-image__img--${normalized.previewImageFit || 'original'}`,
-            imageStyle: `width:${normalized.previewImageWidthPercent || 100}%;`
+            imageStyle: `width:${normalized.previewImageWidthPercent || 100}%;`,
+            previewButtonLabel: item.label || 'Continue'
         };
     }
 
@@ -2395,10 +2752,13 @@ export default class NativeFormsDesigner extends LightningElement {
             };
         });
 
+        const showRepeatSourceWarning = base.isRepeatGroup && !base.repeatSourceAlias && sectionChildren.length > 0;
         return {
             ...base,
             sectionColumnClass,
-            sectionSlots
+            sectionSlots,
+            showRepeatSourceWarning,
+            repeatSourceWarningText: showRepeatSourceWarning ? 'You need to set an object for this element.' : ''
         };
     }
 
@@ -2421,6 +2781,13 @@ export default class NativeFormsDesigner extends LightningElement {
     repeatSourceAlias(item) {
         const config = this.parseConfig(item.configJson);
         return config.repeatSourceAlias || '';
+    }
+
+    repeatGroupHasRowFields(item) {
+        if (!item?.elementId) {
+            return false;
+        }
+        return this.elements.some((candidate) => candidate.parentElementId === item.elementId);
     }
 
     repeatAllowAddRows(item) {
@@ -2473,7 +2840,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     previewHtml(item) {
         const config = this.parseConfig(item.configJson);
-        return config.html || config.text || '<p>Display text</p>';
+        return config.html || config.text || (item?.elementType === 'mergedDocument' ? '<p>Merged document text</p>' : '<p>Display text</p>');
     }
 
     previewValue(item) {
@@ -2865,12 +3232,19 @@ export default class NativeFormsDesigner extends LightningElement {
         return `preview-section__grid preview-section__grid--${this.sectionColumns(configJson)}`;
     }
 
+    clearPublishResult() {
+        this.publishResult = null;
+        this.publishResultContextVersionId = '';
+    }
+
     handleFormChange(event) {
         this.selectedFormId = event.detail.value;
         this.storeSelectedForm(this.selectedFormId);
         this.selectedVersionId = null;
         this.clearStoredVersion();
         this.selectedElementId = null;
+        this.clearPublishResult();
+        this.clearUndoStack();
         this.loadWorkspace(this.selectedProjectId, this.selectedFormId, null);
     }
 
@@ -2880,7 +3254,8 @@ export default class NativeFormsDesigner extends LightningElement {
         this.selectedFormId = null;
         this.selectedVersionId = null;
         this.selectedElementId = null;
-        this.publishResult = null;
+        this.clearPublishResult();
+        this.clearUndoStack();
         this.clearStoredForm();
         this.clearStoredVersion();
         this.loadWorkspace(this.selectedProjectId, null, null);
@@ -2890,15 +3265,39 @@ export default class NativeFormsDesigner extends LightningElement {
         this.selectedVersionId = event.detail.value;
         this.storeSelectedVersion(this.selectedVersionId);
         this.selectedElementId = null;
-        this.publishResult = null;
+        this.clearPublishResult();
+        this.clearUndoStack();
         this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
     }
 
+    handleFormActionMenuSelect(event) {
+        const action = event.detail.value;
+        if (action === 'newForm') {
+            this.handleOpenNewFormModal();
+        } else if (action === 'createProject') {
+            this.handleOpenCreateProjectModal();
+        } else if (action === 'createFromLayout') {
+            this.handleOpenLayoutImportModal();
+        } else if (action === 'cloneForm') {
+            this.handleOpenCloneFormModal();
+        } else if (action === 'restoreFromPublished') {
+            this.handleRestoreFromPublished();
+        }
+    }
+
     handleOpenNewFormModal() {
+        if (this.newFormActionDisabled) {
+            return;
+        }
         this.newFormDescription = '';
         this.newFormProjectId = this.selectedProjectId || '';
         this.newFormProjectName = '';
         this.showNewFormModal = true;
+    }
+
+    handleOpenCreateProjectModal() {
+        this.newProjectName = '';
+        this.showCreateProjectModal = true;
     }
 
     async handleOpenLayoutImportModal() {
@@ -2939,7 +3338,9 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     handleOpenDisplayTextModal() {
-        this.modalDisplayText = this.editorDisplayText || '<p>Display text</p>';
+        this.modalDisplayText = this.editorDisplayText || (this.selectedElementIsMergedDocument ? '<p>Merged document text</p>' : '<p>Display text</p>');
+        this.modalMergeAlias = '';
+        this.modalMergeFieldPath = '';
         this.showDisplayTextModal = true;
     }
 
@@ -3009,9 +3410,27 @@ export default class NativeFormsDesigner extends LightningElement {
         this.showFieldFormulaModal = true;
     }
 
+    handleOpenButtonParameterFormulaModal(event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+        const index = Number(event.currentTarget.dataset.index);
+        const parameter = (this.editorButtonQueryParameters || [])[index];
+        if (!parameter) {
+            return;
+        }
+        this.modalButtonParameterIndex = index;
+        this.modalButtonParameterFormula = parameter.valueFormula || '';
+        this.modalButtonParameterFormulaError = '';
+        this.modalButtonParameterFormulaPreviewValue = '';
+        this.selectedButtonParameterFormulaFieldToken = '';
+        this.showButtonParameterFormulaModal = true;
+    }
+
     handleCloseDisplayTextModal() {
         this.showDisplayTextModal = false;
         this.modalDisplayText = '';
+        this.modalMergeAlias = '';
+        this.modalMergeFieldPath = '';
     }
 
     handleCloseCustomJsModal() {
@@ -3033,6 +3452,15 @@ export default class NativeFormsDesigner extends LightningElement {
         this.modalFormulaPreviewValue = '';
         this.modalFormulaError = '';
         this.selectedFormulaFieldToken = '';
+    }
+
+    handleCloseButtonParameterFormulaModal() {
+        this.showButtonParameterFormulaModal = false;
+        this.modalButtonParameterIndex = null;
+        this.modalButtonParameterFormula = '';
+        this.modalButtonParameterFormulaPreviewValue = '';
+        this.modalButtonParameterFormulaError = '';
+        this.selectedButtonParameterFormulaFieldToken = '';
     }
 
     handleOpenDeleteFormModal() {
@@ -3060,6 +3488,14 @@ export default class NativeFormsDesigner extends LightningElement {
         this.newFormDescription = '';
         this.newFormProjectId = '';
         this.newFormProjectName = '';
+    }
+
+    handleCloseCreateProjectModal() {
+        if (this.isCreatingProject) {
+            return;
+        }
+        this.showCreateProjectModal = false;
+        this.newProjectName = '';
     }
 
     handleCloseLayoutImportModal() {
@@ -3138,6 +3574,10 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleNewProjectNameChange(event) {
         this.newFormProjectName = event.detail.value || '';
+    }
+
+    handleCreateProjectNameChange(event) {
+        this.newProjectName = event.detail.value || '';
     }
 
     handleLayoutImportDescriptionChange(event) {
@@ -3262,7 +3702,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedFormId = result.formId;
             this.selectedVersionId = result.versionId;
             this.selectedElementId = null;
-            this.publishResult = null;
+            this.clearPublishResult();
+            this.clearUndoStack();
             this.storeSelectedProject(result.projectId);
             this.storeSelectedForm(result.formId);
             this.storeSelectedVersion(result.versionId);
@@ -3276,6 +3717,34 @@ export default class NativeFormsDesigner extends LightningElement {
             this.errorMessage = this.normalizeError(error);
         } finally {
             this.isCreatingForm = false;
+        }
+    }
+
+    async handleCreateProject() {
+        if (this.createProjectDisabled) {
+            return;
+        }
+        this.isCreatingProject = true;
+        this.errorMessage = '';
+        try {
+            const result = await createProject({ projectName: this.newProjectName });
+            this.selectedProjectId = result.value;
+            this.selectedProjectName = result.label;
+            this.selectedFormId = null;
+            this.selectedVersionId = null;
+            this.selectedElementId = null;
+            this.storeSelectedProject(result.value);
+            this.clearStoredForm();
+            this.clearStoredVersion();
+            this.clearUndoStack();
+            this.showCreateProjectModal = false;
+            this.newProjectName = '';
+            await this.loadWorkspace(result.value, null, null);
+            this.showToast('Project created', `${result.label} is ready for forms.`, 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isCreatingProject = false;
         }
     }
 
@@ -3301,7 +3770,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedFormId = result.formId;
             this.selectedVersionId = result.versionId;
             this.selectedElementId = null;
-            this.publishResult = null;
+            this.clearPublishResult();
+            this.clearUndoStack();
             this.storeSelectedProject(result.projectId);
             this.storeSelectedForm(result.formId);
             this.storeSelectedVersion(result.versionId);
@@ -3346,7 +3816,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedFormId = result.formId;
             this.selectedVersionId = result.versionId;
             this.selectedElementId = null;
-            this.publishResult = null;
+            this.clearPublishResult();
+            this.clearUndoStack();
             this.storeSelectedProject(result.projectId);
             this.storeSelectedForm(result.formId);
             this.storeSelectedVersion(result.versionId);
@@ -3360,6 +3831,36 @@ export default class NativeFormsDesigner extends LightningElement {
             this.errorMessage = this.normalizeError(error);
         } finally {
             this.isCloningForm = false;
+        }
+    }
+
+    async handleRestoreFromPublished() {
+        if (this.restorePublishedDisabled) {
+            return;
+        }
+
+        this.isRestoringPublished = true;
+        this.errorMessage = '';
+        try {
+            const result = await restoreDraftFromPublished({
+                formId: this.selectedFormId,
+                sourceVersionId: this.selectedVersionId
+            });
+            this.selectedProjectId = result.projectId;
+            this.selectedFormId = result.formId;
+            this.selectedVersionId = result.versionId;
+            this.selectedElementId = null;
+            this.clearPublishResult();
+            this.clearUndoStack();
+            this.storeSelectedProject(result.projectId);
+            this.storeSelectedForm(result.formId);
+            this.storeSelectedVersion(result.versionId);
+            await this.loadWorkspace(result.projectId, result.formId, result.versionId);
+            this.showToast('Draft restored', 'A new draft version was created from the published form.', 'success');
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isRestoringPublished = false;
         }
     }
 
@@ -3382,7 +3883,8 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedFormId = null;
             this.selectedVersionId = null;
             this.selectedElementId = null;
-            this.publishResult = null;
+            this.clearPublishResult();
+            this.clearUndoStack();
             this.clearStoredForm();
             this.clearStoredVersion();
             await this.loadWorkspace(projectId, null, null);
@@ -3673,23 +4175,42 @@ export default class NativeFormsDesigner extends LightningElement {
         await this.saveFormSettings({}, 'Form language updated.', { skipReload: true });
     }
 
-    handleSecretCodeVerificationEnabledChange(event) {
-        this.draftSecretCodeVerificationEnabled = event.target.checked;
-        if (!this.draftSecretCodeVerificationEnabled && this.selectedElementIsSecretCode) {
-            this.selectedElementId = null;
-            this.syncSelectedState();
-        }
-    }
-
-    async handleSecretCodeVerificationEnabledCommit() {
-        if (this.draftSecretCodeVerificationEnabled === this.selectedVersionSecretCodeVerificationEnabled) {
+    async handleAddUserVerification() {
+        if (!this.enableProSfSecretCodeAuth || this.draftSecretCodeVerificationEnabled || this.isSelectedVersionReadOnly) {
             return;
         }
-        await this.saveFormSettings({}, null, { skipReload: true });
-        if (this.draftSecretCodeVerificationEnabled) {
-            this.selectedElementId = SECRET_CODE_ELEMENT_ID;
-            this.syncSelectedState();
+        this.draftSecretCodeVerificationEnabled = true;
+        const saved = await this.saveFormSettings({}, null, { skipReload: true });
+        if (!saved) {
+            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
+            return;
         }
+        this.selectedElementId = SECRET_CODE_ELEMENT_ID;
+        this.syncSelectedState();
+        this.showToast('User Verification added', 'Visitors will verify their email before accessing the published form.', 'success');
+    }
+
+    async handleRemoveUserVerification() {
+        if (!this.draftSecretCodeVerificationEnabled || this.isSelectedVersionReadOnly) {
+            return;
+        }
+        const confirmed = await LightningConfirm.open({
+            label: 'Remove User Verification?',
+            message: 'Removing User Verification allows visitors to access and submit this form without email verification.',
+            theme: 'warning'
+        });
+        if (!confirmed) {
+            return;
+        }
+        this.draftSecretCodeVerificationEnabled = false;
+        const saved = await this.saveFormSettings({}, null, { skipReload: true });
+        if (!saved) {
+            this.draftSecretCodeVerificationEnabled = this.selectedVersionSecretCodeVerificationEnabled;
+            return;
+        }
+        this.selectedElementId = null;
+        this.syncSelectedState();
+        this.showToast('User Verification removed', 'Visitors will no longer be asked to verify their email for this form.', 'success');
     }
 
     handleSecretCodeIntroTextInput(event) {
@@ -4084,6 +4605,11 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async handleSubmissionPdfEnabledChange(event) {
+        if (!event.target.checked && this.submissionPdfRequiredByRecordsListSignature) {
+            this.draftSubmissionPdfEnabled = true;
+            this.showToast('Submission PDF required', 'Remove the Signature inside the Records List before turning off Submission PDF.', 'warning');
+            return;
+        }
         this.draftSubmissionPdfEnabled = event.target.checked;
         if (this.draftSubmissionPdfEnabled && !(this.draftSubmissionPdfTitle || '').trim()) {
             this.draftSubmissionPdfTitle = 'Submitted Response';
@@ -4298,8 +4824,20 @@ export default class NativeFormsDesigner extends LightningElement {
             this.showToast('Pro feature', 'Enable Pro Electronic Signature in your AWS plan entitlements first.', 'warning');
             return;
         }
+        if (elementType === 'button' && !this.enableProButtonElements) {
+            this.showToast('Pro feature', 'Enable Portal Buttons in TwinaForms Admin Features first.', 'warning');
+            return;
+        }
         if ((elementType === 'ranking' || elementPreset) && !this.enableProSurveyFields) {
             this.showToast('Pro feature', 'Enable Pro Survey Fields in your AWS plan entitlements first.', 'warning');
+            return;
+        }
+        if (elementType === 'location' && !this.enableProLocationFields) {
+            this.showToast('Pro feature', 'Enable Pro Country / State / City in your AWS plan entitlements first.', 'warning');
+            return;
+        }
+        if (elementType === 'mergedDocument' && !this.enableProMergedDocument) {
+            this.showToast('Pro feature', 'Enable Pro Merged Document in your AWS plan entitlements first.', 'warning');
             return;
         }
         await this.addElementType(elementType, elementPreset);
@@ -4309,6 +4847,7 @@ export default class NativeFormsDesigner extends LightningElement {
         if (!this.selectedVersionId || this.isSelectedVersionReadOnly) {
             return;
         }
+        const undoStep = this.captureUndoStep('Add element');
         try {
             const created = await addElement({ versionId: this.selectedVersionId, elementType, elementPreset });
             const selectedElement = this.selectedElement;
@@ -4322,6 +4861,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.selectedElementId = created.id;
             this.syncSelectedState();
         } catch (error) {
+            this.removeUndoStep(undoStep);
             this.errorMessage = this.normalizeError(error);
         }
     }
@@ -4361,6 +4901,7 @@ export default class NativeFormsDesigner extends LightningElement {
         const formulaValidation = this.validateAllFormulasForPublish();
         if (!formulaValidation.valid) {
             this.errorMessage = formulaValidation.message;
+            this.publishResultContextVersionId = this.selectedVersionId || '';
             this.publishResult = {
                 success: false,
                 message: formulaValidation.message
@@ -4375,7 +4916,9 @@ export default class NativeFormsDesigner extends LightningElement {
             const result = await publishVersion({ versionId: this.selectedVersionId });
             this.publishResult = result;
             const nextVersionId = result.newDraftVersionId || this.selectedVersionId;
+            this.publishResultContextVersionId = nextVersionId || '';
             this.storeSelectedVersion(nextVersionId);
+            this.clearUndoStack();
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, nextVersionId);
             this.showToast(
                 result.success ? 'Published' : 'Publish failed',
@@ -4384,6 +4927,7 @@ export default class NativeFormsDesigner extends LightningElement {
             );
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
+            this.publishResultContextVersionId = this.selectedVersionId || '';
             this.publishResult = {
                 success: false,
                 message: this.errorMessage
@@ -4412,6 +4956,173 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorLabelCommit(event) {
         this.editorLabel = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonDestinationTypeChange(event) {
+        this.editorButtonDestinationType = event.detail.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonTargetFormChange(event) {
+        this.editorButtonTargetFormId = event.detail.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonExternalUrlModeChange(event) {
+        this.editorButtonExternalUrlMode = event.detail.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonExternalUrlTemplateCommit(event) {
+        this.editorButtonExternalUrlTemplate = event.target.value || '';
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonExternalUrlFormulaCommit(event) {
+        this.editorButtonExternalUrlFormula = event.target.value || '';
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonSubmitBeforeNavigationChange(event) {
+        this.editorButtonSubmitBeforeNavigation = event.target.checked && !this.selectedElementIsInsideRepeatGroup;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleAddButtonQueryParameter() {
+        this.editorButtonQueryParameters = [...(this.editorButtonQueryParameters || []), {
+            key: `button-param-${Date.now()}`,
+            name: '',
+            valueMode: 'template',
+            usesFormula: false,
+            valueTemplate: '',
+            valueFormula: ''
+        }];
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleRemoveButtonQueryParameter(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        this.editorButtonQueryParameters = this.editorButtonQueryParameters.filter((item, itemIndex) => itemIndex !== index);
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleButtonQueryParameterModeChange(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        const usesFormula = event.detail.value === 'formula';
+        this.editorButtonQueryParameters = this.editorButtonQueryParameters.map((item, itemIndex) => (
+            itemIndex === index ? { ...item, valueMode: event.detail.value, usesFormula } : item
+        ));
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+        if (usesFormula) {
+            this.handleOpenButtonParameterFormulaModal(event);
+        }
+    }
+
+    handleButtonQueryParameterNameCommit(event) {
+        this.commitButtonQueryParameterValue(Number(event.currentTarget.dataset.index), 'name', event.target.value || '');
+    }
+
+    handleButtonQueryParameterTemplateChange(event) {
+        this.commitButtonQueryParameterValue(Number(event.currentTarget.dataset.index), 'valueTemplate', event.detail.value || '');
+    }
+
+    handleButtonParameterFormulaInput(event) {
+        this.modalButtonParameterFormula = event.target.value || '';
+        this.modalButtonParameterFormulaPreviewValue = '';
+        this.modalButtonParameterFormulaError = '';
+    }
+
+    handleButtonParameterFormulaFieldTokenChange(event) {
+        this.selectedButtonParameterFormulaFieldToken = event.detail.value || '';
+    }
+
+    insertTokenIntoButtonParameterFormula(token) {
+        if (!token) {
+            return;
+        }
+        const textarea = this.template.querySelector('[data-id="button-parameter-formula"]');
+        const sourceValue = textarea ? (textarea.value || '') : (this.modalButtonParameterFormula || '');
+        const start = textarea && Number.isInteger(textarea.selectionStart) ? textarea.selectionStart : sourceValue.length;
+        const end = textarea && Number.isInteger(textarea.selectionEnd) ? textarea.selectionEnd : start;
+        const nextValue = `${sourceValue.slice(0, start)}${token}${sourceValue.slice(end)}`;
+        const nextCursor = start + token.length;
+        this.modalButtonParameterFormula = nextValue;
+        this.modalButtonParameterFormulaPreviewValue = '';
+        this.modalButtonParameterFormulaError = '';
+        if (textarea) {
+            textarea.value = nextValue;
+            requestAnimationFrame(() => {
+                textarea.focus();
+                textarea.setSelectionRange(nextCursor, nextCursor);
+            });
+        }
+    }
+
+    handleInsertButtonParameterFormulaFieldToken() {
+        if (!this.selectedButtonParameterFormulaFieldToken) {
+            return;
+        }
+        this.insertTokenIntoButtonParameterFormula(this.selectedButtonParameterFormulaFieldToken);
+        this.selectedButtonParameterFormulaFieldToken = '';
+    }
+
+    validateButtonParameterFormulaExpression(expression) {
+        const normalizedExpression = String(expression || '').replace(/\{row\.([a-zA-Z0-9_]+)\}/g, '{$1}');
+        const validation = validateFormulaConfig({
+            expression: normalizedExpression,
+            fieldKey: '',
+            targetType: 'text',
+            elements: this.elements,
+            allowFormulaReferences: true
+        });
+        if (!validation.valid) {
+            return { valid: false, message: validation.message, previewValue: '' };
+        }
+        const preview = previewFormulaValue({
+            expression: normalizedExpression,
+            fieldKey: '',
+            targetType: 'text',
+            elements: this.elements,
+            sourceValues: this.formulaSourceValues(),
+            allowFormulaReferences: true
+        });
+        return {
+            valid: preview.valid,
+            message: preview.valid ? '' : preview.message,
+            previewValue: preview.value || ''
+        };
+    }
+
+    handleSaveButtonParameterFormulaModal() {
+        const textarea = this.template.querySelector('[data-id="button-parameter-formula"]');
+        const expression = textarea ? (textarea.value || '') : (this.modalButtonParameterFormula || '');
+        const validation = this.validateButtonParameterFormulaExpression(expression);
+        this.modalButtonParameterFormula = expression;
+        this.modalButtonParameterFormulaPreviewValue = validation.previewValue || '';
+        this.modalButtonParameterFormulaError = validation.valid ? '' : validation.message;
+        if (!validation.valid) {
+            return;
+        }
+        this.commitButtonQueryParameterValue(this.modalButtonParameterIndex, 'valueFormula', expression);
+        this.handleCloseButtonParameterFormulaModal();
+        this.showToast('Formula saved', 'Button query parameter formula updated.', 'success');
+    }
+
+    commitButtonQueryParameterValue(index, propertyName, value) {
+        this.editorButtonQueryParameters = this.editorButtonQueryParameters.map((item, itemIndex) => (
+            itemIndex === index ? { ...item, [propertyName]: value } : item
+        ));
         this.applyEditorDraft(false);
         this.flushEditorDraftSave();
     }
@@ -4460,12 +5171,30 @@ export default class NativeFormsDesigner extends LightningElement {
         this.modalDisplayText = event.detail.value;
     }
 
+    handleModalMergeAliasChange(event) {
+        this.modalMergeAlias = event.detail.value;
+        this.modalMergeFieldPath = '';
+    }
+
+    handleModalMergeFieldPathChange(event) {
+        this.modalMergeFieldPath = event.detail.value;
+    }
+
+    handleInsertMergedDocumentToken() {
+        if (!this.canInsertMergedDocumentToken) {
+            return;
+        }
+        const token = `{{${this.modalMergeAlias}.${this.modalMergeFieldPath}}}`;
+        const spacer = this.modalDisplayText && !/\s$/.test(this.modalDisplayText) ? ' ' : '';
+        this.modalDisplayText = `${this.modalDisplayText || ''}${spacer}${token}`;
+    }
+
     handleModalCustomJsChange(event) {
         this.modalCustomJs = event.detail?.value ?? event.target.value ?? '';
     }
 
     handleSaveDisplayTextModal() {
-        this.editorDisplayText = this.modalDisplayText || '<p>Display text</p>';
+        this.editorDisplayText = this.modalDisplayText || (this.selectedElementIsMergedDocument ? '<p>Merged document text</p>' : '<p>Display text</p>');
         this.applyEditorDraft(false);
         this.flushEditorDraftSave();
         this.handleCloseDisplayTextModal();
@@ -4516,6 +5245,12 @@ export default class NativeFormsDesigner extends LightningElement {
                 formulaInput.value = this.modalFormulaExpression || '';
             }
         }
+        if (this.showButtonParameterFormulaModal) {
+            const formulaInput = this.template.querySelector('[data-id="button-parameter-formula"]');
+            if (formulaInput && formulaInput.value !== this.modalButtonParameterFormula) {
+                formulaInput.value = this.modalButtonParameterFormula || '';
+            }
+        }
     }
 
     handleEditorImageUrlCommit(event) {
@@ -4545,7 +5280,12 @@ export default class NativeFormsDesigner extends LightningElement {
         if (!file || !this.selectedElementId || !this.selectedVersionId || this.isSelectedVersionReadOnly) {
             return;
         }
+        if (!this.validateEmbeddedImageFile(file, 'Image')) {
+            event.target.value = null;
+            return;
+        }
 
+        const undoStep = this.captureUndoStep('Edit image');
         try {
             const base64Data = await this.readFileAsBase64(file);
             const uploaded = await uploadImageFile({
@@ -4562,6 +5302,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.syncSelectedState();
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId, true);
         } catch (error) {
+            this.removeUndoStep(undoStep);
             this.errorMessage = this.normalizeError(error);
         }
     }
@@ -4570,6 +5311,9 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorPicklistObject = event.detail.value;
         this.editorPicklistField = '';
         this.picklistFieldOptions = [];
+        if (!this.pendingElementEditUndoSnapshot) {
+            this.pendingElementEditUndoSnapshot = this.captureUndoStep('Edit element');
+        }
         this.elements = this.elements.map((item) => {
             if (item.id !== this.selectedElementId) {
                 return item;
@@ -4618,6 +5362,55 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorLookupResultLimitCommit(event) {
         this.editorLookupResultLimit = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorLocationModeChange(event) {
+        this.editorLocationMode = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationLayoutChange(event) {
+        this.editorLocationLayout = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationRequiredCountryChange(event) {
+        this.editorLocationRequiredCountry = event.target.checked;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationRequiredRegionChange(event) {
+        this.editorLocationRequiredRegion = event.target.checked;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationRequiredCityChange(event) {
+        this.editorLocationRequiredCity = event.target.checked;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationDefaultCountryCommit(event) {
+        this.editorLocationDefaultCountryCode = String(event.target.value || '').trim().toUpperCase();
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorLocationAllowedCountriesCommit(event) {
+        this.editorLocationAllowedCountriesText = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorLocationMinSearchLengthCommit(event) {
+        this.editorLocationMinSearchLength = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
+    handleEditorLocationResultLimitCommit(event) {
+        this.editorLocationResultLimit = event.target.value;
         this.applyEditorDraft(false);
         this.flushEditorDraftSave();
     }
@@ -4819,6 +5612,12 @@ export default class NativeFormsDesigner extends LightningElement {
         this.flushEditorDraftSave();
     }
 
+    handleEditorTextareaMaxLengthCommit(event) {
+        this.editorTextareaMaxLength = event.target.value;
+        this.applyEditorDraft(false);
+        this.flushEditorDraftSave();
+    }
+
     handleEditorDateDisplayFormatChange(event) {
         this.editorDateDisplayFormat = event.detail.value || 'us';
         this.applyEditorDraft();
@@ -4882,6 +5681,9 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorPrefillAlias = event.detail.value;
         if (!this.editorPrefillAlias) {
             this.editorPrefillFieldPath = '';
+            this.editorLocationCountryPrefillFieldPath = '';
+            this.editorLocationRegionPrefillFieldPath = '';
+            this.editorLocationCityPrefillFieldPath = '';
         }
         this.applyEditorDraft();
         await this.ensureParentRepeatGroupAlias(this.editorPrefillAlias);
@@ -4889,6 +5691,21 @@ export default class NativeFormsDesigner extends LightningElement {
 
     handleEditorPrefillFieldChange(event) {
         this.editorPrefillFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationCountryPrefillFieldChange(event) {
+        this.editorLocationCountryPrefillFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationRegionPrefillFieldChange(event) {
+        this.editorLocationRegionPrefillFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationCityPrefillFieldChange(event) {
+        this.editorLocationCityPrefillFieldPath = event.detail.value;
         this.applyEditorDraft();
     }
 
@@ -4906,12 +5723,30 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorSubmitActionKey = event.detail.value;
         if (!this.editorSubmitActionKey) {
             this.editorSubmitFieldPath = '';
+            this.editorLocationCountrySubmitFieldPath = '';
+            this.editorLocationRegionSubmitFieldPath = '';
+            this.editorLocationCitySubmitFieldPath = '';
         }
         this.applyEditorDraft();
     }
 
     handleEditorSubmitFieldChange(event) {
         this.editorSubmitFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationCountrySubmitFieldChange(event) {
+        this.editorLocationCountrySubmitFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationRegionSubmitFieldChange(event) {
+        this.editorLocationRegionSubmitFieldPath = event.detail.value;
+        this.applyEditorDraft();
+    }
+
+    handleEditorLocationCitySubmitFieldChange(event) {
+        this.editorLocationCitySubmitFieldPath = event.detail.value;
         this.applyEditorDraft();
     }
 
@@ -4999,46 +5834,6 @@ export default class NativeFormsDesigner extends LightningElement {
     handleEditorRepeatLabelModeChange(event) {
         this.editorShowLabelsOnEachRow = event.detail.value !== 'tableHeader';
         this.applyEditorDraft(false);
-        this.flushEditorDraftSave();
-    }
-
-    async handleEditorRowSignatureEnabledChange(event) {
-        this.editorRowSignatureEnabled = event.target.checked;
-        if (this.editorRowSignatureEnabled && !this.editorRowSignatureLabel) {
-            this.editorRowSignatureLabel = 'Signature';
-        }
-        if (this.editorRowSignatureEnabled && !this.draftSubmissionPdfEnabled) {
-            this.draftSubmissionPdfEnabled = true;
-            if (!(this.draftSubmissionPdfTitle || '').trim()) {
-                this.draftSubmissionPdfTitle = 'Submitted Response';
-            }
-            await this.handleSubmissionPdfSettingsCommit();
-        }
-        this.applyEditorDraft(false);
-        this.flushEditorDraftSave();
-    }
-
-    handleEditorRowSignatureRequiredChange(event) {
-        this.editorRowSignatureRequired = event.target.checked;
-        this.applyEditorDraft(false);
-        this.flushEditorDraftSave();
-    }
-
-    handleEditorRowSignatureLabelInput(event) {
-        this.editorRowSignatureLabel = event.target.value;
-        this.applyEditorDraft(false);
-    }
-
-    handleEditorRowSignatureLabelCommit() {
-        this.flushEditorDraftSave();
-    }
-
-    handleEditorRowSignatureHelpTextInput(event) {
-        this.editorRowSignatureHelpText = event.target.value;
-        this.applyEditorDraft(false);
-    }
-
-    handleEditorRowSignatureHelpTextCommit() {
         this.flushEditorDraftSave();
     }
 
@@ -5131,6 +5926,7 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
 
+        const undoStep = this.captureUndoStep('Move element');
         try {
             this.selectedElementId = elementId;
             this.optimisticMoveToTopLevel(elementId, targetIndex);
@@ -5142,6 +5938,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 targetIndex
             });
         } catch (error) {
+            this.removeUndoStep(undoStep);
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -5169,6 +5966,12 @@ export default class NativeFormsDesigner extends LightningElement {
             return;
         }
 
+        const undoStep = this.captureUndoStep('Move element');
+        const movedElement = (this.elements || []).find((item) => item.id === elementId);
+        const targetParent = (this.elements || []).find((item) => item.id === sectionId);
+        const enablesSubmissionPdf = movedElement?.elementType === 'signature'
+            && targetParent?.elementType === 'repeatGroup'
+            && !this.draftSubmissionPdfEnabled;
         try {
             this.selectedElementId = elementId;
             this.optimisticPlaceInSection(elementId, sectionId, columnNumber, targetIndex);
@@ -5179,7 +5982,17 @@ export default class NativeFormsDesigner extends LightningElement {
                 columnNumber,
                 targetIndex
             });
+            if (enablesSubmissionPdf) {
+                this.draftSubmissionPdfEnabled = true;
+                this.selectedVersionSubmissionPdfEnabled = true;
+                this.showToast(
+                    'Submission PDF enabled',
+                    'A Records List Signature requires a Submission PDF, so PDF generation was enabled automatically.',
+                    'success'
+                );
+            }
         } catch (error) {
+            this.removeUndoStep(undoStep);
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -5196,12 +6009,14 @@ export default class NativeFormsDesigner extends LightningElement {
         const elementId = event.currentTarget.dataset.id;
         const columns = Number(event.currentTarget.dataset.columns);
         this.isLoading = true;
+        const undoStep = this.captureUndoStep('Change section columns');
         try {
             this.selectedElementId = elementId;
             this.optimisticSetSectionColumns(elementId, columns);
             await updateSectionColumns({ elementId, columns });
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId, true);
         } catch (error) {
+            this.removeUndoStep(undoStep);
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -5215,6 +6030,7 @@ export default class NativeFormsDesigner extends LightningElement {
         }
 
         this.isLoading = true;
+        const undoStep = this.captureUndoStep('Delete element');
         try {
             const deletedId = this.selectedElementId;
             this.removeDeletedElementLocally(deletedId);
@@ -5223,6 +6039,7 @@ export default class NativeFormsDesigner extends LightningElement {
             await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId);
             this.showToast('Element deleted', 'The selected canvas item was removed.', 'success');
         } catch (error) {
+            this.removeUndoStep(undoStep);
             this.errorMessage = this.normalizeError(error);
         } finally {
             this.isLoading = false;
@@ -5279,6 +6096,7 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorConditionalValue = '';
             this.editorMinValue = '';
             this.editorMaxValue = '';
+            this.editorTextareaMaxLength = '254';
             this.editorDateDisplayFormat = 'us';
             this.editorDateGmtOffset = '+00:00';
             this.editorTimeFormat = '24h';
@@ -5290,9 +6108,15 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorPrefillEnabled = false;
             this.editorPrefillAlias = '';
             this.editorPrefillFieldPath = '';
+            this.editorLocationCountryPrefillFieldPath = '';
+            this.editorLocationRegionPrefillFieldPath = '';
+            this.editorLocationCityPrefillFieldPath = '';
             this.editorSubmitEnabled = false;
             this.editorSubmitActionKey = '';
             this.editorSubmitFieldPath = '';
+            this.editorLocationCountrySubmitFieldPath = '';
+            this.editorLocationRegionSubmitFieldPath = '';
+            this.editorLocationCitySubmitFieldPath = '';
             this.editorAllowMultipleFiles = false;
             this.editorAllowedExtensionsText = '';
             this.editorMaxFileSizeMb = '10';
@@ -5301,6 +6125,13 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorFormulaExpression = '';
             this.editorFormulaPreviewValue = '';
             this.editorFormulaError = '';
+            this.editorButtonDestinationType = 'form';
+            this.editorButtonTargetFormId = '';
+            this.editorButtonExternalUrlMode = 'template';
+            this.editorButtonExternalUrlTemplate = '';
+            this.editorButtonExternalUrlFormula = '';
+            this.editorButtonQueryParameters = [];
+            this.editorButtonSubmitBeforeNavigation = false;
             this.selectedFormulaFieldToken = '';
             this.picklistFieldOptions = [];
             this.editorSurveyOptions = [];
@@ -5345,18 +6176,24 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorAllowAddRows = config.allowAddRows !== false;
         this.editorAllowDeleteRows = config.allowDeleteRows !== false;
         this.editorShowLabelsOnEachRow = config.showLabelsOnEachRow !== false;
-        this.editorRowSignatureEnabled = config.rowSignatureEnabled === true;
-        this.editorRowSignatureRequired = config.rowSignatureRequired !== false;
-        this.editorRowSignatureLabel = config.rowSignatureLabel || 'Signature';
-        this.editorRowSignatureHelpText = config.rowSignatureHelpText || '';
-        this.editorRowSignatureAttachToRowRecord = config.rowSignatureAttachToRowRecord === true;
-        this.editorPicklistObject = config.sourceObjectApiName || '';
-        this.editorPicklistField = config.sourcePicklistFieldApiName || '';
+        this.editorRowSignatureAttachToRowRecord = config.attachToRowRecord === true;
+        const inferredPicklistSource = this.inferPicklistSourceFromSubmitMapping(config);
+        this.editorPicklistObject = config.sourceObjectApiName || inferredPicklistSource.objectApiName || '';
+        this.editorPicklistField = config.sourcePicklistFieldApiName || inferredPicklistSource.fieldApiName || '';
         this.editorLookupTargetObject = config.lookupTargetObject || '';
         this.editorLookupSearchFieldsText = this.joinLookupFields(config.lookupSearchFields, 'Name');
         this.editorLookupDisplayFieldsText = this.joinLookupFields(config.lookupDisplayFields, 'Name');
         this.editorLookupMinSearchLength = config.lookupMinSearchLength == null ? '2' : String(config.lookupMinSearchLength);
         this.editorLookupResultLimit = config.lookupLimit == null ? '10' : String(config.lookupLimit);
+        this.editorLocationMode = this.normalizeLocationMode(config.locationMode);
+        this.editorLocationLayout = this.normalizeLocationLayout(config.locationLayout);
+        this.editorLocationRequiredCountry = config.locationRequiredCountry !== false;
+        this.editorLocationRequiredRegion = config.locationRequiredRegion === true;
+        this.editorLocationRequiredCity = config.locationRequiredCity === true;
+        this.editorLocationDefaultCountryCode = config.locationDefaultCountryCode || '';
+        this.editorLocationAllowedCountriesText = this.joinLocationCountryCodes(config.locationAllowedCountries);
+        this.editorLocationMinSearchLength = config.locationMinSearchLength == null ? '2' : String(config.locationMinSearchLength);
+        this.editorLocationResultLimit = config.locationLimit == null ? '10' : String(config.locationLimit);
         this.editorLabelBold = config.labelBold === true;
         this.editorLabelItalic = config.labelItalic === true;
         this.editorLabelUnderline = config.labelUnderline === true;
@@ -5377,6 +6214,9 @@ export default class NativeFormsDesigner extends LightningElement {
         this.syncEditorConditionalLegacyFields();
         this.editorMinValue = config.minValue === null || config.minValue === undefined ? '' : String(config.minValue);
         this.editorMaxValue = config.maxValue === null || config.maxValue === undefined ? '' : String(config.maxValue);
+        this.editorTextareaMaxLength = this.selectedElementIsTextarea && config.maxLengthDisabled !== true && (config.maxLength === null || config.maxLength === undefined)
+            ? '254'
+            : (config.maxLength === null || config.maxLength === undefined ? '' : String(config.maxLength));
         this.editorDateDisplayFormat = config.dateDisplayFormat || 'us';
         this.editorDateGmtOffset = config.dateGmtOffset || '+00:00';
         this.editorPastYears = config.pastYears === null || config.pastYears === undefined ? '' : String(config.pastYears);
@@ -5384,10 +6224,26 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorFutureYears = config.futureYears === null || config.futureYears === undefined ? '' : String(config.futureYears);
         this.editorFutureMonths = config.futureMonths === null || config.futureMonths === undefined ? '' : String(config.futureMonths);
         this.editorTextRule = config.textRule || 'none';
-        this.editorPrefillEnabled = !!config.prefillEnabled || !!config.prefillAlias || !!config.prefillFieldPath;
+        this.editorPrefillEnabled = !!config.prefillEnabled
+            || !!config.prefillAlias
+            || !!config.prefillFieldPath
+            || !!config.locationPrefillCountryFieldPath
+            || !!config.locationPrefillRegionFieldPath
+            || !!config.locationPrefillCityFieldPath;
         this.editorPrefillAlias = config.prefillAlias || '';
         this.editorPrefillFieldPath = config.prefillFieldPath || '';
-        this.editorSubmitEnabled = !!config.submitEnabled || !!config.submitActionKey || !!config.submitFieldPath;
+        this.editorLocationCountryPrefillFieldPath = config.locationPrefillCountryFieldPath || '';
+        this.editorLocationRegionPrefillFieldPath = config.locationPrefillRegionFieldPath || '';
+        this.editorLocationCityPrefillFieldPath = config.locationPrefillCityFieldPath || '';
+        this.editorLocationCountrySubmitFieldPath = config.locationSubmitCountryFieldPath || '';
+        this.editorLocationRegionSubmitFieldPath = config.locationSubmitRegionFieldPath || '';
+        this.editorLocationCitySubmitFieldPath = config.locationSubmitCityFieldPath || '';
+        this.editorSubmitEnabled = !!config.submitEnabled
+            || !!config.submitActionKey
+            || !!config.submitFieldPath
+            || !!config.locationSubmitCountryFieldPath
+            || !!config.locationSubmitRegionFieldPath
+            || !!config.locationSubmitCityFieldPath;
         this.editorSubmitActionKey = config.submitActionKey || '';
         this.editorSubmitFieldPath = config.submitFieldPath || '';
         this.editorAllowMultipleFiles = config.allowMultiple === true;
@@ -5396,6 +6252,24 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorTargetSubmitActionKey = config.targetSubmitActionKey || '';
         this.editorHelpText = config.helpText || '';
         this.editorClearButtonLabel = config.clearButtonLabel || 'Clear';
+        this.editorButtonDestinationType = config.destinationType === 'external' ? 'external' : 'form';
+        this.editorButtonTargetFormId = config.targetFormId || '';
+        this.editorButtonExternalUrlMode = config.externalUrlMode === 'formula' ? 'formula' : 'template';
+        this.editorButtonExternalUrlTemplate = config.externalUrlTemplate || '';
+        this.editorButtonExternalUrlFormula = config.externalUrlFormula || '';
+        this.editorButtonQueryParameters = Array.isArray(config.queryParameters)
+            ? config.queryParameters.map((item, index) => ({
+                key: `button-param-${index}`,
+                name: item.name || '',
+                valueMode: item.valueMode === 'formula' ? 'formula' : 'template',
+                usesFormula: item.valueMode === 'formula',
+                valueTemplate: item.valueTemplate || '',
+                valueFormula: item.valueFormula || ''
+            }))
+            : [];
+        this.editorButtonSubmitBeforeNavigation = this.selectedElementIsInsideRepeatGroup
+            ? false
+            : config.submitBeforeNavigation === true;
         this.editorSurveyOptions = this.normalizeSurveyOptions(config.options);
         this.editorUseFormula = config.isFormula === true;
         this.editorFormulaExpression = config.formulaExpression || '';
@@ -5439,9 +6313,10 @@ export default class NativeFormsDesigner extends LightningElement {
             delete nextConfig.placeholder;
         }
 
-        if (this.selectedElementIsDisplayText) {
-            nextConfig.html = this.editorDisplayText || '<p>Display text</p>';
-            nextConfig.text = this.editorDisplayText || '<p>Display text</p>';
+        if (this.selectedElementIsRichTextDisplay) {
+            const defaultRichText = this.selectedElementIsMergedDocument ? '<p>Merged document text</p>' : '<p>Display text</p>';
+            nextConfig.html = this.editorDisplayText || defaultRichText;
+            nextConfig.text = this.editorDisplayText || defaultRichText;
         }
 
         if (this.selectedElementIsImage) {
@@ -5459,7 +6334,13 @@ export default class NativeFormsDesigner extends LightningElement {
         } else if (this.selectedElementIsSignature) {
             nextConfig.helpText = this.editorHelpText || '';
             nextConfig.clearButtonLabel = this.editorClearButtonLabel || 'Clear';
-            nextConfig.targetSubmitActionKey = this.editorTargetSubmitActionKey || '';
+            if (this.selectedElementIsInsideRepeatGroup) {
+                nextConfig.targetSubmitActionKey = '';
+                nextConfig.attachToRowRecord = this.editorRowSignatureAttachToRowRecord === true;
+            } else {
+                nextConfig.targetSubmitActionKey = this.editorTargetSubmitActionKey || '';
+                delete nextConfig.attachToRowRecord;
+            }
             delete nextConfig.allowMultiple;
             delete nextConfig.allowedExtensions;
             delete nextConfig.maxFileSizeMb;
@@ -5511,6 +6392,30 @@ export default class NativeFormsDesigner extends LightningElement {
             delete nextConfig.lookupLimit;
         }
 
+        if (this.selectedElementIsLocation) {
+            nextConfig.locationMode = this.normalizeLocationMode(this.editorLocationMode);
+            nextConfig.locationLayout = this.normalizeLocationLayout(this.editorLocationLayout);
+            nextConfig.locationRequiredCountry = this.editorLocationRequiredCountry === true;
+            nextConfig.locationRequiredRegion = this.editorLocationRequiredRegion === true;
+            nextConfig.locationRequiredCity = this.editorLocationRequiredCity === true;
+            nextConfig.locationDefaultCountryCode = String(this.editorLocationDefaultCountryCode || '').trim().toUpperCase();
+            nextConfig.locationAllowedCountries = this.parseLocationCountryCodes(this.editorLocationAllowedCountriesText);
+            nextConfig.locationMinSearchLength = this.parsePositiveInteger(this.editorLocationMinSearchLength, 2);
+            nextConfig.locationLimit = Math.min(this.parsePositiveInteger(this.editorLocationResultLimit, 10), 25);
+            nextConfig.locationOutputMode = 'structured';
+        } else {
+            delete nextConfig.locationMode;
+            delete nextConfig.locationLayout;
+            delete nextConfig.locationRequiredCountry;
+            delete nextConfig.locationRequiredRegion;
+            delete nextConfig.locationRequiredCity;
+            delete nextConfig.locationDefaultCountryCode;
+            delete nextConfig.locationAllowedCountries;
+            delete nextConfig.locationMinSearchLength;
+            delete nextConfig.locationLimit;
+            delete nextConfig.locationOutputMode;
+        }
+
         if (this.selectedElementSupportsSurveyChoices) {
             nextConfig.options = this.surveyOptionsForSave();
         }
@@ -5545,6 +6450,9 @@ export default class NativeFormsDesigner extends LightningElement {
                 delete nextConfig.prefillEnabled;
                 delete nextConfig.prefillAlias;
                 delete nextConfig.prefillFieldPath;
+                delete nextConfig.locationPrefillCountryFieldPath;
+                delete nextConfig.locationPrefillRegionFieldPath;
+                delete nextConfig.locationPrefillCityFieldPath;
             }
         } else {
             delete nextConfig.isFormula;
@@ -5597,6 +6505,20 @@ export default class NativeFormsDesigner extends LightningElement {
             delete nextConfig.futureMonths;
         }
 
+        if (this.selectedElementIsTextarea) {
+            const maxLength = this.parsePositiveInteger(this.editorTextareaMaxLength, null);
+            if (maxLength) {
+                nextConfig.maxLength = maxLength;
+                delete nextConfig.maxLengthDisabled;
+            } else {
+                delete nextConfig.maxLength;
+                nextConfig.maxLengthDisabled = true;
+            }
+        } else {
+            delete nextConfig.maxLength;
+            delete nextConfig.maxLengthDisabled;
+        }
+
         if (this.selectedElementIsTime) {
             nextConfig.timeFormat = this.editorTimeFormat === '12h' ? '12h' : '24h';
         } else {
@@ -5613,22 +6535,51 @@ export default class NativeFormsDesigner extends LightningElement {
             if (!this.editorUseFormula) {
                 nextConfig.prefillEnabled = this.editorPrefillEnabled;
                 nextConfig.prefillAlias = this.editorPrefillAlias || '';
-                nextConfig.prefillFieldPath = this.editorPrefillFieldPath || '';
+                if (this.selectedElementIsLocation) {
+                    nextConfig.prefillFieldPath = '';
+                    nextConfig.locationPrefillCountryFieldPath = this.editorLocationCountryPrefillFieldPath || '';
+                    nextConfig.locationPrefillRegionFieldPath = this.editorLocationRegionPrefillFieldPath || '';
+                    nextConfig.locationPrefillCityFieldPath = this.editorLocationCityPrefillFieldPath || '';
+                } else {
+                    nextConfig.prefillFieldPath = this.editorPrefillFieldPath || '';
+                    delete nextConfig.locationPrefillCountryFieldPath;
+                    delete nextConfig.locationPrefillRegionFieldPath;
+                    delete nextConfig.locationPrefillCityFieldPath;
+                }
             } else {
                 delete nextConfig.prefillEnabled;
                 delete nextConfig.prefillAlias;
                 delete nextConfig.prefillFieldPath;
+                delete nextConfig.locationPrefillCountryFieldPath;
+                delete nextConfig.locationPrefillRegionFieldPath;
+                delete nextConfig.locationPrefillCityFieldPath;
             }
             nextConfig.submitEnabled = this.editorSubmitEnabled;
             nextConfig.submitActionKey = this.editorSubmitActionKey || '';
-            nextConfig.submitFieldPath = this.editorSubmitFieldPath || '';
+            if (this.selectedElementIsLocation) {
+                nextConfig.submitFieldPath = '';
+                nextConfig.locationSubmitCountryFieldPath = this.editorLocationCountrySubmitFieldPath || '';
+                nextConfig.locationSubmitRegionFieldPath = this.editorLocationRegionSubmitFieldPath || '';
+                nextConfig.locationSubmitCityFieldPath = this.editorLocationCitySubmitFieldPath || '';
+            } else {
+                nextConfig.submitFieldPath = this.editorSubmitFieldPath || '';
+                delete nextConfig.locationSubmitCountryFieldPath;
+                delete nextConfig.locationSubmitRegionFieldPath;
+                delete nextConfig.locationSubmitCityFieldPath;
+            }
         } else {
             delete nextConfig.prefillEnabled;
             delete nextConfig.prefillAlias;
             delete nextConfig.prefillFieldPath;
+            delete nextConfig.locationPrefillCountryFieldPath;
+            delete nextConfig.locationPrefillRegionFieldPath;
+            delete nextConfig.locationPrefillCityFieldPath;
             delete nextConfig.submitEnabled;
             delete nextConfig.submitActionKey;
             delete nextConfig.submitFieldPath;
+            delete nextConfig.locationSubmitCountryFieldPath;
+            delete nextConfig.locationSubmitRegionFieldPath;
+            delete nextConfig.locationSubmitCityFieldPath;
         }
 
         if (this.selectedElementIsSection) {
@@ -5657,14 +6608,31 @@ export default class NativeFormsDesigner extends LightningElement {
             nextConfig.allowAddRows = this.editorAllowAddRows;
             nextConfig.allowDeleteRows = this.editorAllowDeleteRows;
             nextConfig.showLabelsOnEachRow = this.editorShowLabelsOnEachRow;
-            if (this.rowSignatureFeatureAvailable || this.editorRowSignatureEnabled) {
-                nextConfig.rowSignatureEnabled = this.editorRowSignatureEnabled;
-                nextConfig.rowSignatureRequired = this.editorRowSignatureRequired;
-                nextConfig.rowSignatureLabel = this.editorRowSignatureLabel || 'Signature';
-                nextConfig.rowSignatureHelpText = this.editorRowSignatureHelpText || '';
-                nextConfig.rowSignatureAttachToRowRecord = this.editorRowSignatureAttachToRowRecord;
-            }
+            delete nextConfig.rowSignatureEnabled;
+            delete nextConfig.rowSignatureRequired;
+            delete nextConfig.rowSignatureLabel;
+            delete nextConfig.rowSignatureHelpText;
+            delete nextConfig.rowSignatureAttachToRowRecord;
             delete nextConfig.text;
+        }
+
+        if (this.selectedElementIsButton) {
+            nextConfig.destinationType = this.editorButtonDestinationType === 'form' ? 'form' : 'external';
+            nextConfig.targetFormId = this.editorButtonTargetFormId || '';
+            nextConfig.externalUrlMode = this.editorButtonExternalUrlMode === 'formula' ? 'formula' : 'template';
+            nextConfig.externalUrlTemplate = this.editorButtonExternalUrlTemplate || '';
+            nextConfig.externalUrlFormula = this.editorButtonExternalUrlFormula || '';
+            nextConfig.queryParameters = (this.editorButtonQueryParameters || []).map((item) => ({
+                name: item.name || '',
+                valueMode: item.valueMode === 'formula' ? 'formula' : 'template',
+                valueTemplate: item.valueTemplate || '',
+                valueFormula: item.valueFormula || ''
+            }));
+            nextConfig.submitBeforeNavigation = !this.selectedElementIsInsideRepeatGroup && this.editorButtonSubmitBeforeNavigation;
+            delete nextConfig.required;
+            delete nextConfig.defaultValue;
+            delete nextConfig.placeholder;
+            delete nextConfig.fieldBehavior;
         }
 
         return nextConfig;
@@ -5715,6 +6683,9 @@ export default class NativeFormsDesigner extends LightningElement {
         this.editorPrefillEnabled = false;
         this.editorPrefillAlias = '';
         this.editorPrefillFieldPath = '';
+        this.editorLocationCountryPrefillFieldPath = '';
+        this.editorLocationRegionPrefillFieldPath = '';
+        this.editorLocationCityPrefillFieldPath = '';
         this.applyEditorDraft(false);
         this.flushEditorDraftSave();
         this.handleCloseFieldFormulaModal();
@@ -5728,6 +6699,9 @@ export default class NativeFormsDesigner extends LightningElement {
             this.editorPrefillEnabled = false;
             this.editorPrefillAlias = '';
             this.editorPrefillFieldPath = '';
+            this.editorLocationCountryPrefillFieldPath = '';
+            this.editorLocationRegionPrefillFieldPath = '';
+            this.editorLocationCityPrefillFieldPath = '';
         }
         this.errorMessage = '';
         this.updateFormulaPreview();
@@ -5812,9 +6786,101 @@ export default class NativeFormsDesigner extends LightningElement {
         });
     }
 
-    applyEditorDraft(shouldAutoSave = true, preserveConditionalDraft = false) {
-        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.isSelectedVersionReadOnly) {
+    validateEmbeddedImageFile(file, label = 'Image') {
+        if (!file) {
+            return false;
+        }
+        if (file.size > MAX_EMBEDDED_IMAGE_BYTES) {
+            this.errorMessage = `${label} is too large. Please upload an optimized image under ${MAX_EMBEDDED_IMAGE_LABEL}.`;
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Image too large',
+                message: `Please upload an optimized image under ${MAX_EMBEDDED_IMAGE_LABEL}.`,
+                variant: 'error'
+            }));
+            return false;
+        }
+        return true;
+    }
+
+    elementUndoSnapshot() {
+        return JSON.stringify((this.elements || []).map((item, index) => ({
+            elementId: item.elementId,
+            label: item.label,
+            elementType: item.elementType,
+            fieldKey: item.fieldKey,
+            elementIndex: item.elementIndex,
+            configJson: item.configJson,
+            parentElementId: item.parentElementId,
+            orderValue: item.orderValue == null ? ((index + 1) * 10) : item.orderValue
+        })));
+    }
+
+    captureUndoStep(label = 'Undo') {
+        if (!this.selectedVersionId || this.isSelectedVersionReadOnly || this.isUndoing) {
+            return null;
+        }
+        const step = {
+            versionId: this.selectedVersionId,
+            selectedElementId: this.selectedElement?.elementId || this.selectedElementId,
+            label,
+            snapshotJson: this.elementUndoSnapshot()
+        };
+        this.undoStack = [step].concat(this.undoStack || []).slice(0, MAX_UNDO_STEPS);
+        return step;
+    }
+
+    removeUndoStep(step) {
+        if (!step) {
             return;
+        }
+        this.undoStack = (this.undoStack || []).filter((item) => item !== step);
+        if (this.pendingElementEditUndoSnapshot === step) {
+            this.pendingElementEditUndoSnapshot = null;
+        }
+    }
+
+    clearUndoStack() {
+        this.undoStack = [];
+        this.pendingElementEditUndoSnapshot = null;
+    }
+
+    async handleUndo() {
+        if (this.undoDisabled) {
+            return;
+        }
+        const [step, ...remainingSteps] = this.undoStack || [];
+        this.undoStack = remainingSteps;
+        this.pendingElementEditUndoSnapshot = null;
+        window.clearTimeout(this.autoSaveTimeoutId);
+        this.isUndoing = true;
+        this.errorMessage = '';
+        try {
+            await restoreVersionElementsSnapshot({
+                versionId: step.versionId,
+                snapshotJson: step.snapshotJson
+            });
+            this.selectedVersionId = step.versionId;
+            this.selectedElementId = null;
+            await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, step.versionId, true);
+            const restoredElement = (this.elements || []).find((item) => item.elementId === step.selectedElementId || item.id === step.selectedElementId);
+            this.selectedElementId = restoredElement?.id || null;
+            this.syncSelectedState();
+            this.showToast('Undo complete', 'The previous canvas state was restored.', 'success');
+        } catch (error) {
+            this.undoStack = [step].concat(this.undoStack || []).slice(0, MAX_UNDO_STEPS);
+            this.errorMessage = this.normalizeError(error);
+            await this.loadWorkspace(this.selectedProjectId, this.selectedFormId, this.selectedVersionId, true);
+        } finally {
+            this.isUndoing = false;
+        }
+    }
+
+    applyEditorDraft(shouldAutoSave = true, preserveConditionalDraft = false) {
+        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
+            return;
+        }
+        if (!this.pendingElementEditUndoSnapshot) {
+            this.pendingElementEditUndoSnapshot = this.captureUndoStep('Edit element');
         }
 
         const preservedConditionalState = preserveConditionalDraft
@@ -5831,7 +6897,7 @@ export default class NativeFormsDesigner extends LightningElement {
                 return item;
             }
 
-            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'repeatGroup', 'fileUpload', 'signature'].includes(this.editorElementType)
+            const nextFieldKey = ['text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'repeatGroup', 'fileUpload', 'signature'].includes(this.editorElementType)
                 ? (item.fieldKey || this.generatedFieldKey(this.editorElementType))
                 : null;
 
@@ -5865,7 +6931,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     scheduleAutoSave() {
-        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
@@ -5873,7 +6939,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     flushEditorDraftSave() {
-        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.isSelectedVersionReadOnly) {
+        if (!this.selectedElementId || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton || this.isSelectedVersionReadOnly) {
             return;
         }
         window.clearTimeout(this.autoSaveTimeoutId);
@@ -5881,7 +6947,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     async persistVisualSettings(showToast) {
-        if (!this.selectedElement || this.selectedElementIsSecretCode) {
+        if (!this.selectedElement || this.selectedElementIsSecretCode || this.selectedElementIsSubmitButton) {
             return;
         }
         try {
@@ -5898,7 +6964,9 @@ export default class NativeFormsDesigner extends LightningElement {
             if (showToast) {
                 this.showToast('Saved', 'Visual settings updated.', 'success');
             }
+            this.pendingElementEditUndoSnapshot = null;
         } catch (error) {
+            this.removeUndoStep(this.pendingElementEditUndoSnapshot);
             const saveDebugMessage = this.describeElementSaveError(error, this.selectedElement);
             // Temporary debugging for the checkbox default-value save path.
             // eslint-disable-next-line no-console
@@ -5948,6 +7016,12 @@ export default class NativeFormsDesigner extends LightningElement {
         for (let index = 0; index < (this.elements || []).length; index += 1) {
             const item = this.elements[index];
             const config = this.parseConfig(item?.configJson);
+            if (item?.elementType === 'button') {
+                const buttonValidation = this.validateButtonNavigationForPublish(item, config);
+                if (!buttonValidation.valid) {
+                    return buttonValidation;
+                }
+            }
             if (config.isFormula !== true) {
                 continue;
             }
@@ -5969,19 +7043,104 @@ export default class NativeFormsDesigner extends LightningElement {
         return { valid: true, message: '' };
     }
 
+    validateButtonNavigationForPublish(item, config) {
+        const label = item.label || 'Button';
+        const expressionValues = [];
+        const templateValues = [];
+        if (config.destinationType !== 'form') {
+            if (config.externalUrlMode === 'formula') {
+                expressionValues.push({ label: 'destination formula', value: config.externalUrlFormula || '', requireUrl: true });
+            } else {
+                templateValues.push({ label: 'destination URL template', value: config.externalUrlTemplate || '' });
+            }
+        }
+        (config.queryParameters || []).forEach((parameter, index) => {
+            if (parameter.valueMode === 'formula') {
+                expressionValues.push({ label: `query parameter ${index + 1} formula`, value: parameter.valueFormula || '', requireUrl: false });
+            } else {
+                templateValues.push({ label: `query parameter ${index + 1} template`, value: parameter.valueTemplate || '' });
+            }
+        });
+        for (let index = 0; index < templateValues.length; index += 1) {
+            const rowValidation = this.validateButtonRowReferences(item, templateValues[index].value, label, templateValues[index].label, true);
+            if (!rowValidation.valid) {
+                return rowValidation;
+            }
+        }
+        for (let index = 0; index < expressionValues.length; index += 1) {
+            const entry = expressionValues[index];
+            const rowValidation = this.validateButtonRowReferences(item, entry.value, label, entry.label, false);
+            if (!rowValidation.valid) {
+                return rowValidation;
+            }
+            const normalizedExpression = String(entry.value || '').replace(/\{row\.([a-zA-Z0-9_]+)\}/g, '{$1}');
+            const validation = validateFormulaConfig({
+                expression: normalizedExpression,
+                fieldKey: '',
+                targetType: 'text',
+                elements: this.elements,
+                allowFormulaReferences: true
+            });
+            if (!validation.valid) {
+                return { valid: false, message: `${label} ${entry.label}: ${validation.message}` };
+            }
+            if (entry.requireUrl) {
+                const preview = previewFormulaValue({
+                    expression: normalizedExpression,
+                    fieldKey: '',
+                    targetType: 'text',
+                    elements: this.elements,
+                    sourceValues: this.formulaSourceValues(),
+                    allowFormulaReferences: true
+                });
+                const previewUrl = String(preview.value || '').trim();
+                if (preview.valid && previewUrl && !this.isAbsoluteHttpUrl(previewUrl)) {
+                    return { valid: false, message: `${label} destination formula preview must be a valid http:// or https:// URL, or blank.` };
+                }
+            }
+        }
+        return { valid: true, message: '' };
+    }
+
+    validateButtonRowReferences(item, source, label, contextLabel, templateMode) {
+        const insideRepeatGroup = this.isElementInsideRepeatGroup(item);
+        const rowPattern = templateMode ? /\{\{\s*row\.([a-zA-Z0-9_]+)\s*\}\}/g : /\{row\.([a-zA-Z0-9_]+)\}/g;
+        const rowReferences = Array.from(String(source || '').matchAll(rowPattern), (match) => match[1]);
+        if (rowReferences.length && !insideRepeatGroup) {
+            return { valid: false, message: `${label} ${contextLabel}: row references can only be used inside a Records List.` };
+        }
+        if (!rowReferences.length) {
+            return { valid: true, message: '' };
+        }
+        const repeatGroup = this.findRepeatGroupAncestor(item);
+        const rowFieldKeys = new Set(
+            (this.elements || [])
+                .filter((candidate) => candidate.parentElementId === repeatGroup?.elementId && candidate.fieldKey)
+                .map((candidate) => candidate.fieldKey)
+        );
+        const unknownKey = rowReferences.find((fieldKey) => !rowFieldKeys.has(fieldKey));
+        return unknownKey
+            ? { valid: false, message: `${label} ${contextLabel}: unknown row field reference: ${unknownKey}.` }
+            : { valid: true, message: '' };
+    }
+
     isElementInsideRepeatGroup(item) {
+        return !!this.findRepeatGroupAncestor(item);
+    }
+
+    findRepeatGroupAncestor(item) {
         let parentElementId = item?.parentElementId;
         while (parentElementId) {
             const parent = this.elements.find((candidate) => candidate.elementId === parentElementId);
             if (!parent) {
-                return false;
+                return null;
             }
             if (parent.elementType === 'repeatGroup') {
-                return true;
+                return parent;
             }
             parentElementId = parent.parentElementId;
         }
-        return false;
+        return null;
     }
 
     findParentElement(item) {
@@ -6270,6 +7429,57 @@ export default class NativeFormsDesigner extends LightningElement {
         }
         const value = String(rawValue || '').trim();
         return value || fallbackValue;
+    }
+
+    normalizeLocationMode(value) {
+        const mode = String(value || '').trim();
+        return ['country', 'countryRegion', 'countryCity', 'countryRegionCity'].includes(mode)
+            ? mode
+            : 'countryRegionCity';
+    }
+
+    normalizeLocationLayout(value) {
+        return String(value || '').trim() === 'inline' ? 'inline' : 'stacked';
+    }
+
+    previewLocationParts(item) {
+        const config = this.parseConfig(item?.configJson);
+        const mode = this.normalizeLocationMode(config.locationMode);
+        return [
+            { key: 'country', label: 'Country', show: true },
+            { key: 'region', label: 'State/Region', show: mode === 'countryRegion' || mode === 'countryRegionCity' },
+            { key: 'city', label: 'City', show: mode === 'countryCity' || mode === 'countryRegionCity' }
+        ].filter((part) => part.show);
+    }
+
+    previewLocationInputsClass(item) {
+        const config = this.parseConfig(item?.configJson);
+        return `preview-location-inputs preview-location-inputs--${this.normalizeLocationLayout(config.locationLayout)}`;
+    }
+
+    parseLocationCountryCodes(rawValue) {
+        const seen = new Set();
+        return String(rawValue || '')
+            .split(',')
+            .map((value) => value.trim().toUpperCase())
+            .filter((value) => /^[A-Z]{2}$/.test(value))
+            .filter((value) => {
+                if (seen.has(value)) {
+                    return false;
+                }
+                seen.add(value);
+                return true;
+            });
+    }
+
+    joinLocationCountryCodes(rawValue) {
+        if (!Array.isArray(rawValue)) {
+            return '';
+        }
+        return rawValue
+            .map((value) => String(value || '').trim().toUpperCase())
+            .filter((value) => /^[A-Z]{2}$/.test(value))
+            .join(', ');
     }
 
     showToast(title, message, variant) {

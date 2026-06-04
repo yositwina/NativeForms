@@ -429,6 +429,8 @@ private class NativeFormsCoreServicesTest {
         System.assertEquals('de', NativeFormsRuntimeI18n.normalizeLanguageCode(' DE '));
         System.assertEquals('en', NativeFormsRuntimeI18n.normalizeLanguageCode('it'));
         System.assertEquals('Listo', NativeFormsRuntimeI18n.text('es', 'fileReady', 'fallback'));
+        System.assertEquals('Checking file safety...', NativeFormsRuntimeI18n.text('en', 'fileSafetyScanning', 'fallback'));
+        System.assert(NativeFormsRuntimeI18n.text('he', 'fileSafetyNotice', 'fallback').contains('Salesforce'));
         System.assertEquals('Ajouter une ligne', NativeFormsRuntimeI18n.text('fr', 'repeatAddRow', 'fallback'));
         System.assertEquals('Zeile hinzufügen', NativeFormsRuntimeI18n.text('de', 'repeatAddRow', 'fallback'));
         System.assertEquals('fallback', NativeFormsRuntimeI18n.text('en', 'missingKey', 'fallback'));

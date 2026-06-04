@@ -292,6 +292,19 @@ function deriveTenantRuntimeStatus(tenantRecord) {
   };
 }
 
+function publicPrefillErrorMessage(statusCode) {
+  if (statusCode === 400) {
+    return "Prefill request could not be completed.";
+  }
+  if (statusCode === 401) {
+    return "Unauthorized prefill request.";
+  }
+  if (statusCode === 403) {
+    return "Prefill is not available for this form.";
+  }
+  return "We could not load saved details right now.";
+}
+
 function ensureFormToken(formSecurity, publishToken, mode) {
   if (!publishToken) {
     const error = new Error("Missing required field: publishToken");
@@ -343,6 +356,11 @@ async function ensureActiveTenantForForm(formSecurity) {
 
   const tenantRecord = await getTenantRecord(formSecurity.orgId);
   const runtimeStatus = deriveTenantRuntimeStatus(tenantRecord);
+  if (runtimeStatus.status === "missing") {
+    const error = new Error(runtimeStatus.reason);
+    error.statusCode = 503;
+    throw error;
+  }
   if (runtimeStatus.status === "blocked") {
     const error = new Error(runtimeStatus.reason);
     error.statusCode = 403;
@@ -689,6 +707,7 @@ function buildPrefillResponse({ formId, mapped }) {
     formId,
     input: mapped.input || {},
     hidden: mapped.hidden || {},
+    aliases: mapped.aliases || {},
     meta: mapped.meta || {},
     repeatGroups: mapped.repeatGroups || {}
   };
@@ -1093,9 +1112,17 @@ export const handler = async (event) => {
     }));
 
   } catch (error) {
-    return jsonResponse(error.statusCode || 500, {
+    const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+    if (statusCode >= 500) {
+      console.error("Prefill request failed", {
+        statusCode,
+        message: error?.message || "Unknown prefill failure",
+        stack: error?.stack || null
+      });
+    }
+    return jsonResponse(statusCode, {
       success: false,
-      error: error.message
+      error: publicPrefillErrorMessage(statusCode)
     });
   }
 };

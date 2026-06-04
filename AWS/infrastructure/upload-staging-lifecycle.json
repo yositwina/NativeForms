@@ -1,0 +1,17 @@
+{
+  "Rules": [
+    {
+      "ID": "DeleteTransientUploadsAfterOneDay",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": ""
+      },
+      "Expiration": {
+        "Days": 1
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

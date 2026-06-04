@@ -43,15 +43,23 @@ public with sharing class NativeFormsFeatureFlags {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSubmissionPdf');
     }
 
-    public static Boolean isProRecordsListRowSignaturePdfEnabled() {
-        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProRecordsListRowSignaturePdf');
+    public static Boolean isProMergedDocumentEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProMergedDocument');
     }
 
     public static Boolean isProSurveyFieldsEnabled() {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProSurveyFields');
     }
 
+    public static Boolean isProLocationFieldsEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProLocationFields');
+    }
+
     public static Boolean isProCustomJsEnabled() {
         return NativeFormsTenantEntitlements.isFeatureEnabled('enableProCustomJs');
+    }
+
+    public static Boolean isProButtonElementsEnabled() {
+        return NativeFormsTenantEntitlements.isFeatureEnabled('enableProButtonElements');
     }
 }

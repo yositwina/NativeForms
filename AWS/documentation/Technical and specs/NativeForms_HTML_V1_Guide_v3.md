@@ -16,7 +16,7 @@ Each published form includes:
 {
   version: "1.0",
   formId: "example-form",
-  endpoints: { prefillUrl: "...", submitUrl: "..." },
+  endpoints: { prefillUrl: "...", submitUrl: "...", lookupUrl: "...", locationUrl: "..." },
   tokens: { publish: "..." },
   settings: { debug: false },
   theme: {
@@ -49,12 +49,45 @@ Supported element types in the current runtime:
 - checkbox
 - radio
 - lookup
+- location
 - time
 - image
 - section
 - columns
 - hidden
 - repeatGroup
+- button
+- mergedDocument
+
+### Textarea Character Limit V1
+`textarea` elements can store `config.maxLength`.
+
+- New textarea elements default to `254` characters so mapping to a regular Salesforce Text field does not fail at submit time.
+- Designers may change or clear the limit when the target Salesforce field supports longer text.
+- Published runtime renders the value as a browser `maxlength` and shows a live character counter while the visitor types.
+- Records List textarea children use the same limit behavior per row.
+
+Embedded uploaded images are intentionally capped at 69 KB before base64 encoding. This applies to canvas Image element uploads and Theme logo uploads because publish embeds those assets into generated HTML; larger files should be optimized or hosted externally by URL.
+
+### Merged Document Element V1
+`mergedDocument` is a Pro display element gated by `enableProMergedDocument`.
+
+- The customer-facing Designer label is `Merged Document`.
+- It stores rich HTML in `config.html`, like Display Text.
+- It can include prefill alias merge tokens such as `{{Contact.FirstName}}`.
+- V1 supports prefill alias field paths only; it does not create hidden fields.
+- Published runtime resolves tokens from the latest prefill payload and escapes inserted Salesforce values.
+- Missing values render blank.
+- Submission PDF includes the resolved document text when PDF generation is enabled.
+
+### Button Element V1
+`button` is a Pro action element, offered in the Designer's Input Field palette, for same-tab portal navigation. It has a configurable label and navigation config, but no submitted field value.
+
+- Feature flag: `enableProButtonElements`.
+- Destinations are another currently published TwinaForms form or an absolute external URL template/formula.
+- Query parameters use the same dynamic field concepts as post-submit redirects; blank values are omitted.
+- A Button can submit the whole form before navigation and override the normal post-submit redirect only after successful submit.
+- A Button inside `repeatGroup` can resolve clicked-row references (`{{row.fieldKey}}` or `{row.fieldKey}`) but cannot submit in V1.
 
 ### Time Field V1
 `time` is a simple input field for time-of-day values.
@@ -85,6 +118,7 @@ Supported element types in the current runtime:
 - Records List rows support `multiCheckbox` using the same semicolon value format per row.
 - Submission PDF displays selected option labels joined by comma, not raw API values.
 - Create From Layout maps Salesforce `MultiPicklist` fields to `multiCheckbox` and uses translated Salesforce picklist labels when available.
+- Create From Layout names generated Prefill/Submit actions from the Salesforce object API name, for example `Prefill_Contact` and `Submit_Contact`, so action mapping remains language-stable.
 - Deferred: manual free-text option editing for Text fields, option-column layout settings, dependent multi-picklists.
 
 ### Salesforce Lookup Field V1
@@ -104,6 +138,37 @@ Supported element types in the current runtime:
 - Prefill can resolve an existing lookup Id into a display label through the same lookup definition.
 - V1 supports single-select lookups only.
 - Deferred: default/preloaded records, multi-select lookup, dependent lookup filters, lookup inside `repeatGroup`, and create-new-from-lookup.
+
+### Country / State / City Field V1
+`location` is a Pro field for AWS-backed country, state/region, and city autocomplete. It is customer-facing as `Country / State / City`, appears under Special Elements, and is gated by `enableProLocationFields`.
+
+- V1 uses only TwinaForms AWS data imported from GeoNames. There is no Google Places/API/billing/key integration.
+- Runtime endpoint: `POST /forms/location/search`.
+- The browser sends only `formId`, `publishToken`, `fieldKey`, `kind`, search text, and selected country/region codes.
+- AWS validates the published form, publish token, tenant status, entitlement, and server-side `locationDefinition` before returning results.
+- `NativeFormsBackend` requires the inline role policy `NativeFormsGeoLocationsRead`, granting `dynamodb:Query` on `arn:aws:dynamodb:eu-north-1:355617663345:table/NativeFormsGeoLocations`.
+- City search starts after the configured minimum length, default `2`, and is filtered by selected country and optional state/region.
+- Visitor free text is not submitted in V1; the visitor must choose autocomplete records.
+- Changing Country clears State/Region and City. Changing State/Region clears City.
+- Designer exposes a Location Layout setting with `Stacked` and `Inline`. Inline lays the visible parts in one row on desktop/tablet, follows RTL visual order when the form is RTL, and stacks on mobile.
+- Salesforce submit mapping exposes three clear output mappings: Country Name, State/Region Name, and City Name. The runtime submission value remains structured JSON under the field key for logs/API use, but the Designer does not expose latitude/longitude or a single "submit output" selector in V1.
+- Salesforce prefill mapping also exposes three clear source mappings: Country Name, State/Region Name, and City Name. Prefill builds a trusted structured location value from those fields; V1 does not resolve prefilled names back to GeoNames ids, latitude, or longitude.
+- V1 supports top-level form fields only. Location fields inside Records Lists are deferred.
+
+Example submitted value:
+```json
+{
+  "countryCode": "US",
+  "countryName": "United States",
+  "regionCode": "IL",
+  "regionName": "Illinois",
+  "cityName": "Springfield",
+  "geoNameId": "4250542",
+  "latitude": 39.8017,
+  "longitude": -89.6437,
+  "displayLabel": "Springfield, Illinois, United States"
+}
+```
 
 Example registered lookup definition:
 ```json
@@ -239,15 +304,15 @@ Records List rows support a label display choice for desktop layout.
 - Mobile runtime must always show labels inside each row and hide the table-style header, regardless of the desktop choice.
 - The Designer should expose this as an explicit Records List setting, not as a hidden runtime behavior.
 
-## Records List Row Signature + PDF
-Records List row signatures are an opt-in Pro capability for timesheet-style related-record workflows.
+## Signature Inside Records Lists
+Repeated-row signatures use the normal Pro `Signature` element inside a Records List, rather than a separate container-level feature.
 
-- Feature flag: `enableProRecordsListRowSignaturePdf`.
-- The feature also requires Electronic Signature and Submission PDF entitlements.
-- The setting lives on each Records List element so admins choose exactly which repeated rows require signatures.
-- When an admin enables row signatures on a Records List, Designer should automatically enable and save the form-level Submission PDF setting.
-- Normal Signature elements remain top-level fields and should still be blocked inside Records List rows.
-- Runtime payload stores row signatures under each submitted row as `_rowSignature`; top-level `input.signatures` remains reserved for normal Signature fields.
+- A Signature inside a Records List requires the Electronic Signature and Submission PDF entitlements.
+- The Designer allows one Signature element within each Records List in V1 and configures its label, help text, required state, and optional row-record file attachment on the Signature itself.
+- Adding or moving a Signature into a Records List automatically enables and saves the form-level Submission PDF setting.
+- Submission PDF cannot be disabled while a Records List contains a Signature; removing the final row Signature leaves PDF enabled until the admin chooses to turn it off.
+- Top-level Signature elements remain supported independently and do not automatically enable Submission PDF.
+- Runtime payload stores the row Signature under each submitted row as `_rowSignature`; top-level `input.signatures` remains reserved for normal Signature fields.
 - AWS validates required row signatures before Salesforce submit actions run.
 - AWS maps each submitted row to the corresponding `upsertMany` result row id after submit.
 - The final Submission PDF renders Records List rows as readable row cards and embeds each captured row signature below its row.

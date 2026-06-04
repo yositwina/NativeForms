@@ -3,6 +3,7 @@ public with sharing class NativeFormsDesignerController {
     private static final Integer MAX_PAGE_LAYOUT_IMPORT_FIELDS = 50;
     private static final Integer ELEMENT_LABEL_MAX_LENGTH = 255;
     private static final Integer ELEMENT_CONFIG_JSON_MAX_LENGTH = 131072;
+    private static final Integer MAX_EMBEDDED_IMAGE_BYTES = 70656;
     @TestVisible private static Map<String, Object> pageLayoutImportMetadataMock;
 
     public class SelectOption {
@@ -105,6 +106,17 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Integer orderValue { get; set; }
     }
 
+    public class ElementSnapshotRecord {
+        @AuraEnabled public String elementId { get; set; }
+        @AuraEnabled public String label { get; set; }
+        @AuraEnabled public String elementType { get; set; }
+        @AuraEnabled public String fieldKey { get; set; }
+        @AuraEnabled public Integer elementIndex { get; set; }
+        @AuraEnabled public String configJson { get; set; }
+        @AuraEnabled public String parentElementId { get; set; }
+        @AuraEnabled public Integer orderValue { get; set; }
+    }
+
     public class DesignerWorkspace {
         @AuraEnabled public Id selectedProjectId { get; set; }
         @AuraEnabled public Id selectedFormId { get; set; }
@@ -156,6 +168,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String selectedPublishedUrl { get; set; }
         @AuraEnabled public List<SelectOption> projects { get; set; }
         @AuraEnabled public List<SelectOption> forms { get; set; }
+        @AuraEnabled public List<SelectOption> publishedButtonTargets { get; set; }
         @AuraEnabled public List<VersionOption> versions { get; set; }
         @AuraEnabled public List<SelectOption> themes { get; set; }
         @AuraEnabled public ThemeRecord selectedTheme { get; set; }
@@ -167,14 +180,16 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Boolean enableProLoadFile { get; set; }
         @AuraEnabled public Boolean enableProElectronicSignature { get; set; }
         @AuraEnabled public Boolean enableProSubmissionPdf { get; set; }
-        @AuraEnabled public Boolean enableProRecordsListRowSignaturePdf { get; set; }
+        @AuraEnabled public Boolean enableProMergedDocument { get; set; }
         @AuraEnabled public Boolean enableProSurveyFields { get; set; }
+        @AuraEnabled public Boolean enableProLocationFields { get; set; }
         @AuraEnabled public Boolean enableProFormulaFields { get; set; }
         @AuraEnabled public Boolean enableProPostSubmitAutoLink { get; set; }
         @AuraEnabled public Boolean enableProSfSecretCodeAuth { get; set; }
         @AuraEnabled public Boolean enableProAdvancedSubmitModes { get; set; }
         @AuraEnabled public Boolean enableProPageLayoutClone { get; set; }
         @AuraEnabled public Boolean enableProCustomJs { get; set; }
+        @AuraEnabled public Boolean enableProButtonElements { get; set; }
         @AuraEnabled public Integer currentFormCount { get; set; }
         @AuraEnabled public Integer maxForms { get; set; }
         @AuraEnabled public Boolean formLimitReached { get; set; }
@@ -425,6 +440,7 @@ public with sharing class NativeFormsDesignerController {
         DesignerWorkspace workspace = new DesignerWorkspace();
         workspace.projects = new List<SelectOption>();
         workspace.forms = new List<SelectOption>();
+        workspace.publishedButtonTargets = new List<SelectOption>();
         workspace.versions = new List<VersionOption>();
         workspace.themes = new List<SelectOption>();
         workspace.elements = new List<ElementRecord>();
@@ -435,14 +451,16 @@ public with sharing class NativeFormsDesignerController {
         workspace.enableProLoadFile = NativeFormsFeatureFlags.isProLoadFileEnabled();
         workspace.enableProElectronicSignature = NativeFormsFeatureFlags.isProElectronicSignatureEnabled();
         workspace.enableProSubmissionPdf = NativeFormsFeatureFlags.isProSubmissionPdfEnabled();
-        workspace.enableProRecordsListRowSignaturePdf = NativeFormsFeatureFlags.isProRecordsListRowSignaturePdfEnabled();
+        workspace.enableProMergedDocument = NativeFormsFeatureFlags.isProMergedDocumentEnabled();
         workspace.enableProSurveyFields = NativeFormsFeatureFlags.isProSurveyFieldsEnabled();
+        workspace.enableProLocationFields = NativeFormsFeatureFlags.isProLocationFieldsEnabled();
         workspace.enableProFormulaFields = NativeFormsFeatureFlags.isProFormulaFieldsEnabled();
         workspace.enableProPostSubmitAutoLink = NativeFormsFeatureFlags.isProPostSubmitAutoLinkEnabled();
         workspace.enableProSfSecretCodeAuth = NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled();
         workspace.enableProAdvancedSubmitModes = NativeFormsFeatureFlags.isProAdvancedSubmitModesEnabled();
         workspace.enableProPageLayoutClone = NativeFormsFeatureFlags.isProPageLayoutCloneEnabled();
         workspace.enableProCustomJs = NativeFormsFeatureFlags.isProCustomJsEnabled();
+        workspace.enableProButtonElements = NativeFormsFeatureFlags.isProButtonElementsEnabled();
         FormLimitState formLimitState = buildFormLimitState();
         workspace.currentFormCount = formLimitState.currentFormCount;
         workspace.maxForms = formLimitState.maxForms;
@@ -491,6 +509,21 @@ public with sharing class NativeFormsDesignerController {
             workspace.forms.add(option);
         }
         sortOptionsByLabel(workspace.forms);
+
+        for (NF_Form__c targetForm : [
+            SELECT Id, NF_Key__c, Description__c
+            FROM NF_Form__c
+            WHERE Current_Published_Version__c != null
+              AND NF_Key__c != null
+            WITH USER_MODE
+            LIMIT 200
+        ]) {
+            SelectOption targetOption = new SelectOption();
+            targetOption.label = targetForm.Description__c + ' (' + targetForm.NF_Key__c + ')';
+            targetOption.value = (String) targetForm.Id;
+            workspace.publishedButtonTargets.add(targetOption);
+        }
+        sortOptionsByLabel(workspace.publishedButtonTargets);
 
         Map<Id, NF_Form__c> formsById = new Map<Id, NF_Form__c>(forms);
 
@@ -953,6 +986,9 @@ public with sharing class NativeFormsDesignerController {
         if (normalizedEnabled && !NativeFormsFeatureFlags.isProSubmissionPdfEnabled()) {
             throw new AuraHandledException('Submission PDF is available on Pro plans only. Enable it in your AWS plan entitlements first.');
         }
+        if (!normalizedEnabled && versionContainsRecordsListSignature(versionId)) {
+            throw new AuraHandledException('Submission PDF is required while this form contains a Signature inside a Records List. Remove the row Signature first.');
+        }
 
         NF_Form_Version__c versionRecord = [
             SELECT Id, Form__c, UI_Settings_JSON__c
@@ -1005,6 +1041,22 @@ public with sharing class NativeFormsDesignerController {
             Id = versionRecord.Id,
             Custom_JS__c = versionRecord.Custom_JS__c
         );
+    }
+
+    @AuraEnabled
+    public static SelectOption createProject(String projectName) {
+        Id projectId = NativeFormsProjectService.resolveProjectId(null, projectName);
+        NF_Project__c projectRecord = [
+            SELECT Id, Name
+            FROM NF_Project__c
+            WHERE Id = :projectId
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        SelectOption option = new SelectOption();
+        option.label = projectRecord.Name;
+        option.value = (String) projectRecord.Id;
+        return option;
     }
 
     @AuraEnabled
@@ -1127,7 +1179,7 @@ public with sharing class NativeFormsDesignerController {
 
         Boolean secureMode = normalizedMode != 'create';
         if (secureMode && !NativeFormsFeatureFlags.isProSfSecretCodeAuthEnabled()) {
-            throw new AuraHandledException('Secure page-layout forms require Contact/email secret-code verification on your Pro plan.');
+            throw new AuraHandledException('Secure page-layout forms require User Verification with Contact/email matching on your Pro plan.');
         }
 
         normalizePageLayoutImportLayoutKey(layoutKey);
@@ -1165,13 +1217,13 @@ public with sharing class NativeFormsDesignerController {
         insert as user versionRecord;
 
         List<NF_Form_Action__c> actions = new List<NF_Form_Action__c>();
-        String prefillAlias = 'record';
-        String submitActionKey = 'submitRecord';
+        String prefillAlias = pageLayoutImportActionName('Prefill', plan.objectApiName);
+        String submitActionKey = pageLayoutImportActionName('Submit', plan.objectApiName);
         if (secureMode) {
             actions.add(new NF_Form_Action__c(
                 Form_Version__c = versionRecord.Id,
                 Action_Scope__c = 'Prefill',
-                Command_Key__c = 'loadRecord',
+                Command_Key__c = prefillAlias,
                 Command_Type__c = 'findOne',
                 Object_Api_Name__c = plan.objectApiName,
                 Store_Result_As__c = prefillAlias,
@@ -1207,7 +1259,7 @@ public with sharing class NativeFormsDesignerController {
             Command_Key__c = submitActionKey,
             Command_Type__c = submitCommandType,
             Object_Api_Name__c = plan.objectApiName,
-            Store_Result_As__c = secureMode ? 'savedRecord' : 'createdRecord',
+            Store_Result_As__c = submitActionKey,
             Order__c = secureMode ? 20 : 10,
             Config_JSON__c = JSON.serializePretty(submitConfig)
         ));
@@ -1372,6 +1424,126 @@ public with sharing class NativeFormsDesignerController {
     }
 
     @AuraEnabled
+    public static NewFormResult restoreDraftFromPublished(Id formId, Id sourceVersionId) {
+        if (formId == null) {
+            throw new AuraHandledException('Select a form to restore first.');
+        }
+        if (sourceVersionId == null) {
+            throw new AuraHandledException('Select a published version to restore from.');
+        }
+
+        NF_Form__c formRecord = [
+            SELECT Id, Description__c, Project__c
+            FROM NF_Form__c
+            WHERE Id = :formId
+            WITH USER_MODE LIMIT 1
+        ];
+
+        NF_Form_Version__c publishedVersion = [
+            SELECT Id,
+                   Form__c,
+                   Version_Status__c,
+                   Publish_Status__c,
+                   Security_Mode__c,
+                   Rate_Limit_Profile__c,
+                   Custom_CSS__c,
+                   Custom_JS__c,
+                   Theme_JSON__c,
+                   UI_Settings_JSON__c,
+                   Prefill_Params_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :sourceVersionId
+            WITH USER_MODE LIMIT 1
+        ];
+        if (publishedVersion.Form__c != formRecord.Id) {
+            throw new AuraHandledException('The selected version does not belong to the selected form.');
+        }
+        if (publishedVersion.Version_Status__c != 'Published' && publishedVersion.Publish_Status__c != 'Published') {
+            throw new AuraHandledException('Select a published version to restore from.');
+        }
+
+        AggregateResult versionAggregate = [
+            SELECT MAX(Version_Number__c) maxVersion
+            FROM NF_Form_Version__c
+            WHERE Form__c = :formRecord.Id
+            WITH USER_MODE
+        ];
+        Decimal maxVersion = (Decimal) versionAggregate.get('maxVersion');
+        Integer nextVersionNumber = maxVersion == null ? 1 : maxVersion.intValue() + 1;
+
+        NF_Form_Version__c restoredVersion = new NF_Form_Version__c(
+            Form__c = formRecord.Id,
+            Version_Number__c = nextVersionNumber,
+            Version_Status__c = 'Draft',
+            Publish_Status__c = 'Never Published',
+            Security_Mode__c = publishedVersion.Security_Mode__c,
+            Rate_Limit_Profile__c = publishedVersion.Rate_Limit_Profile__c,
+            Custom_CSS__c = publishedVersion.Custom_CSS__c,
+            Custom_JS__c = publishedVersion.Custom_JS__c,
+            Theme_JSON__c = publishedVersion.Theme_JSON__c,
+            UI_Settings_JSON__c = publishedVersion.UI_Settings_JSON__c,
+            Prefill_Params_JSON__c = publishedVersion.Prefill_Params_JSON__c
+        );
+        insert as user restoredVersion;
+
+        List<NF_Form_Element__c> restoredElements = new List<NF_Form_Element__c>();
+        for (NF_Form_Element__c sourceElement : [
+            SELECT Element_Id__c,
+                   Element_Type__c,
+                   Field_Key__c,
+                   Element_Index__c,
+                   Label__c,
+                   Config_JSON__c,
+                   Parent_Element_Id__c,
+                   Order__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :publishedVersion.Id
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            NF_Form_Element__c restoredElement = sourceElement.clone(false, true, false, false);
+            restoredElement.Form_Version__c = restoredVersion.Id;
+            restoredElements.add(restoredElement);
+        }
+        if (!restoredElements.isEmpty()) {
+            insert as user restoredElements;
+        }
+
+        List<NF_Form_Action__c> restoredActions = new List<NF_Form_Action__c>();
+        for (NF_Form_Action__c sourceAction : [
+            SELECT Action_Scope__c,
+                   Command_Key__c,
+                   Command_Type__c,
+                   Object_Api_Name__c,
+                   Store_Result_As__c,
+                   Config_JSON__c,
+                   Order__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :publishedVersion.Id
+            WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
+        ]) {
+            NF_Form_Action__c restoredAction = sourceAction.clone(false, true, false, false);
+            restoredAction.Form_Version__c = restoredVersion.Id;
+            restoredActions.add(restoredAction);
+        }
+        if (!restoredActions.isEmpty()) {
+            insert as user restoredActions;
+        }
+
+        update as user new NF_Form__c(
+            Id = formRecord.Id,
+            Status__c = 'Draft',
+            Current_Draft_Version__c = restoredVersion.Id
+        );
+
+        NewFormResult result = new NewFormResult();
+        result.projectId = formRecord.Project__c;
+        result.formId = formRecord.Id;
+        result.versionId = restoredVersion.Id;
+        result.formName = formRecord.Description__c;
+        return result;
+    }
+
+    @AuraEnabled
     public static void deleteForm(Id formId, String confirmationText) {
         if (formId == null) {
             throw new AuraHandledException('Form id is required.');
@@ -1478,6 +1650,48 @@ public with sharing class NativeFormsDesignerController {
         delete as user recordsToDelete;
     }
 
+    @AuraEnabled
+    public static void restoreVersionElementsSnapshot(Id versionId, String snapshotJson) {
+        if (versionId == null) {
+            throw new AuraHandledException('Version id is required.');
+        }
+        ensureVersionEditable(versionId);
+        List<ElementSnapshotRecord> snapshot = parseElementSnapshot(snapshotJson);
+
+        List<NF_Form_Element__c> existingElements = [
+            SELECT Id
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+            WITH USER_MODE
+        ];
+        if (!existingElements.isEmpty()) {
+            delete as user existingElements;
+        }
+
+        List<NF_Form_Element__c> restoredElements = new List<NF_Form_Element__c>();
+        Integer fallbackOrder = 10;
+        for (ElementSnapshotRecord snapshotRecord : snapshot) {
+            if (String.isBlank(snapshotRecord.elementId) || String.isBlank(snapshotRecord.elementType)) {
+                continue;
+            }
+            restoredElements.add(new NF_Form_Element__c(
+                Form_Version__c = versionId,
+                Element_Id__c = snapshotRecord.elementId,
+                Element_Type__c = snapshotRecord.elementType,
+                Field_Key__c = snapshotRecord.fieldKey,
+                Element_Index__c = snapshotRecord.elementIndex,
+                Label__c = snapshotRecord.label,
+                Config_JSON__c = snapshotRecord.configJson,
+                Parent_Element_Id__c = snapshotRecord.parentElementId,
+                Order__c = snapshotRecord.orderValue == null ? fallbackOrder : snapshotRecord.orderValue
+            ));
+            fallbackOrder += 10;
+        }
+        if (!restoredElements.isEmpty()) {
+            insert as user restoredElements;
+        }
+    }
+
     public static ElementRecord addElement(Id versionId, String elementType) {
         return addElement(versionId, elementType, null);
     }
@@ -1492,7 +1706,7 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('Choose an element type first.');
         }
         String normalizedPreset = normalizeElementPreset(elementType, elementPreset);
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'image', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'mergedDocument', 'image', 'button', 'repeatGroup' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
@@ -1504,8 +1718,17 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'signature' && !NativeFormsFeatureFlags.isProElectronicSignatureEnabled()) {
             throw new AuraHandledException('Electronic Signature is not available on your current TwinaForms plan.');
         }
+        if (elementType == 'button' && !NativeFormsFeatureFlags.isProButtonElementsEnabled()) {
+            throw new AuraHandledException('Portal Buttons are not available on your current TwinaForms plan.');
+        }
         if ((elementType == 'ranking' || String.isNotBlank(normalizedPreset)) && !NativeFormsFeatureFlags.isProSurveyFieldsEnabled()) {
             throw new AuraHandledException('Survey Fields are not available on your current TwinaForms plan.');
+        }
+        if (elementType == 'location' && !NativeFormsFeatureFlags.isProLocationFieldsEnabled()) {
+            throw new AuraHandledException('Country / State / City is not available on your current TwinaForms plan.');
+        }
+        if (elementType == 'mergedDocument' && !NativeFormsFeatureFlags.isProMergedDocumentEnabled()) {
+            throw new AuraHandledException('Merged Document is not available on your current TwinaForms plan.');
         }
 
         NF_Form_Version__c versionRecord = [
@@ -1648,6 +1871,7 @@ public with sharing class NativeFormsDesignerController {
         Integer originalColumn = readSectionColumn(elementRecord.Config_JSON__c);
 
         String targetParentElementId = null;
+        Boolean placedRowSignature = false;
         if (targetParentId != null) {
             NF_Form_Element__c parentRecord = [
                 SELECT Id, Form_Version__c, Element_Id__c, Element_Type__c, Config_JSON__c
@@ -1662,11 +1886,13 @@ public with sharing class NativeFormsDesignerController {
                 throw new AuraHandledException('Only sections, groups, or repeat groups can receive dropped elements.');
             }
             validateContainerPlacement(parentRecord, elementRecord);
+            validateRecordsListSignaturePlacement(versionId, parentRecord, elementRecord);
             Integer parentColumns = readColumns(parentRecord.Config_JSON__c);
             if (columnNumber == null || columnNumber < 1 || columnNumber > parentColumns) {
                 throw new AuraHandledException('Column number must be between 1 and the container column count.');
             }
             targetParentElementId = parentRecord.Element_Id__c;
+            placedRowSignature = parentRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'signature';
         }
 
         Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
@@ -1675,6 +1901,12 @@ public with sharing class NativeFormsDesignerController {
             elementConfig.remove('sectionColumn');
         } else {
             elementConfig.put('sectionColumn', targetColumn);
+        }
+        if (placedRowSignature) {
+            elementConfig.put('targetSubmitActionKey', '');
+            if (!elementConfig.containsKey('attachToRowRecord')) {
+                elementConfig.put('attachToRowRecord', false);
+            }
         }
         elementRecord.Config_JSON__c = JSON.serializePretty(elementConfig);
         elementRecord.Parent_Element_Id__c = targetParentElementId;
@@ -1764,6 +1996,9 @@ public with sharing class NativeFormsDesignerController {
             orderValue += 10;
         }
         update as user updates;
+        if (placedRowSignature) {
+            enableSubmissionPdfForRecordsListSignature(versionId);
+        }
     }
 
     @AuraEnabled
@@ -1780,7 +2015,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         NF_Form_Element__c sectionRecord = [
-            SELECT Id, Element_Id__c, Element_Type__c
+            SELECT Id, Form_Version__c, Element_Id__c, Element_Type__c
             FROM NF_Form_Element__c
             WHERE Id = :sectionId
             WITH USER_MODE LIMIT 1
@@ -1797,9 +2032,16 @@ public with sharing class NativeFormsDesignerController {
         ];
 
         validateContainerPlacement(sectionRecord, elementRecord);
+        validateRecordsListSignaturePlacement(sectionRecord.Form_Version__c, sectionRecord, elementRecord);
 
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         config.put('sectionColumn', columnNumber);
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'signature') {
+            config.put('targetSubmitActionKey', '');
+            if (!config.containsKey('attachToRowRecord')) {
+                config.put('attachToRowRecord', false);
+            }
+        }
         elementRecord.Config_JSON__c = JSON.serializePretty(config);
         elementRecord.Parent_Element_Id__c = sectionRecord.Element_Id__c;
         update as user new NF_Form_Element__c(
@@ -1807,6 +2049,9 @@ public with sharing class NativeFormsDesignerController {
             Parent_Element_Id__c = elementRecord.Parent_Element_Id__c,
             Config_JSON__c = elementRecord.Config_JSON__c
         );
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'signature') {
+            enableSubmissionPdfForRecordsListSignature(sectionRecord.Form_Version__c);
+        }
     }
 
     @AuraEnabled
@@ -1837,6 +2082,7 @@ public with sharing class NativeFormsDesignerController {
         }
 
         String targetParentElementId = anchorRecord.Parent_Element_Id__c;
+        Boolean placedRowSignature = false;
         Integer targetColumn = readSectionColumn(anchorRecord.Config_JSON__c);
         if (targetParentElementId != null) {
             NF_Form_Element__c parentRecord = [
@@ -1847,6 +2093,8 @@ public with sharing class NativeFormsDesignerController {
                 WITH USER_MODE LIMIT 1
             ];
             validateContainerPlacement(parentRecord, elementRecord);
+            validateRecordsListSignaturePlacement(anchorRecord.Form_Version__c, parentRecord, elementRecord);
+            placedRowSignature = parentRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'signature';
         }
 
         Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
@@ -1854,6 +2102,12 @@ public with sharing class NativeFormsDesignerController {
             elementConfig.remove('sectionColumn');
         } else {
             elementConfig.put('sectionColumn', targetColumn == null ? 1 : targetColumn);
+        }
+        if (placedRowSignature) {
+            elementConfig.put('targetSubmitActionKey', '');
+            if (!elementConfig.containsKey('attachToRowRecord')) {
+                elementConfig.put('attachToRowRecord', false);
+            }
         }
         elementRecord.Config_JSON__c = JSON.serializePretty(elementConfig);
         elementRecord.Parent_Element_Id__c = targetParentElementId;
@@ -1901,6 +2155,9 @@ public with sharing class NativeFormsDesignerController {
             orderValue += 10;
         }
         update as user siblingUpdates;
+        if (placedRowSignature) {
+            enableSubmissionPdfForRecordsListSignature(anchorRecord.Form_Version__c);
+        }
     }
 
     @AuraEnabled
@@ -1952,6 +2209,10 @@ public with sharing class NativeFormsDesignerController {
         if (String.isBlank(fileName) || String.isBlank(base64Data)) {
             throw new AuraHandledException('Choose an image file first.');
         }
+        Blob imageBlob = EncodingUtil.base64Decode(base64Data);
+        if (imageBlob.size() > MAX_EMBEDDED_IMAGE_BYTES) {
+            throw new AuraHandledException('Image is too large. Please upload an optimized image under 69 KB.');
+        }
 
         NF_Form_Element__c elementRecord = [
             SELECT Id, Element_Id__c, Label__c, Element_Type__c, Field_Key__c, Element_Index__c, Config_JSON__c, Parent_Element_Id__c, Order__c
@@ -1966,7 +2227,7 @@ public with sharing class NativeFormsDesignerController {
         ContentVersion versionRecord = new ContentVersion(
             Title = titleFromFileName(fileName),
             PathOnClient = fileName,
-            VersionData = EncodingUtil.base64Decode(base64Data),
+            VersionData = imageBlob,
             FirstPublishLocationId = versionId
         );
         insert as user versionRecord;
@@ -2013,6 +2274,21 @@ public with sharing class NativeFormsDesignerController {
         dto.sectionColumn = readSectionColumn(elementRecord.Config_JSON__c);
         dto.orderValue = elementRecord.Order__c == null ? null : Integer.valueOf(String.valueOf(elementRecord.Order__c));
         return dto;
+    }
+
+    private static List<ElementSnapshotRecord> parseElementSnapshot(String snapshotJson) {
+        if (String.isBlank(snapshotJson)) {
+            return new List<ElementSnapshotRecord>();
+        }
+        try {
+            List<ElementSnapshotRecord> snapshot = (List<ElementSnapshotRecord>) JSON.deserialize(
+                snapshotJson,
+                List<ElementSnapshotRecord>.class
+            );
+            return snapshot == null ? new List<ElementSnapshotRecord>() : snapshot;
+        } catch (Exception error) {
+            throw new AuraHandledException('Undo snapshot could not be read.');
+        }
     }
 
     private static ThemeRecord toThemeRecord(NF_Theme__c row) {
@@ -2087,10 +2363,13 @@ public with sharing class NativeFormsDesignerController {
                 'repeatGroup' => 'Records List',
                 'group' => 'Group',
                 'heading' => 'Display Text',
+                'mergedDocument' => 'Merged Document',
                 'image' => 'Image',
+                'button' => 'Continue',
                 'fileUpload' => 'File Upload',
                 'signature' => 'Signature',
                 'lookup' => 'Lookup',
+                'location' => 'Country / State / City',
                 'checkbox' => 'Checkbox',
                 'textarea' => 'Textarea',
                 'number' => 'Number',
@@ -2114,10 +2393,13 @@ public with sharing class NativeFormsDesignerController {
                 'repeatGroup' => '\u05E8\u05E9\u05D9\u05DE\u05EA \u05E8\u05E9\u05D5\u05DE\u05D5\u05EA',
                 'group' => '\u05E7\u05D1\u05D5\u05E6\u05D4',
                 'heading' => '\u05D8\u05E7\u05E1\u05D8 \u05DC\u05EA\u05E6\u05D5\u05D2\u05D4',
+                'mergedDocument' => '\u05DE\u05E1\u05DE\u05DA \u05DE\u05DE\u05D5\u05D6\u05D2',
                 'image' => '\u05EA\u05DE\u05D5\u05E0\u05D4',
+                'button' => '\u05D4\u05DE\u05E9\u05DA',
                 'fileUpload' => '\u05D4\u05E2\u05DC\u05D0\u05EA \u05E7\u05D5\u05D1\u05E5',
                 'signature' => '\u05D7\u05EA\u05D9\u05DE\u05D4',
                 'lookup' => '\u05D7\u05D9\u05E4\u05D5\u05E9',
+                'location' => '\u05DE\u05D3\u05D9\u05E0\u05D4 / \u05D0\u05D6\u05D5\u05E8 / \u05E2\u05D9\u05E8',
                 'checkbox' => '\u05EA\u05D9\u05D1\u05EA \u05E1\u05D9\u05DE\u05D5\u05DF',
                 'textarea' => '\u05D8\u05E7\u05E1\u05D8 \u05D0\u05E8\u05D5\u05DA',
                 'number' => '\u05DE\u05E1\u05E4\u05E8',
@@ -2141,10 +2423,13 @@ public with sharing class NativeFormsDesignerController {
                 'repeatGroup' => 'Lista de registros',
                 'group' => 'Grupo',
                 'heading' => 'Texto de visualizaci\u00F3n',
+                'mergedDocument' => 'Documento combinado',
                 'image' => 'Imagen',
+                'button' => 'Continuar',
                 'fileUpload' => 'Carga de archivo',
                 'signature' => 'Firma',
                 'lookup' => 'B\u00FAsqueda',
+                'location' => 'Pa\u00EDs / Regi\u00F3n / Ciudad',
                 'checkbox' => 'Casilla',
                 'textarea' => 'Texto largo',
                 'number' => 'N\u00FAmero',
@@ -2168,10 +2453,13 @@ public with sharing class NativeFormsDesignerController {
                 'repeatGroup' => 'Datensatzliste',
                 'group' => 'Gruppe',
                 'heading' => 'Anzeigetext',
+                'mergedDocument' => 'Zusammengef\u00FChrtes Dokument',
                 'image' => 'Bild',
+                'button' => 'Weiter',
                 'fileUpload' => 'Datei-Upload',
                 'signature' => 'Unterschrift',
                 'lookup' => 'Suche',
+                'location' => 'Land / Region / Stadt',
                 'checkbox' => 'Kontrollk\u00E4stchen',
                 'textarea' => 'Langer Text',
                 'number' => 'Zahl',
@@ -2195,10 +2483,13 @@ public with sharing class NativeFormsDesignerController {
                 'repeatGroup' => 'Liste des enregistrements',
                 'group' => 'Groupe',
                 'heading' => 'Texte affich\u00E9',
+                'mergedDocument' => 'Document fusionn\u00E9',
                 'image' => 'Image',
+                'button' => 'Continuer',
                 'fileUpload' => 'Import de fichier',
                 'signature' => 'Signature',
                 'lookup' => 'Recherche',
+                'location' => 'Pays / R\u00E9gion / Ville',
                 'checkbox' => 'Case \u00E0 cocher',
                 'textarea' => 'Texte long',
                 'number' => 'Nombre',
@@ -2220,7 +2511,7 @@ public with sharing class NativeFormsDesignerController {
     }
 
     private static String defaultFieldKeyForType(String elementType, Integer elementIndex, String elementPreset) {
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'radio', 'ranking', 'fileUpload', 'signature', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature', 'repeatGroup' }.contains(elementType)) {
             return null;
         }
         String prefix = 'field';
@@ -2235,6 +2526,7 @@ public with sharing class NativeFormsDesignerController {
         if (elementType == 'select') prefix = 'picklist';
         if (elementType == 'multiCheckbox') prefix = 'multiPicklist';
         if (elementType == 'lookup') prefix = 'lookup';
+        if (elementType == 'location') prefix = 'location';
         if (elementType == 'radio') prefix = 'radio';
         if (elementType == 'radio' && elementPreset == 'stars') prefix = 'rating';
         if (elementType == 'radio' && elementPreset == 'nps') prefix = 'nps';
@@ -2269,6 +2561,7 @@ public with sharing class NativeFormsDesignerController {
             config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderTextarea', 'Enter longer text'));
             config.put('labelPosition', 'above');
             config.put('rows', 4);
+            config.put('maxLength', 254);
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
         }
@@ -2296,6 +2589,18 @@ public with sharing class NativeFormsDesignerController {
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
             config.put('required', false);
+        }
+        if (elementType == 'button') {
+            config.put('destinationType', 'form');
+            config.put('targetFormId', '');
+            config.put('externalUrlMode', 'template');
+            config.put('externalUrlTemplate', '');
+            config.put('externalUrlFormula', '');
+            config.put('queryParameters', new List<Object>());
+            config.put('submitBeforeNavigation', false);
+            config.put('conditionalEnabled', false);
+            config.put('conditionalConditions', new List<Object>());
+            config.put('conditionalExpression', '');
         }
         if (elementType == 'email') {
             config.put('defaultValue', '');
@@ -2348,6 +2653,20 @@ public with sharing class NativeFormsDesignerController {
             config.put('lookupMinSearchLength', 2);
             config.put('lookupLimit', 10);
         }
+        if (elementType == 'location') {
+            config.put('labelPosition', 'above');
+            config.put('fieldBehavior', 'editable');
+            config.put('required', false);
+            config.put('locationMode', 'countryRegionCity');
+            config.put('locationRequiredCountry', true);
+            config.put('locationRequiredRegion', false);
+            config.put('locationRequiredCity', false);
+            config.put('locationDefaultCountryCode', '');
+            config.put('locationAllowedCountries', new List<Object>());
+            config.put('locationMinSearchLength', 2);
+            config.put('locationLimit', 10);
+            config.put('locationOutputMode', 'structured');
+        }
         if (elementType == 'ranking') {
             config.put('labelPosition', 'above');
             config.put('fieldBehavior', 'editable');
@@ -2370,6 +2689,7 @@ public with sharing class NativeFormsDesignerController {
             config.put('helpText', '');
             config.put('clearButtonLabel', NativeFormsRuntimeI18n.text(languageCode, 'signatureClear', 'Clear'));
             config.put('targetSubmitActionKey', '');
+            config.put('attachToRowRecord', false);
         }
         if (elementType == 'section') {
             config.put('text', 'Section description');
@@ -2389,8 +2709,8 @@ public with sharing class NativeFormsDesignerController {
             config.put('allowAddRows', true);
             config.put('allowDeleteRows', true);
         }
-        if (elementType == 'heading') {
-            config.put('html', '<p>Display text</p>');
+        if (elementType == 'heading' || elementType == 'mergedDocument') {
+            config.put('html', elementType == 'mergedDocument' ? '<p>Merged document text</p>' : '<p>Display text</p>');
         }
         if (elementType == 'image') {
             config.put('imageUrl', '');
@@ -3066,7 +3386,7 @@ public with sharing class NativeFormsDesignerController {
             Integer column = 2;
             for (PageLayoutImportField fieldSpec : sectionSpec.fields) {
                 String fieldKey = uniqueImportedFieldKey(fieldSpec.apiName, usedFieldKeys);
-                Map<String, Object> config = configForImportedField(fieldSpec, secureMode, prefillAlias, submitActionKey, languageCode);
+                Map<String, Object> config = configForImportedField(fieldSpec, plan.objectApiName, secureMode, prefillAlias, submitActionKey, languageCode);
                 config.put('sectionColumn', column);
                 elements.add(new NF_Form_Element__c(
                     Form_Version__c = versionId,
@@ -3137,6 +3457,7 @@ public with sharing class NativeFormsDesignerController {
 
     private static Map<String, Object> configForImportedField(
         PageLayoutImportField fieldSpec,
+        String objectApiName,
         Boolean secureMode,
         String prefillAlias,
         String submitActionKey,
@@ -3159,6 +3480,7 @@ public with sharing class NativeFormsDesignerController {
         }
         if (fieldSpec.elementType == 'textarea') {
             config.put('rows', 4);
+            config.put('maxLength', 254);
             config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderTextarea', 'Enter longer text'));
         } else if (fieldSpec.elementType == 'number') {
             config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderNumber', 'Enter number'));
@@ -3173,6 +3495,8 @@ public with sharing class NativeFormsDesignerController {
         } else if (fieldSpec.elementType == 'checkbox') {
             config.put('checked', false);
         } else if (fieldSpec.elementType == 'select' || fieldSpec.elementType == 'multiCheckbox') {
+            config.put('sourceObjectApiName', objectApiName);
+            config.put('sourcePicklistFieldApiName', fieldSpec.apiName);
             config.put('options', fieldSpec.options == null ? new List<Object>() : fieldSpec.options);
         } else if (fieldSpec.elementType == 'lookup') {
             config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'lookupSearchPlaceholder', 'Search records'));
@@ -3241,6 +3565,21 @@ public with sharing class NativeFormsDesignerController {
             return normalized;
         }
         throw new AuraHandledException('Select a supported Salesforce page layout source.');
+    }
+
+    private static String pageLayoutImportActionName(String prefix, String objectApiName) {
+        String normalizedPrefix = String.isBlank(prefix) ? 'Action' : prefix.trim();
+        String objectToken = String.isBlank(objectApiName) ? 'Record' : objectApiName.trim();
+        objectToken = objectToken.replaceAll('[^A-Za-z0-9_]', '_').replaceAll('_+', '_').replaceAll('^_+|_+$', '');
+        if (String.isBlank(objectToken)) {
+            objectToken = 'Record';
+        }
+        if (Pattern.matches('^[0-9].*', objectToken)) {
+            objectToken = 'Object_' + objectToken;
+        }
+
+        String actionName = normalizedPrefix + '_' + objectToken;
+        return actionName.length() > 120 ? actionName.substring(0, 120) : actionName;
     }
 
     private static String buildPageLayoutImportUiSettingsJson(Boolean secureMode, String languageCode) {
@@ -3419,7 +3758,7 @@ public with sharing class NativeFormsDesignerController {
             value,
             languageCode,
             'secretCodeResendButtonLabel',
-            'Resend Code'
+            'Resend Verification Number'
         );
     }
 
@@ -3646,15 +3985,102 @@ public with sharing class NativeFormsDesignerController {
         if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'fileUpload') {
             throw new AuraHandledException('File Upload fields are not supported inside repeat groups in Pro V1.');
         }
-        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'signature') {
-            throw new AuraHandledException('Signature fields are not supported inside repeat groups in Pro V1.');
-        }
         if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'lookup') {
             throw new AuraHandledException('Lookup fields are not supported inside repeat groups in Starter V1.');
+        }
+        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'location') {
+            throw new AuraHandledException('Country / State / City fields are not supported inside Records Lists in Pro V1.');
+        }
+        if (sectionRecord.Element_Type__c == 'repeatGroup'
+            && elementRecord.Element_Type__c == 'button'
+            && booleanValue(parseJsonMap(elementRecord.Config_JSON__c).get('submitBeforeNavigation'))) {
+            throw new AuraHandledException('Buttons inside Records Lists cannot submit the form in Pro V1.');
         }
         if (sectionRecord.Element_Type__c == 'group' && (elementRecord.Element_Type__c == 'section' || elementRecord.Element_Type__c == 'repeatGroup' || elementRecord.Element_Type__c == 'group')) {
             throw new AuraHandledException('Groups can contain fields and display elements, but not other containers.');
         }
+    }
+
+    private static void validateRecordsListSignaturePlacement(
+        Id versionId,
+        NF_Form_Element__c parentRecord,
+        NF_Form_Element__c elementRecord
+    ) {
+        if (parentRecord == null || elementRecord == null
+            || parentRecord.Element_Type__c != 'repeatGroup'
+            || elementRecord.Element_Type__c != 'signature') {
+            return;
+        }
+        if (!NativeFormsFeatureFlags.isProElectronicSignatureEnabled()
+            || !NativeFormsFeatureFlags.isProSubmissionPdfEnabled()) {
+            throw new AuraHandledException('A Signature inside a Records List requires Electronic Signature and Submission PDF on your Pro plan.');
+        }
+        List<NF_Form_Element__c> existingSignatures = [
+            SELECT Id
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+              AND Parent_Element_Id__c = :parentRecord.Element_Id__c
+              AND Element_Type__c = 'signature'
+              AND Id != :elementRecord.Id
+            WITH USER_MODE LIMIT 1
+        ];
+        if (!existingSignatures.isEmpty()) {
+            throw new AuraHandledException('A Records List supports one Signature element in this version.');
+        }
+    }
+
+    private static Boolean versionContainsRecordsListSignature(Id versionId) {
+        if (versionId == null) {
+            return false;
+        }
+        Set<String> recordsListIds = new Set<String>();
+        for (NF_Form_Element__c record : [
+            SELECT Element_Id__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+              AND Element_Type__c = 'repeatGroup'
+            WITH USER_MODE
+        ]) {
+            recordsListIds.add(record.Element_Id__c);
+        }
+        if (recordsListIds.isEmpty()) {
+            return false;
+        }
+        return ![
+            SELECT Id
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :versionId
+              AND Element_Type__c = 'signature'
+              AND Parent_Element_Id__c IN :recordsListIds
+            WITH USER_MODE LIMIT 1
+        ].isEmpty();
+    }
+
+    private static void enableSubmissionPdfForRecordsListSignature(Id versionId) {
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            WITH USER_MODE LIMIT 1
+        ];
+        Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        if (booleanValue(uiSettings.get('submissionPdfEnabled'))) {
+            return;
+        }
+        uiSettings.put('submissionPdfEnabled', true);
+        if (!uiSettings.containsKey('submissionPdfAttachToRecord')) {
+            uiSettings.put('submissionPdfAttachToRecord', true);
+        }
+        if (!uiSettings.containsKey('submissionPdfTitle')) {
+            uiSettings.put('submissionPdfTitle', 'Submitted Response');
+        }
+        if (!uiSettings.containsKey('submissionPdfIncludeEmptyFields')) {
+            uiSettings.put('submissionPdfIncludeEmptyFields', true);
+        }
+        update as user new NF_Form_Version__c(
+            Id = versionRecord.Id,
+            UI_Settings_JSON__c = JSON.serializePretty(uiSettings)
+        );
     }
 
     private static String canonicalObjectName(String requestedObjectName) {
