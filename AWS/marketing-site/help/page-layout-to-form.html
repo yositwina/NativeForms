@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create From Layout &mdash; TwinaForms Help</title>
-  <meta name="description" content="How Create From Layout works in TwinaForms: build a draft form from a Salesforce object's page layout in one click, with prefill and submit aliases pre-configured.">
+  <title>Page Layout to Form &mdash; TwinaForms Help</title>
+  <meta name="description" content="How Page Layout to Form works in TwinaForms: build a draft form from a Salesforce object's page layout in one click, with prefill and submit aliases pre-configured.">
   <link rel="stylesheet" href="/help/styles.css?v=20260601">
-  <link rel="canonical" href="https://twinaforms.com/help/page-layout-clone.html">
+  <link rel="canonical" href="https://twinaforms.com/help/page-layout-to-form.html">
   <link rel="icon" type="image/png" href="/assets/Mango.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="TwinaForms">
-  <meta property="og:title" content="Create From Layout - TwinaForms Help">
-  <meta property="og:description" content="How Create From Layout works in TwinaForms: build a draft form from a Salesforce object's page layout in one click, with prefill and submit aliases pre-configured.">
-  <meta property="og:url" content="https://twinaforms.com/help/page-layout-clone.html">
+  <meta property="og:title" content="Page Layout to Form - TwinaForms Help">
+  <meta property="og:description" content="How Page Layout to Form works in TwinaForms: build a draft form from a Salesforce object's page layout in one click, with prefill and submit aliases pre-configured.">
+  <meta property="og:url" content="https://twinaforms.com/help/page-layout-to-form.html">
   <meta property="og:image" content="https://twinaforms.com/assets/image.png">
   <meta property="og:locale" content="en_US">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Create From Layout - TwinaForms Help">
-  <meta name="twitter:description" content="How Create From Layout works in TwinaForms: build a draft form from a Salesforce object's page layout in one click, with prefill and submit aliases pre-configured.">
+  <meta name="twitter:title" content="Page Layout to Form - TwinaForms Help">
+  <meta name="twitter:description" content="How Page Layout to Form works in TwinaForms: build a draft form from a Salesforce object's page layout in one click, with prefill and submit aliases pre-configured.">
   <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"TwinaForms","alternateName":"Twina Forms","url":"https://twinaforms.com","logo":"https://twinaforms.com/assets/image.png","description":"Native Salesforce form builder","parentOrganization":{"@type":"Organization","name":"Harmony-IT"}}</script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Help","item":"https://twinaforms.com/help/"},{"@type":"ListItem","position":3,"name":"Create From Layout","item":"https://twinaforms.com/help/page-layout-clone.html"}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Help","item":"https://twinaforms.com/help/"},{"@type":"ListItem","position":3,"name":"Page Layout to Form","item":"https://twinaforms.com/help/page-layout-to-form.html"}]}</script>
 
 </head>
 <body>
@@ -40,11 +40,11 @@
     <section class="hero">
       <a class="back-link" href="/help/index.html">&larr; All help topics</a>
       <p class="eyebrow">TwinaForms Help</p>
-      <h1>Create From Layout &mdash; one click to a working draft.</h1>
-      <p class="hero-copy">Create From Layout reads a Salesforce object's page layout and turns it into a TwinaForms Draft &mdash; all the layout's elements come over, and the prefill and submit actions are created and wired to every field automatically. Use it when you want a form that already mirrors how your team works with the same record in Salesforce.</p>
+      <h1>Page Layout to Form &mdash; one click to a working draft.</h1>
+      <p class="hero-copy">Page Layout to Form reads a Salesforce object's page layout and turns it into a TwinaForms Draft &mdash; all the layout's elements come over, and the prefill and submit actions are created and wired to every field automatically. Use it when you want a form that already mirrors how your team works with the same record in Salesforce.</p>
       <nav class="section-nav" aria-label="On this page">
         <a href="#concept">What it does</a>
-        <a href="#how">How to clone a layout</a>
+        <a href="#how">How it works</a>
         <a href="#generated">What gets generated</a>
         <a href="#skipped">What's skipped</a>
         <a href="#multilingual">Multilingual support</a>
@@ -62,7 +62,7 @@
     </section>
 
     <section class="section" id="how">
-      <h2>How to clone a layout</h2>
+      <h2>How it works</h2>
       <ol class="steps">
         <li>Open the Designer page in TwinaForms.</li>
         <li>In the top-right toolbar, next to the <strong>+ New Form</strong> button, click <strong>Create From Layout</strong>.</li>
@@ -73,7 +73,7 @@
 
     <section class="section" id="generated">
       <h2>What gets generated</h2>
-      <p>For a typical clone, the Draft contains:</p>
+      <p>A typical run produces a Draft that contains:</p>
       <ul>
         <li>An <strong>input element</strong> for each field on the object's page layout (with the matching input type &mdash; text, number, picklist, date, lookup, etc.).</li>
         <li>The layout's sections preserved where it makes sense for a public-facing form.</li>
@@ -88,14 +88,14 @@
       <p>Two categories of fields don't come over from the layout, intentionally:</p>
       <ul>
         <li><strong>Salesforce system fields</strong> &mdash; Owner, Created By, Created Date, Last Modified By, Last Modified Date, and System Modstamp. These are managed by Salesforce itself, so they're not surfaced on the form.</li>
-        <li><strong>Formula fields</strong> &mdash; Salesforce formula fields compute their own value server-side, so there's nothing for the visitor to input. They are not included in the cloned form.</li>
+        <li><strong>Formula fields</strong> &mdash; Salesforce formula fields compute their own value server-side, so there's nothing for the visitor to input. They are not included in the generated form.</li>
       </ul>
-      <p>Other fields that don't have a TwinaForms equivalent (e.g., Rich Text Area, compound Address, Geolocation, Encrypted Text) are also omitted. Add equivalent plain Text or Text Area fields after the clone if you need to capture similar data.</p>
+      <p>Other fields that don't have a TwinaForms equivalent (e.g., Rich Text Area, compound Address, Geolocation, Encrypted Text) are also omitted. Add equivalent plain Text or Text Area fields afterwards if you need to capture similar data.</p>
     </section>
 
     <section class="section" id="multilingual">
       <h2>Multilingual support</h2>
-      <p>The clone is multilingual. When you choose a non-English form language, TwinaForms requests labels from Salesforce in that language, so object, section, and field labels come from your org's <strong>Translation Workbench</strong> translations when they exist. If a label hasn't been translated in your org, the clone falls back to the base English label &mdash; the form is still created, and you can edit the label directly in the Draft.</p>
+      <p>Page Layout to Form is multilingual. When you choose a non-English form language, TwinaForms requests labels from Salesforce in that language, so object, section, and field labels come from your org's <strong>Translation Workbench</strong> translations when they exist. If a label hasn't been translated in your org, it falls back to the base English label &mdash; the form is still created, and you can edit the label directly in the Draft.</p>
       <div class="callout">
         <strong>Hebrew layouts:</strong> when you pick Hebrew as the form language, the new form has <em>RTL Mode</em> enabled automatically so Form Settings reflects the right-to-left direction.
       </div>
@@ -103,13 +103,13 @@
 
     <section class="section" id="check">
       <h2>What to check afterwards</h2>
-      <p>The clone is a strong starting point, not a finished form. Before publishing, walk through:</p>
+      <p>The generated form is a strong starting point, not a finished form. Before publishing, walk through:</p>
       <ul>
         <li><strong>Field labels</strong> &mdash; some internal Salesforce labels are too technical for external users. Rephrase them where needed.</li>
         <li><strong>Hidden / internal fields</strong> &mdash; the layout may include fields your team uses but visitors shouldn't see. Set those to <em>Hidden</em> behavior or delete them.</li>
         <li><strong>Required flags</strong> &mdash; required-on-Salesforce isn't always the same as required-for-the-visitor. Adjust per field as needed.</li>
         <li><strong>Submit mode</strong> &mdash; confirm whether the form should update an existing record only, create only, or update-or-create. You can change this in the Submit Actions tab.</li>
-        <li><strong>Submit and prefill aliases</strong> &mdash; the clone wires every field to the action aliases automatically; spot-check a few to confirm everything looks right.</li>
+        <li><strong>Submit and prefill aliases</strong> &mdash; every field is wired to the action aliases automatically; spot-check a few to confirm everything looks right.</li>
         <li><strong>Translations</strong> &mdash; if the Salesforce label for a field hasn't been translated yet and you want it translated, either add it to Translation Workbench in Salesforce or edit the label directly in the TwinaForms Draft.</li>
       </ul>
     </section>
