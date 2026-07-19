@@ -15,6 +15,12 @@ const HIDDEN_DETAIL_KEYS = new Set([
 
 const LS_PROJECT_KEY = 'nfLogsSelectedProjectId';
 const LS_FORM_KEY = 'nfLogsSelectedFormId';
+const SALESFORCE_ID_PATTERN = /^[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?$/;
+
+function sanitizeSalesforceId(value) {
+    const normalized = String(value || '').trim();
+    return SALESFORCE_ID_PATTERN.test(normalized) ? normalized : '';
+}
 
 export default class NativeFormsSubmissionLogs extends LightningElement {
     isLoading = true;
@@ -97,7 +103,7 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
 
     readStored(key) {
         try {
-            return window.localStorage.getItem(key) || '';
+            return sanitizeSalesforceId(window.localStorage.getItem(key));
         } catch (error) {
             return '';
         }
@@ -105,8 +111,9 @@ export default class NativeFormsSubmissionLogs extends LightningElement {
 
     writeStored(key, value) {
         try {
-            if (value) {
-                window.localStorage.setItem(key, value);
+            const safeValue = sanitizeSalesforceId(value);
+            if (safeValue) {
+                window.localStorage.setItem(key, safeValue);
             } else {
                 window.localStorage.removeItem(key);
             }

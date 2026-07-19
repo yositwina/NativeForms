@@ -461,7 +461,6 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
         this.successMessage = '';
         this.hasBlockingSetupAccessIssue = false;
         this.isBusy = true;
-        const oauthWindow = window.open('', '_blank');
 
         try {
             if (!this.connectUrl) {
@@ -472,18 +471,71 @@ export default class NativeFormsConnect extends NavigationMixin(LightningElement
             this.successMessage = 'Finish authentication in the Salesforce window, then return here.';
             this.persistConnectState();
             this.startConnectionPolling();
-            if (oauthWindow) {
-                oauthWindow.location = this.connectUrl;
-            } else {
-                window.open(this.connectUrl, '_blank');
-            }
+            this.launchOauthWindow(this.connectUrl);
         } catch (error) {
-            if (oauthWindow && !oauthWindow.closed) {
-                oauthWindow.close();
-            }
             this.errorMessage = this.normalizeRegistrationError(error);
         } finally {
             this.isBusy = false;
+        }
+    }
+
+    async handleReconnectServiceAccess() {
+        this.errorMessage = '';
+        this.successMessage = '';
+        this.tenantTestMessage = '';
+        this.tenantTestMessageVariant = '';
+        this.hasBlockingSetupAccessIssue = false;
+        this.isBusy = true;
+
+        try {
+            if (!this.connectUrl) {
+                const data = await registerOrg({
+                    requestJson: JSON.stringify(this.buildRegistrationPayload())
+                });
+
+                if (!data?.success) {
+                    throw new Error(data?.errorMessage || 'TwinaForms registration failed.');
+                }
+
+                this.connectUrl = data.connectUrl || '';
+            }
+
+            if (!this.connectUrl) {
+                throw new Error('TwinaForms could not generate a Salesforce connection URL.');
+            }
+
+            this.isAwaitingOauthReturn = true;
+            this.successMessage = 'Finish authentication in the Salesforce window, then return here.';
+            this.persistConnectState();
+            this.startConnectionPolling();
+            this.launchOauthWindow(this.connectUrl);
+        } catch (error) {
+            this.errorMessage = this.normalizeRegistrationError(error);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Could not reconnect TwinaForms',
+                message: this.errorMessage,
+                variant: 'error',
+                mode: 'sticky'
+            }));
+        } finally {
+            this.isBusy = false;
+        }
+    }
+
+    // Open the Salesforce OAuth authorization page in a new browser tab.
+    //
+    // The previous implementation opened a blank tab via window.open('', '_blank')
+    // and then navigated it with `oauthWindow.location = url`. Under the Lightning
+    // Locker secure-window proxy (enforced at Locker API 67 / Summer '26) that
+    // deferred assignment is silently dropped, so the tab is stranded on
+    // about:blank and the request never reaches AWS. Opening the tab directly with
+    // the destination URL is the Locker-safe pattern.
+    launchOauthWindow(url) {
+        const opened = window.open(url, '_blank');
+        if (!opened) {
+            // Popup blocked (rare, only possible after an async round-trip):
+            // fall back to navigating the current tab so auth can still complete.
+            window.location.assign(url);
         }
     }
 

@@ -32,6 +32,13 @@ import { previewFormulaValue, validateFormulaConfig } from './formulaEngine';
 const DESIGNER_PROJECT_KEY = 'nativeforms:selectedProjectId';
 const DESIGNER_FORM_KEY = 'nativeforms:selectedFormId';
 const DESIGNER_VERSION_KEY = 'nativeforms:selectedVersionId';
+const SALESFORCE_ID_PATTERN = /^[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?$/;
+
+function sanitizeSalesforceId(value) {
+    const normalized = String(value || '').trim();
+    return SALESFORCE_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
 const MAX_UNDO_STEPS = 5;
 const SUBMIT_BUTTON_ELEMENT_ID = '__submitButton__';
 const USER_VERIFICATION_ELEMENT_ID = '__userVerification__';
@@ -1152,7 +1159,7 @@ export default class NativeFormsDesigner extends LightningElement {
     }
 
     get selectedElementSupportsConditional() {
-        return !['section', 'repeatGroup'].includes(this.editorElementType);
+        return this.editorElementType !== 'repeatGroup';
     }
 
     get submitButtonUsesConditionalValue() {
@@ -7580,8 +7587,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     storeSelectedVersion(versionId) {
         try {
-            if (versionId) {
-                window.localStorage.setItem(DESIGNER_VERSION_KEY, versionId);
+            const safeVersionId = sanitizeSalesforceId(versionId);
+            if (safeVersionId) {
+                window.localStorage.setItem(DESIGNER_VERSION_KEY, safeVersionId);
             }
         } catch (e) {
             // ignore browser storage failures
@@ -7590,7 +7598,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     loadStoredVersionId() {
         try {
-            return window.localStorage.getItem(DESIGNER_VERSION_KEY);
+            return sanitizeSalesforceId(window.localStorage.getItem(DESIGNER_VERSION_KEY));
         } catch (e) {
             return null;
         }
@@ -7606,8 +7614,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     storeSelectedForm(formId) {
         try {
-            if (formId) {
-                window.localStorage.setItem(DESIGNER_FORM_KEY, formId);
+            const safeFormId = sanitizeSalesforceId(formId);
+            if (safeFormId) {
+                window.localStorage.setItem(DESIGNER_FORM_KEY, safeFormId);
             }
         } catch (e) {
             // ignore browser storage failures
@@ -7616,7 +7625,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     loadStoredFormId() {
         try {
-            return window.localStorage.getItem(DESIGNER_FORM_KEY);
+            return sanitizeSalesforceId(window.localStorage.getItem(DESIGNER_FORM_KEY));
         } catch (e) {
             return null;
         }
@@ -7632,8 +7641,9 @@ export default class NativeFormsDesigner extends LightningElement {
 
     storeSelectedProject(projectId) {
         try {
-            if (projectId) {
-                window.localStorage.setItem(DESIGNER_PROJECT_KEY, projectId);
+            const safeProjectId = sanitizeSalesforceId(projectId);
+            if (safeProjectId) {
+                window.localStorage.setItem(DESIGNER_PROJECT_KEY, safeProjectId);
             }
         } catch (e) {
             // ignore browser storage failures
@@ -7642,7 +7652,7 @@ export default class NativeFormsDesigner extends LightningElement {
 
     loadStoredProjectId() {
         try {
-            return window.localStorage.getItem(DESIGNER_PROJECT_KEY);
+            return sanitizeSalesforceId(window.localStorage.getItem(DESIGNER_PROJECT_KEY));
         } catch (e) {
             return null;
         }

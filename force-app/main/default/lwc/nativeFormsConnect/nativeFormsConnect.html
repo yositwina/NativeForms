@@ -165,6 +165,20 @@
                         </div>
                     </template>
 
+                    <div class="stage-actions slds-m-top_medium">
+                        <lightning-button
+                            variant="brand"
+                            label="Reconnect TwinaForms"
+                            onclick={handleReconnectServiceAccess}
+                            disabled={actionDisabled}>
+                        </lightning-button>
+                        <lightning-button
+                            label="Test Again"
+                            onclick={handleTestTenantSetup}
+                            disabled={actionDisabled}>
+                        </lightning-button>
+                    </div>
+
                     <template if:true={showTenantTestMessage}>
                         <div class={tenantTestMessageClass}>
                             {tenantTestMessage}

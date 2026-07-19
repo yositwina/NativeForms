@@ -1,13 +1,13 @@
 {
   "packageDirectories": [
     {
-      "versionName": "ver 0.10 beta",
-      "versionNumber": "0.10.0.NEXT",
+      "versionName": "ver 0.12 Locker connect fix",
+      "versionNumber": "0.12.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "TwinaForms",
-      "ancestorVersion": "0.9.0",
-      "versionDescription": ""
+      "ancestorVersion": "0.11.0",
+      "versionDescription": "Fix Salesforce Connect OAuth popup stranded on about:blank under Lightning Locker (open OAuth URL directly instead of assigning .location on a blank window)."
     }
   ],
   "name": "twinaforms",
@@ -55,6 +55,11 @@
     "TwinaForms@0.9.0-7": "04tgL000000GWTlQAO",
     "TwinaForms@0.9.0-8": "04tgL000000GWbpQAG",
     "TwinaForms@0.10.0-1": "04tgL000000GZ6fQAG",
-    "TwinaForms@0.10.0-2": "04tgL000000GZUrQAO"
+    "TwinaForms@0.10.0-2": "04tgL000000GZUrQAO",
+    "TwinaForms@0.10.0-3": "04tgL000000GaXNQA0",
+    "TwinaForms@0.10.0-4": "04tgL000000GbrdQAC",
+    "TwinaForms@0.10.0-5": "04tgL000000GburQAC",
+    "TwinaForms@0.11.0-1": "04tgL000000I2wDQAS",
+    "TwinaForms@0.12.0-1": "04tgL000000Ji8bQAC"
   }
 }

@@ -1,4 +1,4 @@
-public without sharing class NativeFormsBootstrapV2Signer {
+public inherited sharing class NativeFormsBootstrapV2Signer {
     public static final String SIGNATURE_ALGORITHM = 'HMAC-SHA256';
     private static final String APEX_HMAC_ALGORITHM = 'HmacSHA256';
 

@@ -336,6 +336,11 @@ private class NativeFormsPublisherTest {
         System.assertEquals('acme/forms/current/index.html', String.valueOf(registerPayload.get('generatedHtmlRef')), 'Register payload should carry the generated HTML key.');
         System.assertEquals('rich-published-form', String.valueOf(registerPayload.get('formSlug')), 'Register payload should use the normalized friendly slug.');
 
+        Map<String, Object> submitPolicy = (Map<String, Object>) registerPayload.get('submitPolicy');
+        Map<String, Object> allowedWriteFields = (Map<String, Object>) submitPolicy.get('allowedWriteFields');
+        List<Object> caseWriteFields = (List<Object>) allowedWriteFields.get('Case');
+        System.assert(caseWriteFields.contains('ContactId'), 'Records List parent relationship fields must be allowed by the submit policy.');
+
         Map<String, Object> captcha = (Map<String, Object>) registerPayload.get('captcha');
         System.assertEquals(true, captcha.get('enabled'), 'Register payload should enable CAPTCHA when the form requires it.');
         System.assert(String.isNotBlank(String.valueOf(captcha.get('siteKey'))), 'Register payload should include the shared CAPTCHA site key.');

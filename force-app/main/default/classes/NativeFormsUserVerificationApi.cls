@@ -153,7 +153,7 @@ global with sharing class NativeFormsUserVerificationApi {
         normalized.maxAttempts = normalizePositiveInt(payload.maxAttempts, DEFAULT_MAX_ATTEMPTS);
 
         Map<String, Object> uiSettings = loadUiSettings(normalized.publishedVersionId);
-        if (!booleanValue(uiSettings.get('userVerificationEnabled'))) {
+        if (!isUserVerificationEnabled(uiSettings)) {
             throw buildHandledException('User Verification is not enabled for this form.', 403);
         }
 
@@ -266,6 +266,14 @@ global with sharing class NativeFormsUserVerificationApi {
             return (Boolean) value;
         }
         return String.valueOf(value).toLowerCase() == 'true';
+    }
+
+    private static Boolean isUserVerificationEnabled(Map<String, Object> uiSettings) {
+        if (uiSettings == null) {
+            return false;
+        }
+        return booleanValue(uiSettings.get('userVerificationEnabled'))
+            || booleanValue(uiSettings.get('secretCodeVerificationEnabled'));
     }
 
     private static UserVerificationHandledException buildHandledException(String message, Integer statusCode) {
