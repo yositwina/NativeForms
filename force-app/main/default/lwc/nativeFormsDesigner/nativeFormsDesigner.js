@@ -21,6 +21,9 @@ import getConnectedImportView from '@salesforce/apex/NativeFormsConnectedOrgCont
 import getSnapshotPackage from '@salesforce/apex/NativeFormsConnectedOrgController.getSnapshotPackage';
 import getObjectOptions from '@salesforce/apex/NativeFormsDesignerController.getObjectOptions';
 import getPageLayoutImportOptions from '@salesforce/apex/NativeFormsDesignerController.getPageLayoutImportOptions';
+import getRelatedListImportOptions from '@salesforce/apex/NativeFormsDesignerController.getRelatedListImportOptions';
+import getRelatedListFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getRelatedListFieldOptions';
+import getRelatedParentMatchOptions from '@salesforce/apex/NativeFormsDesignerController.getRelatedParentMatchOptions';
 import previewPageLayoutImport from '@salesforce/apex/NativeFormsDesignerController.previewPageLayoutImport';
 import getPicklistFieldOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistFieldOptions';
 import getPicklistValueOptions from '@salesforce/apex/NativeFormsDesignerController.getPicklistValueOptions';
@@ -225,6 +228,21 @@ export default class NativeFormsDesigner extends LightningElement {
     @track lookupSearchFieldOptions = [];
     @track lookupDisplayFieldOptions = [];
     @track layoutImportLayoutOptions = [];
+    // Page Layout to Form - related records as a table
+    layoutImportIncludeRelated = false;
+    layoutImportRelatedValue = '';
+    layoutImportParentShape = '';
+    layoutImportContactLookupField = '';
+    layoutImportParentContactField = '';
+    layoutImportBusinessKeyField = '';
+    layoutImportBusinessKeyParam = '';
+    isLoadingRelatedMetadata = false;
+    @track layoutImportRelatedListOptions = [];
+    @track layoutImportRelatedFieldOptions = [];
+    @track layoutImportRelatedFieldValues = [];
+    @track layoutImportContactLookupOptions = [];
+    @track layoutImportParentContactOptions = [];
+    @track layoutImportBusinessKeyOptions = [];
     @track prefillAliasDetails = [];
     @track submitActionDetails = [];
     @track editorSurveyOptions = [];
@@ -4665,6 +4683,11 @@ export default class NativeFormsDesigner extends LightningElement {
 
     async handleLayoutImportModeChange(event) {
         this.layoutImportMode = event.detail.value || 'secureUpdateOrCreate';
+        if (this.layoutImportMode === 'create') {
+            // Related records need a verified contact to reach the parent record.
+            this.layoutImportIncludeRelated = false;
+            this.resetRelatedSelections();
+        }
         await this.refreshLayoutImportPreview();
     }
 
@@ -4789,7 +4812,8 @@ export default class NativeFormsDesigner extends LightningElement {
                 objectApiName: this.layoutImportObjectApiName,
                 layoutKey: this.layoutImportLayoutKey,
                 mode: this.layoutImportMode,
-                languageCode: this.layoutImportLanguageCode
+                languageCode: this.layoutImportLanguageCode,
+                relatedListJson: this.buildRelatedListJson()
             });
             this.selectedProjectId = result.projectId;
             this.selectedFormId = result.formId;
@@ -9007,19 +9031,183 @@ export default class NativeFormsDesigner extends LightningElement {
             // ignore browser storage failures
         }
     }
+
+    // --- Page Layout to Form: related records as a table -------------------
+
+    get layoutImportRelatedAvailable() {
+        return this.layoutImportMode !== 'create' && !!this.layoutImportObjectApiName;
+    }
+
+    get layoutImportRelatedFieldsDisabled() {
+        return !this.layoutImportRelatedValue;
+    }
+
+    get layoutImportShowContactLookup() {
+        return this.layoutImportIncludeRelated && this.layoutImportParentShape === 'B';
+    }
+
+    get layoutImportShowParentContact() {
+        return this.layoutImportIncludeRelated && this.layoutImportParentShape === 'C';
+    }
+
+    get layoutImportShowBusinessKey() {
+        return this.layoutImportShowParentContact && !!this.layoutImportBusinessKeyField;
+    }
+
+    get layoutImportRelatedFieldHelp() {
+        const chosen = this.layoutImportRelatedFieldValues.length;
+        return `Choose up to 6 fields to show as columns. ${chosen} selected. Only field types that work inside a Records List are listed.`;
+    }
+
+    get layoutImportRelatedNotice() {
+        if (!this.layoutImportIncludeRelated) {
+            return '';
+        }
+        if (this.layoutImportParentShape === 'none') {
+            return 'This object cannot be reached from a verified contact, so related records are not available for it.';
+        }
+        return 'The table loads up to 20 existing rows, newest first. Visitors can edit rows and add new ones, but not delete them. User Verification is switched on so the signed-in contact can be identified.';
+    }
+
+    async handleLayoutImportIncludeRelatedChange(event) {
+        this.layoutImportIncludeRelated = event.target.checked === true;
+        this.resetRelatedSelections();
+        if (!this.layoutImportIncludeRelated || !this.layoutImportObjectApiName) {
+            return;
+        }
+        this.isLoadingRelatedMetadata = true;
+        try {
+            const [relatedLists, parentMatch] = await Promise.all([
+                getRelatedListImportOptions({ objectApiName: this.layoutImportObjectApiName }),
+                getRelatedParentMatchOptions({ objectApiName: this.layoutImportObjectApiName })
+            ]);
+            this.layoutImportRelatedListOptions = (relatedLists || []).map((item) => ({
+                label: item.label,
+                value: item.value,
+                childObjectApiName: item.childObjectApiName,
+                parentLookupField: item.parentLookupField,
+                childObjectLabelPlural: item.childObjectLabelPlural
+            }));
+            this.layoutImportParentShape = parentMatch ? parentMatch.shape : 'none';
+            this.layoutImportContactLookupOptions = this.toFieldOptions(parentMatch && parentMatch.contactLookupFields);
+            this.layoutImportParentContactOptions = this.toFieldOptions(parentMatch && parentMatch.parentContactFields);
+            this.layoutImportBusinessKeyOptions = [{ label: 'No business key', value: '' }].concat(
+                this.toFieldOptions(parentMatch && parentMatch.businessKeyFields)
+            );
+            // Auto-pick when there is only one sensible answer, so most imports ask nothing extra.
+            if (this.layoutImportContactLookupOptions.length === 1) {
+                this.layoutImportContactLookupField = this.layoutImportContactLookupOptions[0].value;
+            }
+            if (this.layoutImportParentContactOptions.length === 1) {
+                this.layoutImportParentContactField = this.layoutImportParentContactOptions[0].value;
+            }
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+            this.layoutImportIncludeRelated = false;
+        } finally {
+            this.isLoadingRelatedMetadata = false;
+        }
+    }
+
+    toFieldOptions(rawFields) {
+        return (rawFields || []).map((item) => ({ label: item.label, value: item.apiName }));
+    }
+
+    resetRelatedSelections() {
+        this.layoutImportRelatedValue = '';
+        this.layoutImportRelatedFieldOptions = [];
+        this.layoutImportRelatedFieldValues = [];
+        this.layoutImportContactLookupField = '';
+        this.layoutImportParentContactField = '';
+        this.layoutImportBusinessKeyField = '';
+        this.layoutImportBusinessKeyParam = '';
+    }
+
+    async handleLayoutImportRelatedListChange(event) {
+        this.layoutImportRelatedValue = event.detail.value || '';
+        this.layoutImportRelatedFieldValues = [];
+        this.layoutImportRelatedFieldOptions = [];
+        const selected = this.selectedRelatedListOption;
+        if (!selected) {
+            return;
+        }
+        this.isLoadingRelatedMetadata = true;
+        try {
+            const fields = await getRelatedListFieldOptions({
+                childObjectApiName: selected.childObjectApiName,
+                parentLookupField: selected.parentLookupField
+            });
+            this.layoutImportRelatedFieldOptions = (fields || []).map((item) => ({
+                label: item.label,
+                value: item.apiName
+            }));
+        } catch (error) {
+            this.errorMessage = this.normalizeError(error);
+        } finally {
+            this.isLoadingRelatedMetadata = false;
+        }
+    }
+
+    get selectedRelatedListOption() {
+        return this.layoutImportRelatedListOptions.find(
+            (item) => item.value === this.layoutImportRelatedValue
+        );
+    }
+
+    handleLayoutImportRelatedFieldsChange(event) {
+        const chosen = event.detail.value || [];
+        if (chosen.length > 6) {
+            this.errorMessage = 'A related records table supports up to 6 fields.';
+            return;
+        }
+        this.errorMessage = '';
+        this.layoutImportRelatedFieldValues = chosen;
+    }
+
+    handleLayoutImportContactLookupChange(event) {
+        this.layoutImportContactLookupField = event.detail.value || '';
+    }
+
+    handleLayoutImportParentContactChange(event) {
+        this.layoutImportParentContactField = event.detail.value || '';
+    }
+
+    handleLayoutImportBusinessKeyChange(event) {
+        this.layoutImportBusinessKeyField = event.detail.value || '';
+        if (!this.layoutImportBusinessKeyField) {
+            this.layoutImportBusinessKeyParam = '';
+        }
+    }
+
+    handleLayoutImportBusinessKeyParamChange(event) {
+        this.layoutImportBusinessKeyParam = (event.target.value || '').trim();
+    }
+
+    /** Serialises the picker into the shape parseRelatedListSpec expects, or null when unused. */
+    buildRelatedListJson() {
+        if (!this.layoutImportIncludeRelated || !this.layoutImportRelatedValue) {
+            return null;
+        }
+        const selected = this.selectedRelatedListOption;
+        if (!selected || !this.layoutImportRelatedFieldValues.length) {
+            return null;
+        }
+        let parentMatchMode = 'contact';
+        if (this.layoutImportParentShape === 'B') {
+            parentMatchMode = 'contactLookup';
+        } else if (this.layoutImportParentShape === 'C') {
+            parentMatchMode = 'parentLookup';
+        }
+        return JSON.stringify({
+            childObjectApiName: selected.childObjectApiName,
+            parentLookupField: selected.parentLookupField,
+            listLabel: selected.childObjectLabelPlural,
+            fieldApiNames: this.layoutImportRelatedFieldValues,
+            parentMatchMode,
+            contactLookupField: this.layoutImportContactLookupField,
+            parentContactField: this.layoutImportParentContactField,
+            businessKeyField: this.layoutImportBusinessKeyField,
+            businessKeyParam: this.layoutImportBusinessKeyParam
+        });
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

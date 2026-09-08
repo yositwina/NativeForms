@@ -210,7 +210,8 @@ global with sharing class NativeFormsAgentforceActions {
                     objectApiName,
                     selectedLayout.value,
                     mode,
-                    languageCode
+                    languageCode,
+                    null
                 );
 
             response.status = STATUS_CREATED;

@@ -585,7 +585,8 @@ private class NativeFormsDesignerBuilderTest {
             'Contact',
             layoutOptions[0].value,
             'secureUpdateOrCreate',
-            'he'
+            'he',
+            null
         );
 
         NF_Form_Version__c versionRecord = [
@@ -1381,6 +1382,219 @@ private class NativeFormsDesignerBuilderTest {
 
         System.assertEquals('fileUpload', savedFileUpload.elementType);
         System.assertEquals('Upload Field', savedFileUpload.label);
+        }
+    }
+
+    @IsTest
+    static void relatedListDiscoveryReturnsChildRelationshipsAndSupportedFields() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllProFlagsEnabled();
+
+        List<Map<String, Object>> relatedLists = NativeFormsDesignerController.getRelatedListImportOptions('Contact');
+        Boolean foundCases = false;
+        for (Map<String, Object> option : relatedLists) {
+            if (option.get('childObjectApiName') == 'Case' && option.get('parentLookupField') == 'ContactId') {
+                foundCases = true;
+            }
+        }
+        System.assert(foundCases, 'Contact should expose Cases as a related list via ContactId.');
+
+        List<Map<String, Object>> fieldOptions = NativeFormsDesignerController.getRelatedListFieldOptions('Case', 'ContactId');
+        System.assert(!fieldOptions.isEmpty(), 'Case should expose importable row fields.');
+        Set<String> supported = new Set<String>{
+            'text', 'textarea', 'number', 'email', 'tel', 'url',
+            'date', 'time', 'checkbox', 'select', 'multiCheckbox', 'radio', 'lookup'
+        };
+        for (Map<String, Object> option : fieldOptions) {
+            System.assert(
+                supported.contains(String.valueOf(option.get('elementType'))),
+                'Only row-safe element types may be offered, found ' + option.get('elementType')
+            );
+            System.assertNotEquals('ContactId', String.valueOf(option.get('apiName')),
+                'The parent lookup is set automatically and must not be offered as a row field.');
+        }
+
+        Map<String, Object> parentMatch = NativeFormsDesignerController.getRelatedParentMatchOptions('Contact');
+        System.assertEquals('A', String.valueOf(parentMatch.get('shape')),
+            'Contact as the parent object is shape A.');
+        }
+    }
+
+    @IsTest
+    static void pageLayoutImportGeneratesRelatedRecordsTable() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllProFlagsEnabled();
+        setPageLayoutMock();
+
+        List<NativeFormsDesignerController.SelectOption> layoutOptions =
+            NativeFormsDesignerController.getPageLayoutImportOptions('Contact', 'en');
+
+        String relatedListJson = JSON.serialize(new Map<String, Object>{
+            'childObjectApiName' => 'Case',
+            'parentLookupField' => 'ContactId',
+            'listLabel' => 'Related Cases',
+            'fieldApiNames' => new List<String>{ 'Subject', 'Status' },
+            'parentMatchMode' => 'contact'
+        });
+
+        NativeFormsDesignerController.NewFormResult result = NativeFormsDesignerController.createFormFromPageLayout(
+            'Contact With Cases',
+            null,
+            null,
+            null,
+            'Contact',
+            layoutOptions[0].value,
+            'secureUpdateOrCreate',
+            'en',
+            relatedListJson
+        );
+
+        List<NF_Form_Action__c> actions = [
+            SELECT Command_Key__c, Command_Type__c, Action_Scope__c, Object_Api_Name__c,
+                   Store_Result_As__c, Config_JSON__c
+            FROM NF_Form_Action__c
+            WHERE Form_Version__c = :result.versionId
+            ORDER BY Order__c
+        ];
+
+        Map<String, NF_Form_Action__c> byType = new Map<String, NF_Form_Action__c>();
+        for (NF_Form_Action__c action : actions) {
+            byType.put(action.Command_Type__c + ':' + action.Object_Api_Name__c, action);
+        }
+
+        // Shape A: one Contact findOne serves as both identity and parent.
+        NF_Form_Action__c contactPrefill = byType.get('findOne:Contact');
+        System.assertNotEquals(null, contactPrefill, 'A Contact identity prefill must be generated.');
+        System.assert(contactPrefill.Config_JSON__c.contains('verifiedEmail'),
+            'The identity prefill must match on the verified email, not a URL parameter.');
+
+        NF_Form_Action__c childPrefill = byType.get('findMany:Case');
+        System.assertNotEquals(null, childPrefill, 'A findMany prefill must be generated for the related list.');
+        Map<String, Object> childConfig = (Map<String, Object>) JSON.deserializeUntyped(childPrefill.Config_JSON__c);
+        System.assertEquals(20, Integer.valueOf(String.valueOf(childConfig.get('limit'))),
+            'The generated related list must be capped at 20 rows (BUG-023).');
+        System.assertEquals('CreatedDate DESC', String.valueOf(childConfig.get('orderBy')));
+        System.assert(childPrefill.Config_JSON__c.contains('ContactId'),
+            'The child query must be scoped by the parent lookup.');
+        System.assert(childPrefill.Config_JSON__c.contains('.Id'),
+            'The child query must chain off the parent alias Id.');
+
+        NF_Form_Action__c parentSubmit = byType.get('findAndUpdate:Contact');
+        System.assertNotEquals(null, parentSubmit, 'The parent must be saved with findAndUpdate.');
+        Map<String, Object> parentSubmitConfig =
+            (Map<String, Object>) JSON.deserializeUntyped(parentSubmit.Config_JSON__c);
+        System.assertEquals('create', String.valueOf(parentSubmitConfig.get('onNotFound')),
+            'The parent must be created when no record matches yet.');
+
+        NF_Form_Action__c childSubmit = byType.get('upsertMany:Case');
+        System.assertNotEquals(null, childSubmit, 'The related rows must be saved with upsertMany.');
+        Map<String, Object> childSubmitConfig =
+            (Map<String, Object>) JSON.deserializeUntyped(childSubmit.Config_JSON__c);
+        System.assertEquals('ContactId', String.valueOf(childSubmitConfig.get('relationshipField')));
+        System.assertEquals('alias', String.valueOf(childSubmitConfig.get('relationshipValueSource')));
+        System.assertEquals(parentSubmit.Store_Result_As__c + '.Id',
+            String.valueOf(childSubmitConfig.get('relationshipValueText')),
+            'New rows must attach to the parent that the submit produced.');
+        System.assertEquals(false, childSubmitConfig.get('allowDelete'),
+            'Generated related lists must not ship row deletion.');
+        System.assertEquals('relatedRecords', String.valueOf(childSubmitConfig.get('repeatGroupKey')));
+
+        List<NF_Form_Element__c> elements = [
+            SELECT Element_Type__c, Field_Key__c, Label__c, Parent_Element_Id__c, Config_JSON__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+            ORDER BY Order__c
+        ];
+
+        NF_Form_Element__c repeatGroup;
+        Integer rowFieldCount = 0;
+        Boolean foundRowId = false;
+        for (NF_Form_Element__c element : elements) {
+            if (element.Element_Type__c == 'repeatGroup') {
+                repeatGroup = element;
+            } else if (element.Parent_Element_Id__c == 'layout-related-records') {
+                rowFieldCount++;
+                if (element.Config_JSON__c.contains('"submitFieldPath" : "Id"')) {
+                    foundRowId = true;
+                }
+            }
+        }
+
+        System.assertNotEquals(null, repeatGroup, 'A Records List element must be generated.');
+        System.assertEquals('relatedRecords', repeatGroup.Field_Key__c);
+        System.assertEquals('Related Cases', repeatGroup.Label__c);
+        Map<String, Object> repeatConfig = (Map<String, Object>) JSON.deserializeUntyped(repeatGroup.Config_JSON__c);
+        System.assertEquals(childPrefill.Store_Result_As__c, String.valueOf(repeatConfig.get('repeatSourceAlias')),
+            'The Records List must read rows from the findMany alias.');
+        System.assertEquals(childSubmit.Command_Key__c, String.valueOf(repeatConfig.get('repeatSubmitActionKey')));
+        System.assertEquals(true, repeatConfig.get('allowAddRows'));
+        System.assertEquals(false, repeatConfig.get('allowDeleteRows'));
+
+        System.assert(foundRowId, 'A hidden row Id field must be generated so existing rows update by Id.');
+        System.assertEquals(3, rowFieldCount, 'Row Id plus the two chosen fields must be generated.');
+        }
+    }
+
+    @IsTest
+    static void relatedListImportRejectsInvalidSelections() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllProFlagsEnabled();
+        setPageLayoutMock();
+
+        List<NativeFormsDesignerController.SelectOption> layoutOptions =
+            NativeFormsDesignerController.getPageLayoutImportOptions('Contact', 'en');
+
+        String tooManyFields = JSON.serialize(new Map<String, Object>{
+            'childObjectApiName' => 'Case',
+            'parentLookupField' => 'ContactId',
+            'fieldApiNames' => new List<String>{ 'Subject', 'Status', 'Priority', 'Origin', 'Type', 'Reason', 'Description' },
+            'parentMatchMode' => 'contact'
+        });
+
+        Boolean threw = false;
+        try {
+            NativeFormsDesignerController.createFormFromPageLayout(
+                'Too Many Fields', null, null, null, 'Contact',
+                layoutOptions[0].value, 'secureUpdateOrCreate', 'en', tooManyFields
+            );
+        } catch (Exception e) {
+            threw = true;
+        }
+        System.assert(threw, 'More than six row fields must be rejected.');
+
+        String noFields = JSON.serialize(new Map<String, Object>{
+            'childObjectApiName' => 'Case',
+            'parentLookupField' => 'ContactId',
+            'fieldApiNames' => new List<String>(),
+            'parentMatchMode' => 'contact'
+        });
+        threw = false;
+        try {
+            NativeFormsDesignerController.createFormFromPageLayout(
+                'No Fields', null, null, null, 'Contact',
+                layoutOptions[0].value, 'secureUpdateOrCreate', 'en', noFields
+            );
+        } catch (Exception e) {
+            threw = true;
+        }
+        System.assert(threw, 'A related list with no chosen fields must be rejected.');
+
+        String createModeJson = JSON.serialize(new Map<String, Object>{
+            'childObjectApiName' => 'Case',
+            'parentLookupField' => 'ContactId',
+            'fieldApiNames' => new List<String>{ 'Subject' },
+            'parentMatchMode' => 'contact'
+        });
+        threw = false;
+        try {
+            NativeFormsDesignerController.createFormFromPageLayout(
+                'Create Mode', null, null, null, 'Contact',
+                layoutOptions[0].value, 'create', 'en', createModeJson
+            );
+        } catch (Exception e) {
+            threw = true;
+        }
+        System.assert(threw, 'Related records need a secure form so the contact can be identified.');
         }
     }
 }

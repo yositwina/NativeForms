@@ -1243,7 +1243,8 @@ public with sharing class NativeFormsDesignerController {
         String objectApiName,
         String layoutKey,
         String mode,
-        String languageCode
+        String languageCode,
+        String relatedListJson
     ) {
         String normalizedDescription = String.isBlank(description) ? null : description.trim();
         if (String.isBlank(normalizedDescription)) {
@@ -1273,6 +1274,16 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('No supported editable fields were found for the selected object.');
         }
 
+        RelatedListImportSpec relatedSpec = parseRelatedListSpec(relatedListJson, plan.objectApiName);
+        if (relatedSpec != null) {
+            if (!NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
+                throw new AuraHandledException('Related records tables require Records Lists on your Pro plan.');
+            }
+            if (!secureMode) {
+                throw new AuraHandledException('Related records require a secure form, so the signed-in contact can be identified.');
+            }
+        }
+
         Id effectiveProjectId = NativeFormsProjectService.resolveProjectId(projectId, newProjectName);
         NF_Form__c formRecord = new NF_Form__c(
             Description__c = normalizedDescription,
@@ -1295,7 +1306,7 @@ public with sharing class NativeFormsDesignerController {
             ),
             UI_Settings_JSON__c = buildPageLayoutImportUiSettingsJson(secureMode, normalizedLanguageCode),
             Prefill_Params_JSON__c = secureMode
-                ? buildPageLayoutImportPrefillParamsJson(normalizedMode, normalizedLanguageCode)
+                ? buildPageLayoutImportPrefillParamsJson(normalizedMode, normalizedLanguageCode, relatedSpec)
                 : '[]'
         );
         insert as user versionRecord;
@@ -1303,7 +1314,35 @@ public with sharing class NativeFormsDesignerController {
         List<NF_Form_Action__c> actions = new List<NF_Form_Action__c>();
         String prefillAlias = pageLayoutImportActionName('Prefill', plan.objectApiName);
         String submitActionKey = pageLayoutImportActionName('Submit', plan.objectApiName);
-        if (secureMode) {
+        String relatedRepeatGroupKey;
+        String relatedRepeatElementId;
+        String relatedChildAlias;
+        String relatedChildSubmitKey;
+
+        if (relatedSpec != null) {
+            String contactAlias = pageLayoutImportActionName('Prefill', 'Contact');
+            if (relatedSpec.parentMatchMode == 'contact') {
+                prefillAlias = contactAlias;
+            }
+            relatedChildAlias = pageLayoutImportActionName('Prefill', relatedSpec.childObjectApiName);
+            relatedChildSubmitKey = pageLayoutImportActionName('Submit', relatedSpec.childObjectApiName);
+            relatedRepeatGroupKey = 'relatedRecords';
+            relatedRepeatElementId = 'layout-related-records';
+            actions.addAll(buildRelatedRecordsActions(
+                versionRecord.Id,
+                plan,
+                relatedSpec,
+                contactAlias,
+                prefillAlias,
+                relatedChildAlias,
+                submitActionKey,
+                relatedChildSubmitKey,
+                'recordId',
+                relatedRepeatGroupKey
+            ));
+        }
+
+        if (relatedSpec == null && secureMode) {
             actions.add(new NF_Form_Action__c(
                 Form_Version__c = versionRecord.Id,
                 Action_Scope__c = 'Prefill',
@@ -1328,25 +1367,27 @@ public with sharing class NativeFormsDesignerController {
             ));
         }
 
-        Map<String, Object> submitConfig = new Map<String, Object>();
-        String submitCommandType = 'create';
-        if (secureMode) {
-            submitCommandType = 'updateById';
-            submitConfig.put('recordIdSource', '{input.recordId}');
-            if (normalizedMode == 'secureUpdateOrCreate') {
-                submitConfig.put('onNotFound', 'create');
+        if (relatedSpec == null) {
+            Map<String, Object> submitConfig = new Map<String, Object>();
+            String submitCommandType = 'create';
+            if (secureMode) {
+                submitCommandType = 'updateById';
+                submitConfig.put('recordIdSource', '{input.recordId}');
+                if (normalizedMode == 'secureUpdateOrCreate') {
+                    submitConfig.put('onNotFound', 'create');
+                }
             }
+            actions.add(new NF_Form_Action__c(
+                Form_Version__c = versionRecord.Id,
+                Action_Scope__c = 'Submit',
+                Command_Key__c = submitActionKey,
+                Command_Type__c = submitCommandType,
+                Object_Api_Name__c = plan.objectApiName,
+                Store_Result_As__c = submitActionKey,
+                Order__c = secureMode ? 20 : 10,
+                Config_JSON__c = JSON.serializePretty(submitConfig)
+            ));
         }
-        actions.add(new NF_Form_Action__c(
-            Form_Version__c = versionRecord.Id,
-            Action_Scope__c = 'Submit',
-            Command_Key__c = submitActionKey,
-            Command_Type__c = submitCommandType,
-            Object_Api_Name__c = plan.objectApiName,
-            Store_Result_As__c = submitActionKey,
-            Order__c = secureMode ? 20 : 10,
-            Config_JSON__c = JSON.serializePretty(submitConfig)
-        ));
         insert as user actions;
 
         List<NF_Form_Element__c> elements = buildPageLayoutImportElements(
@@ -1357,6 +1398,35 @@ public with sharing class NativeFormsDesignerController {
             submitActionKey,
             normalizedLanguageCode
         );
+        if (relatedSpec != null) {
+            Set<String> usedFieldKeys = new Set<String>{ 'recordId', 'layoutSection', relatedRepeatGroupKey };
+            Integer nextOrder = 10;
+            Integer nextIndex = 1;
+            for (NF_Form_Element__c existingElement : elements) {
+                if (String.isNotBlank(existingElement.Field_Key__c)) {
+                    usedFieldKeys.add(existingElement.Field_Key__c);
+                }
+                if (existingElement.Order__c != null && existingElement.Order__c >= nextOrder) {
+                    nextOrder = Integer.valueOf(existingElement.Order__c) + 10;
+                }
+                if (existingElement.Element_Index__c != null && existingElement.Element_Index__c >= nextIndex) {
+                    nextIndex = Integer.valueOf(existingElement.Element_Index__c) + 1;
+                }
+            }
+            elements.addAll(buildRelatedRecordsElements(
+                versionRecord.Id,
+                relatedSpec,
+                relatedChildAlias,
+                relatedChildSubmitKey,
+                relatedRepeatGroupKey,
+                relatedRepeatElementId,
+                nextOrder,
+                nextIndex,
+                usedFieldKeys,
+                normalizedLanguageCode,
+                plan.warnings
+            ));
+        }
         elements = filterStorableImportedElements(elements, plan);
         if (elements.isEmpty()) {
             throw new AuraHandledException('No supported fields could be stored from this Salesforce layout.');
@@ -3792,6 +3862,24 @@ public with sharing class NativeFormsDesignerController {
         });
     }
 
+    private static String buildPageLayoutImportPrefillParamsJson(
+        String mode,
+        String languageCode,
+        RelatedListImportSpec relatedSpec
+    ) {
+        List<Object> params = (List<Object>) JSON.deserializeUntyped(
+            buildPageLayoutImportPrefillParamsJson(mode, languageCode)
+        );
+        if (relatedSpec != null && String.isNotBlank(relatedSpec.businessKeyParam)) {
+            params.add(new Map<String, Object>{
+                'key' => relatedSpec.businessKeyParam,
+                'label' => relatedSpec.businessKeyParam,
+                'required' => true
+            });
+        }
+        return JSON.serializePretty(params);
+    }
+
     private static String localizedRecordIdLabel(String languageCode) {
         String normalizedLanguageCode = defaultLanguageCode(languageCode);
         if (normalizedLanguageCode == 'he') return '\u05DE\u05D6\u05D4\u05D4 \u05E8\u05E9\u05D5\u05DE\u05D4';
@@ -4454,5 +4542,496 @@ public with sharing class NativeFormsDesignerController {
         public Integer compare(NF_Form_Version__c a, NF_Form_Version__c b) {
             return String.valueOf(b.Name).toLowerCase().compareTo(String.valueOf(a.Name).toLowerCase());
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Page Layout to Form - related records as a table
+    // Spec: AWS/documentation/New features after 0.1/Layout_to_Form_Related_Records_Table.md
+    // ---------------------------------------------------------------------
+
+    /** Element types verified to round-trip inside a Records List row. See spec section 6. */
+    private static final Set<String> RELATED_ROW_SUPPORTED_TYPES = new Set<String>{
+        'text', 'textarea', 'number', 'email', 'tel', 'url',
+        'date', 'time', 'checkbox', 'select', 'multiCheckbox', 'radio', 'lookup'
+    };
+
+    private static final Integer RELATED_ROW_LIMIT = 20;
+    private static final Integer RELATED_MAX_FIELDS = 6;
+
+    private class RelatedListImportSpec {
+        String childObjectApiName;
+        String childObjectLabel;
+        String parentLookupField;
+        String listLabel;
+        List<String> fieldApiNames = new List<String>();
+        String parentMatchMode;
+        String contactLookupField;
+        String parentContactField;
+        String businessKeyField;
+        String businessKeyParam;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, Object>> getRelatedListImportOptions(String objectApiName) {
+        String canonicalObject = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObject)) {
+            throw new AuraHandledException('Select a valid Salesforce object first.');
+        }
+        Schema.SObjectType parentType = Schema.getGlobalDescribe().get(canonicalObject);
+        if (parentType == null || !parentType.getDescribe().isAccessible()) {
+            throw new AuraHandledException('You do not have access to the selected Salesforce object.');
+        }
+
+        List<Map<String, Object>> options = new List<Map<String, Object>>();
+        Set<String> seen = new Set<String>();
+        for (Schema.ChildRelationship relationship : parentType.getDescribe().getChildRelationships()) {
+            Schema.SObjectField lookupField = relationship.getField();
+            Schema.SObjectType childType = relationship.getChildSObject();
+            if (lookupField == null || childType == null) {
+                continue;
+            }
+            Schema.DescribeSObjectResult childDescribe = childType.getDescribe();
+            if (!childDescribe.isAccessible() || !childDescribe.isCreateable() || !childDescribe.isQueryable()) {
+                continue;
+            }
+            String childName = childDescribe.getName();
+            if (childDescribe.isCustomSetting() || childName.endsWith('__History')
+                || childName.endsWith('__Share') || childName.endsWith('Feed')) {
+                continue;
+            }
+            Schema.DescribeFieldResult lookupDescribe = lookupField.getDescribe();
+            if (!lookupDescribe.isAccessible() || !lookupDescribe.isCreateable()) {
+                continue;
+            }
+            String key = childName + '.' + lookupDescribe.getName();
+            if (seen.contains(key)) {
+                continue;
+            }
+            seen.add(key);
+            options.add(new Map<String, Object>{
+                'childObjectApiName' => childName,
+                'childObjectLabel' => childDescribe.getLabel(),
+                'childObjectLabelPlural' => childDescribe.getLabelPlural(),
+                'parentLookupField' => lookupDescribe.getName(),
+                'parentLookupLabel' => lookupDescribe.getLabel(),
+                'value' => key,
+                'label' => childDescribe.getLabelPlural() + ' (' + lookupDescribe.getLabel() + ')'
+            });
+        }
+        return options;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, Object>> getRelatedListFieldOptions(String childObjectApiName, String parentLookupField) {
+        String canonicalChild = canonicalObjectName(childObjectApiName);
+        if (String.isBlank(canonicalChild)) {
+            throw new AuraHandledException('Select a related list first.');
+        }
+        Schema.SObjectType childType = Schema.getGlobalDescribe().get(canonicalChild);
+        if (childType == null || !childType.getDescribe().isAccessible()) {
+            throw new AuraHandledException('You do not have access to the related object.');
+        }
+
+        String skipField = String.isBlank(parentLookupField) ? '' : parentLookupField.trim().toLowerCase();
+        List<Map<String, Object>> options = new List<Map<String, Object>>();
+        for (Schema.SObjectField field : childType.getDescribe().fields.getMap().values()) {
+            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+            if (fieldDescribe.getName().toLowerCase() == skipField) {
+                continue;
+            }
+            if (!fieldDescribe.isCreateable() && !fieldDescribe.isUpdateable()) {
+                continue;
+            }
+            PageLayoutImportField fieldSpec = toPageLayoutImportField(fieldDescribe);
+            if (fieldSpec == null || !RELATED_ROW_SUPPORTED_TYPES.contains(fieldSpec.elementType)) {
+                continue;
+            }
+            options.add(new Map<String, Object>{
+                'apiName' => fieldSpec.apiName,
+                'label' => fieldSpec.label,
+                'elementType' => fieldSpec.elementType,
+                'required' => fieldSpec.required
+            });
+        }
+        return options;
+    }
+
+    /**
+     * Describes how the parent record can be reached from the verified Contact.
+     * Shape A: the parent object is Contact itself.
+     * Shape B: Contact has a lookup to the parent object, for example Contact.AccountId -> Account.
+     * Shape C: the parent has a lookup to Contact, optionally narrowed by a business key.
+     */
+    @AuraEnabled(cacheable=true)
+    public static Map<String, Object> getRelatedParentMatchOptions(String objectApiName) {
+        String canonicalObject = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObject)) {
+            throw new AuraHandledException('Select a valid Salesforce object first.');
+        }
+        if (canonicalObject == 'Contact') {
+            return new Map<String, Object>{
+                'shape' => 'A',
+                'contactLookupFields' => new List<Object>(),
+                'parentContactFields' => new List<Object>(),
+                'businessKeyFields' => new List<Object>()
+            };
+        }
+
+        List<Object> contactLookups = new List<Object>();
+        for (Schema.SObjectField field : Contact.SObjectType.getDescribe().fields.getMap().values()) {
+            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+            if (fieldDescribe.getType() != Schema.DisplayType.Reference || !fieldDescribe.isAccessible()) {
+                continue;
+            }
+            for (Schema.SObjectType target : fieldDescribe.getReferenceTo()) {
+                if (target.getDescribe().getName() == canonicalObject) {
+                    contactLookups.add(new Map<String, Object>{
+                        'apiName' => fieldDescribe.getName(),
+                        'label' => fieldDescribe.getLabel()
+                    });
+                }
+            }
+        }
+
+        List<Object> parentContactFields = new List<Object>();
+        List<Object> businessKeyFields = new List<Object>();
+        for (Schema.SObjectField field : Schema.getGlobalDescribe().get(canonicalObject).getDescribe().fields.getMap().values()) {
+            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+            if (!fieldDescribe.isAccessible()) {
+                continue;
+            }
+            if (fieldDescribe.getType() == Schema.DisplayType.Reference) {
+                for (Schema.SObjectType target : fieldDescribe.getReferenceTo()) {
+                    if (target.getDescribe().getName() == 'Contact') {
+                        parentContactFields.add(new Map<String, Object>{
+                            'apiName' => fieldDescribe.getName(),
+                            'label' => fieldDescribe.getLabel()
+                        });
+                    }
+                }
+                continue;
+            }
+            Schema.DisplayType keyType = fieldDescribe.getType();
+            if (keyType == Schema.DisplayType.Date || keyType == Schema.DisplayType.String
+                || keyType == Schema.DisplayType.Picklist || keyType == Schema.DisplayType.Double) {
+                businessKeyFields.add(new Map<String, Object>{
+                    'apiName' => fieldDescribe.getName(),
+                    'label' => fieldDescribe.getLabel()
+                });
+            }
+        }
+
+        String shape = !contactLookups.isEmpty() ? 'B' : (!parentContactFields.isEmpty() ? 'C' : 'none');
+        return new Map<String, Object>{
+            'shape' => shape,
+            'contactLookupFields' => contactLookups,
+            'parentContactFields' => parentContactFields,
+            'businessKeyFields' => businessKeyFields
+        };
+    }
+
+    private static RelatedListImportSpec parseRelatedListSpec(String relatedListJson, String parentObjectApiName) {
+        if (String.isBlank(relatedListJson)) {
+            return null;
+        }
+        Map<String, Object> raw;
+        try {
+            raw = (Map<String, Object>) JSON.deserializeUntyped(relatedListJson);
+        } catch (Exception parseError) {
+            throw new AuraHandledException('The related list selection could not be read.');
+        }
+
+        RelatedListImportSpec spec = new RelatedListImportSpec();
+        spec.childObjectApiName = canonicalObjectName(stringValue(raw.get('childObjectApiName')));
+        spec.parentLookupField = stringValue(raw.get('parentLookupField'));
+        spec.listLabel = stringValue(raw.get('listLabel'));
+        spec.parentMatchMode = stringValue(raw.get('parentMatchMode'));
+        spec.contactLookupField = stringValue(raw.get('contactLookupField'));
+        spec.parentContactField = stringValue(raw.get('parentContactField'));
+        spec.businessKeyField = stringValue(raw.get('businessKeyField'));
+        spec.businessKeyParam = stringValue(raw.get('businessKeyParam'));
+
+        if (String.isBlank(spec.childObjectApiName) || String.isBlank(spec.parentLookupField)) {
+            throw new AuraHandledException('Choose a related list and the field that links it to the parent record.');
+        }
+        Schema.SObjectType childType = Schema.getGlobalDescribe().get(spec.childObjectApiName);
+        if (childType == null || !childType.getDescribe().isCreateable()) {
+            throw new AuraHandledException('You do not have permission to create records on the related object.');
+        }
+        spec.childObjectLabel = childType.getDescribe().getLabelPlural();
+        if (String.isBlank(spec.listLabel)) {
+            spec.listLabel = spec.childObjectLabel;
+        }
+
+        Object rawFields = raw.get('fieldApiNames');
+        if (rawFields instanceof List<Object>) {
+            for (Object rawField : (List<Object>) rawFields) {
+                String apiName = stringValue(rawField);
+                if (String.isNotBlank(apiName)) {
+                    spec.fieldApiNames.add(apiName);
+                }
+            }
+        }
+        if (spec.fieldApiNames.isEmpty()) {
+            throw new AuraHandledException('Choose at least one field to show in the related records table.');
+        }
+        if (spec.fieldApiNames.size() > RELATED_MAX_FIELDS) {
+            throw new AuraHandledException('A related records table supports up to ' + RELATED_MAX_FIELDS + ' fields.');
+        }
+
+        if (parentObjectApiName == 'Contact') {
+            spec.parentMatchMode = 'contact';
+        } else if (spec.parentMatchMode == 'contactLookup') {
+            if (String.isBlank(spec.contactLookupField)) {
+                throw new AuraHandledException('Choose the Contact field that points to the parent record.');
+            }
+        } else if (spec.parentMatchMode == 'parentLookup') {
+            if (String.isBlank(spec.parentContactField)) {
+                throw new AuraHandledException('Choose the field on the parent record that points to the Contact.');
+            }
+            if (String.isNotBlank(spec.businessKeyField) && String.isBlank(spec.businessKeyParam)) {
+                throw new AuraHandledException('Give the URL parameter name that supplies the business key value.');
+            }
+        } else {
+            throw new AuraHandledException('Choose how the parent record is identified for the signed-in contact.');
+        }
+        return spec;
+    }
+
+    private static Map<String, Object> relatedCondition(String fieldApiName, String valueSource, String valueText) {
+        return new Map<String, Object>{
+            'fieldApiName' => fieldApiName,
+            'operator' => 'eq',
+            'valueSource' => valueSource,
+            'valueText' => valueText
+        };
+    }
+
+    /**
+     * Builds the identity chain that reaches the parent record without a recordId in the URL.
+     * Spec section 4: verified Contact -> parent record -> child rows, then parent writeback -> child writeback.
+     */
+    private static List<NF_Form_Action__c> buildRelatedRecordsActions(
+        Id versionId,
+        PageLayoutImportPlan plan,
+        RelatedListImportSpec spec,
+        String contactAlias,
+        String parentAlias,
+        String childAlias,
+        String parentSubmitKey,
+        String childSubmitKey,
+        String parentIdFieldKey,
+        String repeatGroupKey
+    ) {
+        List<NF_Form_Action__c> actions = new List<NF_Form_Action__c>();
+        Integer orderValue = 10;
+
+        // 1. Identity - resolve the verified email to a Contact.
+        actions.add(new NF_Form_Action__c(
+            Form_Version__c = versionId,
+            Action_Scope__c = 'Prefill',
+            Command_Key__c = contactAlias,
+            Command_Type__c = 'findOne',
+            Object_Api_Name__c = 'Contact',
+            Store_Result_As__c = contactAlias,
+            Order__c = orderValue,
+            Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'conditions' => new List<Object>{ relatedCondition('Email', 'verifiedEmail', 'email') },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1',
+                'onNotFound' => 'ignore'
+            })
+        ));
+        orderValue += 10;
+
+        // 2. Find the parent record, unless the parent object is Contact itself (shape A).
+        if (spec.parentMatchMode != 'contact') {
+            List<Object> conditions = new List<Object>();
+            if (spec.parentMatchMode == 'contactLookup') {
+                conditions.add(relatedCondition('Id', 'alias', contactAlias + '.' + spec.contactLookupField));
+            } else {
+                conditions.add(relatedCondition(spec.parentContactField, 'alias', contactAlias + '.Id'));
+                if (String.isNotBlank(spec.businessKeyField)) {
+                    conditions.add(relatedCondition(spec.businessKeyField, 'param', spec.businessKeyParam));
+                }
+            }
+            String logic = conditions.size() == 2 ? '1 AND 2' : '1';
+            actions.add(new NF_Form_Action__c(
+                Form_Version__c = versionId,
+                Action_Scope__c = 'Prefill',
+                Command_Key__c = parentAlias,
+                Command_Type__c = 'findOne',
+                Object_Api_Name__c = plan.objectApiName,
+                Store_Result_As__c = parentAlias,
+                Order__c = orderValue,
+                Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                    'conditions' => conditions,
+                    'conditionLogic' => logic,
+                    'conditionExpression' => logic,
+                    'onNotFound' => 'ignore'
+                })
+            ));
+            orderValue += 10;
+        }
+
+        // 3. Load the related rows, scoped to the parent record.
+        actions.add(new NF_Form_Action__c(
+            Form_Version__c = versionId,
+            Action_Scope__c = 'Prefill',
+            Command_Key__c = childAlias,
+            Command_Type__c = 'findMany',
+            Object_Api_Name__c = spec.childObjectApiName,
+            Store_Result_As__c = childAlias,
+            Order__c = orderValue,
+            Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'conditions' => new List<Object>{
+                    relatedCondition(spec.parentLookupField, 'alias', parentAlias + '.Id')
+                },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1',
+                'limit' => RELATED_ROW_LIMIT,
+                'orderBy' => 'CreatedDate DESC',
+                'onNotFound' => 'ignore'
+            })
+        ));
+        orderValue += 10;
+
+        // 4. Save the parent: update the matched record, or create it when there is none yet.
+        actions.add(new NF_Form_Action__c(
+            Form_Version__c = versionId,
+            Action_Scope__c = 'Submit',
+            Command_Key__c = parentSubmitKey,
+            Command_Type__c = 'findAndUpdate',
+            Object_Api_Name__c = plan.objectApiName,
+            Store_Result_As__c = parentSubmitKey,
+            Order__c = orderValue,
+            Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'conditions' => new List<Object>{ relatedCondition('Id', 'field', parentIdFieldKey) },
+                'conditionLogic' => '1',
+                'conditionExpression' => '1',
+                'onNotFound' => 'create'
+            })
+        ));
+        orderValue += 10;
+
+        // 5. Save the rows, attaching new ones to whichever parent step 4 produced.
+        actions.add(new NF_Form_Action__c(
+            Form_Version__c = versionId,
+            Action_Scope__c = 'Submit',
+            Command_Key__c = childSubmitKey,
+            Command_Type__c = 'upsertMany',
+            Object_Api_Name__c = spec.childObjectApiName,
+            Store_Result_As__c = childSubmitKey,
+            Order__c = orderValue,
+            Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'repeatGroupKey' => repeatGroupKey,
+                'relationshipField' => spec.parentLookupField,
+                'relationshipValueSource' => 'alias',
+                'relationshipValueText' => parentSubmitKey + '.Id',
+                'allowDelete' => false
+            })
+        ));
+
+        return actions;
+    }
+
+    /** Builds the Records List element plus its row fields, including the hidden row Id. */
+    private static List<NF_Form_Element__c> buildRelatedRecordsElements(
+        Id versionId,
+        RelatedListImportSpec spec,
+        String childAlias,
+        String childSubmitKey,
+        String repeatGroupKey,
+        String repeatElementId,
+        Integer startOrder,
+        Integer startIndex,
+        Set<String> usedFieldKeys,
+        String languageCode,
+        List<String> warnings
+    ) {
+        List<NF_Form_Element__c> elements = new List<NF_Form_Element__c>();
+        Integer orderValue = startOrder;
+        Integer elementIndex = startIndex;
+
+        elements.add(new NF_Form_Element__c(
+            Form_Version__c = versionId,
+            Element_Id__c = repeatElementId,
+            Element_Type__c = 'repeatGroup',
+            Field_Key__c = repeatGroupKey,
+            Element_Index__c = elementIndex++,
+            Label__c = spec.listLabel,
+            Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'repeatSourceAlias' => childAlias,
+                'repeatSubmitActionKey' => childSubmitKey,
+                'columns' => 2,
+                'boxed' => true,
+                'showTitle' => true,
+                'showLabelsOnEachRow' => true,
+                'allowAddRows' => true,
+                'allowDeleteRows' => false
+            }),
+            Order__c = orderValue
+        ));
+        orderValue += 10;
+
+        // Hidden row Id drives update-existing versus create-new per row.
+        String rowIdKey = uniqueImportedFieldKey('rowId', usedFieldKeys);
+        elements.add(new NF_Form_Element__c(
+            Form_Version__c = versionId,
+            Element_Id__c = repeatElementId + '-row-id',
+            Element_Type__c = 'hidden',
+            Field_Key__c = rowIdKey,
+            Element_Index__c = elementIndex++,
+            Label__c = 'Row Id',
+            Parent_Element_Id__c = repeatElementId,
+            Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                'sectionColumn' => 1,
+                'fieldBehavior' => 'hidden',
+                'defaultValue' => '',
+                'prefillEnabled' => true,
+                'prefillAlias' => childAlias,
+                'prefillFieldPath' => 'Id',
+                'submitEnabled' => true,
+                'submitActionKey' => childSubmitKey,
+                'submitFieldPath' => 'Id'
+            }),
+            Order__c = orderValue
+        ));
+        orderValue += 10;
+
+        Schema.DescribeSObjectResult childDescribe = Schema.getGlobalDescribe().get(spec.childObjectApiName).getDescribe();
+        Map<String, Schema.SObjectField> childFields = childDescribe.fields.getMap();
+        Integer column = 1;
+        for (String apiName : spec.fieldApiNames) {
+            Schema.SObjectField field = childFields.get(apiName);
+            if (field == null) {
+                warnings.add('Field ' + apiName + ' was not found on ' + spec.childObjectApiName + ' and was skipped.');
+                continue;
+            }
+            PageLayoutImportField fieldSpec = toPageLayoutImportField(field.getDescribe());
+            if (fieldSpec == null || !RELATED_ROW_SUPPORTED_TYPES.contains(fieldSpec.elementType)) {
+                warnings.add('Field ' + apiName + ' is not supported inside a Records List row and was skipped.');
+                continue;
+            }
+            String fieldKey = uniqueImportedFieldKey(fieldSpec.apiName, usedFieldKeys);
+            Map<String, Object> config = configForImportedField(
+                fieldSpec, spec.childObjectApiName, true, childAlias, childSubmitKey, languageCode
+            );
+            config.put('sectionColumn', column);
+            elements.add(new NF_Form_Element__c(
+                Form_Version__c = versionId,
+                Element_Id__c = repeatElementId + '-' + fieldKey,
+                Element_Type__c = fieldSpec.elementType,
+                Field_Key__c = fieldKey,
+                Element_Index__c = elementIndex++,
+                Label__c = fieldSpec.label,
+                Parent_Element_Id__c = repeatElementId,
+                Config_JSON__c = JSON.serializePretty(config),
+                Order__c = orderValue
+            ));
+            orderValue += 10;
+            column = column == 2 ? 1 : 2;
+        }
+        return elements;
     }
 }

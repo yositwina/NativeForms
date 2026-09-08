@@ -2842,6 +2842,71 @@
                                     disabled={formLimitReached}
                                     onchange={handleLayoutImportModeChange}>
                                 </lightning-combobox>
+                                <template if:true={layoutImportRelatedAvailable}>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Include related records as a table"
+                                        checked={layoutImportIncludeRelated}
+                                        onchange={handleLayoutImportIncludeRelatedChange}>
+                                    </lightning-input>
+                                </template>
+                                <template if:true={layoutImportIncludeRelated}>
+                                    <lightning-combobox
+                                        label="Related List"
+                                        value={layoutImportRelatedValue}
+                                        options={layoutImportRelatedListOptions}
+                                        onchange={handleLayoutImportRelatedListChange}>
+                                    </lightning-combobox>
+                                    <lightning-dual-listbox
+                                        label="Columns"
+                                        source-label="Available fields"
+                                        selected-label="Shown in the table"
+                                        options={layoutImportRelatedFieldOptions}
+                                        value={layoutImportRelatedFieldValues}
+                                        max="6"
+                                        disabled={layoutImportRelatedFieldsDisabled}
+                                        field-level-help={layoutImportRelatedFieldHelp}
+                                        onchange={handleLayoutImportRelatedFieldsChange}>
+                                    </lightning-dual-listbox>
+                                    <template if:true={layoutImportShowContactLookup}>
+                                        <lightning-combobox
+                                            label="Contact field that points to the parent record"
+                                            value={layoutImportContactLookupField}
+                                            options={layoutImportContactLookupOptions}
+                                            onchange={handleLayoutImportContactLookupChange}>
+                                        </lightning-combobox>
+                                    </template>
+                                    <template if:true={layoutImportShowParentContact}>
+                                        <lightning-combobox
+                                            label="Parent field that points to the Contact"
+                                            value={layoutImportParentContactField}
+                                            options={layoutImportParentContactOptions}
+                                            onchange={handleLayoutImportParentContactChange}>
+                                        </lightning-combobox>
+                                        <lightning-combobox
+                                            label="Narrow to one record by"
+                                            value={layoutImportBusinessKeyField}
+                                            options={layoutImportBusinessKeyOptions}
+                                            onchange={handleLayoutImportBusinessKeyChange}>
+                                        </lightning-combobox>
+                                    </template>
+                                    <template if:true={layoutImportShowBusinessKey}>
+                                        <lightning-input
+                                            label="URL parameter that supplies this value"
+                                            value={layoutImportBusinessKeyParam}
+                                            onchange={handleLayoutImportBusinessKeyParamChange}>
+                                        </lightning-input>
+                                    </template>
+                                    <p class="designer-new-form-help">{layoutImportRelatedNotice}</p>
+                                </template>
+                                <template if:true={isLoadingRelatedMetadata}>
+                                    <div class="designer-layout-import-loading">
+                                        <lightning-spinner
+                                            size="small"
+                                            alternative-text="Loading related lists">
+                                        </lightning-spinner>
+                                    </div>
+                                </template>
                                 <template if:true={isLoadingLayoutMetadata}>
                                     <div class="designer-layout-import-loading">
                                         <lightning-spinner
