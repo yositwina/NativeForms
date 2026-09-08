@@ -52,7 +52,7 @@ Public submit flow that refreshes Salesforce access and writes Salesforce data.
 Scan:
 - public submit Lambda URL/API route
 - file upload/finalization flow if enabled
-- user-verification verification path if enabled
+- secret-code verification path if enabled
 
 Review risks:
 - bypassing `formId` + `publishToken`

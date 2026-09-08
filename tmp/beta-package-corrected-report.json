@@ -1,0 +1,26 @@
+{
+  "status": 0,
+  "result": [
+    {
+      "Id": "08cgL000000Ht9lQAC",
+      "Status": "Success",
+      "Package2Id": "0HogL0000002CUvSAM",
+      "Package2Name": "TwinaForms",
+      "Package2VersionId": "05igL0000005ZjVQAU",
+      "SubscriberPackageVersionId": "04tgL000000SAqrQAG",
+      "Tag": null,
+      "Branch": null,
+      "Error": [],
+      "CreatedDate": "2026-09-08 14:43",
+      "HasMetadataRemoved": false,
+      "CodeCoverage": 83,
+      "VersionNumber": "0.15.0.10",
+      "HasPassedCodeCoverageCheck": true,
+      "CreatedBy": "005gL00000I0QbFQAV",
+      "ConvertedFromVersionId": null,
+      "TotalNumberOfMetadataFiles": 206,
+      "TotalSizeOfMetadataFiles": 2915541
+    }
+  ],
+  "warnings": []
+}

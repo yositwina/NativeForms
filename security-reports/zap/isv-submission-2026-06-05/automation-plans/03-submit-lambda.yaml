@@ -1,0 +1,64 @@
+﻿---
+env:
+  contexts:
+    - name: TwinaForms Submit Lambda
+      urls:
+        - https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Submit missing publish token is rejected
+        url: https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"formId\":\"nf-00Dg5000008sWZN-a04g5000001BARhAAO\",\"input\":{}}"
+        responseCode: 401
+      - name: Submit invalid publish token is rejected
+        url: https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"formId\":\"nf-00Dg5000008sWZN-a04g5000001BARhAAO\",\"publishToken\":\"invalid-zap-token\",\"input\":{}}"
+        responseCode: 401
+      - name: Submit wrong form id is rejected
+        url: https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{\"formId\":\"nf-00Dg5000008sWZN-wrong\",\"publishToken\":\"2bd0d0c2161c3c2697ad1822c913f356\",\"input\":{}}"
+        responseCode: 403
+      - name: Submit empty JSON body is rejected
+        url: https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        data: "{}"
+        responseCode: 400
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\zap\isv-submission-2026-06-05\official-reports
+      reportFile: 03-submit-lambda.html
+      reportTitle: TwinaForms Submit Lambda ZAP Report
+      reportDescription: Passive ZAP requestor report for the public submit Lambda. Requests cover safe rejection cases and do not create Salesforce records. This report does not run an active attack scan.
+
+

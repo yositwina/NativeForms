@@ -256,7 +256,8 @@ function jsonResponse(statusCode, payload) {
   return {
     statusCode,
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff"
     },
     body: JSON.stringify(payload)
   };

@@ -29,6 +29,35 @@
 
                         <div class="designer-topbar__field designer-topbar__field--form designer-topbar__field--inline">
                             <span class="designer-topbar__inline-label">Form</span>
+                            <lightning-button-menu
+                                class="designer-form-sort"
+                                alternative-text={formSortButtonAlternativeText}
+                                icon-name={formSortIconName}
+                                menu-alignment="left"
+                                variant="border-filled"
+                                disabled={disableFormSelector}
+                                onselect={handleFormSortChange}>
+                                <lightning-menu-item
+                                    value="nameAsc"
+                                    label="Name A-Z"
+                                    checked={formSortNameAscChecked}>
+                                </lightning-menu-item>
+                                <lightning-menu-item
+                                    value="nameDesc"
+                                    label="Name Z-A"
+                                    checked={formSortNameDescChecked}>
+                                </lightning-menu-item>
+                                <lightning-menu-item
+                                    value="numberAsc"
+                                    label="Form number low-high"
+                                    checked={formSortNumberAscChecked}>
+                                </lightning-menu-item>
+                                <lightning-menu-item
+                                    value="numberDesc"
+                                    label="Form number high-low"
+                                    checked={formSortNumberDescChecked}>
+                                </lightning-menu-item>
+                            </lightning-button-menu>
                             <lightning-combobox
                                 name="formId"
                                 variant="label-hidden"
@@ -130,6 +159,17 @@
                                 prefix-icon-name="utility:copy"
                                 disabled={cloneFormDisabled}>
                             </lightning-menu-item>
+                            <lightning-menu-item
+                                label="Export Form"
+                                value="exportForm"
+                                prefix-icon-name="utility:download"
+                                disabled={exportFormDisabled}>
+                            </lightning-menu-item>
+                            <lightning-menu-item
+                                label="Import Form"
+                                value="importForm"
+                                prefix-icon-name="utility:upload">
+                            </lightning-menu-item>
                             <template if:true={showRestorePublishedAction}>
                                 <lightning-menu-item
                                     label="Restore From This Published Version"
@@ -139,6 +179,12 @@
                                 </lightning-menu-item>
                             </template>
                         </lightning-button-menu>
+                        <input
+                            type="file"
+                            class="slds-hide"
+                            accept=".json,application/json"
+                            data-id="portable-form-import-hidden"
+                            onchange={handleImportFormFileSelected} />
                     </div>
                 </section>
 
@@ -331,7 +377,7 @@
                                                         <div class="preview-section__title">{row.item.label}</div>
                                                     </template>
                                                 </div>
-                                                <div class={row.item.sectionColumnClass}>
+                                                <div class={row.item.sectionColumnClass} style={row.item.sectionColumnStyle}>
                                                     <template for:each={row.item.sectionSlots} for:item="column">
                                                         <div
                                                             key={column.key}
@@ -372,7 +418,10 @@
                                                                             <template if:true={child.showConditionalBadge}>
                                                                                 <div class="preview-conditional-badge">{child.conditionalSummary}</div>
                                                                             </template>
-                                                                            <template lwc:if={child.isCheckbox}>
+                                                                            <template lwc:if={child.isSpacer}>
+                                                                                <div class={child.previewSpacerClass}><span>Blank space</span></div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isCheckbox}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.displayLabel}</label>
@@ -555,12 +604,15 @@
                                                         <template if:true={row.item.repeatSourceAlias}>
                                                             <span>Source: {row.item.repeatSourceAlias}</span>
                                                         </template>
+                                                        <template if:true={row.item.repeatSubmitAlias}>
+                                                            <span>Save: {row.item.repeatSubmitAlias}</span>
+                                                        </template>
                                                         <template if:true={row.item.showRepeatSourceWarning}>
                                                             <span class="preview-repeat-group__warning">{row.item.repeatSourceWarningText}</span>
                                                         </template>
                                                     </div>
                                                 </div>
-                                                <div class={row.item.sectionColumnClass}>
+                                                <div class={row.item.sectionColumnClass} style={row.item.sectionColumnStyle}>
                                                     <template for:each={row.item.sectionSlots} for:item="column">
                                                         <div
                                                             key={column.key}
@@ -601,7 +653,10 @@
                                                                             <template if:true={child.showConditionalBadge}>
                                                                                 <div class="preview-conditional-badge">{child.conditionalSummary}</div>
                                                                             </template>
-                                                                            <template lwc:if={child.isCheckbox}>
+                                                                            <template lwc:if={child.isSpacer}>
+                                                                                <div class={child.previewSpacerClass}><span>Blank space</span></div>
+                                                                            </template>
+                                                                            <template lwc:elseif={child.isCheckbox}>
                                                                                 <div class={child.fieldPreviewClass}>
                                                                                     <template if:true={child.showLabel}>
                                                                                         <label class={child.labelClass}>{child.displayLabel}</label>
@@ -727,6 +782,10 @@
                                                     </template>
                                                 </div>
                                             </div>
+                                        </template>
+
+                                        <template lwc:elseif={row.item.isSpacer}>
+                                            <div class={row.item.previewSpacerClass}><span>Blank space</span></div>
                                         </template>
 
                                         <template lwc:elseif={row.item.isCheckbox}>
@@ -960,6 +1019,23 @@
                                     value={draftUserVerificationMatchField}
                                     disabled>
                                 </lightning-input>
+
+                                <div class="selection-label-row selection-label-row--flush">
+                                    <p class="field-inline-label">Sender Email</p>
+                                    <lightning-helptext content={userVerificationSenderEmailHelpText}></lightning-helptext>
+                                </div>
+                                <lightning-input
+                                    type="email"
+                                    variant="label-hidden"
+                                    label="Sender Email"
+                                    value={draftUserVerificationSenderEmail}
+                                    message-when-value-missing={userVerificationSenderEmailMessage}
+                                    oninput={handleUserVerificationSenderEmailInput}
+                                    onblur={handleUserVerificationSenderEmailBlur}>
+                                </lightning-input>
+                                <template if:true={userVerificationSenderEmailMessage}>
+                                    <p class="selection-hint selection-hint--error">{userVerificationSenderEmailMessage}</p>
+                                </template>
                             </div>
 
                             <div class="selection-card">
@@ -1203,6 +1279,9 @@
                                         </lightning-combobox>
                                     </div>
                                 </div>
+                                <template if:true={selectedElementCanClone}>
+                                    <lightning-button class="slds-m-top_small slds-show" label="Clone" icon-name="utility:copy" onclick={handleCloneField} disabled={cloneFieldDisabled}></lightning-button>
+                                </template>
                             </div>
 
                             <template if:true={selectedElementIsButton}>
@@ -1371,6 +1450,16 @@
                                     </div>
                                 </template>
 
+                                <template if:true={selectedElementIsSpacer}>
+                                    <lightning-combobox
+                                        label="Space Size"
+                                        value={editorSpacerSize}
+                                        options={spacerSizeOptions}
+                                        onchange={handleEditorSpacerSizeChange}>
+                                    </lightning-combobox>
+                                    <p class="selection-hint">Reserves field space, with or without room for a label above it.</p>
+                                </template>
+
                                 <div class="settings-divider"></div>
                                 <p class="selection-label">Display Settings</p>
 
@@ -1515,6 +1604,15 @@
                                         options={sectionColumnOptions}
                                         onchange={handleEditorColumnsChange}>
                                     </lightning-combobox>
+                                    <template if:true={showColumnLayoutPicker}>
+                                        <div class="column-layout-picker" role="radiogroup" aria-label="Column layout">
+                                            <template for:each={columnLayoutOptions} for:item="option">
+                                                <button key={option.value} type="button" class={option.className} data-layout={option.value} onclick={handleColumnLayoutChange} aria-pressed={option.selected} title={option.label}>
+                                                    <span class={option.thumbnailClass} aria-hidden="true"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
                                 </template>
 
                                 <template if:true={selectedElementIsGroup}>
@@ -1524,6 +1622,15 @@
                                         options={sectionColumnOptions}
                                         onchange={handleEditorColumnsChange}>
                                     </lightning-combobox>
+                                    <template if:true={showColumnLayoutPicker}>
+                                        <div class="column-layout-picker" role="radiogroup" aria-label="Column layout">
+                                            <template for:each={columnLayoutOptions} for:item="option">
+                                                <button key={option.value} type="button" class={option.className} data-layout={option.value} onclick={handleColumnLayoutChange} aria-pressed={option.selected} title={option.label}>
+                                                    <span class={option.thumbnailClass} aria-hidden="true"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
                                 </template>
 
                                 <template if:true={selectedElementIsRepeatGroup}>
@@ -1545,6 +1652,15 @@
                                         options={sectionColumnOptions}
                                         onchange={handleEditorColumnsChange}>
                                     </lightning-combobox>
+                                    <template if:true={showColumnLayoutPicker}>
+                                        <div class="column-layout-picker" role="radiogroup" aria-label="Column layout">
+                                            <template for:each={columnLayoutOptions} for:item="option">
+                                                <button key={option.value} type="button" class={option.className} data-layout={option.value} onclick={handleColumnLayoutChange} aria-pressed={option.selected} title={option.label}>
+                                                    <span class={option.thumbnailClass} aria-hidden="true"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
                                 </template>
 
                             </div>
@@ -1735,16 +1851,53 @@
                                         options={salesforceObjectOptions}
                                         onchange={handleEditorLookupTargetObjectChange}>
                                     </lightning-combobox>
-                                    <lightning-input
-                                        label="Search Fields"
-                                        value={editorLookupSearchFieldsText}
-                                        onblur={handleEditorLookupSearchFieldsCommit}>
-                                    </lightning-input>
-                                    <lightning-input
-                                        label="Display Fields"
-                                        value={editorLookupDisplayFieldsText}
-                                        onblur={handleEditorLookupDisplayFieldsCommit}>
-                                    </lightning-input>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <span>Search Field</span>
+                                        <lightning-helptext content={lookupSearchFieldsHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-combobox
+                                        label="Search Field"
+                                        variant="label-hidden"
+                                        value={editorLookupSearchField}
+                                        options={lookupSearchFieldOptionsForEditor}
+                                        onchange={handleEditorLookupSearchFieldChange}>
+                                    </lightning-combobox>
+                                    <div class="selection-label-row selection-label-row--flush">
+                                        <span>{lookupCopyFieldsTitle}</span>
+                                        <lightning-helptext content={lookupCopyFieldsHelpText}></lightning-helptext>
+                                    </div>
+                                    <template for:each={lookupSetFieldRows} for:item="mapping" for:index="mappingIndex">
+                                        <div key={mapping.key} class="lookup-set-field-row">
+                                            <lightning-combobox
+                                                label="Record Field"
+                                                data-index={mappingIndex}
+                                                data-field-name="sourceField"
+                                                value={mapping.sourceField}
+                                                options={lookupSourceFieldOptionsForEditor}
+                                                onchange={handleLookupSetFieldChange}>
+                                            </lightning-combobox>
+                                            <lightning-combobox
+                                                label="Form Field"
+                                                data-index={mappingIndex}
+                                                data-field-name="targetFieldKey"
+                                                value={mapping.targetFieldKey}
+                                                options={lookupSetTargetFieldOptions}
+                                                onchange={handleLookupSetFieldChange}>
+                                            </lightning-combobox>
+                                            <lightning-button-icon
+                                                icon-name="utility:delete"
+                                                alternative-text="Delete mapping"
+                                                title="Delete mapping"
+                                                data-index={mappingIndex}
+                                                onclick={handleDeleteLookupSetField}>
+                                            </lightning-button-icon>
+                                        </div>
+                                    </template>
+                                    <lightning-button
+                                        label="Add Field Mapping"
+                                        variant="neutral"
+                                        onclick={handleAddLookupSetField}>
+                                    </lightning-button>
                                     <lightning-input
                                         type="number"
                                         label="Minimum Search Characters"
@@ -1993,15 +2146,26 @@
 
                                 <template if:true={selectedElementIsRepeatGroup}>
                                     <div class="selection-label-row">
-                                        <p class="field-inline-label">Source Prefill Alias</p>
+                                        <p class="field-inline-label">Prefill Alias</p>
                                         <lightning-helptext content={repeatSourceAliasHelpText}></lightning-helptext>
                                     </div>
                                     <lightning-combobox
                                         variant="label-hidden"
-                                        label="Source Prefill Alias"
+                                        label="Prefill Alias"
                                         value={editorRepeatSourceAlias}
                                         options={prefillAliasOptions}
                                         onchange={handleEditorRepeatSourceAliasChange}>
+                                    </lightning-combobox>
+                                    <div class="selection-label-row">
+                                        <p class="field-inline-label">Submit Alias</p>
+                                        <lightning-helptext content={repeatSubmitAliasHelpText}></lightning-helptext>
+                                    </div>
+                                    <lightning-combobox
+                                        variant="label-hidden"
+                                        label="Submit Alias"
+                                        value={editorRepeatSubmitActionKey}
+                                        options={repeatSubmitActionOptions}
+                                        onchange={handleEditorRepeatSubmitActionChange}>
                                     </lightning-combobox>
                                     <template if:true={selectedRepeatGroupSourceWarning}>
                                         <p class="selection-hint selection-hint--error">{selectedRepeatGroupSourceWarning}</p>
@@ -2764,6 +2928,228 @@
                                     variant="brand"
                                     label="Accept"
                                     onclick={handleAcceptLayoutImportResult}>
+                                </lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+
+                <template if:true={showImportFormModal}>
+                    <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="portable-form-import-heading" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container designer-new-form-modal designer-layout-import-result-modal">
+                            <header class="slds-modal__header">
+                                <h2 id="portable-form-import-heading" class="slds-modal__title slds-hyphenate">Import Form</h2>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium designer-layout-import-result designer-portable-import-result">
+                                <h3 class="designer-portable-import-result__heading">{importModalInstruction}</h3>
+                                <template if:true={showImportSourcePicker}>
+                                    <section class="designer-layout-import-result__section designer-portable-connected-imports">
+                                        <h3>{connectedOrgFormsHeading}</h3>
+                                        <template if:true={connectedImportStatusMessage}>
+                                            <p class="designer-new-form-help">{connectedImportStatusMessage}</p>
+                                        </template>
+                                        <template if:true={hasConnectedSnapshots}>
+                                            <template for:each={connectedSnapshots} for:item="snapshot">
+                                                <button
+                                                    key={snapshot.key}
+                                                    type="button"
+                                                    class="designer-portable-connected-imports__item"
+                                                    data-source-org-id={snapshot.sourceOrgId}
+                                                    data-form-key={snapshot.globalFormKey}
+                                                    disabled={connectedSnapshotActionDisabled}
+                                                    onclick={handleConnectedSnapshotSelected}>
+                                                    <span class="designer-portable-connected-imports__line">
+                                                        <strong>{snapshot.formKeyLabel}</strong>
+                                                        <template if:true={snapshot.formNameLabel}>
+                                                            <span> - <strong>{snapshot.formNameLabel}</strong></span>
+                                                        </template>
+                                                        <span> - {snapshot.versionLabel}</span>
+                                                        <span> - <span class="designer-portable-connected-imports__label">Published</span> {snapshot.publishedDateLabel}</span>
+                                                        <span> - <span class="designer-portable-connected-imports__label">Theme</span>: {snapshot.themeNameLabel}</span>
+                                                    </span>
+                                                </button>
+                                            </template>
+                                        </template>
+                                    </section>
+
+                                    <section class="designer-layout-import-result__section designer-portable-import-source">
+                                        <div class="designer-portable-import-source__heading">
+                                            <h3>Manually Import Source</h3>
+                                            <lightning-helptext content="Use this only when a TwinaForms JSON export file was manually exported from another org and is available on this computer."></lightning-helptext>
+                                        </div>
+                                        <lightning-button
+                                            variant="neutral"
+                                            label="Choose JSON File"
+                                            icon-name="utility:upload"
+                                            disabled={importFormActionDisabled}
+                                            onclick={handleChooseImportFile}>
+                                        </lightning-button>
+                                    </section>
+                                </template>
+                                <template if:true={importHasPreview}>
+                                    <p class={importTargetMessageClass}>{importPrimaryMessage}</p>
+                                </template>
+
+                                <template if:true={importDecisionRequired}>
+                                    <section class="designer-layout-import-result__section">
+                                        <lightning-radio-group
+                                            label="This public key already exists"
+                                            message-when-value-missing="Choose what to do with the existing form."
+                                            options={importDecisionOptions}
+                                            value={importDecision}
+                                            type="radio"
+                                            disabled={isImportingForm}
+                                            onchange={handleImportDecisionChange}>
+                                        </lightning-radio-group>
+                                    </section>
+                                </template>
+
+                                <template if:true={showImportProjectPicker}>
+                                    <lightning-combobox
+                                        label="Target Project"
+                                        value={importProjectId}
+                                        options={importProjectOptions}
+                                        disabled={isImportingForm}
+                                        onchange={handleImportProjectChange}>
+                                    </lightning-combobox>
+                                </template>
+
+                                <template if:true={hasImportBlockingErrors}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Blocking Errors</h3>
+                                        <template for:each={importBlockingErrors} for:item="error">
+                                            <p key={error} class="selection-hint selection-hint--error">{error}</p>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasImportMissingObjects}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Missing Objects</h3>
+                                        <template for:each={importMissingObjects} for:item="objectName">
+                                            <p key={objectName} class="designer-new-form-help">{objectName}</p>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasImportMissingFields}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Missing Fields</h3>
+                                        <template for:each={importMissingFields} for:item="fieldName">
+                                            <p key={fieldName} class="designer-new-form-help">{fieldName}</p>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasImportWarnings}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Warnings</h3>
+                                        <template for:each={importWarnings} for:item="warning">
+                                            <p key={warning} class="designer-new-form-help">{warning}</p>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasImportAssetPreview}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Assets</h3>
+                                        <template if:true={hasImportAssetItems}>
+                                            <template if:true={hasSingleImportAssetItem}>
+                                                <p class="designer-import-preview-copy">
+                                                    {importAssetSummaryText}
+                                                    <strong>{importSingleAssetName}</strong>
+                                                </p>
+                                            </template>
+                                            <template if:true={hasMultipleImportAssetItems}>
+                                                <p class="designer-import-preview-copy">{importAssetSummaryText}</p>
+                                                <ul class="designer-import-preview-list">
+                                                    <template for:each={importAssetItems} for:item="assetName">
+                                                        <li key={assetName}><strong>{assetName}</strong></li>
+                                                    </template>
+                                                </ul>
+                                            </template>
+                                        </template>
+                                        <template if:false={hasImportAssetItems}>
+                                            <template for:each={importAssetMessages} for:item="message">
+                                                <p key={message} class="designer-import-preview-copy">{message}</p>
+                                            </template>
+                                        </template>
+                                        <template if:true={hasImportAssetWarnings}>
+                                            <template for:each={importAssetWarnings} for:item="warning">
+                                                <p key={warning} class="selection-hint selection-hint--warning">{warning}</p>
+                                            </template>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasImportFeaturePreview}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Features</h3>
+                                        <template if:true={hasImportFeatureMessages}>
+                                            <template for:each={importFeatureMessages} for:item="message">
+                                                <p key={message} class="designer-import-preview-copy">{message}</p>
+                                            </template>
+                                        </template>
+                                        <template if:true={hasImportFeatureLabels}>
+                                            <ul class="designer-import-preview-list">
+                                                <template for:each={importFeatureLabels} for:item="featureName">
+                                                    <li key={featureName}>{featureName}</li>
+                                                </template>
+                                            </ul>
+                                        </template>
+                                        <template if:true={hasImportFeatureWarnings}>
+                                            <template for:each={importFeatureWarnings} for:item="warning">
+                                                <p key={warning} class="selection-hint selection-hint--warning">{warning}</p>
+                                            </template>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={hasImportThemePreview}>
+                                    <section class="designer-layout-import-result__section">
+                                        <h3>Theme</h3>
+                                        <template if:true={hasImportThemeMessages}>
+                                            <template for:each={importThemeMessages} for:item="message">
+                                                <p key={message} class="designer-new-form-help">{message}</p>
+                                            </template>
+                                        </template>
+                                        <template if:true={hasImportThemeWarnings}>
+                                            <template for:each={importThemeWarnings} for:item="warning">
+                                                <p key={warning} class="selection-hint selection-hint--warning">{warning}</p>
+                                            </template>
+                                        </template>
+                                        <template if:true={importRequiresThemeConflictChoice}>
+                                            <lightning-radio-group
+                                                label="Theme conflict"
+                                                options={importThemeConflictOptions}
+                                                value={importThemeConflictChoice}
+                                                type="radio"
+                                                disabled={isImportingForm}
+                                                onchange={handleImportThemeConflictChange}>
+                                            </lightning-radio-group>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={importHasPreview}>
+                                    <p class={importTargetNoticeClass}>{importPreviewSummary}</p>
+                                    <p class="designer-portable-import-result__file">Info: file loaded <em>{importFileName}</em></p>
+                                </template>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Cancel"
+                                    disabled={isImportingForm}
+                                    onclick={handleCloseImportFormModal}>
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Import"
+                                    class="slds-m-left_small"
+                                    disabled={importFormConfirmDisabled}
+                                    onclick={handleImportForm}>
                                 </lightning-button>
                             </footer>
                         </div>

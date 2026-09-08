@@ -230,6 +230,8 @@ Supported functions:
 
 ## Conditional Visibility
 Elements can define optional conditional visibility rules.
+V1 supports conditional visibility for fields, display elements, Sections, and Groups.
+Records List container visibility remains deferred because repeated-row prefill and submit behavior needs separate handling.
 
 ```js
 {
@@ -295,6 +297,15 @@ Sections, Groups, and Records List row layouts share the same column-count model
 - The Designer, Apex publisher, generated public HTML, and submission PDF renderer must all accept the same range.
 - Published forms should collapse multi-column section grids to a single column on mobile.
 - Values outside the supported range should be rejected or clamped by the layer that reads them.
+
+## Records List Source / Save Definition
+Records Lists can be valid with a row source, a row save target, or both.
+
+- `repeatSourceAlias` points to the Prefill alias that loads existing rows into the Records List.
+- `repeatSubmitActionKey` points to the Submit action that saves rows from the Records List.
+- The Designer should warn only when a Records List contains row fields and both values are empty.
+- For `upsertMany`, a row field mapped to Salesforce `Id` is the row identity. If that row value is present, submit updates the existing child record; if it is blank, submit creates a new child record. The publisher may infer this identity field from a Records List child prefill mapping to `Id`, so admins do not have to submit `Id` as a normal writable field.
+- The warning should explain that rows have no Prefill Alias or Submit Alias, not that a prefill object is required.
 
 ## Records List Row Label Mode
 Records List rows support a label display choice for desktop layout.

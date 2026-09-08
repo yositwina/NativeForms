@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Hidden org-level key material used to decrypt TwinaForms submission-log detail in Salesforce.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>false</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableLicensing>false</enableLicensing>
+    <enableReports>false</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>false</enableSharing>
+    <enableStreamingApi>false</enableStreamingApi>
+    <label>NF Submission Log Key</label>
+    <nameField>
+        <label>Org Id</label>
+        <type>Text</type>
+    </nameField>
+    <pluralLabel>NF Submission Log Keys</pluralLabel>
+    <sharingModel>ReadWrite</sharingModel>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>Key_Version__c</fullName>
+        <description>Version label stored with submission-log crypto material.</description>
+        <externalId>false</externalId>
+        <label>Key Version</label>
+        <length>40</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Public_Key__c</fullName>
+        <description>Base64-encoded SPKI public key synced to AWS for submission-log encryption.</description>
+        <label>Public Key</label>
+        <length>32768</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>4</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Sealed_Log_Data__c</fullName>
+        <description>Package-internal sealed data used by Apex to unlock submission-log detail for authorized org users.</description>
+        <label>Sealed Log Data</label>
+        <length>32768</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>6</visibleLines>
+    </fields>
+</CustomObject>

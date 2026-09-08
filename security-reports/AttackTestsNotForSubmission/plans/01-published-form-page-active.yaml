@@ -1,0 +1,49 @@
+---
+# ACTIVE ATTACK SCAN - NOT FOR ISV SUBMISSION
+# Static published form page on S3/CloudFront. Spider + active attack scan.
+env:
+  contexts:
+    - name: TwinaForms Published Form Page
+      urls:
+        - https://forms.twinaforms.com/
+      includePaths:
+        - https://forms\.twinaforms\.com/twinaforms/form1.*
+      excludePaths: []
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    continueOnFailure: true
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Seed published form page with sample prefill parameter
+        url: https://forms.twinaforms.com/twinaforms/form1?email=liam.carter@example.com
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+
+  - type: spider
+    parameters:
+      context: TwinaForms Published Form Page
+      maxDuration: 2
+      maxDepth: 5
+
+  - type: activeScan
+    parameters:
+      context: TwinaForms Published Form Page
+      maxScanDurationInMins: 8
+      maxRuleDurationInMins: 2
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\AttackTestsNotForSubmission\reports
+      reportFile: 01-published-form-page-active.html
+      reportTitle: TwinaForms Published Form Page ACTIVE Attack Scan (NOT FOR SUBMISSION)
+      reportDescription: Active OWASP ZAP attack scan of the public static published form page. Internal hardening evidence only, not part of the ISV submission packet.

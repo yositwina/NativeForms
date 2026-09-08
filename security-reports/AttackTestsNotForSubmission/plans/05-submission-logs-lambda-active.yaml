@@ -1,0 +1,55 @@
+---
+# ACTIVE ATTACK SCAN - NOT FOR ISV SUBMISSION
+# Submission logs Lambda. All routes require a tenant bearer token. Seeded
+# without a bearer, so the active scanner fuzzes the pre-auth attack surface
+# (stays at the 401 rejection layer). orgId and path-id params are fuzzed.
+env:
+  contexts:
+    - name: TwinaForms Submission Logs Lambda
+      urls:
+        - https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://jafi5esjqnvip3gbdahj7d2a7m0eyhby\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    continueOnFailure: true
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Seed submission logs list (no bearer)
+        url: https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-logs?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+      - name: Seed submission log detail (no bearer)
+        url: https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-logs/zap-test-id?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+      - name: Seed submission log config status (no bearer)
+        url: https://jafi5esjqnvip3gbdahj7d2a7m0eyhby.lambda-url.eu-north-1.on.aws/submission-log-config/status?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+
+  - type: activeScan
+    parameters:
+      context: TwinaForms Submission Logs Lambda
+      maxScanDurationInMins: 8
+      maxRuleDurationInMins: 2
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\AttackTestsNotForSubmission\reports
+      reportFile: 05-submission-logs-lambda-active.html
+      reportTitle: TwinaForms Submission Logs Lambda ACTIVE Attack Scan (NOT FOR SUBMISSION)
+      reportDescription: Active OWASP ZAP attack scan of the submission logs Lambda without bearer tokens. Fuzzes the pre-auth attack surface. Internal hardening evidence only, not part of the ISV submission packet.

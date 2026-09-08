@@ -9,3 +9,15 @@ AWS/*.pdf
 !AWS/documentation/NativeForms_Prefill_PDG_v2.pdf
 !AWS/documentation/Security Protocols.pdf
 !AWS/documentation/Tasks for later.pdf
+
+# Local working files (not project source)
+.tmp-chrome-pdf-profile/
+.video-work/
+old temp/
+output/
+
+# Never commit to this public repo - contain credentials or scanner internals
+AWS/DO NOT OPEN/
+**/source-scanner/
+**/*Username_Password_Access*
+**/*Sample_API_Callouts*

@@ -1,17 +1,18 @@
 {
   "packageDirectories": [
     {
-      "versionName": "ver 0.12 Locker connect fix",
-      "versionNumber": "0.12.0.NEXT",
+      "versionName": "ver 0.15 beta",
+      "versionNumber": "0.15.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "TwinaForms",
-      "ancestorVersion": "0.11.0",
-      "versionDescription": "Fix Salesforce Connect OAuth popup stranded on about:blank under Lightning Locker (open OAuth URL directly instead of assigning .location on a blank window)."
+      "ancestorVersion": "0.14.0",
+      "versionDescription": "Beta with recent Designer and runtime improvements for customer sandbox testing."
     }
   ],
   "name": "twinaforms",
   "namespace": "twinaforms",
+  "oauthLocalPort": 1717,
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "64.0",
   "packageAliases": {
@@ -60,6 +61,17 @@
     "TwinaForms@0.10.0-4": "04tgL000000GbrdQAC",
     "TwinaForms@0.10.0-5": "04tgL000000GburQAC",
     "TwinaForms@0.11.0-1": "04tgL000000I2wDQAS",
-    "TwinaForms@0.12.0-1": "04tgL000000Ji8bQAC"
+    "TwinaForms@0.12.0-1": "04tgL000000Ji8bQAC",
+    "TwinaForms@0.13.0-1": "04tgL000000KWGfQAO",
+    "TwinaForms@0.14.0-1": "04tgL000000OO9FQAW",
+    "TwinaForms@0.15.0-1": "04tgL000000RmlJQAS",
+    "TwinaForms@0.15.0-2": "04tgL000000RqP7QAK",
+    "TwinaForms@0.15.0-3": "04tgL000000RrBVQA0",
+    "TwinaForms@0.15.0-4": "04tgL000000RrOPQA0",
+    "TwinaForms@0.15.0-5": "04tgL000000RztpQAC",
+    "TwinaForms@0.15.0-6": "04tgL000000S1ijQAC",
+    "TwinaForms@0.15.0-7": "04tgL000000S2V7QAK",
+    "TwinaForms@0.15.0-8": "04tgL000000S4dNQAS",
+    "TwinaForms@0.15.0-10": "04tgL000000SAqrQAG"
   }
 }

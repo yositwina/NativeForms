@@ -118,7 +118,7 @@ Starter should include these product capabilities at launch:
   - selected record `Id` submits into a mapped Salesforce reference field
 - image element
 - display text element
-- conditional view with one condition
+- conditional view with one condition for fields, display elements, sections, and groups; Records List container visibility remains deferred
 - basic validations:
   - text rule
   - number min/max
@@ -159,7 +159,7 @@ Starter should include these product capabilities at launch:
   - default is the current short session behavior, based on the code expiry window
   - optional same-tab session stores the signed verification token in browser `sessionStorage`, survives refresh in that tab, expires at the visitor's local midnight, and is capped by AWS at 12 hours
   - closing the browser tab clears the session because V1 intentionally does not use `localStorage`
-- Designer UX names the feature `User Verification` and offers it under `Special Elements`, because it changes the visitor journey rather than displaying passive content. Adding the fixed-position canvas gate enables verification and removing it disables verification after confirmation. Its message, button, rule, and session controls live in the right-side properties panel as a system block, not a normal submitted field. Customer-facing copy should say `verification number`, not `verification number`. Internal/runtime `userVerification...` identifiers may remain only for compatibility with existing published forms and package versions; new package-visible metadata should avoid `User Verification` naming when a safe migration path exists.
+- Designer UX names the feature `User Verification` and offers it under `Special Elements`, because it changes the visitor journey rather than displaying passive content. Adding the fixed-position canvas gate enables verification and removing it disables verification after confirmation. Its message, button, rule, and session controls live in the right-side properties panel as a system block, not a normal submitted field. Customer-facing copy should say `verification number`, not `secret code`. Internal/runtime `secretCode...` identifiers may remain only for compatibility with existing published forms and package versions; new package-visible metadata should avoid `Secret Code` naming when a safe migration path exists.
 - Designer drag/drop reordering should be optimistic and narrow: update the canvas locally, preserve the selected right-panel state, save a parent/column/index move to Salesforce in the background, and reload the workspace only on failure. This applies to top-level moves and moves within section/group/records-list columns.
 
 ### Support
@@ -269,6 +269,9 @@ Still missing:
 
 Decision:
 - theme support should be included in Starter, at least at a basic level
+- page background supports an optional background image. Without an image, it uses a start color and a gradient color; setting both colors to the same value publishes a solid background on desktop and mobile.
+- theme branding supports a header image and optional footer image. Uploaded theme images are stored as Salesforce Files and embedded into published HTML when under the current embedded-image size limit.
+- theme typography offers safe system fonts plus selected Google Fonts. Published HTML loads only selected Google Fonts and falls back to Arial if the external font request is blocked.
 
 ### 3. Prefill / submit UX model
 Status:

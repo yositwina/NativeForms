@@ -1,25 +1,25 @@
 # Salesforce Packaging Namespace Audit V1
 
-Last updated: 2026-06-04
+Last updated: 2026-09-08
 
 ## Current TwinaForms Managed 2GP Package
 
 - package name: `TwinaForms`
 - package id: `0HogL0000002CUvSAM`
-- latest released package version create request id: `08cgL0000009qtpQAA`
-- latest package2 version id: `05igL0000003VQfQAM`
-- latest subscriber package version id: `04tgL000000GWbpQAG`
-- latest version number: `0.9.0.8`
+- latest released package version create request id: `08cgL000000H9oTQAS`
+- latest package2 version id: `05igL0000005FPpQAM`
+- latest subscriber package version id: `04tgL000000OO9FQAW`
+- latest version number: `0.14.0.1`
 - latest package code coverage: `83%`
-- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GWbpQAG`
-- latest released note: includes Merged Document, locked Lookup runtime behavior after prefill, Layout-to-Form picklist source-property preservation, textarea character-limit UX/publish handling, the Pro Button element, Country / State / City autocomplete, updated User Verification and Submission PDF/signature UX, scanned-file-upload support, App Launcher branding, 69 KB embedded image guards for publish stability, and the published 1-5 Star Rating label fix
-- latest beta package version create request id: `08cgL0000009t5JQAQ`
-- latest beta package2 version id: `05igL0000003WhhQAE`
-- latest beta subscriber package version id: `04tgL000000GZ6fQAG`
-- latest beta version number: `0.10.0.1`
-- latest beta package code coverage: not calculated for this beta package version
-- latest beta sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000GZ6fQAG`
-- latest beta note: User Verification rename beta. The active implementation uses `NativeFormsUserVerificationApi`, `/nativeforms/user-verification`, `Enable_Pro_User_Verification__c`, `NativeForms_User_Verification_Default`, and new Contact verification fields. Because this is a promoted managed 2GP package and metadata deletion access is not enabled, the previously released `NativeFormsSecretCodeApi`, `/nativeforms/secret-code`, old Contact/config fields, and old email template remain packaged as compatibility components.
+- latest install URL: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000OO9FQAW`
+- latest released note: pre-scanner release with connected-org portability work, Agentforce action support, User Verification sender fixes, and Code Analyzer CRUD/empty-catch cleanup
+- latest beta package version create request id: `08cgL000000Ht9lQAC`
+- latest beta package2 version id: `05igL0000005ZjVQAU`
+- latest beta subscriber package version id: `04tgL000000SAqrQAG`
+- latest beta version number: `0.15.0.10`
+- latest beta package code coverage: `83%`
+- latest sandbox install URL: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000SAqrQAG`
+- latest beta note: includes the current Designer/runtime work, durable non-reused public form keys with explicit import update/new-form decisions, simplified Lookup field mapping, and the recent Records List, RTL, theme, export, and validation fixes; it is not promoted/released
 - target namespace: `twinaforms`
 
 ## Packaging Note
@@ -37,6 +37,8 @@ The current target install flow is Bootstrap V2:
 Before creating a managed package version, TwinaForms needs a namespace-readiness audit so a clean subscriber install does not fail because of string-based metadata names.
 
 ## Audit Summary
+
+The 2026-09-08 beta audit found the persisted Blank Space (`spacer`) element missing from `Element_Type__c` metadata. The value is now included, and the internal element-type picklist remains unrestricted. The remaining persisted Designer types match the package metadata.
 
 The core Apex object model is mostly package-safe because it uses compile-time Apex references such as `NF_Form__c`, `NF_Form_Version__c`, and direct SOQL. Managed packaging should resolve those references inside the package namespace.
 
@@ -181,6 +183,20 @@ Rule:
 - Keep response DTOs as Apex classes.
 
 ## Pre-Package Checklist
+
+## Current Beta Package
+
+Built on 2026-09-08 from the current workspace, including the latest user edits, conditional visibility fixes, and Blank Space (`spacer`) metadata parity correction. Full package validation and Apex coverage passed; validation was not skipped. Local protocol, security, bootstrap, and nine conditional-visibility tests passed. No subscriber installation or production promotion was performed for this build.
+
+- `TwinaForms@0.15.0-10`
+- Version: `0.15.0.10`
+- Subscriber Package Version Id: `04tgL000000SAqrQAG`
+- Package2VersionId: `05igL0000005ZjVQAU`
+- Create request: `08cgL000000Ht9lQAC`
+- Status: beta / not released
+- Code coverage: `83%`
+- Sandbox install link: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000SAqrQAG`
+- Notes: includes the current Designer/runtime work, durable non-reused public form keys with explicit import update/new-form decisions, simplified Lookup field mapping, and the recent Records List, RTL, theme, export, and validation fixes.
 
 Before the next managed package version:
 

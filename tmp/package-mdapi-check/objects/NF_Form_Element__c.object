@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>UI and layout elements for a TwinaForms form version.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableLicensing>false</enableLicensing>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>NF Form Element</label>
+    <nameField>
+        <displayFormat>ELM-{0000}</displayFormat>
+        <label>Element Name</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>NF Form Elements</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>Config_JSON__c</fullName>
+        <description>Element-specific configuration JSON.</description>
+        <inlineHelpText>Stores flexible element configuration such as options, visibility, rows, layout settings, and repeat-group metadata.</inlineHelpText>
+        <label>Config JSON</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>10</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Element_Id__c</fullName>
+        <description>Stable runtime element id used in generated HTML.</description>
+        <inlineHelpText>Runtime element id.</inlineHelpText>
+        <label>Element Id</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Element_Index__c</fullName>
+        <description>Stable per-form element sequence number carried across versions.</description>
+        <inlineHelpText>Automatically assigned sequence number for this form element across all versions of the same form.</inlineHelpText>
+        <label>Element Index</label>
+        <precision>18</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <trackHistory>false</trackHistory>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>Element_Type__c</fullName>
+        <description>Element type used by the TwinaForms runtime.</description>
+        <inlineHelpText>Choose the element type.</inlineHelpText>
+        <label>Element Type</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>false</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>heading</fullName>
+                    <default>true</default>
+                    <label>Heading</label>
+                </value>
+                <value>
+                    <fullName>text</fullName>
+                    <default>false</default>
+                    <label>Text</label>
+                </value>
+                <value>
+                    <fullName>input</fullName>
+                    <default>false</default>
+                    <label>Input</label>
+                </value>
+                <value>
+                    <fullName>textarea</fullName>
+                    <default>false</default>
+                    <label>Textarea</label>
+                </value>
+                <value>
+                    <fullName>number</fullName>
+                    <default>false</default>
+                    <label>Number</label>
+                </value>
+                <value>
+                    <fullName>date</fullName>
+                    <default>false</default>
+                    <label>Date</label>
+                </value>
+                <value>
+                    <fullName>time</fullName>
+                    <default>false</default>
+                    <label>Time</label>
+                </value>
+                <value>
+                    <fullName>email</fullName>
+                    <default>false</default>
+                    <label>Email</label>
+                </value>
+                <value>
+                    <fullName>tel</fullName>
+                    <default>false</default>
+                    <label>Phone</label>
+                </value>
+                <value>
+                    <fullName>url</fullName>
+                    <default>false</default>
+                    <label>URL</label>
+                </value>
+                <value>
+                    <fullName>select</fullName>
+                    <default>false</default>
+                    <label>Select</label>
+                </value>
+                <value>
+                    <fullName>multiCheckbox</fullName>
+                    <default>false</default>
+                    <label>Multi Checkbox</label>
+                </value>
+                <value>
+                    <fullName>lookup</fullName>
+                    <default>false</default>
+                    <label>Lookup</label>
+                </value>
+                <value>
+                    <fullName>location</fullName>
+                    <default>false</default>
+                    <label>Country / State / City</label>
+                </value>
+                <value>
+                    <fullName>checkbox</fullName>
+                    <default>false</default>
+                    <label>Checkbox</label>
+                </value>
+                <value>
+                    <fullName>radio</fullName>
+                    <default>false</default>
+                    <label>Radio</label>
+                </value>
+                <value>
+                    <fullName>ranking</fullName>
+                    <default>false</default>
+                    <label>Ranking</label>
+                </value>
+                <value>
+                    <fullName>fileUpload</fullName>
+                    <default>false</default>
+                    <label>File Upload</label>
+                </value>
+                <value>
+                    <fullName>signature</fullName>
+                    <default>false</default>
+                    <label>Signature</label>
+                </value>
+                <value>
+                    <fullName>mergedDocument</fullName>
+                    <default>false</default>
+                    <label>Merged Document</label>
+                </value>
+                <value>
+                    <fullName>image</fullName>
+                    <default>false</default>
+                    <label>Image</label>
+                </value>
+                <value>
+                    <fullName>button</fullName>
+                    <default>false</default>
+                    <label>Button</label>
+                </value>
+                <value>
+                    <fullName>section</fullName>
+                    <default>false</default>
+                    <label>Section</label>
+                </value>
+                <value>
+                    <fullName>group</fullName>
+                    <default>false</default>
+                    <label>Group</label>
+                </value>
+                <value>
+                    <fullName>columns</fullName>
+                    <default>false</default>
+                    <label>Columns</label>
+                </value>
+                <value>
+                    <fullName>hidden</fullName>
+                    <default>false</default>
+                    <label>Hidden</label>
+                </value>
+                <value>
+                    <fullName>repeatGroup</fullName>
+                    <default>false</default>
+                    <label>Repeat Group</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Field_Key__c</fullName>
+        <description>Runtime field key used in the form input object.</description>
+        <inlineHelpText>Input key such as email or contactId.</inlineHelpText>
+        <label>Field Key</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Form_Version__c</fullName>
+        <description>Parent form version for this element.</description>
+        <inlineHelpText>Form version that owns this element.</inlineHelpText>
+        <label>Form Version</label>
+        <referenceTo>NF_Form_Version__c</referenceTo>
+        <relationshipLabel>Form Elements</relationshipLabel>
+        <relationshipName>FormElements</relationshipName>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+        <trackHistory>false</trackHistory>
+        <type>MasterDetail</type>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+    </fields>
+    <fields>
+        <fullName>Label__c</fullName>
+        <description>Primary display label for the element.</description>
+        <inlineHelpText>Display label.</inlineHelpText>
+        <label>Label</label>
+        <length>255</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Order__c</fullName>
+        <description>Render order of the element inside the form version.</description>
+        <inlineHelpText>Render order.</inlineHelpText>
+        <label>Order</label>
+        <precision>8</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <trackHistory>false</trackHistory>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>Parent_Element_Id__c</fullName>
+        <description>Optional parent element id for nested layouts.</description>
+        <inlineHelpText>Parent element id for nesting or grouping.</inlineHelpText>
+        <label>Parent Element Id</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <listViews>
+        <fullName>Debug_All_Records</fullName>
+        <columns>NAME</columns>
+        <columns>Form_Version__c</columns>
+        <columns>Element_Id__c</columns>
+        <columns>Element_Type__c</columns>
+        <columns>Field_Key__c</columns>
+        <columns>Label__c</columns>
+        <columns>Order__c</columns>
+        <columns>Parent_Element_Id__c</columns>
+        <filterScope>Everything</filterScope>
+        <label>Debug - All Records</label>
+    </listViews>
+</CustomObject>

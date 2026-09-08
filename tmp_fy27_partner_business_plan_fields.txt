@@ -1,0 +1,151 @@
+fields 36
+
+--- Text49
+Harmony-it
+
+--- Text50
+www,harmony-it.co.il
+
+--- Text51
+https://appexchange.salesforce.com/appxListingDetail?listingId=196eb1c3-7596-478e-9aa8-1c3c3299d96e&channel=recommended
+
+--- Text52
+TwinaForms
+
+--- Text53
+TwinaForms is a native Salesforce app that helps teams create public forms, prefill known data, collect submissions, and write results back to Salesforce without building a custom portal.
+
+Its standout shortcut, One-Click Page Layout to Form, builds a working, published public form straight from any Salesforce page layout — with field selection, layout, prefill, and submit settings all configured automatically.
+
+--- Dropdown80
+Select
+
+--- Dropdown81
+Select
+
+--- Dropdown82
+Existing ISV Partner
+
+--- Text54
+The user create forms in native salesforce app and publish them to AWS cloud.  
+that his customers can use these public forms.
+
+--- Text55
+TwinaForms predominantly uses custom objects included in the managed package. These objects store form projects, forms, versions, form elements, actions, publications, themes, package configuration, and submission-log encryption metadata.
+The app can also interact with standard or custom Salesforce objects selected by the customer when they configure prefill or submit actions, such as Contact, Lead, Account, Case, Campaign Member, or other customer-selected objects. Those interactions are configuration-driven and respect Salesforce permissions and validation.
+
+--- Text56
+TwinaForms uses secure API connections between Salesforce and TwinaForms AWS services.
+The Salesforce managed package calls AWS endpoints over HTTPS for tenant setup, publishing, public form runtime support, prefill, submit processing, and submission-log services. Protected Salesforce-to-AWS calls are authenticated with Bootstrap V2 HMAC request signing. The signing secret is generated in Salesforce, stored in protected package-controlled configuration, and used server-side by Apex. Requests include org id, timestamp, nonce, body hash, and HMAC-SHA256 signature.
+AWS connects back to Salesforce only after an authorized admin completes OAuth using the packaged Salesforce External Client App. TwinaForms stores tenant connection data server-side and validates org identity. AWS API operations are scoped by org id and tenant status. Salesforce object and field operations are based on customer configuration, use allowlisted metadata, and avoid arbitrary unauthenticated access.
+TwinaForms follows Salesforce Connected App / External Client App compliance requirements. OAuth credentials are not exposed in the browser, refresh tokens are stored server-side, and package UI users do not handle client secrets.
+
+--- Text57
+Over the next 12-24 months, TwinaForms plans to focus on practical features that help Salesforce admins build and manage forms faster.
+Planned roadmap items include:
+Better form creation from Salesforce layouts, including related records.
+Export and import of forms between Salesforce orgs.
+Reusable form templates for common business processes.
+More advanced writeback options for create, update, and related records.
+Improved PDF output, including better tables, themes, logos, and RTL/Hebrew support.
+More styling and branding controls for public forms.
+Better license, trial, usage, and tenant health visibility for admins.
+Starter templates for nonprofits, SMBs, and common Salesforce workflows.
+Future admin-assistant capabilities to help guide setup and configuration.
+
+--- Text58
+TwinaForms is developed in-house. The team has hands-on experience with Salesforce-specific development, including Apex, Lightning Web Components, Salesforce custom objects, permission sets, managed packaging, OAuth/External Client Apps, and AppExchange Security Review requirements.
+The product also includes AWS services, so the team works across both Salesforce package development and secure cloud backend development.
+
+--- Text59
+Agentforce is not currently embedded into TwinaForms.
+TwinaForms does not currently include an Agentforce agent, prompt action, or autonomous agent workflow as part of the managed package. The current solution focuses on Salesforce-native form building, public form publishing, prefill, submission processing, and Salesforce writeback.
+
+--- Text60
+I aim to get 20 -50 paying cusotmers.
+
+--- Text61
+Sales, Service and NPSP, but all industires need forms
+
+--- Text62
+SMB
+
+--- Text63
+USA, Israel
+
+--- Text64
+Salesforce consultants
+Salesforce Sys Admin
+
+--- Text65
+TwinaForms competes mainly with form and document automation tools used with Salesforce, such as FormAssembly, Formstack, and Titan.
+TwinaForms is different because it is designed as a Salesforce-native form builder experience. Admins can create public forms from Salesforce layouts, prefill known Salesforce data, collect submissions, and write results back to Salesforce with a familiar Salesforce-style setup.
+Key differentiators:
+>Salesforce-first design for admins, not a separate external form system.
+>Fast form creation from Salesforce metadata and layouts.
+>Secure public forms with prefill and controlled Salesforce writeback.
+>Strong support for Hebrew, RTL, nonprofits, and SMB use cases.
+>Simpler setup and lower operational complexity for teams that want forms connected directly to Salesforce
+
+
+--- Text66
+4800 US annualy per org 
+
+--- Text67
+4800 USD (annaul) per Org,  one licnese with  5 users (designer) will be more than enough for all SMBs
+
+--- Text68
+TwinaForms is offered as a paid subscription service. Customers may start with a free (very limited version, but with no end date)  or limited trial/freemium version, but continued or expanded use requires a paid subscription. Fees are managed directly by TwinaForms according to the customer’s selected plan.
+
+--- Text69
+TwinaForms is a composite application that includes a Salesforce managed package and AWS-hosted services. The customer pays one subscription price for the complete solution. We understand that Salesforce revenue share is applied according to our Partner Application Distribution Agreement and any guidance from the Partner Development Team.  
+Example: If a customer purchases TwinaForms for $1,000 per year, the order will be reported through the Channel Order App. Salesforce revenue share will be calculated according to the applicable AppExchange terms for the approved commercial model.
+
+--- Text70
+Revital Twina  - Owner and CEO
+
+--- Text71
+We have some  beta cusomer  and ● Late-stage opportunities (after quote shared with customers):
+
+
+--- Text72
+We do not currently have late-stage quoted opportunities. Our commercial target is to reach approximately 20 paying customers after AppExchange approval and launch.
+that calculuate dto 96,000 UD annaulty
+
+--- Text73
+FormAssembly publicly states that it is trusted by 5,500+ teams. Assuming an average annual price of approximately $5,000 per customer, this represents roughly $27 million in annual market activity for one established competitor.
+If FormAssembly represents approximately 25% of the relevant market, the total addressable market for Salesforce-connected form solutions could be around $100 million annually.
+TwinaForms’ first-year target is modest: approximately 20 paying customers after AppExchange approval. This represents only a small fraction of the estimated market and gives us room to grow without requiring aggressive market-share assumptions.
+
+--- Text74
+TwinaForms will use a focused go-to-market plan for Salesforce admins, small and mid-sized businesses, and nonprofit organizations that need secure public forms connected to Salesforce.
+Our first-year GTM plan includes:
+>Launching the AppExchange listing with clear positioning around Salesforce-native public forms, prefill, and writeback.
+>Direct approach to salesforce consultants
+>Updating website content, short demos, and setup videos that show common use cases.
+>Targeting Salesforce admins and consultants through LinkedIn, Salesforce community groups, and partner referrals.
+>Offering a free trial or freemium entry point to reduce adoption friction.
+>Providing nonprofit discounts and starter templates for common workflows.
+>Building case studies from early customers and using them to support future AppExchange and direct-sales activity.
+The first-year sales goal is modest: approximately 20 paying customers after approval.
+
+--- Text75
+ASAP, product is done and ready
+
+--- Text76
+Jult 2026
+
+--- Text77
+Not for now
+
+--- Dropdown78
+Yes
+
+--- Dropdown79
+Yes
+
+--- Dropdown1
+Composite
+
+--- Dropdown2
+Annually

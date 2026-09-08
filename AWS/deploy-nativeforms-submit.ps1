@@ -3,7 +3,9 @@ param(
   [string]$Region = "eu-north-1",
   [string]$Profile = "nativeforms-codex",
   [string]$CaptchaSecretKey = "",
-  [string]$UploadStagingBucket = ""
+  [string]$UploadStagingBucket = "",
+  [string]$PdfRendererFunctionName = "",
+  [string]$PdfRenderer = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,7 +46,7 @@ aws lambda update-function-code `
   --region $Region `
   --profile $Profile
 
-if ([string]::IsNullOrWhiteSpace($CaptchaSecretKey) -and [string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
+if ([string]::IsNullOrWhiteSpace($CaptchaSecretKey) -and [string]::IsNullOrWhiteSpace($UploadStagingBucket) -and [string]::IsNullOrWhiteSpace($PdfRendererFunctionName) -and [string]::IsNullOrWhiteSpace($PdfRenderer)) {
   Write-Host "Lambda code updated. Lambda environment was not changed."
   exit 0
 }
@@ -77,6 +79,12 @@ if (![string]::IsNullOrWhiteSpace($CaptchaSecretKey)) {
 }
 if (![string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
   $variables["UPLOAD_STAGING_BUCKET"] = $UploadStagingBucket
+}
+if (![string]::IsNullOrWhiteSpace($PdfRendererFunctionName)) {
+  $variables["PDF_RENDERER_FUNCTION_NAME"] = $PdfRendererFunctionName
+}
+if (![string]::IsNullOrWhiteSpace($PdfRenderer)) {
+  $variables["PDF_RENDERER"] = $PdfRenderer
 }
 
 $environmentJson = @{

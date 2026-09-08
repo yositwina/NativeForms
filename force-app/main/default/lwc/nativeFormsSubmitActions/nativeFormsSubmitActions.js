@@ -60,7 +60,7 @@ export default class NativeFormsSubmitActions extends LightningElement {
     }
 
     get submitModeHelpText() {
-        return 'Choose whether this action creates, updates, finds then updates, or saves repeat-group rows.';
+        return 'Create new record: Creates a new Salesforce record. It does not update existing data.\n\nFind and update existing record: Finds one Salesforce record using the match conditions below, then updates it. If no record is found, choose whether to show an error or create a new record.\n\nSave records list: Use only with a Records List element. Saves each row from that Records List. Set the Parent Id here so new child rows are linked to the parent record.';
     }
 
     get ifNoMatchFoundHelpText() {
@@ -130,10 +130,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
 
     get commandTypeOptions() {
         const options = [
-            { label: 'Create record', value: 'create' }
+            { label: 'Create new record', value: 'create' }
         ];
-        if (this.enableProAdvancedSubmitModes || this.draftAction?.commandType === 'updateById') {
-            options.push({ label: 'Update by record Id', value: 'updateById' });
+        if (this.enableProAdvancedSubmitModes) {
             options.push({ label: 'Find and update existing record', value: 'findAndUpdate' });
         }
         if (this.enableProRepeatGroups) {
@@ -307,9 +306,9 @@ export default class NativeFormsSubmitActions extends LightningElement {
             return 'Build conditions with Salesforce fields on the left, then choose a URL parameter, form field, result alias field, or literal value on the right.';
         }
         if (this.draftAction?.commandType === 'upsertMany') {
-            return 'Use this Pro mode to save rows from one Records List. Existing rows with an Id update, and rows without an Id create new records.';
+            return 'Use only with a Records List element. Saves each row from that Records List. Set the Parent Id here so new child rows are linked to the parent record.';
         }
-        return 'Create adds a new record using the fields mapped from the Builder.';
+        return 'Creates a new Salesforce record. It does not update existing data.';
     }
 
     get filteredObjectOptions() {

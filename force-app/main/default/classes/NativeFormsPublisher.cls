@@ -39,10 +39,15 @@ public with sharing class NativeFormsPublisher {
                    Form__r.Theme__r.Name,
                    Form__r.Theme__r.Logo_URL__c,
                    Form__r.Theme__r.Logo_Content_Document_Id__c,
+                   Form__r.Theme__r.Background_Image_URL__c,
+                   Form__r.Theme__r.Background_Image_Content_Document_Id__c,
+                   Form__r.Theme__r.Footer_Image_URL__c,
+                   Form__r.Theme__r.Footer_Image_Content_Document_Id__c,
                    Form__r.Theme__r.Logo_Size_Px__c,
                    Form__r.Theme__r.Logo_Position__c,
                    Form__r.Theme__r.Form_Width__c,
                    Form__r.Theme__r.Background_Color__c,
+                   Form__r.Theme__r.Background_Gradient_Color__c,
                    Form__r.Theme__r.Form_Background_Color__c,
                    Form__r.Theme__r.Form_Border_Color__c,
                    Form__r.Theme__r.Title_Font__c,
@@ -180,6 +185,13 @@ public with sharing class NativeFormsPublisher {
             }
         }
         Map<String, Object> versionUiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        if (booleanValue(versionUiSettings.get('userVerificationEnabled'))
+            && versionUiSettings.containsKey('userVerificationSenderEmail')
+            && String.isBlank(stringValue(versionUiSettings.get('userVerificationSenderEmail')))) {
+            result.success = false;
+            result.message = 'User Verification requires a sender email. Enter a verified Org-Wide Email Address or authorized sender email.';
+            return result;
+        }
         String recordsListSignatureError = validateRecordsListSignatures(publishElements);
         if (String.isNotBlank(recordsListSignatureError)) {
             result.success = false;
@@ -303,6 +315,12 @@ public with sharing class NativeFormsPublisher {
                 }
             } catch (Exception cloneError) {
                 System.debug(LoggingLevel.ERROR, 'Failed to create successor draft: ' + cloneError.getMessage());
+            }
+
+            try {
+                System.enqueueJob(new NativeFormsPortableSnapshotSyncJob(versionRecord.Form__c, versionRecord.Id));
+            } catch (Exception snapshotQueueError) {
+                System.debug(LoggingLevel.WARN, 'Failed to queue connected-org snapshot sync: ' + snapshotQueueError.getMessage());
             }
 
             result.success = true;
@@ -750,9 +768,40 @@ public with sharing class NativeFormsPublisher {
             return null;
         }
 
-        String contentDocumentId = versionRecord.Form__r.Theme__r.Logo_Content_Document_Id__c;
+        return buildPublishedThemeImageUrl(
+            versionRecord.Form__r.Theme__r.Logo_Content_Document_Id__c,
+            versionRecord.Form__r.Theme__r.Logo_URL__c,
+            'Theme header image'
+        );
+    }
+
+    private static String buildPublishedThemeBackgroundImageUrl(NF_Form_Version__c versionRecord) {
+        if (versionRecord == null || versionRecord.Form__r == null || versionRecord.Form__r.Theme__r == null) {
+            return null;
+        }
+
+        return buildPublishedThemeImageUrl(
+            versionRecord.Form__r.Theme__r.Background_Image_Content_Document_Id__c,
+            versionRecord.Form__r.Theme__r.Background_Image_URL__c,
+            'Theme background image'
+        );
+    }
+
+    private static String buildPublishedThemeFooterImageUrl(NF_Form_Version__c versionRecord) {
+        if (versionRecord == null || versionRecord.Form__r == null || versionRecord.Form__r.Theme__r == null) {
+            return null;
+        }
+
+        return buildPublishedThemeImageUrl(
+            versionRecord.Form__r.Theme__r.Footer_Image_Content_Document_Id__c,
+            versionRecord.Form__r.Theme__r.Footer_Image_URL__c,
+            'Theme footer image'
+        );
+    }
+
+    private static String buildPublishedThemeImageUrl(String contentDocumentId, String fallbackUrl, String imageLabel) {
         if (String.isBlank(contentDocumentId)) {
-            return versionRecord.Form__r.Theme__r.Logo_URL__c;
+            return fallbackUrl;
         }
 
         List<ContentVersion> versions = [
@@ -763,16 +812,16 @@ public with sharing class NativeFormsPublisher {
             LIMIT 1
         ];
         if (versions.isEmpty()) {
-            return versionRecord.Form__r.Theme__r.Logo_URL__c;
+            return fallbackUrl;
         }
 
         ContentVersion versionData = versions[0];
         String mimeType = mimeTypeFromFileName(versionData.PathOnClient);
         if (String.isBlank(mimeType) || versionData.VersionData == null) {
-            return versionRecord.Form__r.Theme__r.Logo_URL__c;
+            return fallbackUrl;
         }
         if (versionData.VersionData.size() > MAX_EMBEDDED_IMAGE_BYTES) {
-            throw new AuraHandledException('Theme logo is too large to publish. Please upload an optimized logo under 69 KB.');
+            throw new AuraHandledException(imageLabel + ' is too large to publish. Please upload an optimized image under 69 KB.');
         }
 
         return 'data:' + mimeType + ';base64,' + EncodingUtil.base64Encode(versionData.VersionData);
@@ -1228,6 +1277,9 @@ public with sharing class NativeFormsPublisher {
             commandConfig.put('createOnlyFields', createOnlyFields);
         }
 
+        if (normalizedType == 'upsertMany' && String.isBlank(idFieldKey)) {
+            idFieldKey = repeatGroupIdentityFieldKey(elements, recordsByElementId, repeatGroupKey);
+        }
         if (normalizedType == 'update') {
             String recordIdSource = stringValue(commandConfig.get('recordIdSource'));
             if (String.isNotBlank(recordIdSource)) {
@@ -1334,9 +1386,36 @@ public with sharing class NativeFormsPublisher {
         if (!fields.isEmpty()) {
             commandConfig.put('fields', fields);
         }
+        if (String.isBlank(idFieldKey)) {
+            idFieldKey = repeatGroupIdentityFieldKey(elements, elementsByElementId(elements), stringValue(commandConfig.get('repeatGroupKey')));
+        }
         if (String.isNotBlank(idFieldKey)) {
             commandConfig.put('idField', idFieldKey);
         }
+    }
+
+    private static String repeatGroupIdentityFieldKey(
+        List<NF_Form_Element__c> elements,
+        Map<String, NF_Form_Element__c> recordsByElementId,
+        String repeatGroupKey
+    ) {
+        if (elements == null || elements.isEmpty() || recordsByElementId == null || String.isBlank(repeatGroupKey)) {
+            return null;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null || String.isBlank(elementRecord.Field_Key__c) || String.isBlank(elementRecord.Config_JSON__c)) {
+                continue;
+            }
+            NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
+            if (repeatGroupParent == null || repeatGroupParent.Field_Key__c != repeatGroupKey) {
+                continue;
+            }
+            Map<String, Object> elementConfig = parseJsonMap(elementRecord.Config_JSON__c);
+            if (stringValue(elementConfig.get('submitFieldPath')) == 'Id' || stringValue(elementConfig.get('prefillFieldPath')) == 'Id') {
+                return elementRecord.Field_Key__c;
+            }
+        }
+        return null;
     }
 
     private static String normalizeCommandType(String commandType, Map<String, Object> config) {
@@ -1502,6 +1581,9 @@ public with sharing class NativeFormsPublisher {
     }
 
     private static String buildConditionValueExpression(String valueSource, String valueText) {
+        if (valueSource == 'verifiedEmail') {
+            return '{params.email}';
+        }
         if (String.isBlank(valueText)) {
             return null;
         }
@@ -1732,6 +1814,8 @@ public with sharing class NativeFormsPublisher {
         Boolean captchaEnabled = captchaConfig != null && booleanValue(captchaConfig.get('enabled'));
         String captchaSiteKey = captchaEnabled ? stringValue(captchaConfig.get('siteKey')) : '';
         String themeLogoUrl = buildPublishedThemeLogoUrl(versionRecord);
+        String themeBackgroundImageUrl = buildPublishedThemeBackgroundImageUrl(versionRecord);
+        String themeFooterImageUrl = buildPublishedThemeFooterImageUrl(versionRecord);
         String titleText = firstNonBlank(
             stringValue(uiSettings.get('title')),
             stringValue(uiSettings.get('formTitle'))
@@ -1779,9 +1863,11 @@ public with sharing class NativeFormsPublisher {
         html += '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
         html += '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
         html += '<title>' + escapeHtml(titleText) + '</title>';
+        html += googleFontsLink(theme);
         html += '<style>';
         html += ':root{';
         html += '--nf-bg:' + cssColor(theme, 'backgroundColor', '#f4f7fb') + ';';
+        html += '--nf-bg-gradient:' + cssColor(theme, 'backgroundGradientColor', cssColor(theme, 'backgroundColor', '#f4f7fb')) + ';';
         html += '--nf-surface:' + cssColor(theme, 'formBackgroundColor', '#ffffff') + ';';
         html += '--nf-text:' + cssColor(theme, 'mainTextColor', '#16325c') + ';';
         html += '--nf-border:' + cssColor(theme, 'formBorderColor', '#d8dde6') + ';';
@@ -1803,8 +1889,12 @@ public with sharing class NativeFormsPublisher {
         html += '--nf-input-bg:' + cssColor(theme, 'inputBackgroundColor', '#ffffff') + ';';
         html += '--nf-input-border:' + cssColor(theme, 'inputBorderColor', '#c9d3df') + ';';
         html += '--nf-form-width:' + cssFormWidth(theme, 'formWidth', '880px') + ';';
+        html += '--nf-spacer-field-height:46px;--nf-spacer-label-space:27px;';
         html += '}';
-        html += 'body{font-family:var(--nf-font);background:linear-gradient(180deg,var(--nf-bg) 0%, #8fb5de 38%, #dce9f7 72%, #f8fbff 100%);color:var(--nf-text);margin:0;padding:28px 24px;min-height:100vh;box-sizing:border-box;}';
+        String bodyBackgroundCss = String.isNotBlank(themeBackgroundImageUrl)
+            ? 'linear-gradient(180deg,rgba(255,255,255,.54) 0%,rgba(255,255,255,.54) 100%),' + cssUrl(themeBackgroundImageUrl) + ' center center/cover no-repeat,linear-gradient(180deg,var(--nf-bg) 0%,var(--nf-bg-gradient) 100%)'
+            : 'linear-gradient(180deg,var(--nf-bg) 0%,var(--nf-bg-gradient) 100%)';
+        html += 'body{font-family:var(--nf-font);background:' + bodyBackgroundCss + ';color:var(--nf-text);margin:0;padding:28px 24px;min-height:100vh;box-sizing:border-box;}';
         html += '.nf-shell{max-width:var(--nf-form-width);min-height:calc(100vh - 56px);margin:0 auto;background:var(--nf-surface);border:1px solid var(--nf-border);border-radius:calc(var(--nf-radius) + 6px);padding:32px;box-shadow:0 16px 44px rgba(22,50,92,.08);box-sizing:border-box;}';
         html += '.nf-shell--result-only{min-height:0;background:transparent;border:0;box-shadow:none;padding:0;}';
         html += '.nf-grid{display:grid;gap:16px;}';
@@ -1818,6 +1908,7 @@ public with sharing class NativeFormsPublisher {
                 (columnIndex == 1 ? '1fr' : 'repeat(' + String.valueOf(columnIndex) + ',minmax(0,1fr))') +
                 ';}';
         }
+        html += columnLayoutCss(elements);
         html += '.nf-section__column{display:grid;gap:14px;align-content:start;}';
         html += '.nf-repeat{display:grid;gap:16px;}';
         html += '.nf-repeat__meta{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;color:var(--nf-muted);font-size:12px;}';
@@ -1829,12 +1920,12 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-repeat__row-delete{flex:0 0 32px;width:32px;display:flex;align-items:center;}';
         html += '.nf-repeat__row-delete button{border:1px solid #d5e6f8;background:#fff;color:#9aa8ba;border-radius:10px;padding:4px 7px;font-size:11px;line-height:1;cursor:pointer;white-space:nowrap;}';
         html += '.nf-repeat__row-delete button:hover{border-color:#f5c2c7;color:#b42318;background:#fde7e9;}';
-        html += '.nf-repeat__row-body{flex:1 1 auto;min-width:0;display:grid;gap:14px;}';
+        html += '.nf-repeat__row-body{flex:1 1 auto;min-width:0;display:grid;gap:14px;container-type:inline-size;}';
         html += '.nf-repeat__row-signature{flex:0 0 260px;min-width:220px;}';
         html += '.nf-repeat__row-signature .nf-signature__canvas{height:120px;}';
         html += '.nf-repeat__header-row{display:flex;gap:12px;align-items:flex-end;padding:10px 12px 10px;margin-bottom:0;background:#e7edf5;border-radius:calc(var(--nf-radius) - 6px) calc(var(--nf-radius) - 6px) 0 0;font-weight:700;color:#355070;}';
         html += '.nf-repeat__header-spacer{flex:0 0 auto;width:32px;}';
-        html += '.nf-repeat__header-body{flex:1 1 auto;min-width:0;}';
+        html += '.nf-repeat__header-body{flex:1 1 auto;min-width:0;container-type:inline-size;}';
         html += '.nf-repeat__actions button{border:1px solid var(--nf-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:8px 14px;font:inherit;cursor:pointer;}';
         html += '.nf-repeat__actions{display:flex;justify-content:flex-start;}';
         html += '.nf-copy{margin:0;color:var(--nf-muted);line-height:1.6;}';
@@ -1848,6 +1939,8 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-image-wrap--stretch{justify-content:stretch;}';
         html += '.nf-image--stretch{width:100%;max-width:100%;object-fit:cover;}';
         html += '.nf-field{display:grid;gap:8px;align-items:start;}';
+        html += '.nf-spacer{display:block;min-height:var(--nf-spacer-field-height);}';
+        html += '.nf-spacer--field-with-label{min-height:calc(var(--nf-spacer-field-height) + var(--nf-spacer-label-space));}';
         html += '.nf-field label{display:block;font-weight:400;color:var(--nf-text);}';
         html += '.nf-required-marker{color:#b42318;margin-left:4px;font-weight:700;}';
         html += '.nf-field label.nf-label--bold{font-weight:700;}';
@@ -1868,12 +1961,40 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-location__inputs{display:grid;gap:8px;}';
         html += '.nf-location--inline .nf-location__inputs{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));}';
         html += '.nf-location__inputs > input[hidden]{display:none !important;}';
-        html += '.nf-lookup__clear{justify-self:start;border:1px solid var(--nf-input-border);background:#fff;color:var(--nf-text);border-radius:999px;padding:6px 10px;font:inherit;font-size:.9em;cursor:pointer;}';
+        html += '.nf-lookup__input-wrap{position:relative;min-width:0;}';
+        html += '.nf-lookup__input-wrap input{padding-right:42px;}';
+        html += '.nf-lookup__clear{position:absolute;top:50%;right:7px;transform:translateY(-50%);width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--nf-muted);font:inherit;font-size:20px;line-height:28px;text-align:center;cursor:pointer;padding:0;}';
+        html += '.nf-lookup__clear:hover,.nf-lookup__clear:focus{background:rgba(15,108,189,.1);color:var(--nf-text);outline:none;}';
         html += '.nf-lookup__results{position:absolute;z-index:20;top:48px;left:0;right:0;max-height:240px;overflow:auto;border:1px solid var(--nf-input-border);border-radius:var(--nf-field-radius);background:var(--nf-input-bg);box-shadow:0 16px 36px rgba(15,35,65,.16);}';
         html += '.nf-lookup__results[hidden]{display:none !important;}';
         html += '.nf-lookup__option{display:block;width:100%;border:0;border-bottom:1px solid rgba(15,35,65,.08);background:transparent;color:var(--nf-text);padding:10px 12px;text-align:left;font:inherit;cursor:pointer;}';
         html += '.nf-lookup__option:hover,.nf-lookup__option:focus{background:rgba(15,108,189,.08);outline:none;}';
         html += '.nf-lookup__status{min-height:1.2em;color:var(--nf-muted);font-size:.92em;line-height:1.35;}';
+        html += '.nf-date-wrap{position:relative;display:block;min-width:0;}';
+        html += '.nf-field .nf-date-wrap input{width:100%;min-width:0;padding-inline-end:48px;}';
+        html += '.nf-field .nf-date-toggle{position:absolute;inset-inline-end:7px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--nf-text);font:inherit;line-height:1;cursor:pointer;box-shadow:none;display:inline-flex;align-items:center;justify-content:center;padding:0;}';
+        html += '.nf-field .nf-date-toggle:hover,.nf-field .nf-date-toggle:focus{border-color:var(--nf-button-bg);box-shadow:0 0 0 3px rgba(15,108,189,.10);outline:none;}';
+        html += '.nf-date-toggle__icon{width:18px;height:18px;border:2px solid currentColor;border-radius:4px;box-sizing:border-box;position:relative;display:inline-block;}';
+        html += '.nf-date-toggle__icon:before{content:"";position:absolute;left:-2px;right:-2px;top:3px;border-top:2px solid currentColor;}';
+        html += '.nf-date-toggle__icon:after{content:"";position:absolute;width:4px;height:4px;left:5px;top:9px;background:currentColor;box-shadow:6px 0 0 currentColor;}';
+        html += '.nf-date-picker{position:absolute;z-index:30;top:calc(100% + 8px);inset-inline-start:0;width:min(320px,calc(100vw - 32px));padding:14px;border:1px solid var(--nf-input-border);border-radius:calc(var(--nf-field-radius) + 4px);background:var(--nf-input-bg);color:var(--nf-text);box-shadow:0 18px 42px rgba(15,35,65,.18);box-sizing:border-box;}';
+        html += '.nf-date-picker[hidden]{display:none !important;}';
+        html += '.nf-date-picker__header{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;gap:8px;align-items:center;margin-bottom:10px;}';
+        html += '.nf-date-picker__title{text-align:center;font-weight:700;line-height:1.25;}';
+        html += '.nf-date-picker__nav,.nf-date-picker__day{border:1px solid transparent;background:transparent;color:var(--nf-text);font:inherit;cursor:pointer;}';
+        html += '.nf-date-picker__nav{width:36px;height:36px;border-radius:999px;}';
+        html += '.nf-date-picker__nav:hover,.nf-date-picker__nav:focus{background:rgba(15,108,189,.08);outline:none;}';
+        html += '.nf-date-picker__week,.nf-date-picker__grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}';
+        html += '.nf-date-picker__week{margin-bottom:6px;color:var(--nf-muted);font-size:.78em;text-align:center;}';
+        html += '.nf-date-picker__day{aspect-ratio:1;border-radius:999px;text-align:center;min-width:0;}';
+        html += '.nf-date-picker__day:hover,.nf-date-picker__day:focus{background:rgba(15,108,189,.08);outline:none;}';
+        html += '.nf-date-picker__day--today{border-color:var(--nf-input-border);font-weight:700;}';
+        html += '.nf-date-picker__day--selected{background:var(--nf-button-bg);color:var(--nf-button-text);font-weight:700;}';
+        html += '.nf-date-picker__day:disabled{opacity:.35;cursor:not-allowed;background:transparent;color:var(--nf-muted);}';
+        html += '@container (max-width:900px){.nf-repeat__row-body .nf-section__grid--5,.nf-repeat__row-body .nf-section__grid--6,.nf-repeat__row-body .nf-section__grid--7,.nf-repeat__row-body .nf-section__grid--8,.nf-repeat__row-body .nf-section__grid--9,.nf-repeat__row-body .nf-section__grid--10,.nf-repeat__header-body .nf-section__grid--5,.nf-repeat__header-body .nf-section__grid--6,.nf-repeat__header-body .nf-section__grid--7,.nf-repeat__header-body .nf-section__grid--8,.nf-repeat__header-body .nf-section__grid--9,.nf-repeat__header-body .nf-section__grid--10{grid-template-columns:repeat(4,minmax(0,1fr));}}';
+        html += '@container (max-width:760px){.nf-repeat__row-body .nf-section__grid--4,.nf-repeat__row-body .nf-section__grid--5,.nf-repeat__row-body .nf-section__grid--6,.nf-repeat__row-body .nf-section__grid--7,.nf-repeat__row-body .nf-section__grid--8,.nf-repeat__row-body .nf-section__grid--9,.nf-repeat__row-body .nf-section__grid--10,.nf-repeat__header-body .nf-section__grid--4,.nf-repeat__header-body .nf-section__grid--5,.nf-repeat__header-body .nf-section__grid--6,.nf-repeat__header-body .nf-section__grid--7,.nf-repeat__header-body .nf-section__grid--8,.nf-repeat__header-body .nf-section__grid--9,.nf-repeat__header-body .nf-section__grid--10{grid-template-columns:repeat(3,minmax(0,1fr));}}';
+        html += '@container (max-width:620px){.nf-repeat__row-body .nf-section__grid--3,.nf-repeat__row-body .nf-section__grid--4,.nf-repeat__row-body .nf-section__grid--5,.nf-repeat__row-body .nf-section__grid--6,.nf-repeat__row-body .nf-section__grid--7,.nf-repeat__row-body .nf-section__grid--8,.nf-repeat__row-body .nf-section__grid--9,.nf-repeat__row-body .nf-section__grid--10,.nf-repeat__header-body .nf-section__grid--3,.nf-repeat__header-body .nf-section__grid--4,.nf-repeat__header-body .nf-section__grid--5,.nf-repeat__header-body .nf-section__grid--6,.nf-repeat__header-body .nf-section__grid--7,.nf-repeat__header-body .nf-section__grid--8,.nf-repeat__header-body .nf-section__grid--9,.nf-repeat__header-body .nf-section__grid--10{grid-template-columns:repeat(2,minmax(0,1fr));}}';
+        html += '@container (max-width:380px){.nf-repeat__row-body .nf-section__grid--2,.nf-repeat__row-body .nf-section__grid--3,.nf-repeat__row-body .nf-section__grid--4,.nf-repeat__row-body .nf-section__grid--5,.nf-repeat__row-body .nf-section__grid--6,.nf-repeat__row-body .nf-section__grid--7,.nf-repeat__row-body .nf-section__grid--8,.nf-repeat__row-body .nf-section__grid--9,.nf-repeat__row-body .nf-section__grid--10,.nf-repeat__header-body .nf-section__grid--2,.nf-repeat__header-body .nf-section__grid--3,.nf-repeat__header-body .nf-section__grid--4,.nf-repeat__header-body .nf-section__grid--5,.nf-repeat__header-body .nf-section__grid--6,.nf-repeat__header-body .nf-section__grid--7,.nf-repeat__header-body .nf-section__grid--8,.nf-repeat__header-body .nf-section__grid--9,.nf-repeat__header-body .nf-section__grid--10{grid-template-columns:1fr;}}';
         html += '.nf-field--checkbox label{display:flex;gap:10px;align-items:center;font-weight:400;}';
         html += '.nf-field--checkbox input{width:auto;}';
         html += '.nf-upload{display:grid;gap:10px;}';
@@ -1967,6 +2088,8 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-logo-wrap--center{justify-content:center;}';
         html += '.nf-logo-wrap--right{justify-content:flex-end;}';
         html += '.nf-logo{display:block;max-width:100%;}';
+        html += '.nf-footer-image-wrap{margin-top:24px;display:flex;justify-content:center;}';
+        html += '.nf-footer-image{display:block;max-width:100%;height:auto;object-fit:contain;}';
         html += '.nf-title{margin:0;color:var(--nf-title-color);font-family:var(--nf-title-font);font-size:var(--nf-title-size);}';
         html += '.nf-intro{margin:8px 0 0;color:var(--nf-muted);}';
         html += '.nf-shell[dir="rtl"] .nf-header,.nf-shell[dir="rtl"] .nf-copy,.nf-shell[dir="rtl"] .nf-richtext,.nf-shell[dir="rtl"] .nf-status,.nf-shell[dir="rtl"] .nf-result__panel,.nf-shell[dir="rtl"] .nf-result__details summary,.nf-shell[dir="rtl"] .nf-section__top h2,.nf-shell[dir="rtl"] .nf-field label{text-align:right;}';
@@ -1974,6 +2097,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-shell[dir="rtl"] .nf-required-marker{margin-left:0;margin-right:6px;}';
         html += '.nf-shell[dir="rtl"] .nf-section__grid{direction:rtl;}';
         html += '.nf-shell[dir="rtl"] .nf-repeat__meta,.nf-shell[dir="rtl"] .nf-repeat__header-row{direction:rtl;}';
+        html += '.nf-shell[dir="rtl"] .nf-date-wrap,.nf-shell[dir="rtl"] .nf-date-picker{direction:rtl;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left{display:flex;align-items:center;justify-content:flex-start;gap:12px;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left label{order:2;flex:0 0 140px;direction:ltr;margin:0;white-space:normal;max-width:100%;text-align:right;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left input,.nf-shell[dir="rtl"] .nf-field--left textarea,.nf-shell[dir="rtl"] .nf-field--left select,.nf-shell[dir="rtl"] .nf-field--left .nf-location,.nf-shell[dir="rtl"] .nf-field--left .nf-field--radio-group{order:1;flex:1 1 auto;min-width:0;}';
@@ -1984,9 +2108,15 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-shell[dir="rtl"] .nf-radio-option span{margin-left:0;margin-right:8px;}';
         html += '.nf-shell[dir="rtl"] .nf-captcha,.nf-shell[dir="rtl"] .nf-actions,.nf-shell[dir="rtl"] .nf-repeat__actions{direction:rtl;justify-content:flex-start;}';
         html += '.nf-shell[dir="rtl"] input.nf-control--ltr,.nf-shell[dir="rtl"] textarea.nf-control--ltr,.nf-shell[dir="rtl"] select.nf-control--ltr{direction:ltr;text-align:left;}';
+        html += '.nf-shell[dir="rtl"] input[data-nativeforms-time="true"]{direction:ltr;text-align:right;}';
+        html += '.nf-shell[dir="rtl"] .nf-lookup input[data-lookup-input="true"],.nf-shell[dir="rtl"] .nf-lookup__option,.nf-shell[dir="rtl"] .nf-lookup__status{direction:rtl;text-align:right;}';
+        html += '.nf-shell[dir="rtl"] .nf-lookup__input-wrap input{padding-right:14px;padding-left:42px;}';
+        html += '.nf-shell[dir="rtl"] .nf-lookup__clear{right:auto;left:7px;}';
         html += '.nf-shell[dir="rtl"] .nf-field--left input:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--left textarea:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--left select:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--right input:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--right textarea:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--right select:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--above input:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--above textarea:not(.nf-control--ltr),.nf-shell[dir="rtl"] .nf-field--above select:not(.nf-control--ltr){text-align:right;padding-right:18px;padding-left:14px;}';
+        html += '.nf-shell[dir="rtl"] .nf-field .nf-date-wrap input{padding-right:14px;padding-left:48px;}';
         html += '@media (max-width: 768px){';
-        html += 'body{padding:16px;background:linear-gradient(180deg,var(--nf-bg) 0%, #97bbdf 38%, #dce9f7 72%, #f8fbff 100%);}';
+        html += 'body{padding:16px;}';
+        html += '.nf-shell{max-width:100%;}';
         html += '.nf-shell{min-height:0;padding:18px 16px 20px;border-radius:20px;}';
         html += '.nf-section{padding:1.2rem 0.95rem 1rem;border-radius:18px;}';
         html += '.nf-section__top{left:0.85rem;padding:0 0.35rem;}';
@@ -2007,6 +2137,7 @@ public with sharing class NativeFormsPublisher {
         html += '.nf-repeat__row .nf-field label{display:block;}';
         html += '.nf-repeat__row .nf-field--hidden{grid-template-columns:1fr;}';
         html += '.nf-repeat__row .nf-field--hidden label{display:block;}';
+        html += '.nf-date-picker{position:fixed;left:16px;right:16px;bottom:16px;top:auto;width:auto;max-width:none;}';
         html += '.nf-repeat__actions,.nf-actions{display:grid;justify-content:stretch;}';
         html += '.nf-repeat__actions button,.nf-actions button{width:100%;}';
         html += '.nf-logo{max-height:4rem !important;}';
@@ -2018,7 +2149,7 @@ public with sharing class NativeFormsPublisher {
         }
         html += '</style></head><body>';
         html += '<div class="nf-shell" dir="' + (rtlEnabled ? 'rtl' : 'ltr') + '"><div class="nf-runtime" data-nativeforms-runtime>';
-        html += '<form class="nf-grid" data-nativeforms-version="' + escapeHtml(String.valueOf(versionRecord.Id)) + '">';
+        html += '<form class="nf-grid" novalidate data-nativeforms-version="' + escapeHtml(String.valueOf(versionRecord.Id)) + '">';
         html += '<input class="nf-meta" type="hidden" name="nativeformsVersionId" value="' + escapeHtml(String.valueOf(versionRecord.Id)) + '">';
         if (String.isNotBlank(themeLogoUrl)) {
             String logoPosition = firstNonBlank(stringValue(theme.get('logoPosition')), 'left').toLowerCase();
@@ -2082,7 +2213,11 @@ public with sharing class NativeFormsPublisher {
             html += '</div>';
         }
         html += '<div class="nf-status" data-nativeforms-status></div>';
-        html += '</form><div class="nf-result" data-nativeforms-result hidden></div></div></div>';
+        html += '</form><div class="nf-result" data-nativeforms-result hidden></div>';
+        if (String.isNotBlank(themeFooterImageUrl)) {
+            html += '<div class="nf-footer-image-wrap"><img class="nf-footer-image" src="' + escapeHtml(themeFooterImageUrl) + '" alt="Theme footer image"></div>';
+        }
+        html += '</div></div>';
         if (captchaEnabled) {
             html += '<script src="https://www.google.com/recaptcha/api.js" async defer></script>';
         }
@@ -2142,20 +2277,22 @@ public with sharing class NativeFormsPublisher {
         html += 'const runtimeText=(config.runtimeText&&typeof config.runtimeText==="object")?config.runtimeText:{};';
         html += 'function t(key,fallback){const value=runtimeText[key];return typeof value==="string"&&value!==""?value:fallback;}';
         html += 'function interpolate(template,replacements){let output=String(template==null?"":template);const values=replacements||{};Object.keys(values).forEach(function(key){output=output.replace(new RegExp("\\\\{"+key+"\\\\}","g"),String(values[key]));});return output;}';
-        html += 'const FORMULA_SOURCE_REGEX=/\\{([A-Za-z0-9_]+)\\}/g;';
+        html += 'const FORMULA_SOURCE_REGEX=/\\{((?:row\\.)?[A-Za-z0-9_]+)\\}/g;';
         html += 'function formulaFieldControls(){return Array.from(form.querySelectorAll("[data-formula-target=\'true\']"));}';
         html += 'function formulaSafeVarName(fieldKey){return "field_"+String(fieldKey||"").replace(/[^A-Za-z0-9_]/g,"_");}';
-        html += 'function normalizeFormulaExpression(expression){return String(expression||"").replace(/\\bAND\\b/g,"and").replace(/\\bOR\\b/g,"or").replace(/\\bTRUE\\b/g,"true").replace(/\\bFALSE\\b/g,"false").trim();}';
+        html += 'function formulaReplaceOutsideStrings(source,replacer){return String(source||"").replace(/"(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|[^"\']+/g,function(segment){const head=segment.charAt(0);return head===\'"\'||head==="\'"?segment:replacer(segment);});}';
+        html += 'function normalizeFormulaExpression(expression){return formulaReplaceOutsideStrings(expression,function(segment){return segment.replace(/\\bAND\\b(?!\\s*\\()/g,"and").replace(/\\bOR\\b(?!\\s*\\()/g,"or").replace(/\\bTRUE\\b/g,"true").replace(/\\bFALSE\\b/g,"false");}).trim();}';
         html += 'function formulaIsBlank(value){return value===null||value===undefined||String(value)==="";}';
         html += 'function formulaToText(value){return formulaIsBlank(value)?"":String(value);}';
         html += 'function formulaToNumber(value){if(value===null||value===undefined||value===""){return null;}const parsed=Number(value);return Number.isFinite(parsed)?parsed:null;}';
+        html += 'function formulaToInt(value){const numeric=formulaToNumber(value);return numeric===null?null:Math.trunc(numeric);}';
         html += 'function formulaNormalizeComparable(value){if(typeof value==="string"){const trimmed=value.trim().toLowerCase();if(trimmed==="true"){return true;}if(trimmed==="false"){return false;}}return value;}';
         html += 'function formulaPad2(value){return String(value).padStart(2,"0");}';
         html += 'function formulaIsoLocalDate(dateValue){return dateValue.getFullYear()+"-"+formulaPad2(dateValue.getMonth()+1)+"-"+formulaPad2(dateValue.getDate());}';
         html += 'function formulaIsoLocalDateTime(dateValue){return formulaIsoLocalDate(dateValue)+"T"+formulaPad2(dateValue.getHours())+":"+formulaPad2(dateValue.getMinutes())+":"+formulaPad2(dateValue.getSeconds());}';
-        html += 'function formulaParseIsoDateLike(rawValue){const value=String(rawValue||"").trim();if(!value){return null;}const parsed=new Date(value);return Number.isNaN(parsed.getTime())?null:parsed;}';
+        html += 'function formulaParseIsoDateLike(rawValue){const value=String(rawValue||"").trim();if(!value){return null;}const dateOnly=value.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);if(dateOnly){const year=Number(dateOnly[1]);const month=Number(dateOnly[2]);const day=Number(dateOnly[3]);const localDate=new Date(year,month-1,day);return localDate.getFullYear()===year&&localDate.getMonth()===month-1&&localDate.getDate()===day?localDate:null;}const parsed=new Date(value);return Number.isNaN(parsed.getTime())?null:parsed;}';
         html += 'function formulaIsIsoDateValue(value){return typeof value==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(value.trim())&&formulaParseIsoDateLike(value)!==null;}function formulaAddDays(dateValue,days){const parsed=formulaParseIsoDateLike(dateValue);const numericDays=Number(days);if(!parsed||!Number.isFinite(numericDays)){return NaN;}parsed.setDate(parsed.getDate()+numericDays);return formulaIsoLocalDate(parsed);}function formulaDiffDays(leftDateValue,rightDateValue){const leftDate=formulaParseIsoDateLike(leftDateValue);const rightDate=formulaParseIsoDateLike(rightDateValue);if(!leftDate||!rightDate){return NaN;}return Math.round((leftDate.getTime()-rightDate.getTime())/(24*60*60*1000));}function formulaAddValues(left,right){if(formulaIsIsoDateValue(left)&&Number.isFinite(Number(right))){return formulaAddDays(left,right);}if(Number.isFinite(Number(left))&&formulaIsIsoDateValue(right)){return formulaAddDays(right,left);}return Number(left)+Number(right);}function formulaSubtractValues(left,right){if(formulaIsIsoDateValue(left)&&Number.isFinite(Number(right))){return formulaAddDays(left,-Number(right));}if(formulaIsIsoDateValue(left)&&formulaIsIsoDateValue(right)){return formulaDiffDays(left,right);}return Number(left)-Number(right);}';
-        html += 'function createFormulaParser(){if(!(window.exprEval&&window.exprEval.Parser)){return null;}const parser=new window.exprEval.Parser({operators:{add:true,subtract:true,multiply:true,divide:true,remainder:false,power:false,factorial:false,comparison:true,logical:true,conditional:true,concatenate:false,assignment:false,array:false,fndef:false,in:false},allowMemberAccess:false});parser.unaryOps={"-":function(value){return-Number(value);},"+":Number,not:function(value){return!value;}};parser.binaryOps={"+":formulaAddValues,"-":formulaSubtractValues,"*":function(left,right){return Number(left)*Number(right);},"/":function(left,right){return Number(left)/Number(right);},"==":function(left,right){return formulaNormalizeComparable(left)===formulaNormalizeComparable(right);},"!=":function(left,right){return formulaNormalizeComparable(left)!==formulaNormalizeComparable(right);},">":function(left,right){return left>right;},"<":function(left,right){return left<right;},">=":function(left,right){return left>=right;},"<=":function(left,right){return left<=right;},and:function(left,right){return Boolean(left&&right);},or:function(left,right){return Boolean(left||right);}};parser.ternaryOps={"?":function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;}};parser.functions={CONCAT:function(){return Array.prototype.slice.call(arguments).map(formulaToText).join("");},URLENCODE:function(value){return encodeURIComponent(formulaToText(value));},IF:function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;},COALESCE:function(){for(let index=0;index<arguments.length;index+=1){if(!formulaIsBlank(arguments[index])){return arguments[index];}}return null;},ISBLANK:function(value){return formulaIsBlank(value);},VALUE:function(value){return formulaToNumber(value);},TEXT:function(value){return formulaToText(value);},ROUND:function(value,digits){const numericValue=formulaToNumber(value);const numericDigits=Number.isFinite(Number(digits))?Number(digits):0;if(numericValue===null){return null;}const factor=Math.pow(10,numericDigits);return Math.round(numericValue*factor)/factor;},ABS:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.abs(numericValue);},MIN:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.min.apply(Math,values):null;},MAX:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.max.apply(Math,values):null;},TODAY:function(){return formulaIsoLocalDate(new Date());},NOW:function(){return formulaIsoLocalDateTime(new Date());},YEAR:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getFullYear():null;},MONTH:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getMonth()+1:null;},DAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDate():null;}};parser.consts={true:true,false:false};return parser;}';
+        html += 'function createFormulaParser(){if(!(window.exprEval&&window.exprEval.Parser)){return null;}const parser=new window.exprEval.Parser({operators:{add:true,subtract:true,multiply:true,divide:true,remainder:false,power:false,factorial:false,comparison:true,logical:true,conditional:true,concatenate:false,assignment:false,array:false,fndef:false,in:false},allowMemberAccess:false});parser.unaryOps={"-":function(value){return-Number(value);},"+":Number,not:function(value){return!value;}};parser.binaryOps={"+":formulaAddValues,"-":formulaSubtractValues,"*":function(left,right){return Number(left)*Number(right);},"/":function(left,right){return Number(left)/Number(right);},"==":function(left,right){return formulaNormalizeComparable(left)===formulaNormalizeComparable(right);},"!=":function(left,right){return formulaNormalizeComparable(left)!==formulaNormalizeComparable(right);},">":function(left,right){return left>right;},"<":function(left,right){return left<right;},">=":function(left,right){return left>=right;},"<=":function(left,right){return left<=right;},and:function(left,right){return Boolean(left&&right);},or:function(left,right){return Boolean(left||right);}};parser.ternaryOps={"?":function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;}};parser.functions={CONCAT:function(){return Array.prototype.slice.call(arguments).map(formulaToText).join("");},URLENCODE:function(value){return encodeURIComponent(formulaToText(value));},IF:function(conditionValue,trueValue,falseValue){return conditionValue?trueValue:falseValue;},COALESCE:function(){for(let index=0;index<arguments.length;index+=1){if(!formulaIsBlank(arguments[index])){return arguments[index];}}return null;},ISBLANK:function(value){return formulaIsBlank(value);},VALUE:function(value){return formulaToNumber(value);},TEXT:function(value){return formulaToText(value);},ROUND:function(value,digits){const numericValue=formulaToNumber(value);const numericDigits=Number.isFinite(Number(digits))?Number(digits):0;if(numericValue===null){return null;}const factor=Math.pow(10,numericDigits);return Math.round(numericValue*factor)/factor;},ABS:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.abs(numericValue);},MIN:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.min.apply(Math,values):null;},MAX:function(){const values=Array.prototype.slice.call(arguments).map(formulaToNumber).filter(function(item){return item!==null;});return values.length?Math.max.apply(Math,values):null;},TODAY:function(){return formulaIsoLocalDate(new Date());},NOW:function(){return formulaIsoLocalDateTime(new Date());},YEAR:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getFullYear():null;},MONTH:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getMonth()+1:null;},DAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDate():null;},WEEKDAY:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?parsed.getDay()+1:null;},DAYNAME:function(value,locale){const parsed=formulaParseIsoDateLike(value);if(!parsed){return null;}const requested=formulaToText(locale)||String(config.languageCode||"")||"en";try{return new Intl.DateTimeFormat(requested,{weekday:"long"}).format(parsed);}catch(error){return new Intl.DateTimeFormat("en",{weekday:"long"}).format(parsed);}},DATE:function(year,month,day){const yearValue=formulaToInt(year);const monthValue=formulaToInt(month);const dayValue=formulaToInt(day);if(yearValue===null||monthValue===null||dayValue===null||yearValue<1000){return null;}const parsed=new Date(yearValue,monthValue-1,dayValue);return parsed.getFullYear()===yearValue&&parsed.getMonth()===monthValue-1&&parsed.getDate()===dayValue?formulaIsoLocalDate(parsed):null;},ADDMONTHS:function(value,months){const parsed=formulaParseIsoDateLike(value);const count=formulaToInt(months);if(!parsed||count===null){return null;}const targetMonth=parsed.getMonth()+count;const lastDayOfTarget=new Date(parsed.getFullYear(),targetMonth+1,0).getDate();return formulaIsoLocalDate(new Date(parsed.getFullYear(),targetMonth,Math.min(parsed.getDate(),lastDayOfTarget)));},DATEVALUE:function(value){const parsed=formulaParseIsoDateLike(value);return parsed?formulaIsoLocalDate(parsed):null;},LEFT:function(value,count){const length=formulaToInt(count);return length===null||length<=0?"":formulaToText(value).slice(0,length);},RIGHT:function(value,count){const length=formulaToInt(count);return length===null||length<=0?"":formulaToText(value).slice(-length);},MID:function(value,start,count){const startValue=formulaToInt(start);const length=formulaToInt(count);if(startValue===null||length===null||length<=0){return "";}const from=Math.max(0,startValue-1);return formulaToText(value).slice(from,from+length);},LEN:function(value){return formulaToText(value).length;},TRIM:function(value){return formulaToText(value).trim();},UPPER:function(value){return formulaToText(value).toUpperCase();},LOWER:function(value){return formulaToText(value).toLowerCase();},SUBSTITUTE:function(value,search,replacement){const text=formulaToText(value);const needle=formulaToText(search);return needle?text.split(needle).join(formulaToText(replacement)):text;},CONTAINS:function(value,search){return formulaToText(value).indexOf(formulaToText(search))>=0;},BEGINS:function(value,search){return formulaToText(value).startsWith(formulaToText(search));},AND:function(){return Array.prototype.slice.call(arguments).every(function(item){return Boolean(item);});},OR:function(){return Array.prototype.slice.call(arguments).some(function(item){return Boolean(item);});},NOT:function(value){return !value;},MOD:function(value,divisor){const numericValue=formulaToNumber(value);const numericDivisor=formulaToNumber(divisor);if(numericValue===null||numericDivisor===null||numericDivisor===0){return null;}return numericValue%numericDivisor;},CEILING:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.ceil(numericValue);},FLOOR:function(value){const numericValue=formulaToNumber(value);return numericValue===null?null:Math.floor(numericValue);},POWER:function(base,exponent){const numericBase=formulaToNumber(base);const numericExponent=formulaToNumber(exponent);if(numericBase===null||numericExponent===null){return null;}const result=Math.pow(numericBase,numericExponent);return Number.isFinite(result)?result:null;},SQRT:function(value){const numericValue=formulaToNumber(value);return numericValue===null||numericValue<0?null:Math.sqrt(numericValue);}};parser.consts={true:true,false:false};return parser;}';
         html += 'const formulaParser=createFormulaParser();';
         html += 'function formulaFieldKeySet(){return new Set(formulaFieldControls().map(function(control){return String(control.name||control.dataset.formulaFieldKey||"");}).filter(function(value){return !!value;}));}';
         html += 'function parseMultiCheckboxValue(value){if(Array.isArray(value)){return new Set(value.map(function(item){return String(item);}));}return new Set(String(value==null?"":value).split(";").map(function(item){return item.trim();}).filter(function(item){return !!item;}));}';
@@ -2163,7 +2300,8 @@ public with sharing class NativeFormsPublisher {
         html += 'function setMultiCheckboxValue(fields,value){const selected=parseMultiCheckboxValue(value);Array.from(fields).forEach(function(el){el.checked=selected.has(String(el.value||""));el.setCustomValidity("");});}';
         html += 'function readRuntimeFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.locationHidden==="true"){try{return first.value?JSON.parse(first.value):null;}catch(error){return null;}}if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
         html += 'function normalizeFormulaResult(targetType,value){if(targetType==="number"){return formulaToNumber(value);}if(value===null||value===undefined){return "";}return String(value);}';
-        html += 'function evaluateFormulaControl(control){if(!control||!formulaParser){return;}const expression=normalizeFormulaExpression(control.dataset.formulaExpression||"");if(!expression){control.value="";return;}const variableMap={};let normalizedExpression=expression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=readRuntimeFieldValue(fieldKey);});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const normalizedValue=normalizeFormulaResult(control.dataset.formulaType||"text",rawValue);control.value=normalizedValue===null||normalizedValue===undefined?"":String(normalizedValue);}catch(error){control.value="";}}';
+        html += 'function readFormulaSourceValue(fieldKey,rowEl){const key=String(fieldKey||"");if(key.indexOf("row.")===0){return rowEl?readRepeatFieldValueByKey(rowEl,key.slice(4)):"";}return readRuntimeFieldValue(key);}';
+        html += 'function evaluateFormulaControl(control){if(!control||!formulaParser){return;}const expression=normalizeFormulaExpression(control.dataset.formulaExpression||"");if(!expression){control.value="";return;}const rowEl=control.closest?control.closest("[data-repeat-row]"):null;const variableMap={};let normalizedExpression=expression.replace(FORMULA_SOURCE_REGEX,function(_,fieldKey){const safeName=formulaSafeVarName(fieldKey);variableMap[fieldKey]=safeName;return safeName;});const parserValues={};Object.keys(variableMap).forEach(function(fieldKey){parserValues[variableMap[fieldKey]]=readFormulaSourceValue(fieldKey,rowEl);});try{const compiled=formulaParser.parse(normalizedExpression);const rawValue=compiled.evaluate(parserValues);const normalizedValue=normalizeFormulaResult(control.dataset.formulaType||"text",rawValue);control.value=normalizedValue===null||normalizedValue===undefined?"":String(normalizedValue);}catch(error){control.value="";}}';
         html += 'function evaluateAllFormulaFields(){formulaFieldControls().forEach(function(control){evaluateFormulaControl(control);});}';
         html += 'const captchaConfig=config.captcha||{};';
         html += 'const captchaEnabled=!!captchaConfig.enabled;';
@@ -2183,7 +2321,7 @@ public with sharing class NativeFormsPublisher {
         html += 'const userVerificationGatedEl=document.querySelector("[data-user-verification-gated]");';
         html += 'const userVerificationSessionMode=String(userVerificationConfig.sessionMode||"short").trim()==="sameTabUntilMidnight"?"sameTabUntilMidnight":"short";';
         html += 'let userVerificationToken="";let userVerificationApproved=!userVerificationEnabled;let userVerificationVerifiedEmail="";let userVerificationSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-"+Math.random().toString(36).slice(2)+"-"+Date.now());';
-        html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};const lookupTimersByField={};const lookupAbortByField={};const locationTimersByField={};const locationAbortByField={};';
+        html += 'let fileUploadSessionId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():("nf-upload-"+Math.random().toString(36).slice(2)+"-"+Date.now());const uploadedFilesByField={};const fileUploadStateByField={};const lookupTimersByField={};const lookupAbortByField={};const lookupRecordsByInstance={};const locationTimersByField={};const locationAbortByField={};';
         html += 'function setStatus(kind,message){if(!statusEl){return;}statusEl.className="nf-status nf-status--"+kind;statusEl.textContent=message||"";}';
         html += 'function clearStatus(){if(!statusEl){return;}statusEl.className="nf-status";statusEl.textContent="";}';
         html += 'function getPrefillParams(){const params={};new URLSearchParams(window.location.search).forEach(function(value,key){params[key]=value;});return params;}';
@@ -2204,7 +2342,7 @@ public with sharing class NativeFormsPublisher {
         html += 'function clearFileUploadField(fieldKey){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={message:"",error:""};const control=fileUploadControls().find(function(item){return fileUploadFieldKey(item)===fieldKey;});if(control){control.value="";renderFileUploadState(control);}}';
         html += 'async function waitForSafeUpload(uploadRef,fieldKey){if(!config.uploadStatusUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}for(let attempt=0;attempt<40;attempt+=1){const response=await fetch(config.uploadStatusUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,sessionId:fileUploadSessionId,uploadToken:uploadRef.uploadToken})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||t("fileSafetyUnavailable","We could not safely process this file. Please upload another file or try again."));}if(data.status==="ready"){return;}if(data.status==="rejected"){throw new Error(t("fileSafetyRejected","This file cannot be accepted. Please upload another file."));}if(data.status==="unavailable"){throw new Error(t("fileSafetyUnavailable","We could not safely process this file. Please upload another file or try again."));}await new Promise(function(resolve){window.setTimeout(resolve,1500);});}throw new Error(t("fileSafetyUnavailable","We could not safely process this file. Please upload another file or try again."));}';
         html += 'async function uploadSelectedFiles(control){const fieldKey=fileUploadFieldKey(control);const files=Array.from((control&&control.files)||[]);if(!fieldKey){return;}if(!files.length){clearFileUploadField(fieldKey);return;}if(!config.uploadInitUrl){throw new Error(t("fileUploadsConfigMissing","File Uploads are not configured for this published form."));}uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:true,message:t("fileUploading","Uploading files..."),error:""};renderFileUploadState(control);try{const uploaded=[];for(let index=0;index<files.length;index+=1){const file=files[index];const initResponse=await fetch(config.uploadInitUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,fileName:file.name,contentType:file.type||"application/octet-stream",fileSize:file.size,sessionId:fileUploadSessionId})});const initData=await initResponse.json();if(!initResponse.ok||initData.success===false){throw new Error(initData.error||t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadResponse=await fetch(initData.uploadUrl,{method:"PUT",headers:{"Content-Type":initData.contentType||file.type||"application/octet-stream"},body:file});if(!uploadResponse.ok){throw new Error(t("fileUploadFailed","We could not upload this file. Please try again."));}const uploadRef={uploadToken:initData.uploadToken,fileName:initData.fileName||file.name,contentType:initData.contentType||file.type||"application/octet-stream",fileSize:initData.fileSize||file.size};fileUploadStateByField[fieldKey]={scanning:true,message:t("fileSafetyScanning","Checking file safety..."),error:""};renderFileUploadState(control);await waitForSafeUpload(uploadRef,fieldKey);uploaded.push(uploadRef);}uploadedFilesByField[fieldKey]=uploaded;fileUploadStateByField[fieldKey]={uploading:false,scanning:false,message:uploaded.length?interpolate(t("fileReadyCount","{count} file(s) ready."),{count:String(uploaded.length)}):"",error:""};renderFileUploadState(control);}catch(error){uploadedFilesByField[fieldKey]=[];fileUploadStateByField[fieldKey]={uploading:false,scanning:false,message:"",error:error&&error.message?error.message:t("fileUploadFailed","We could not upload this file. Please try again.")};renderFileUploadState(control);throw error;}}';
-        html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading||state.scanning){return{valid:false,message:t("fileSafetyPleaseWait","Please wait while your files are checked.")};}if(control.required&&refs.length===0){return{valid:false,message:t("fileUploadRequired","Please upload the required file before submitting.")};}}return{valid:true,message:""};}';
+        html += 'function validateUploadedFiles(){const controls=fileUploadControls();for(let index=0;index<controls.length;index+=1){const control=controls[index];if(isConditionHidden(control)){continue;}const fieldKey=fileUploadFieldKey(control);const state=fileUploadStateByField[fieldKey]||{};const refs=uploadedFilesByField[fieldKey]||[];if(state.uploading||state.scanning){return{valid:false,message:t("fileSafetyPleaseWait","Please wait while your files are checked.")};}if(control.required&&refs.length===0){return{valid:false,message:t("fileUploadRequired","Please upload the required file before submitting.")};}}return{valid:true,message:""};}';
         html += 'function clearAllUploadedFiles(){fileUploadControls().forEach(function(control){clearFileUploadField(fileUploadFieldKey(control));});}';
         html += 'function signaturePads(){return Array.from(form.querySelectorAll("[data-nativeforms-signature=\'true\']"));}';
         html += 'function signatureCanvasForPad(pad){return pad?pad.querySelector("canvas[data-signature-canvas]"):null;}';
@@ -2213,12 +2351,12 @@ public with sharing class NativeFormsPublisher {
         html += 'function setSignatureFeedback(pad,message,kind){const feedback=pad?pad.querySelector("[data-signature-feedback]"):null;if(!feedback){return;}feedback.textContent=message||"";feedback.style.color=kind==="error"?"#b42318":"";}';
         html += 'function clearSignaturePad(pad){const canvas=signatureCanvasForPad(pad);if(!canvas){return;}const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);pad.dataset.signatureEmpty="true";setSignatureFeedback(pad,"","");}';
         html += 'function initSignaturePad(pad){const canvas=signatureCanvasForPad(pad);if(!pad||!canvas){return;}resizeSignatureCanvas(canvas);let drawing=false;function point(event){const rect=canvas.getBoundingClientRect();const source=event.touches&&event.touches.length?event.touches[0]:event;return{x:source.clientX-rect.left,y:source.clientY-rect.top};}function start(event){event.preventDefault();resizeSignatureCanvas(canvas);drawing=true;const ctx=canvas.getContext("2d");const p=point(event);ctx.beginPath();ctx.moveTo(p.x,p.y);}function move(event){if(!drawing){return;}event.preventDefault();const ctx=canvas.getContext("2d");const p=point(event);ctx.lineTo(p.x,p.y);ctx.stroke();pad.dataset.signatureEmpty="false";setSignatureFeedback(pad,"","");}function end(){drawing=false;}canvas.addEventListener("pointerdown",start);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",end);canvas.addEventListener("pointerleave",end);canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end);const clearButton=pad.querySelector("[data-signature-clear]");if(clearButton){clearButton.addEventListener("click",function(event){event.preventDefault();clearSignaturePad(pad);});}pad.dataset.signatureEmpty="true";}';
-        html += 'function validateSignatures(){const pads=signaturePads();for(let index=0;index<pads.length;index+=1){const pad=pads[index];if(pad.dataset.signatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("signatureRequired","Please sign before submitting."),"error");return{valid:false,message:t("signatureRequired","Please sign before submitting.")};}}return{valid:true,message:""};}';
+        html += 'function validateSignatures(){const pads=signaturePads();for(let index=0;index<pads.length;index+=1){const pad=pads[index];if(isConditionHidden(pad)){continue;}if(pad.dataset.signatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("signatureRequired","Please sign before submitting."),"error");return{valid:false,message:t("signatureRequired","Please sign before submitting.")};}}return{valid:true,message:""};}';
         html += 'function collectSignatures(){const signatures={};signaturePads().forEach(function(pad){const fieldKey=signatureFieldKey(pad);const canvas=signatureCanvasForPad(pad);if(!fieldKey||!canvas||pad.dataset.signatureEmpty!=="false"){return;}signatures[fieldKey]={dataUrl:canvas.toDataURL("image/png"),contentType:"image/png",fileName:(fieldKey||"signature")+".png",signedAt:new Date().toISOString()};});return signatures;}';
         html += 'function clearAllSignatures(){signaturePads().forEach(clearSignaturePad);}';
         html += 'function rowSignaturePads(root){return Array.from((root||form).querySelectorAll("[data-nativeforms-row-signature=\'true\']"));}';
         html += 'function initRepeatRowSignatures(rowEl){rowSignaturePads(rowEl).forEach(initSignaturePad);}';
-        html += 'function validateRepeatRowSignatures(){const rows=form.querySelectorAll("[data-repeat-row]");for(let index=0;index<rows.length;index+=1){const rowEl=rows[index];const pad=rowEl.querySelector("[data-nativeforms-row-signature=\'true\']");if(pad&&pad.dataset.rowSignatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("rowSignatureRequired","Please sign each required row before submitting."),"error");const canvas=signatureCanvasForPad(pad);if(canvas&&typeof canvas.focus==="function"){canvas.focus();}return{valid:false,message:t("rowSignatureReview","Please review the row signatures and try again.")};}}return{valid:true,message:""};}';
+        html += 'function validateRepeatRowSignatures(){const rows=form.querySelectorAll("[data-repeat-row]");for(let index=0;index<rows.length;index+=1){const rowEl=rows[index];const pad=rowEl.querySelector("[data-nativeforms-row-signature=\'true\']");if(pad&&!isConditionHidden(pad)&&pad.dataset.rowSignatureRequired==="true"&&pad.dataset.signatureEmpty!=="false"){setSignatureFeedback(pad,t("rowSignatureRequired","Please sign each required row before submitting."),"error");const canvas=signatureCanvasForPad(pad);if(canvas&&typeof canvas.focus==="function"){canvas.focus();}return{valid:false,message:t("rowSignatureReview","Please review the row signatures and try again.")};}}return{valid:true,message:""};}';
         html += 'function setUserVerificationMessage(message,kind){if(!userVerifyEl){return;}const target=userVerifyEl.querySelector("[data-user-verification-message]");if(!target){return;}target.className="nf-user-verification__message"+(kind==="success"?" nf-user-verification__message--success":kind==="error"?" nf-user-verification__message--error":"");target.textContent=message||"";}';
         html += 'function setUserVerificationGatedState(unlocked){if(userVerificationGatedEl){userVerificationGatedEl.hidden=!unlocked;userVerificationGatedEl.querySelectorAll("input,textarea,select,button").forEach(function(control){control.disabled=!unlocked;});}userVerificationApproved=!!unlocked;}';
         html += 'function setUserVerificationStepVisible(visible){if(!userVerifyEl){return;}const codeStep=userVerifyEl.querySelector("[data-user-verification-step]");const resendWrap=userVerifyEl.querySelector("[data-user-verification-resend-wrap]");if(codeStep){codeStep.hidden=!visible;}if(resendWrap){resendWrap.hidden=!visible;}}';
@@ -2253,24 +2391,46 @@ public with sharing class NativeFormsPublisher {
         html += 'function formatParsedDate(parsed,format){if(!parsed){return "";}const day=String(parsed.day).padStart(2,"0");const month=String(parsed.month).padStart(2,"0");const year=String(parsed.year).padStart(4,"0");return format==="eu"?day+"/"+month+"/"+year:month+"/"+day+"/"+year;}';
         html += 'function formatDateForField(value,field){const format=field&&field.dataset&&field.dataset.dateFormat?field.dataset.dateFormat:"us";const parsed=parseDateValue(value,format)||parseDateValue(value,"us")||parseDateValue(value,"eu");return parsed?formatParsedDate(parsed,format):value==null?"":String(value);}';
         html += 'function validateDateField(el,showMessage){if(!el||el.dataset.nativeformsDate!=="true"){return true;}const format=el.dataset.dateFormat||"us";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseDateValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("dateInvalid","Please enter a valid date in {format} format."),{format:dateFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}const minDate=el.dataset.effectiveMinDate||"";const maxDate=el.dataset.effectiveMaxDate||"";if(minDate&&parsed.iso<minDate){el.setCustomValidity(interpolate(t("dateMin","Please enter a date on or after {date}."),{date:formatDateForField(minDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}if(maxDate&&parsed.iso>maxDate){el.setCustomValidity(interpolate(t("dateMax","Please enter a date on or before {date}."),{date:formatDateForField(maxDate,el)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
+        html += 'function datePickerRoot(input){return input&&input.closest?input.closest("[data-nativeforms-date-picker=true]"):null;}';
+        html += 'function datePickerPanel(input){const root=datePickerRoot(input);return root?root.querySelector("[data-date-picker]"):null;}';
+        html += 'function datePickerInputs(root){const scope=root||form;const inputs=[];if(scope.matches&&scope.matches("[data-nativeforms-date=true]")){inputs.push(scope);}if(scope.querySelectorAll){Array.prototype.push.apply(inputs,Array.from(scope.querySelectorAll("[data-nativeforms-date=true]")));}return inputs;}';
+        html += 'function datePickerIso(year,month,day){return String(year).padStart(4,"0")+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0");}';
+        html += 'function datePickerPartsFromIso(iso){const parsed=parseDateValue(iso,"us");return parsed?{year:parsed.year,month:parsed.month,day:parsed.day}:null;}';
+        html += 'function datePickerMonthName(year,monthIndex){try{return new Intl.DateTimeFormat(config.languageCode||undefined,{month:"long",year:"numeric"}).format(new Date(year,monthIndex,1));}catch(error){return String(monthIndex+1).padStart(2,"0")+"/"+String(year);} }';
+        html += 'function datePickerWeekdays(){const fallback=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];try{const formatter=new Intl.DateTimeFormat(config.languageCode||undefined,{weekday:"short"});return fallback.map(function(_,index){return formatter.format(new Date(Date.UTC(2026,1,index+1)));});}catch(error){return fallback;}}';
+        html += 'function datePickerBaseParts(input){const parsed=parseDateValue(input.value||"",input.dataset.dateFormat||"us")||datePickerPartsFromIso(input.dataset.effectiveMinDate||"")||datePickerPartsFromIso(input.dataset.effectiveMaxDate||"");if(parsed){return parsed;}const today=new Date();return{year:today.getFullYear(),month:today.getMonth()+1,day:today.getDate()};}';
+        html += 'function closeDatePickers(exceptInput){form.querySelectorAll("[data-date-picker]").forEach(function(panel){const root=exceptInput?datePickerRoot(exceptInput):null;if(root&&root.contains(panel)){return;}panel.hidden=true;});}';
+        html += 'function renderDatePicker(input){const panel=datePickerPanel(input);if(!panel){return;}const base=datePickerBaseParts(input);const year=Number(input.dataset.datePickerYear||base.year);const monthIndex=Number(input.dataset.datePickerMonth||base.month-1);input.dataset.datePickerYear=String(year);input.dataset.datePickerMonth=String(monthIndex);const selected=parseDateValue(input.value||"",input.dataset.dateFormat||"us");const today=new Date();const todayIso=datePickerIso(today.getFullYear(),today.getMonth()+1,today.getDate());const minDate=input.dataset.effectiveMinDate||"";const maxDate=input.dataset.effectiveMaxDate||"";const firstDay=new Date(year,monthIndex,1).getDay();const daysInMonth=new Date(year,monthIndex+1,0).getDate();const blanks=Array.from({length:firstDay}).map(function(){return "<span></span>";}).join("");const days=Array.from({length:daysInMonth}).map(function(_,dayIndex){const day=dayIndex+1;const iso=datePickerIso(year,monthIndex+1,day);const disabled=(minDate&&iso<minDate)||(maxDate&&iso>maxDate);let classes="";if(selected&&selected.iso===iso){classes+=" nf-date-picker__day--selected";}if(todayIso===iso){classes+=" nf-date-picker__day--today";}return `<button type="button" class="nf-date-picker__day${classes}" data-date-value="${iso}"${disabled?" disabled":""}>${day}</button>`;}).join("");const weekdays=datePickerWeekdays().map(function(day){return `<span>${escapeHtml(day)}</span>`;}).join("");panel.innerHTML=`<div class="nf-date-picker__header"><button type="button" class="nf-date-picker__nav" data-date-nav="-1" aria-label="${escapeHtml(t("datePickerPreviousMonth","Previous month"))}">&#8249;</button><div class="nf-date-picker__title">${escapeHtml(datePickerMonthName(year,monthIndex))}</div><button type="button" class="nf-date-picker__nav" data-date-nav="1" aria-label="${escapeHtml(t("datePickerNextMonth","Next month"))}">&#8250;</button></div><div class="nf-date-picker__week">${weekdays}</div><div class="nf-date-picker__grid">${blanks}${days}</div>`;}';
+        html += 'function openDatePicker(input){if(!input||input.readOnly||input.disabled){return;}closeDatePickers(input);const base=datePickerBaseParts(input);input.dataset.datePickerYear=String(base.year);input.dataset.datePickerMonth=String(base.month-1);renderDatePicker(input);const panel=datePickerPanel(input);if(panel){panel.hidden=false;}}';
+        html += 'function selectDatePickerValue(input,iso){input.value=formatDateForField(iso,input);validateDateField(input,false);renderDatePicker(input);const panel=datePickerPanel(input);if(panel){panel.hidden=true;}input.dispatchEvent(new Event("input",{bubbles:true}));input.dispatchEvent(new Event("change",{bubbles:true}));input.focus();}';
+        html += 'function datePickerInputFromRoot(root){return root?root.querySelector("[data-nativeforms-date=true]"):null;}';
+        html += 'function moveDatePickerMonth(input,delta){let year=Number(input.dataset.datePickerYear||datePickerBaseParts(input).year);let monthIndex=Number(input.dataset.datePickerMonth||datePickerBaseParts(input).month-1)+Number(delta||0);while(monthIndex<0){year-=1;monthIndex+=12;}while(monthIndex>11){year+=1;monthIndex-=12;}input.dataset.datePickerYear=String(year);input.dataset.datePickerMonth=String(monthIndex);renderDatePicker(input);const panel=datePickerPanel(input);if(panel){panel.hidden=false;}}';
+        html += 'function initDatePickers(root){datePickerInputs(root).forEach(function(input){const container=datePickerRoot(input);if(!container||container.dataset.datePickerReady==="true"){return;}container.dataset.datePickerReady="true";input.addEventListener("input",function(){const parsed=parseDateValue(input.value||"",input.dataset.dateFormat||"us");if(parsed){input.dataset.datePickerYear=String(parsed.year);input.dataset.datePickerMonth=String(parsed.month-1);renderDatePicker(input);}});});if(form.dataset.datePickerDocumentReady!=="true"){form.dataset.datePickerDocumentReady="true";form.addEventListener("click",function(event){const target=event.target&&event.target.closest?event.target:null;if(!target){return;}const toggle=target.closest("[data-date-picker-toggle]");if(toggle){event.preventDefault();event.stopPropagation();const input=datePickerInputFromRoot(toggle.closest("[data-nativeforms-date-picker=true]"));const panel=datePickerPanel(input);if(panel&&!panel.hidden){panel.hidden=true;}else{openDatePicker(input);}return;}const nav=target.closest("[data-date-nav]");if(nav){event.preventDefault();event.stopPropagation();const input=datePickerInputFromRoot(nav.closest("[data-nativeforms-date-picker=true]"));if(input){moveDatePickerMonth(input,Number(nav.dataset.dateNav||0));}return;}const day=target.closest("[data-date-value]");if(day&&!day.disabled){event.preventDefault();event.stopPropagation();const input=datePickerInputFromRoot(day.closest("[data-nativeforms-date-picker=true]"));if(input){selectDatePickerValue(input,day.dataset.dateValue);}}});document.addEventListener("click",function(event){const target=event.target&&event.target.closest?event.target:null;if(!target||!target.closest("[data-nativeforms-date-picker=true]")){closeDatePickers();}});document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeDatePickers();}});}}';
         html += 'function timeFormatHint(format){return format==="12h"?"h:mm AM/PM":"HH:mm";}';
         html += 'function parseTimeValue(value,format){const raw=String(value||"").trim();if(!raw){return null;}const salesforceTimeMatch=raw.match(/^(\\d{1,2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:?\\d{2})?$/);if(salesforceTimeMatch){const sfHours=Number(salesforceTimeMatch[1]);const sfMinutes=Number(salesforceTimeMatch[2]);const sfSeconds=salesforceTimeMatch[3]===undefined?0:Number(salesforceTimeMatch[3]);if(Number.isInteger(sfHours)&&Number.isInteger(sfMinutes)&&Number.isInteger(sfSeconds)&&sfHours>=0&&sfHours<=23&&sfMinutes>=0&&sfMinutes<=59&&sfSeconds>=0&&sfSeconds<=59){return String(sfHours).padStart(2,"0")+":"+String(sfMinutes).padStart(2,"0");}}let match;if(format==="12h"){match=raw.match(/^(\\d{1,2}):(\\d{2})\\s*([AaPp][Mm])$/);if(!match){return null;}let hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<1||hours>12||minutes<0||minutes>59){return null;}const meridiem=match[3].toUpperCase();if(meridiem==="AM"&&hours===12){hours=0;}else if(meridiem==="PM"&&hours<12){hours+=12;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}match=raw.match(/^(\\d{1,2}):(\\d{2})$/);if(!match){return null;}const hours=Number(match[1]);const minutes=Number(match[2]);if(!Number.isInteger(hours)||!Number.isInteger(minutes)||hours<0||hours>23||minutes<0||minutes>59){return null;}return String(hours).padStart(2,"0")+":"+String(minutes).padStart(2,"0");}';
         html += 'function formatTimeForField(value,field){const format=field&&field.dataset&&field.dataset.timeFormat?field.dataset.timeFormat:"24h";const parsed=parseTimeValue(value,"24h")||parseTimeValue(value,"12h");if(!parsed){return value==null?"":String(value);}if(format!=="12h"){return parsed;}const parts=parsed.split(":");const hour24=Number(parts[0]);const meridiem=hour24>=12?"PM":"AM";const hour12=hour24%12||12;return String(hour12)+":"+parts[1]+" "+meridiem;}';
         html += 'function validateTimeField(el,showMessage){if(!el||el.dataset.nativeformsTime!=="true"){return true;}const format=el.dataset.timeFormat||"24h";const raw=String(el.value||"").trim();if(!raw){el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}const parsed=parseTimeValue(raw,format);if(!parsed){el.setCustomValidity(interpolate(t("timeInvalid","Please enter a valid time in {format} format."),{format:timeFormatHint(format)}));if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return false;}el.setCustomValidity("");if(showMessage&&typeof el.reportValidity==="function"){el.reportValidity();}return true;}';
         html += 'function readFieldValue(fieldKey){const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=form.querySelector("[name=\'"+fieldKey+"\']:checked");return checked?checked.value:"";}return first.value||"";}';
-        html += 'function evaluateSingleCondition(condition){if(!condition||!condition.fieldKey||!condition.operator){return true;}const actual=readFieldValue(condition.fieldKey);const compare=condition.value||"";if(condition.operator==="equals"){return String(actual)===compare;}if(condition.operator==="notEquals"){return String(actual)!==compare;}if(condition.operator==="isTrue"){return actual===true||String(actual).toLowerCase()==="true";}if(condition.operator==="isFalse"){return actual===false||String(actual).toLowerCase()==="false"||String(actual)==="";}if(condition.operator==="isBlank"){return String(actual)==="";}if(condition.operator==="isNotBlank"){return String(actual)!=="";}return true;}';
+        html += 'function evaluateSingleCondition(condition,rowEl){if(!condition||!condition.fieldKey||!condition.operator){return true;}const rowHasField=rowEl&&Array.from(rowEl.querySelectorAll("[data-repeat-field-key]")).some(function(field){return field.dataset.repeatFieldKey===condition.fieldKey;});const actual=rowHasField?readRepeatFieldValueByKey(rowEl,condition.fieldKey):readFieldValue(condition.fieldKey);const compare=condition.value||"";if(condition.operator==="equals"){return String(actual)===compare;}if(condition.operator==="notEquals"){return String(actual)!==compare;}if(condition.operator==="isTrue"){return actual===true||String(actual).toLowerCase()==="true";}if(condition.operator==="isFalse"){return actual===false||String(actual).toLowerCase()==="false"||String(actual)==="";}if(condition.operator==="isBlank"){return String(actual)==="";}if(condition.operator==="isNotBlank"){return String(actual)!=="";}return true;}';
         html += 'function evaluateConditionExpression(results,expression){if(!results.length){return true;}if(results.length===1){return results[0];}const normalized=((expression||"").trim()||results.map(function(_,index){return String(index+1);}).join(" AND ")).replace(/\\(/g," ( ").replace(/\\)/g," ) ").replace(/\\s+/g," ").trim();const tokens=normalized?normalized.split(" "):[];const values=[];const operators=[];function applyOperator(){if(values.length<2||!operators.length){return;}const operator=operators.pop();const right=values.pop();const left=values.pop();values.push(operator==="AND"?(left&&right):(left||right));}function precedence(operator){return operator==="AND"?2:1;}for(let index=0;index<tokens.length;index+=1){const token=tokens[index];if(!token){continue;}if(token==="("){operators.push(token);continue;}if(token===")"){while(operators.length&&operators[operators.length-1]!=="("){applyOperator();}if(operators.length&&operators[operators.length-1]==="("){operators.pop();}continue;}if(token==="AND"||token==="OR"){while(operators.length&&operators[operators.length-1]!=="("&&precedence(operators[operators.length-1])>=precedence(token)){applyOperator();}operators.push(token);continue;}if(/^\\d+$/.test(token)){const refIndex=Number(token)-1;values.push(refIndex>=0&&refIndex<results.length?results[refIndex]:false);}}while(operators.length){applyOperator();}return values.length?!!values[0]:false;}';
-        html += 'function evaluateElementConditions(el){let conditions=[];try{conditions=JSON.parse(el.dataset.conditions||"[]")||[];}catch(error){conditions=[];}if(!conditions.length&&el.dataset.conditionSource){conditions=[{fieldKey:el.dataset.conditionSource,operator:el.dataset.conditionOperator,value:el.dataset.conditionValue||""}];}if(!conditions.length){return true;}const results=conditions.map(function(condition){return evaluateSingleCondition(condition);});return evaluateConditionExpression(results,el.dataset.conditionExpression||"");}';
-        html += 'function lookupForField(fieldKey){return form.querySelector("[data-nativeforms-lookup=\'true\'][data-lookup-field-key=\'"+String(fieldKey||"").replace(/\'/g,"\\\\\'")+"\']");}';
-        html += 'function setLookupValue(fieldKey,id,label){const lookupEl=lookupForField(fieldKey);if(!lookupEl){return false;}const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");if(hidden){hidden.value=id==null?"":String(id);}if(input){input.value=label||id||"";}if(clear){clear.hidden=!id;}lookupEl.dataset.lookupSelectedLabel=label||"";return true;}';
-        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}if(setLookupValue(fieldKey,value,"")){resolveLookupLabel(fieldKey,value);return;}if(setLocationValue(fieldKey,value)){return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}if(fields[0].dataset.nativeformsMultiCheckbox==="true"){setMultiCheckboxValue(fields,value);return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}});}';
+        html += 'function evaluateElementConditions(el){let conditions=[];try{conditions=JSON.parse(el.dataset.conditions||"[]")||[];}catch(error){conditions=[];}if(!conditions.length&&el.dataset.conditionSource){conditions=[{fieldKey:el.dataset.conditionSource,operator:el.dataset.conditionOperator,value:el.dataset.conditionValue||""}];}if(!conditions.length){return true;}const rowEl=el.closest("[data-repeat-row]");const results=conditions.map(function(condition){return evaluateSingleCondition(condition,rowEl);});return evaluateConditionExpression(results,el.dataset.conditionExpression||"");}';
+        html += 'function lookupForField(fieldKey){return form.querySelector("[data-nativeforms-lookup=\'true\'][data-lookup-field-key=\'"+String(fieldKey||"").replace(/\'/g,"\\\\\'")+"\']:not([data-lookup-repeat=\'true\'])");}';
+        html += 'function lookupInstanceKey(lookupEl){if(!lookupEl){return "";}if(!lookupEl.dataset.lookupInstanceKey){const rowEl=lookupEl.closest("[data-repeat-row]");const groupEl=rowEl?rowEl.closest("[data-repeat-group]"):null;lookupEl.dataset.lookupInstanceKey=(lookupEl.dataset.lookupFieldKey||"lookup")+":"+(rowEl?((groupEl&&groupEl.dataset.repeatGroup)||"row")+":"+(rowEl.dataset.repeatRowIndex||"0"):"single")+":"+Math.random().toString(36).slice(2);}return lookupEl.dataset.lookupInstanceKey;}';
+        html += 'function setLookupElementValue(lookupEl,id,label){if(!lookupEl){return false;}const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");if(hidden){hidden.value=id==null?"":String(id);}if(input){input.value=label||id||"";}if(clear){clear.hidden=!id;}lookupEl.dataset.lookupSelectedLabel=label||"";return true;}';
+        html += 'function setLookupValue(fieldKey,id,label){return setLookupElementValue(lookupForField(fieldKey),id,label);}';
+        html += 'function setFieldValue(fieldKey,value){if(formulaFieldKeySet().has(String(fieldKey||""))){return;}const lookupEl=lookupForField(fieldKey);if(setLookupValue(fieldKey,value,"")){resolveLookupLabel(fieldKey,value);applyLockState(lookupEl);return;}if(setLocationValue(fieldKey,value)){const locationFields=form.querySelectorAll("[name=\'"+fieldKey+"\']");locationFields.forEach(function(el){applyLockState(el);});return;}const fields=form.querySelectorAll("[name=\'"+fieldKey+"\']");if(!fields.length){return;}if(fields[0].dataset.nativeformsMultiCheckbox==="true"){setMultiCheckboxValue(fields,value);fields.forEach(function(el){applyLockState(el);});return;}fields.forEach(function(el){if(el.type==="checkbox"){el.checked=!!value;}else if(el.type==="radio"){el.checked=String(el.value)===String(value);}else if(el.dataset.nativeformsDate==="true"){el.value=formatDateForField(value,el);validateDateField(el,false);}else if(el.dataset.nativeformsTime==="true"){el.value=formatTimeForField(value,el);validateTimeField(el,false);}else{el.value=value==null?"":value;}applyLockState(el);});}';
         html += 'function lookupControls(){return Array.from(form.querySelectorAll("[data-nativeforms-lookup=\'true\']"));}';
         html += 'function setLookupStatus(lookupEl,message,isError){const status=lookupEl?lookupEl.querySelector("[data-lookup-status]"):null;if(status){status.textContent=message||"";status.style.color=isError?"#b42318":"";}}';
-        html += 'function renderLookupResults(lookupEl,items){const results=lookupEl?lookupEl.querySelector("[data-lookup-results]"):null;if(!results){return;}if(!items||!items.length){results.innerHTML="";results.hidden=true;return;}results.innerHTML=items.map(function(item){return \'<button type="button" class="nf-lookup__option" data-lookup-id="\'+escapeHtml(item.id||"")+\'" data-lookup-label="\'+escapeHtml(item.label||item.id||"")+\'">\'+escapeHtml(item.label||item.id||"")+\'</button>\';}).join("");results.hidden=false;}';
+        html += 'function lookupSetFields(lookupEl){try{return JSON.parse(lookupEl&&lookupEl.dataset.lookupSetFields?lookupEl.dataset.lookupSetFields:"[]")||[];}catch(error){return[];}}';
+        html += 'function lookupRecordForButton(lookupEl,button){const instanceKey=lookupInstanceKey(lookupEl);const recordId=String(button&&button.dataset.lookupId||"");return(lookupRecordsByInstance[instanceKey]||{})[recordId]||{id:recordId,label:button&&button.dataset.lookupLabel||recordId,fields:{}};}';
+        html += 'function lookupRecordFieldValue(fields,sourceField){if(!fields||!sourceField){return null;}if(Object.prototype.hasOwnProperty.call(fields,sourceField)){return fields[sourceField];}const requested=String(sourceField).toLowerCase();const actualKey=Object.keys(fields).find(function(key){return String(key).toLowerCase()===requested;});return actualKey?fields[actualKey]:null;}';
+        html += 'function applyLookupSetFields(lookupEl,record,clearValues){const mappings=lookupSetFields(lookupEl);if(!mappings.length){return;}const rowEl=lookupEl&&lookupEl.dataset.lookupRepeat==="true"?lookupEl.closest("[data-repeat-row]"):null;const fields=(record&&record.fields)||{};mappings.forEach(function(mapping){const sourceField=String(mapping&&mapping.sourceField||"");const targetFieldKey=String(mapping&&mapping.targetFieldKey||"");if(!sourceField||!targetFieldKey){return;}const value=clearValues?"":(sourceField.toLowerCase()==="id"?(record&&record.id):lookupRecordFieldValue(fields,sourceField));if(rowEl){const rowFields=Array.from(rowEl.querySelectorAll("[data-repeat-field-key=\'"+targetFieldKey.replace(/\'/g,"\\\\\'")+"\']"));if(rowFields.length){rowFields.forEach(function(field){setRepeatFieldValue(field,value);applyLockState(field);});return;}}setFieldValue(targetFieldKey,value==null?"":value);});}';
+        html += 'function renderLookupResults(lookupEl,items){const results=lookupEl?lookupEl.querySelector("[data-lookup-results]"):null;if(!results){return;}const instanceKey=lookupInstanceKey(lookupEl);lookupRecordsByInstance[instanceKey]={};if(!items||!items.length){results.innerHTML="";results.hidden=true;return;}items.forEach(function(item){if(item&&item.id){lookupRecordsByInstance[instanceKey][String(item.id)]=item;}});results.innerHTML=items.map(function(item){return \'<button type="button" class="nf-lookup__option" data-lookup-id="\'+escapeHtml(item.id||"")+\'" data-lookup-label="\'+escapeHtml(item.label||item.id||"")+\'">\'+escapeHtml(item.label||item.id||"")+\'</button>\';}).join("");results.hidden=false;}';
         html += 'async function callLookup(payload){if(!config.lookupUrl){throw new Error(t("lookupConfigMissing","Lookup is not configured for this published form."));}const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({formId:config.formId,publishToken:config.publishToken},payload||{}))});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}return data;}';
-        html += 'async function resolveLookupLabel(fieldKey,value){const id=String(value||"").trim();if(!id){return;}try{const data=await callLookup({fieldKey:fieldKey,recordId:id});if(data.record){setLookupValue(fieldKey,data.record.id,data.record.label||data.record.id);}}catch(error){}}';
-        html += 'async function runLookupSearch(lookupEl){const fieldKey=lookupEl&&lookupEl.dataset.lookupFieldKey;const input=lookupEl?lookupEl.querySelector("[data-lookup-input]"):null;if(!fieldKey||!input||lookupEl.dataset.lookupLocked==="true"||input.readOnly||input.disabled){return;}const search=String(input.value||"").trim();const hidden=lookupEl.querySelector("[data-lookup-hidden]");if(hidden){hidden.value="";}const minLength=Math.max(1,Number(lookupEl.dataset.lookupMinLength||2)||2);if(search.length<minLength){renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}if(lookupAbortByField[fieldKey]){lookupAbortByField[fieldKey].abort();}const controller=window.AbortController?new AbortController():null;lookupAbortByField[fieldKey]=controller;setLookupStatus(lookupEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,search:search})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}renderLookupResults(lookupEl,data.records||[]);setLookupStatus(lookupEl,(data.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
-        html += 'function initLookupControls(){lookupControls().forEach(function(lookupEl){const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const results=lookupEl.querySelector("[data-lookup-results]");if(input){input.addEventListener("input",function(){if(lookupEl.dataset.lookupLocked==="true"||input.readOnly||input.disabled){renderLookupResults(lookupEl,[]);return;}const fieldKey=lookupEl.dataset.lookupFieldKey;window.clearTimeout(lookupTimersByField[fieldKey]);lookupTimersByField[fieldKey]=window.setTimeout(function(){runLookupSearch(lookupEl);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLookupResults(lookupEl,[]);},180);});}if(results){results.addEventListener("click",function(event){if(lookupEl.dataset.lookupLocked==="true"){event.preventDefault();renderLookupResults(lookupEl,[]);return;}const button=event.target.closest("[data-lookup-id]");if(!button){return;}setLookupValue(lookupEl.dataset.lookupFieldKey,button.dataset.lookupId||"",button.dataset.lookupLabel||button.dataset.lookupId||"");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}if(clear){clear.addEventListener("click",function(){if(lookupEl.dataset.lookupLocked==="true"||clear.disabled){return;}setLookupValue(lookupEl.dataset.lookupFieldKey,"","");renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}});}';
+        html += 'async function resolveLookupElementLabel(lookupEl,value){const fieldKey=lookupEl&&lookupEl.dataset.lookupFieldKey;const id=String(value||"").trim();if(!fieldKey||!id){return;}try{const data=await callLookup({fieldKey:fieldKey,recordId:id});if(data.record){setLookupElementValue(lookupEl,data.record.id,data.record.label||data.record.id);applyLookupSetFields(lookupEl,data.record,false);handleRuntimeStateChange({target:{name:fieldKey}});}}catch(error){}}';
+        html += 'async function resolveLookupLabel(fieldKey,value){const lookupEl=lookupForField(fieldKey);if(lookupEl){resolveLookupElementLabel(lookupEl,value);}}';
+        html += 'async function runLookupSearch(lookupEl){const fieldKey=lookupEl&&lookupEl.dataset.lookupFieldKey;const input=lookupEl?lookupEl.querySelector("[data-lookup-input]"):null;if(!fieldKey||!input||lookupEl.dataset.lookupLocked==="true"||input.readOnly||input.disabled){return;}const search=String(input.value||"").trim();const hidden=lookupEl.querySelector("[data-lookup-hidden]");if(hidden){hidden.value="";}const minLength=Math.max(1,Number(lookupEl.dataset.lookupMinLength||2)||2);if(search.length<minLength){renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}const instanceKey=lookupInstanceKey(lookupEl);if(lookupAbortByField[instanceKey]){lookupAbortByField[instanceKey].abort();}const controller=window.AbortController?new AbortController():null;lookupAbortByField[instanceKey]=controller;setLookupStatus(lookupEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.lookupUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,search:search})});const data=await response.json();if(!response.ok||data.success===false){throw new Error(data.error||"Lookup failed");}renderLookupResults(lookupEl,data.records||[]);setLookupStatus(lookupEl,(data.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
+        html += 'function initLookupControls(root){Array.from((root||form).querySelectorAll("[data-nativeforms-lookup=\'true\']")).forEach(function(lookupEl){if(lookupEl.dataset.lookupInitialized==="true"){return;}lookupEl.dataset.lookupInitialized="true";lookupInstanceKey(lookupEl);const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const results=lookupEl.querySelector("[data-lookup-results]");if(input){input.addEventListener("input",function(){if(lookupEl.dataset.lookupLocked==="true"||input.readOnly||input.disabled){renderLookupResults(lookupEl,[]);return;}const instanceKey=lookupInstanceKey(lookupEl);window.clearTimeout(lookupTimersByField[instanceKey]);lookupTimersByField[instanceKey]=window.setTimeout(function(){runLookupSearch(lookupEl);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLookupResults(lookupEl,[]);},180);});}if(results){results.addEventListener("click",function(event){if(lookupEl.dataset.lookupLocked==="true"){event.preventDefault();renderLookupResults(lookupEl,[]);return;}const button=event.target.closest("[data-lookup-id]");if(!button){return;}const record=lookupRecordForButton(lookupEl,button);setLookupElementValue(lookupEl,button.dataset.lookupId||"",button.dataset.lookupLabel||button.dataset.lookupId||"");applyLookupSetFields(lookupEl,record,false);renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}if(clear){clear.addEventListener("click",function(){if(lookupEl.dataset.lookupLocked==="true"||clear.disabled){return;}setLookupElementValue(lookupEl,"","");applyLookupSetFields(lookupEl,null,true);renderLookupResults(lookupEl,[]);setLookupStatus(lookupEl,"",false);handleRuntimeStateChange({target:{name:lookupEl.dataset.lookupFieldKey}});});}});}';
         html += 'function locationControls(){return Array.from(form.querySelectorAll("[data-nativeforms-location=\'true\']"));}';
         html += 'function locationForField(fieldKey){return form.querySelector("[data-nativeforms-location=\'true\'][data-location-field-key=\'"+String(fieldKey||"").replace(/\'/g,"\\\\\'")+"\']");}';
         html += 'function locationInput(locationEl,kind){return locationEl?locationEl.querySelector("[data-location-input=\'"+kind+"\']"):null;}';
@@ -2284,18 +2444,18 @@ public with sharing class NativeFormsPublisher {
         html += 'async function runLocationSearch(locationEl,kind){const fieldKey=locationEl&&locationEl.dataset.locationFieldKey;const input=locationInput(locationEl,kind);if(!fieldKey||!input||input.readOnly||input.disabled){return;}const search=String(input.value||"").trim();clearLocationParts(locationEl,kind);const minLength=kind==="country"?1:Math.max(1,Number(locationEl.dataset.locationMinLength||2)||2);if(search.length<minLength){renderLocationResults(locationEl,[]);setLocationStatus(locationEl,search?t("lookupKeepTyping","Keep typing to search.").replace("{min}",String(minLength)):"",false);return;}const data=selectedLocationData(locationEl);if((kind==="region"||kind==="city")&&!data.countryCode){renderLocationResults(locationEl,[]);setLocationStatus(locationEl,t("locationChooseCountry","Choose a country first."),true);return;}const timerKey=fieldKey+":"+kind;if(locationAbortByField[timerKey]){locationAbortByField[timerKey].abort();}const controller=window.AbortController?new AbortController():null;locationAbortByField[timerKey]=controller;setLocationStatus(locationEl,t("lookupSearching","Searching..."),false);try{const response=await fetch(config.locationUrl,{method:"POST",headers:{"Content-Type":"application/json"},signal:controller?controller.signal:undefined,body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:fieldKey,kind:kind,search:search,countryCode:data.countryCode||"",regionCode:kind==="city"&&locationEl.dataset.locationRegionExplicit!=="true"?"":(data.regionCode||"")})});const payload=await response.json();if(!response.ok||payload.success===false){throw new Error(payload.error||"Location search failed");}renderLocationResults(locationEl,payload.records||[]);locationEl.dataset.locationActiveKind=kind;setLocationStatus(locationEl,(payload.records||[]).length?"":t("lookupNoResults","No matching records found."),false);}catch(error){if(error&&error.name==="AbortError"){return;}renderLocationResults(locationEl,[]);setLocationStatus(locationEl,error&&error.message?error.message:t("lookupFailed","Lookup failed."),true);}}';
         html += 'async function applyDefaultLocationCountry(locationEl){const defaultCountry=String(locationEl&&locationEl.dataset.locationDefaultCountry||"").trim().toUpperCase();if(!defaultCountry||selectedLocationData(locationEl).countryCode||!config.locationUrl){return;}try{const response=await fetch(config.locationUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formId:config.formId,publishToken:config.publishToken,fieldKey:locationEl.dataset.locationFieldKey,kind:"country",search:defaultCountry})});const payload=await response.json();const match=(payload.records||[]).find(function(item){return String(item.countryCode||"").toUpperCase()===defaultCountry;});if(response.ok&&match){applyLocationSelection(locationEl,"country",match);}}catch(error){}}';
         html += 'function initLocationControls(){locationControls().forEach(function(locationEl){const mode=locationEl.dataset.locationMode||"countryRegionCity";const region=locationInput(locationEl,"region");const city=locationInput(locationEl,"city");if(region){region.hidden=mode==="country"||mode==="countryCity";}if(city){city.hidden=mode==="country"||mode==="countryRegion";}["country","region","city"].forEach(function(kind){const input=locationInput(locationEl,kind);if(!input){return;}input.addEventListener("input",function(){const key=(locationEl.dataset.locationFieldKey||"")+":"+kind;window.clearTimeout(locationTimersByField[key]);locationTimersByField[key]=window.setTimeout(function(){runLocationSearch(locationEl,kind);},400);});input.addEventListener("blur",function(){window.setTimeout(function(){renderLocationResults(locationEl,[]);},180);});});const results=locationEl.querySelector("[data-location-results]");if(results){results.addEventListener("click",function(event){const button=event.target.closest("[data-location-item]");if(!button){return;}let item={};try{item=JSON.parse(button.dataset.locationItem||"{}");}catch(error){}applyLocationSelection(locationEl,locationEl.dataset.locationActiveKind||"country",item);});}const clear=locationEl.querySelector("[data-location-clear]");if(clear){clear.addEventListener("click",function(){writeLocationData(locationEl,{});["country","region","city"].forEach(function(kind){const input=locationInput(locationEl,kind);if(input){input.value="";}});renderLocationResults(locationEl,[]);setLocationStatus(locationEl,"",false);handleRuntimeStateChange({target:{name:locationEl.dataset.locationFieldKey}});});}applyDefaultLocationCountry(locationEl);});}';
-        html += 'function validateLocationFields(){const controls=locationControls();for(let index=0;index<controls.length;index+=1){const locationEl=controls[index];const data=selectedLocationData(locationEl);const countryInput=locationInput(locationEl,"country");const regionInput=locationInput(locationEl,"region");const cityInput=locationInput(locationEl,"city");const hasCountry=!!(data.countryCode||data.countryName);const hasRegion=!!(data.regionCode||data.regionName);if(locationEl.dataset.locationRequiredCountry==="true"&&!hasCountry){setLocationStatus(locationEl,t("locationCountryRequired","Choose a country."),true);if(countryInput){countryInput.focus();}return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if(regionInput&&!regionInput.hidden&&locationEl.dataset.locationRequiredRegion==="true"&&!hasRegion){setLocationStatus(locationEl,t("locationRegionRequired","Choose a state or region."),true);regionInput.focus();return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if(cityInput&&!cityInput.hidden&&locationEl.dataset.locationRequiredCity==="true"&&!data.cityName){setLocationStatus(locationEl,t("locationCityRequired","Choose a city."),true);cityInput.focus();return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if((countryInput&&String(countryInput.value||"").trim()&&!hasCountry)||(regionInput&&!regionInput.hidden&&String(regionInput.value||"").trim()&&!hasRegion)||(cityInput&&!cityInput.hidden&&String(cityInput.value||"").trim()&&!data.cityName)){setLocationStatus(locationEl,t("lookupSelectResult","Choose a result from the lookup list."),true);return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}}return{valid:true,message:""};}';
-        html += 'function validateLookupFields(){const controls=lookupControls();for(let index=0;index<controls.length;index+=1){const lookupEl=controls[index];const input=lookupEl.querySelector("[data-lookup-input]");const hidden=lookupEl.querySelector("[data-lookup-hidden]");const required=lookupEl.dataset.lookupRequired==="true";const hasId=!!(hidden&&String(hidden.value||"").trim());if(required&&!hasId){setLookupStatus(lookupEl,t("lookupRequired","Select a record before submitting."),true);if(input){input.focus();}return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}if(input&&String(input.value||"").trim()&&!hasId){setLookupStatus(lookupEl,t("lookupSelectResult","Choose a result from the lookup list."),true);input.focus();return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}}return{valid:true,message:""};}';
-        html += 'function validateMultiCheckboxGroups(){const groups=form.querySelectorAll("[data-nativeforms-multi-checkbox-group=\'true\']");for(let index=0;index<groups.length;index+=1){const group=groups[index];const required=group.dataset.required==="true";const boxes=Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']"));const first=boxes[0];const hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.setCustomValidity("");});if(required&&!hasValue){if(first){first.setCustomValidity(t("multiCheckboxRequired","Select at least one option."));first.reportValidity();first.focus();}return{valid:false,message:t("multiCheckboxReview","Please review the checkbox groups and try again.")};}}return{valid:true,message:""};}';
+        html += 'function validateLocationFields(){const controls=locationControls();for(let index=0;index<controls.length;index+=1){const locationEl=controls[index];if(isConditionHidden(locationEl)){continue;}const data=selectedLocationData(locationEl);const countryInput=locationInput(locationEl,"country");const regionInput=locationInput(locationEl,"region");const cityInput=locationInput(locationEl,"city");const hasCountry=!!(data.countryCode||data.countryName);const hasRegion=!!(data.regionCode||data.regionName);if(locationEl.dataset.locationRequiredCountry==="true"&&!hasCountry){setLocationStatus(locationEl,t("locationCountryRequired","Choose a country."),true);if(countryInput){countryInput.focus();}return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if(regionInput&&!regionInput.hidden&&locationEl.dataset.locationRequiredRegion==="true"&&!hasRegion){setLocationStatus(locationEl,t("locationRegionRequired","Choose a state or region."),true);regionInput.focus();return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if(cityInput&&!cityInput.hidden&&locationEl.dataset.locationRequiredCity==="true"&&!data.cityName){setLocationStatus(locationEl,t("locationCityRequired","Choose a city."),true);cityInput.focus();return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}if((countryInput&&String(countryInput.value||"").trim()&&!hasCountry)||(regionInput&&!regionInput.hidden&&String(regionInput.value||"").trim()&&!hasRegion)||(cityInput&&!cityInput.hidden&&String(cityInput.value||"").trim()&&!data.cityName)){setLocationStatus(locationEl,t("lookupSelectResult","Choose a result from the lookup list."),true);return{valid:false,message:t("locationReview","Please review the location fields and try again.")};}}return{valid:true,message:""};}';
+        html += 'function validateLookupFields(){const controls=lookupControls();for(let index=0;index<controls.length;index+=1){const lookupEl=controls[index];if(isConditionHidden(lookupEl)){continue;}const input=lookupEl.querySelector("[data-lookup-input]");const hidden=lookupEl.querySelector("[data-lookup-hidden]");const required=lookupEl.dataset.lookupRequired==="true";const hasId=!!(hidden&&String(hidden.value||"").trim());if(required&&!hasId){setLookupStatus(lookupEl,t("lookupRequired","Select a record before submitting."),true);if(input){input.focus();}return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}if(input&&String(input.value||"").trim()&&!hasId){setLookupStatus(lookupEl,t("lookupSelectResult","Choose a result from the lookup list."),true);input.focus();return{valid:false,message:t("lookupReview","Please review the lookup fields and try again.")};}}return{valid:true,message:""};}';
+        html += 'function validateMultiCheckboxGroups(){const groups=form.querySelectorAll("[data-nativeforms-multi-checkbox-group=\'true\']");for(let index=0;index<groups.length;index+=1){const group=groups[index];if(isConditionHidden(group)){continue;}const required=group.dataset.required==="true";const boxes=Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']"));const first=boxes[0];const hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.setCustomValidity("");});if(required&&!hasValue){if(first){first.setCustomValidity(t("multiCheckboxRequired","Select at least one option."));first.reportValidity();first.focus();}return{valid:false,message:t("multiCheckboxReview","Please review the checkbox groups and try again.")};}}return{valid:true,message:""};}';
         html += 'function readAllFieldValues(){const values={};form.querySelectorAll("[name]").forEach(function(control){const fieldKey=String(control.name||"");if(!fieldKey||Object.prototype.hasOwnProperty.call(values,fieldKey)){return;}values[fieldKey]=readRuntimeFieldValue(fieldKey);});return values;}';
         html += 'const repeatDeleteState={};';
         html += 'let lastPrefillPayload=null;let activeButtonNavigationUrl="";';
         html += 'function readRepeatFieldValueByKey(rowEl,fieldKey){const fields=rowEl.querySelectorAll("[data-repeat-field-key=\'"+fieldKey+"\']");if(!fields.length){return "";}const first=fields[0];if(first.dataset.nativeformsMultiCheckbox==="true"){return readMultiCheckboxValue(fields);}if(first.type==="checkbox"){return !!first.checked;}if(first.type==="radio"){const checked=Array.from(fields).find(function(el){return el.checked;});return checked?checked.value:"";}if(first.dataset.nativeformsDate==="true"){const parsed=parseDateValue(first.value||"",first.dataset.dateFormat||"us");return parsed?parsed.iso:(first.value||"");}if(first.dataset.nativeformsTime==="true"){const parsed=parseTimeValue(first.value||"",first.dataset.timeFormat||"24h");return parsed||String(first.value||"");}return first.value||"";}';
-        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.dataset.nativeformsMultiCheckbox==="true"){field.checked=parseMultiCheckboxValue(value).has(String(field.value||""));field.setCustomValidity("");return;}if(field.type==="checkbox"){field.checked=!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}if(field.dataset.nativeformsTime==="true"){field.value=formatTimeForField(value,field);validateTimeField(field,false);return;}field.value=value==null?"":value;}';
-        html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:"";if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
-        html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);initRepeatRowSignatures(rowsHost.lastElementChild);});}';
+        html += 'function setRepeatFieldValue(field,value){if(!field){return;}if(field.dataset.nativeformsMultiCheckbox==="true"){field.checked=parseMultiCheckboxValue(value).has(String(field.value||""));field.setCustomValidity("");return;}if(field.type==="checkbox"){field.checked=typeof value==="string"?["true","1","yes","checked"].indexOf(value.trim().toLowerCase())>=0:!!value;return;}if(field.type==="radio"){field.checked=String(field.value)===String(value==null?"":value);return;}if(field.dataset.nativeformsDate==="true"){field.value=formatDateForField(value,field);validateDateField(field,false);return;}if(field.dataset.nativeformsTime==="true"){field.value=formatTimeForField(value,field);validateTimeField(field,false);return;}field.value=value==null?"":value;}';
+        html += 'function setupRepeatRow(groupKey,rowEl,rowData,rowIndex){rowEl.dataset.repeatRowIndex=String(rowIndex);rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;const sourceField=field.dataset.repeatSourceField||fieldKey;const value=rowData&&Object.prototype.hasOwnProperty.call(rowData,sourceField)?rowData[sourceField]:(field.dataset.repeatDefault||"");if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}if(field.type==="radio"){field.name=groupKey+"-"+rowIndex+"-"+fieldKey;}else if(field.name){field.removeAttribute("name");}setRepeatFieldValue(field,value);});rowEl.querySelectorAll("[data-repeat-label-target=\'true\']").forEach(function(field){if(field.id){field.id=groupKey+"-"+rowIndex+"-"+field.id;}});rowEl.querySelectorAll("[data-nativeforms-lookup=\'true\'][data-lookup-repeat=\'true\']").forEach(function(lookupEl){const hidden=lookupEl.querySelector("[data-lookup-hidden]");const value=hidden?hidden.value:"";if(value){resolveLookupElementLabel(lookupEl,value);}});rowEl.querySelectorAll("label[for]").forEach(function(label,index){const target=rowEl.querySelectorAll("[data-repeat-label-target=\'true\'],[data-repeat-field-key]")[index];if(target&&target.id){label.setAttribute("for",target.id);}});}';
+        html += 'function renderRepeatGroup(groupKey,groupPayload){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}repeatDeleteState[groupKey]=[];rowsHost.innerHTML="";const rows=(groupPayload&&Array.isArray(groupPayload.rows))?groupPayload.rows:[];rows.forEach(function(rowData,rowIndex){const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,rowData||{},rowIndex);rowsHost.appendChild(fragment);applyDateConstraints(rowsHost.lastElementChild);initDatePickers(rowsHost.lastElementChild);initRepeatRowSignatures(rowsHost.lastElementChild);initLookupControls(rowsHost.lastElementChild);wireLiveValidation(rowsHost.lastElementChild);});}';
         html += 'function clearRepeatGroups(){form.querySelectorAll("[data-repeat-rows]").forEach(function(host){host.innerHTML="";});Object.keys(repeatDeleteState).forEach(function(key){repeatDeleteState[key]=[];});}';
-        html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);initRepeatRowSignatures(rowsHost.lastElementChild);}';
+        html += 'function addRepeatRow(groupKey){const rowsHost=form.querySelector("[data-repeat-rows=\'"+groupKey+"\']");const template=form.querySelector("template[data-repeat-template=\'"+groupKey+"\']");if(!rowsHost||!template){return;}const fragment=template.content.cloneNode(true);const rowEl=fragment.querySelector("[data-repeat-row]");setupRepeatRow(groupKey,rowEl,{},rowsHost.children.length);rowsHost.appendChild(fragment);applyDateConstraints(rowsHost.lastElementChild);initDatePickers(rowsHost.lastElementChild);initRepeatRowSignatures(rowsHost.lastElementChild);initLookupControls(rowsHost.lastElementChild);wireLiveValidation(rowsHost.lastElementChild);evaluateAllFormulaFields();evaluateConditions();}';
         html += 'function collectRepeatGroups(){const groups={};form.querySelectorAll("[data-repeat-group]").forEach(function(groupEl){const groupKey=groupEl.dataset.repeatGroup;const rows=[];groupEl.querySelectorAll("[data-repeat-row]").forEach(function(rowEl,rowIndex){const row={};const seen={};rowEl.querySelectorAll("[data-repeat-field-key]").forEach(function(field){const fieldKey=field.dataset.repeatFieldKey;if(seen[fieldKey]){return;}row[fieldKey]=readRepeatFieldValueByKey(rowEl,fieldKey);seen[fieldKey]=true;});const rowSignaturePad=rowEl.querySelector("[data-nativeforms-row-signature=\'true\']");const rowSignatureCanvas=signatureCanvasForPad(rowSignaturePad);if(rowSignaturePad&&rowSignatureCanvas&&rowSignaturePad.dataset.signatureEmpty==="false"){row._rowSignature={dataUrl:rowSignatureCanvas.toDataURL("image/png"),contentType:"image/png",fileName:groupKey+"-row-"+String(rowIndex+1)+"-signature.png",signedAt:new Date().toISOString()};}rows.push(row);});groups[groupKey]={rows:rows,deletedIds:repeatDeleteState[groupKey]||[]};});return groups;}';
         html += 'form.addEventListener("click",function(event){const addButton=event.target.closest("[data-repeat-add]");if(addButton){event.preventDefault();addRepeatRow(addButton.dataset.repeatAdd);return;}const deleteButton=event.target.closest("[data-repeat-delete-row]");if(deleteButton){event.preventDefault();const rowEl=deleteButton.closest("[data-repeat-row]");const groupEl=deleteButton.closest("[data-repeat-group]");if(!rowEl||!groupEl){return;}const groupKey=groupEl.dataset.repeatGroup;const idFieldKey=groupEl.dataset.repeatIdField;const existingId=idFieldKey?readRepeatFieldValueByKey(rowEl,idFieldKey):"";if(existingId){repeatDeleteState[groupKey]=repeatDeleteState[groupKey]||[];repeatDeleteState[groupKey].push(existingId);}rowEl.remove();}});';
         html += 'function applyLockState(control){if(!control||control.dataset.lockOnPrefill!=="true"){return;}let lookupEl=null;if(control.matches&&control.matches("[data-nativeforms-lookup=\'true\']")){lookupEl=control;}if(!lookupEl&&control.closest){lookupEl=control.closest("[data-nativeforms-lookup=\'true\']");}if(!lookupEl&&control.querySelector){lookupEl=control.querySelector("[data-nativeforms-lookup=\'true\']");}if(lookupEl){const hidden=lookupEl.querySelector("[data-lookup-hidden]");const input=lookupEl.querySelector("[data-lookup-input]");const clear=lookupEl.querySelector("[data-lookup-clear]");const hasLookupValue=!!(hidden&&String(hidden.value||"").trim());lookupEl.dataset.lookupLocked=hasLookupValue?"true":"false";if(input){input.readOnly=hasLookupValue;input.setAttribute("aria-readonly",hasLookupValue?"true":"false");}if(clear){clear.disabled=hasLookupValue;}if(hasLookupValue){renderLookupResults(lookupEl,[]);}return;}let hasValue=false;if(control.dataset.nativeformsMultiCheckbox==="true"){const group=control.closest("[data-nativeforms-multi-checkbox-group=\'true\']");const boxes=group?Array.from(group.querySelectorAll("input[data-nativeforms-multi-checkbox=\'true\']")):[control];hasValue=boxes.some(function(box){return box.checked;});boxes.forEach(function(box){box.disabled=hasValue;});return;}if(control.type==="checkbox"||control.type==="radio"){hasValue=!!control.checked;}else{hasValue=String(control.value==null?"":control.value).trim()!=="";}if(control.tagName==="SELECT"||control.type==="checkbox"||control.type==="radio"){control.disabled=hasValue;}else{control.readOnly=hasValue;}}';
@@ -2303,19 +2463,21 @@ public with sharing class NativeFormsPublisher {
         html += 'function applyPrefillPayload(payload){if(!payload){return;}lastPrefillPayload=payload;const input=payload.input||{};const hidden=payload.hidden||{};const repeatGroups=payload.repeatGroups||{};Object.keys(input).forEach(function(key){setFieldValue(key,input[key]);});Object.keys(hidden).forEach(function(key){setFieldValue(key,hidden[key]);});clearRepeatGroups();Object.keys(repeatGroups).forEach(function(groupKey){renderRepeatGroup(groupKey,repeatGroups[groupKey]);});renderMergedDocuments(payload);evaluateAllFormulaFields();applyLockedFields();evaluateConditions();}';
         html += 'async function runInitialPrefill(){const params=getPrefillParams();if(!hasPrefillParams(params)||userVerificationEnabled){return;}setPrefillLoading(true,t("prefillLoadingMessage","Please wait while we prepare your form."));try{const data=await runPrefillWithParams(params);if(!hasPrefillData(data)){setStatus("info",t("prefillNoData","No saved details found. You can continue with a blank form."));}}catch(error){emitTwinaFormsEvent("prefill:error",{message:error&&error.message?error.message:t("prefillLoadFailed","We could not load prefill data for this form.")});setStatus("error",t("prefillLoadFailedContinue","We could not load saved details. You can still complete the form manually."));}finally{setPrefillLoading(false);}}';
         html += 'function isoDate(value){return value.toISOString().split("T")[0];}';
-        html += 'function applyDateConstraints(){form.querySelectorAll("[data-nativeforms-date=\'true\']").forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
+        html += 'function applyDateConstraints(root){datePickerInputs(root||form).forEach(function(el){const now=new Date();let minDate=el.dataset.minDate?new Date(el.dataset.minDate+"T00:00:00Z"):null;let maxDate=el.dataset.maxDate?new Date(el.dataset.maxDate+"T00:00:00Z"):null;const pastYears=Number(el.dataset.pastYears||0);const pastMonths=Number(el.dataset.pastMonths||0);const futureYears=Number(el.dataset.futureYears||0);const futureMonths=Number(el.dataset.futureMonths||0);if(pastYears||pastMonths){minDate=new Date(now);minDate.setFullYear(minDate.getFullYear()-pastYears);minDate.setMonth(minDate.getMonth()-pastMonths);}if(futureYears||futureMonths){maxDate=new Date(now);maxDate.setFullYear(maxDate.getFullYear()+futureYears);maxDate.setMonth(maxDate.getMonth()+futureMonths);}if(minDate){el.dataset.effectiveMinDate=isoDate(minDate);}else{el.removeAttribute("data-effective-min-date");}if(maxDate){el.dataset.effectiveMaxDate=isoDate(maxDate);}else{el.removeAttribute("data-effective-max-date");}if(el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us")||parseDateValue(el.value,"us")||parseDateValue(el.value,"eu");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}validateDateField(el,false);});}';
         html += 'function updateCharacterCounter(el){const max=parseInt(el&&el.dataset?el.dataset.characterLimit:"",10);const field=el?el.closest(".nf-field"):null;const counter=field?field.querySelector("[data-character-counter]"):null;if(!counter||!Number.isFinite(max)||max<=0){return;}const used=String(el.value||"").length;counter.textContent=used+"/"+max+" "+t("characters","characters");counter.classList.toggle("nf-char-counter--over",used>max);}';
-        html += 'function validateField(el){if(!el||el.type==="hidden"){return true;}updateCharacterCounter(el);const max=parseInt(el.dataset?el.dataset.characterLimit:"",10);if(Number.isFinite(max)&&max>0&&String(el.value||"").length>max){el.setCustomValidity(interpolate(t("textTooLong","Keep this field under {max} characters."),{max:String(max)}));}else if(el.dataset&&el.dataset.characterLimit){el.setCustomValidity("");}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,true);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid;}if(el.dataset.nativeformsTime==="true"){const valid=validateTimeField(el,true);if(valid&&el.value){el.value=formatTimeForField(el.value,el);}return valid;}const valid=el.checkValidity();if(!valid){el.reportValidity();}return valid;}';
-        html += 'function validateAllFields(){const fields=Array.from(form.querySelectorAll("input,textarea,select")).filter(function(el){return el.type!=="hidden";});let valid=true;fields.forEach(function(el){if(!validateField(el)){valid=false;}});return valid;}';
-        html += 'function wireLiveValidation(){form.querySelectorAll("input,textarea,select").forEach(function(el){if(el.type==="hidden"){return;}updateCharacterCounter(el);const events=(el.dataset.nativeformsDate==="true"||el.dataset.nativeformsTime==="true")?["change","blur"]:["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){validateField(el);});});});}';
-        html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!validateDateField(el,true)){return{success:false,message:el.validationMessage||t("dateReview","Please review the date fields and try again."),values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
-        html += 'function collectNormalizedTimeValues(){const values={};const timeFields=form.querySelectorAll("[data-nativeforms-time=\'true\']");for(let index=0;index<timeFields.length;index+=1){const el=timeFields[index];if(!validateTimeField(el,true)){return{success:false,message:el.validationMessage||t("timeReview","Please review the time fields and try again."),values:{}};}const parsed=parseTimeValue(el.value||"",el.dataset.timeFormat||"24h");if(parsed&&el.name){values[el.name]=parsed;el.value=formatTimeForField(parsed,el);}}return{success:true,message:"",values:values};}';
+        html += 'function validateField(el,showMessage){if(!el||el.type==="hidden"||isConditionHidden(el)){return true;}const displayMessage=showMessage!==false;updateCharacterCounter(el);const max=parseInt(el.dataset?el.dataset.characterLimit:"",10);if(Number.isFinite(max)&&max>0&&String(el.value||"").length>max){el.setCustomValidity(interpolate(t("textTooLong","Keep this field under {max} characters."),{max:String(max)}));}else if(el.dataset&&el.dataset.characterLimit){el.setCustomValidity("");}if(el.dataset.nativeformsDate==="true"){const valid=validateDateField(el,displayMessage);if(valid&&el.value){const parsed=parseDateValue(el.value,el.dataset.dateFormat||"us");if(parsed){el.value=formatParsedDate(parsed,el.dataset.dateFormat||"us");}}return valid&&el.checkValidity();}if(el.dataset.nativeformsTime==="true"){const valid=validateTimeField(el,displayMessage);if(valid&&el.value){el.value=formatTimeForField(el.value,el);}return valid&&el.checkValidity();}const valid=el.checkValidity();if(!valid&&displayMessage){el.reportValidity();}return valid;}';
+        html += 'function validateAllFields(){const fields=Array.from(form.querySelectorAll("input,textarea,select")).filter(function(el){return el.type!=="hidden"&&!isConditionHidden(el);});let valid=true;fields.forEach(function(el){if(!validateField(el,false)){valid=false;}});return valid;}';
+        html += 'function wireLiveValidation(root){const scope=root||form;const fields=[];if(scope.matches&&scope.matches("input,textarea,select")){fields.push(scope);}if(scope.querySelectorAll){Array.prototype.push.apply(fields,Array.from(scope.querySelectorAll("input,textarea,select")));}fields.forEach(function(el){if(el.type==="hidden"||el.dataset.validationWired==="true"){return;}el.setAttribute("data-validation-wired","true");updateCharacterCounter(el);const isDateOrTime=el.dataset.nativeformsDate==="true"||el.dataset.nativeformsTime==="true";const events=["input","change","blur"];events.forEach(function(evt){el.addEventListener(evt,function(){const valid=validateField(el);if(valid&&isDateOrTime&&statusEl&&statusEl.classList.contains("nf-status--error")){clearStatus();}});});});}';
+        html += 'function collectNormalizedDateValues(){const values={};const dateFields=form.querySelectorAll("[data-nativeforms-date=\'true\']");for(let index=0;index<dateFields.length;index+=1){const el=dateFields[index];if(!isConditionHidden(el)&&!validateDateField(el,true)){return{success:false,message:el.validationMessage||t("dateReview","Please review the date fields and try again."),values:{}};}const parsed=parseDateValue(el.value||"",el.dataset.dateFormat||"us");if(parsed&&el.name){values[el.name]=parsed.iso;}}return{success:true,message:"",values:values};}';
+        html += 'function collectNormalizedTimeValues(){const values={};const timeFields=form.querySelectorAll("[data-nativeforms-time=\'true\']");for(let index=0;index<timeFields.length;index+=1){const el=timeFields[index];if(!isConditionHidden(el)&&!validateTimeField(el,true)){return{success:false,message:el.validationMessage||t("timeReview","Please review the time fields and try again."),values:{}};}const parsed=parseTimeValue(el.value||"",el.dataset.timeFormat||"24h");if(parsed&&el.name){values[el.name]=parsed;el.value=formatTimeForField(parsed,el);}}return{success:true,message:"",values:values};}';
         html += 'function setElementVisibilityState(elementId,visible){const key=String(elementId||"");if(!key){return;}manualVisibilityState[key]=visible!==false;evaluateConditions();}';
-        html += 'function evaluateConditions(){form.querySelectorAll("[data-conditions],[data-condition-source],[data-element-id]").forEach(function(el){const elementId=String(el.dataset.elementId||"");const conditionVisible=evaluateElementConditions(el);const manualVisible=elementId&&Object.prototype.hasOwnProperty.call(manualVisibilityState,elementId)?manualVisibilityState[elementId]:true;const visible=conditionVisible&&manualVisible;el.hidden=!visible;el.style.display=visible?"":"none";});}';
+        html += 'function isConditionHidden(el){return !!(el&&el.closest&&el.closest("[data-condition-hidden]"));}';
+        html += 'function evaluateConditions(){form.querySelectorAll("[data-conditions],[data-condition-source],[data-element-id]").forEach(function(el){const staticHidden=el.dataset.hiddenBehavior==="true";const elementId=String(el.dataset.elementId||"");const conditionVisible=staticHidden?false:evaluateElementConditions(el);const manualVisible=!staticHidden&&elementId&&Object.prototype.hasOwnProperty.call(manualVisibilityState,elementId)?manualVisibilityState[elementId]:true;const visible=!staticHidden&&conditionVisible&&manualVisible;if(!conditionVisible||!manualVisible){el.setAttribute("data-condition-hidden","true");}else{el.removeAttribute("data-condition-hidden");}el.hidden=!visible;el.style.display=visible?"":"none";});}';
         html += 'const twinaFormsApi={getValue:function(fieldKey){return readRuntimeFieldValue(String(fieldKey||""));},setValue:function(fieldKey,value){const safeFieldKey=String(fieldKey||"");setFieldValue(safeFieldKey,value);handleRuntimeStateChange();emitTwinaFormsEvent("change",{fieldKey:safeFieldKey,value:readRuntimeFieldValue(safeFieldKey),source:"api"});},getAll:function(){return readAllFieldValues();},showElement:function(elementId){setElementVisibilityState(elementId,true);},hideElement:function(elementId){setElementVisibilityState(elementId,false);},on:function(eventName,handler){const name=String(eventName||"");if(!name||typeof handler!=="function"){return function(){};}twinaFormsHandlers[name]=twinaFormsHandlers[name]||[];twinaFormsHandlers[name].push(handler);return function(){twinaFormsApi.off(name,handler);};},off:function(eventName,handler){const name=String(eventName||"");const handlers=twinaFormsHandlers[name]||[];if(typeof handler!=="function"){delete twinaFormsHandlers[name];return;}twinaFormsHandlers[name]=handlers.filter(function(candidate){return candidate!==handler;});}};';
         html += 'window.TwinaForms=twinaFormsApi;window.NativeForms=window.TwinaForms;';
         html += 'function runGuardedCustomJs(){const customJsSource="' + escapeJsString(publishedCustomJs) + '";if(!String(customJsSource||"").trim()){return;}try{const runner=new Function("TwinaForms",customJsSource);runner(window.TwinaForms);}catch(error){console.error("TwinaForms custom JavaScript error",error);emitTwinaFormsEvent("customjs:error",{message:error&&error.message?error.message:"Custom JavaScript failed",source:"customjs"});}}';
         html += 'applyDateConstraints();';
+        html += 'initDatePickers();';
         html += 'wireLiveValidation();';
         html += 'wireRankingFields();';
         html += 'initLookupControls();';
@@ -2334,6 +2496,7 @@ public with sharing class NativeFormsPublisher {
         html += 'setUserVerificationGatedState(!userVerificationEnabled);';
         html += 'setUserVerificationStepVisible(false);';
         html += 'restoreUserVerificationSession();';
+        html += 'applyLockedFields();';
         html += 'emitTwinaFormsEvent("form:ready",{versionId:config.versionId,formId:config.formId});';
         html += 'if(userVerificationEnabled&&userVerifyEl){const sendButton=userVerifyEl.querySelector("[data-user-verification-send]");const verifyButton=userVerifyEl.querySelector("[data-user-verification-verify]");const resendButton=userVerifyEl.querySelector("[data-user-verification-resend]");function userVerificationSendFailureMessage(data){return(data&&data.message&&data.emailSent!==false)?data.message:t("userVerificationNoMatchingContact","No verification email was sent. Check that exactly one Contact uses this email and that Salesforce email deliverability is enabled.");}if(sendButton){sendButton.addEventListener("click",async function(){const email=readUserVerificationEmail();if(!email){setUserVerificationMessage(t("userVerificationEnterEmailFirst","Enter your email first."),"error");return;}sendButton.disabled=true;try{const data=await sendUserVerificationRequest("sendCode",{email:email,expiryMinutes:userVerificationConfig.expiryMinutes,maxAttempts:userVerificationConfig.maxAttempts});setUserVerificationStepVisible(true);if(data&&data.emailSent===false){setUserVerificationMessage(userVerificationSendFailureMessage(data),"error");return;}setUserVerificationMessage(userVerificationConfig.sentMessage||t("userVerificationSentMessage","If we found a matching contact, we sent a 6-digit verification number to that email."),"");const codeInput=userVerifyEl.querySelector("[data-user-verification]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setUserVerificationMessage(error&&error.message?error.message:t("userVerificationSendFailed","We could not send the verification number right now."),"error");}finally{sendButton.disabled=false;}});}if(verifyButton){verifyButton.addEventListener("click",async function(){const email=readUserVerificationEmail();const code=readUserVerificationCode();if(!email||!code){setUserVerificationMessage(t("userVerificationEnterEmailAndCodeFirst","Enter your email and verification number first."),"error");return;}verifyButton.disabled=true;try{const verifyPayload={email:email,code:code,expiryMinutes:userVerificationConfig.expiryMinutes,maxAttempts:userVerificationConfig.maxAttempts,sessionId:userVerificationSessionId,sessionMode:userVerificationSessionMode};if(userVerificationSessionMode==="sameTabUntilMidnight"){verifyPayload.sessionExpiresAt=userVerificationSessionExpiresAtForRequest();}const data=await sendUserVerificationRequest("verifyCode",verifyPayload);if(data.approved){userVerificationToken=data.verificationToken||"";userVerificationVerifiedEmail=data.normalizedEmail||email;userVerificationSessionId=data.sessionId||userVerificationSessionId;storeUserVerificationSession(data,userVerificationVerifiedEmail);await continueAfterUserVerification(userVerificationVerifiedEmail);}else{setUserVerificationStepVisible(true);setUserVerificationMessage((data&&data.message)||userVerificationConfig.invalidMessage||t("userVerificationInvalidMessage","The verification number is invalid or expired. Try again or request a new one."),"error");}}catch(error){setUserVerificationStepVisible(true);setUserVerificationMessage(error&&error.message?error.message:t("userVerificationVerifyFailed","We could not verify the number right now."),"error");}finally{verifyButton.disabled=false;}});}if(resendButton){resendButton.addEventListener("click",async function(){const email=readUserVerificationEmail();if(!email){setUserVerificationMessage(t("userVerificationEnterEmailFirst","Enter your email first."),"error");return;}resendButton.disabled=true;try{const data=await sendUserVerificationRequest("sendCode",{email:email,expiryMinutes:userVerificationConfig.expiryMinutes,maxAttempts:userVerificationConfig.maxAttempts});setUserVerificationStepVisible(true);if(data&&data.emailSent===false){setUserVerificationMessage(userVerificationSendFailureMessage(data),"error");return;}setUserVerificationMessage(userVerificationConfig.sentMessage||t("userVerificationSentMessage","If we found a matching contact, we sent a 6-digit verification number to that email."),"");const codeInput=userVerifyEl.querySelector("[data-user-verification]");if(codeInput){window.setTimeout(function(){codeInput.focus();},0);}}catch(error){setUserVerificationMessage(error&&error.message?error.message:t("userVerificationSendFailed","We could not send the verification number right now."),"error");}finally{resendButton.disabled=false;}});}}';
         html += 'renderMergedDocuments(null);';
@@ -2341,7 +2504,7 @@ public with sharing class NativeFormsPublisher {
         html += 'form.addEventListener("submit",async function(event){event.preventDefault();clearStatus();';
         html += 'clearResult();';
         html += 'if(userVerificationEnabled&&!userVerificationApproved){activeButtonNavigationUrl="";setStatus("error",userVerificationConfig.invalidMessage||t("userVerifyRequiredBeforeSubmit","Complete User Verification before continuing."));return;}';
-        html += 'if(!form.reportValidity()){activeButtonNavigationUrl="";return;}';
+        html += 'if(!validateAllFields()){const invalidField=Array.from(form.querySelectorAll("input,textarea,select")).find(function(el){return el.type!=="hidden"&&!isConditionHidden(el)&&!el.checkValidity();});if(invalidField){invalidField.reportValidity();}activeButtonNavigationUrl="";setStatus("error",t("formReview","Please review the highlighted fields and try again."));return;}';
         html += 'const multiCheckboxValidation=validateMultiCheckboxGroups();if(!multiCheckboxValidation.valid){activeButtonNavigationUrl="";setStatus("error",multiCheckboxValidation.message||t("multiCheckboxReview","Please review the checkbox groups and try again."));return;}';
         html += 'const lookupValidation=validateLookupFields();if(!lookupValidation.valid){activeButtonNavigationUrl="";setStatus("error",lookupValidation.message||t("lookupReview","Please review the lookup fields and try again."));return;}';
         html += 'const locationValidation=validateLocationFields();if(!locationValidation.valid){activeButtonNavigationUrl="";setStatus("error",locationValidation.message||t("locationReview","Please review the location fields and try again."));return;}';
@@ -2439,6 +2602,7 @@ public with sharing class NativeFormsPublisher {
             Boolean showLabelsOnEachRow = !config.containsKey('showLabelsOnEachRow') || booleanValue(config.get('showLabelsOnEachRow'));
             Integer columnCount = safeSectionColumnCount(config);
             String idFieldKey = repeatGroupIdFieldKey(childElements);
+            String repeatGridClass = columnGridClass(elementRecord, columnCount, config);
             Boolean hasHeader = !showLabelsOnEachRow && childElements != null && !childElements.isEmpty();
             String repeatHtml = '<div class="nf-section nf-repeat' + (boxed ? '' : ' nf-section--plain') + (hasHeader ? ' nf-repeat--has-header' : '') + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + ' data-repeat-group="' + escapeHtml(repeatGroupKey) + '" data-repeat-id-field="' + escapeHtml(firstNonBlank(idFieldKey, '')) + '">';
             if (showTitle) {
@@ -2450,7 +2614,7 @@ public with sharing class NativeFormsPublisher {
                 if (allowDeleteRows) {
                     repeatHtml += '<div class="nf-repeat__header-spacer"></div>';
                 }
-                repeatHtml += '<div class="nf-repeat__header-body"><div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                repeatHtml += '<div class="nf-repeat__header-body"><div class="' + repeatGridClass + '">';
                 for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
                     repeatHtml += '<div class="nf-section__column">';
                     for (NF_Form_Element__c childElement : childElements) {
@@ -2480,7 +2644,7 @@ public with sharing class NativeFormsPublisher {
             }
             repeatHtml += '<div class="nf-repeat__row-body">';
             if (childElements != null) {
-                repeatHtml += '<div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                repeatHtml += '<div class="' + repeatGridClass + '">';
                 for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
                     repeatHtml += '<div class="nf-section__column">';
                     for (NF_Form_Element__c childElement : childElements) {
@@ -2509,7 +2673,7 @@ public with sharing class NativeFormsPublisher {
                         groupHtml += renderElement(childElement, childrenByParent, rtlEnabled, languageCode);
                     }
                 } else {
-                    groupHtml += '<div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                    groupHtml += '<div class="' + columnGridClass(elementRecord, columnCount, config) + '">';
                     for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
                         groupHtml += '<div class="nf-section__column">';
                         for (NF_Form_Element__c childElement : childElements) {
@@ -2542,7 +2706,7 @@ public with sharing class NativeFormsPublisher {
                 sectionHtml += '<p class="nf-copy">' + bodyText + '</p>';
             }
             if (childElements != null && !childElements.isEmpty()) {
-                sectionHtml += '<div class="nf-section__grid nf-section__grid--' + String.valueOf(columnCount) + '">';
+                sectionHtml += '<div class="' + columnGridClass(elementRecord, columnCount, config) + '">';
                 for (Integer columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
                     sectionHtml += '<div class="nf-section__column">';
                     for (NF_Form_Element__c childElement : childElements) {
@@ -2556,6 +2720,11 @@ public with sharing class NativeFormsPublisher {
             }
             sectionHtml += '</div>';
             return sectionHtml;
+        }
+
+        if (typeValue == 'spacer') {
+            String spacerSize = stringValue(config.get('spacerSize')) == 'fieldWithLabel' ? 'field-with-label' : 'field';
+            return '<div class="nf-spacer nf-spacer--' + spacerSize + '" data-element-id="' + safeElementId + '"' + wrapperAttrs + '></div>';
         }
 
         if (typeValue == 'heading' || typeValue == 'mergedDocument') {
@@ -2708,10 +2877,9 @@ public with sharing class NativeFormsPublisher {
             if (minSearchLength == null || minSearchLength <= 0) {
                 minSearchLength = 2;
             }
-            String controlHtml = '<div class="nf-lookup" data-nativeforms-lookup="true" data-lookup-field-key="' + safeName + '" data-lookup-required="' + String.valueOf(required).toLowerCase() + '" data-lookup-min-length="' + String.valueOf(minSearchLength) + '"' + lockOnPrefillAttr + '>';
+            String controlHtml = '<div class="nf-lookup" data-nativeforms-lookup="true" data-lookup-field-key="' + safeName + '" data-lookup-required="' + String.valueOf(required).toLowerCase() + '" data-lookup-min-length="' + String.valueOf(minSearchLength) + '"' + lookupSetFieldsDataAttr(config) + lockOnPrefillAttr + '>';
             controlHtml += '<input type="hidden" name="' + safeName + '" data-lookup-hidden="true"' + lockOnPrefillAttr + '>';
-            controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '-lookup" autocomplete="off" data-lookup-input="true"' + placeholderAttr + '>';
-            controlHtml += '<button type="button" class="nf-lookup__clear" data-lookup-clear hidden aria-label="Clear selection">Clear</button>';
+            controlHtml += '<div class="nf-lookup__input-wrap"><input class="nf-control--ltr" type="text" id="' + safeName + '-lookup" autocomplete="off" data-lookup-input="true"' + placeholderAttr + '><button type="button" class="nf-lookup__clear" data-lookup-clear hidden aria-label="Clear selection" title="Clear selection">&times;</button></div>';
             controlHtml += '<div class="nf-lookup__results" data-lookup-results hidden></div>';
             controlHtml += '<div class="nf-lookup__status" data-lookup-status></div>';
             controlHtml += '</div>';
@@ -2750,7 +2918,11 @@ public with sharing class NativeFormsPublisher {
             String datePlaceholder = String.isNotBlank(placeholder) ? placeholder : datePlaceholder(config);
             String dateValueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
             String labelHtml = labelPosition == 'hidden' ? '' : '<label for="' + safeName + '"' + labelClassAttr + '>' + safeLabelWithRequired + '</label>';
-            String controlHtml = '<input class="nf-control--ltr" type="text" id="' + safeName + '" name="' + safeName + '" inputmode="numeric" autocomplete="off" data-nativeforms-date="true"' + dateRangeAttrs + lockOnPrefillAttr + ' placeholder="' + escapeHtml(datePlaceholder) + '"' + dateValueAttr + requiredAttr + '>';
+            String controlHtml = '<div class="nf-date-wrap" data-nativeforms-date-picker="true">';
+            controlHtml += '<input class="nf-control--ltr" type="text" id="' + safeName + '" name="' + safeName + '" inputmode="numeric" autocomplete="off" data-nativeforms-date="true"' + dateRangeAttrs + lockOnPrefillAttr + ' placeholder="' + escapeHtml(datePlaceholder) + '"' + dateValueAttr + requiredAttr + '>';
+            controlHtml += '<button type="button" class="nf-date-toggle" data-date-picker-toggle aria-label="' + escapeHtml(runtimeTextValue(languageCode, 'datePickerOpen', 'Open date picker')) + '" title="' + escapeHtml(runtimeTextValue(languageCode, 'datePickerOpen', 'Open date picker')) + '"><span class="nf-date-toggle__icon" aria-hidden="true"></span></button>';
+            controlHtml += '<div class="nf-date-picker" data-date-picker hidden></div>';
+            controlHtml += '</div>';
             return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
@@ -2812,6 +2984,7 @@ public with sharing class NativeFormsPublisher {
         return renderFieldWrapper(safeElementId, wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
     }
 
+    @TestVisible
     private static String renderRepeatGroupChildElement(NF_Form_Element__c elementRecord, String repeatAlias, Boolean showLabels, Boolean rtlEnabled, String languageCode) {
         Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
         String typeValue = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
@@ -2827,26 +3000,41 @@ public with sharing class NativeFormsPublisher {
         if (String.isBlank(placeholder) && isLegacySeedDefaultValue(typeValue, rawDefaultValue)) {
             placeholder = localizedPlaceholderForType(typeValue, languageCode, config);
         }
+        Boolean isFormula = booleanValue(config.get('isFormula')) && (typeValue == 'text' || typeValue == 'number');
+        String rowDefaultValue = isFormula ? '' : normalizeLegacySeedDefaultValue(typeValue, rawDefaultValue);
+        if (isFormula) {
+            sourceField = fieldKey;
+            placeholder = '';
+        }
+        String wrapperAttrs = conditionalDataAttrs(config) + hiddenBehaviorStyle(config);
         String labelPosition = showLabels ? normalizedLabelPosition(config) : 'hidden';
         String labelClassAttr = labelClassAttr(config);
         String repeatLabelClassAttr = labelPosition == 'hidden'
             ? repeatMobileLabelClassAttr(config)
             : labelClassAttr;
         String sourceAttr = ' data-repeat-source-field="' + escapeHtml(sourceField) + '"';
-        String keyAttr = ' data-repeat-field-key="' + escapeHtml(fieldKey) + '"';
+        String keyAttr = ' data-repeat-field-key="' + escapeHtml(fieldKey) + '"'
+            + (String.isNotBlank(rowDefaultValue) ? ' data-repeat-default="' + escapeHtml(rowDefaultValue) + '"' : '');
         String lockOnPrefillAttr = lockOnPrefillDataAttr(config);
+        String formulaAttrs = isFormula ? formulaDataAttrs(fieldKey, typeValue, config) : '';
+        String formulaReadonlyAttr = isFormula ? ' readonly' : '';
         Boolean required = booleanValue(config.get('required'));
         String requiredAttr = required ? ' required' : '';
         String safeLabelWithRequired = appendRequiredMarker(escapeHtml(label), required);
         String baseId = escapeHtml(fieldKey);
         Boolean hiddenByBehavior = isHiddenBehavior(config);
 
+        if (typeValue == 'spacer') {
+            String spacerSize = stringValue(config.get('spacerSize')) == 'fieldWithLabel' ? 'field-with-label' : 'field';
+            return '<div class="nf-spacer nf-spacer--' + spacerSize + '"' + wrapperAttrs + '></div>';
+        }
+
         if (typeValue == 'heading' || typeValue == 'mergedDocument') {
             String richHtml = config.containsKey('html') ? String.valueOf(config.get('html')) : '<p>' + escapeHtml(label) + '</p>';
             if (typeValue == 'mergedDocument') {
-                return '<div class="nf-richtext nf-merged-document" data-merged-document-template="' + escapeHtml(richHtml) + '">' + richHtml + '</div>';
+                return '<div class="nf-richtext nf-merged-document"' + wrapperAttrs + ' data-merged-document-template="' + escapeHtml(richHtml) + '">' + richHtml + '</div>';
             }
-            return '<div class="nf-richtext">' + richHtml + '</div>';
+            return '<div class="nf-richtext"' + wrapperAttrs + '>' + richHtml + '</div>';
         }
 
         if (typeValue == 'image') {
@@ -2855,11 +3043,11 @@ public with sharing class NativeFormsPublisher {
 
         if (typeValue == 'button') {
             String buttonConfig = escapeHtml(JSON.serialize(config));
-            return '<div class="nf-portal-button" data-element-id="' + escapeHtml(String.isNotBlank(elementRecord.Element_Id__c) ? elementRecord.Element_Id__c : fieldKey) + '"' + conditionalDataAttrs(config) + '><button type="button" data-nativeforms-button="true" data-button-config="' + buttonConfig + '">' + escapeHtml(label) + '</button></div>';
+            return '<div class="nf-portal-button" data-element-id="' + escapeHtml(String.isNotBlank(elementRecord.Element_Id__c) ? elementRecord.Element_Id__c : fieldKey) + '"' + wrapperAttrs + '><button type="button" data-nativeforms-button="true" data-button-config="' + buttonConfig + '">' + escapeHtml(label) + '</button></div>';
         }
 
         if (typeValue == 'checkbox') {
-            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '"><label' + labelClassAttr + '><input type="checkbox" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + requiredAttr + '> ' + safeLabelWithRequired + '</label></div>';
+            return '<div class="nf-field nf-field--checkbox nf-field--' + escapeHtml(labelPosition) + '"' + wrapperAttrs + '><label' + labelClassAttr + '><input type="checkbox" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + requiredAttr + '> ' + safeLabelWithRequired + '</label></div>';
         }
 
         if (typeValue == 'textarea') {
@@ -2871,7 +3059,7 @@ public with sharing class NativeFormsPublisher {
             String counterHtml = maxLength != null && maxLength > 0 ? '<div class="nf-char-counter" data-character-counter="true">0/' + String.valueOf(maxLength) + ' ' + escapeHtml(runtimeTextValue(languageCode, 'characters', 'characters')) + '</div>' : '';
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String controlHtml = '<textarea id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + requiredAttr + maxLengthAttr + '></textarea>' + counterHtml;
-            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'select' && config.containsKey('options')) {
@@ -2884,11 +3072,11 @@ public with sharing class NativeFormsPublisher {
             }
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String controlHtml = '<select id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + requiredAttr + '>' + optionsHtml + '</select>';
-            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'multiCheckbox' && config.containsKey('options')) {
-            String html = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '" data-nativeforms-multi-checkbox-group="true" data-required="' + String.valueOf(required).toLowerCase() + '">';
+            String html = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '"' + wrapperAttrs + ' data-nativeforms-multi-checkbox-group="true" data-required="' + String.valueOf(required).toLowerCase() + '">';
             html += '<label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             html += '<div class="nf-field--multi-checkbox-group">';
             Integer optionIndex = 0;
@@ -2909,12 +3097,12 @@ public with sharing class NativeFormsPublisher {
         if (typeValue == 'ranking' && config.containsKey('options')) {
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String controlHtml = renderRankingControl(baseId, config, requiredAttr);
-            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'radio' && config.containsKey('options')) {
             String presentation = stringValue(config.get('presentation'));
-            String html = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '">';
+            String html = '<div class="nf-field nf-field--' + escapeHtml(labelPosition) + '"' + wrapperAttrs + '>';
             html += '<label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             html += '<div class="nf-field--radio-group' + surveyPresentationClass(presentation) + '">';
             Integer optionIndex = 0;
@@ -2932,8 +3120,23 @@ public with sharing class NativeFormsPublisher {
             return html;
         }
 
+        if (typeValue == 'lookup') {
+            Integer minSearchLength = integerValue(config.get('lookupMinSearchLength'));
+            if (minSearchLength == null || minSearchLength <= 0) {
+                minSearchLength = 2;
+            }
+            String labelHtml = '<label for="' + baseId + '-lookup"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String controlHtml = '<div class="nf-lookup" data-nativeforms-lookup="true" data-lookup-repeat="true" data-lookup-field-key="' + escapeHtml(fieldKey) + '" data-lookup-required="' + String.valueOf(required).toLowerCase() + '" data-lookup-min-length="' + String.valueOf(minSearchLength) + '"' + lookupSetFieldsDataAttr(config) + lockOnPrefillAttr + '>';
+            controlHtml += '<div class="nf-lookup__input-wrap"><input class="nf-control--ltr" type="text" id="' + baseId + '-lookup" autocomplete="off" data-lookup-input="true" data-repeat-label-target="true"' + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + '><button type="button" class="nf-lookup__clear" data-lookup-clear hidden aria-label="Clear selection" title="Clear selection">&times;</button></div>';
+            controlHtml += '<input type="hidden" id="' + baseId + '" data-lookup-hidden="true"' + keyAttr + sourceAttr + lockOnPrefillAttr + '>';
+            controlHtml += '<div class="nf-lookup__results" data-lookup-results hidden></div>';
+            controlHtml += '<div class="nf-lookup__status" data-lookup-status></div>';
+            controlHtml += '</div>';
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
+        }
+
         if (typeValue == 'hidden' || hiddenByBehavior) {
-            return '<input type="hidden" id="' + baseId + '"' + keyAttr + sourceAttr + '>';
+            return '<input type="hidden" id="' + baseId + '"' + keyAttr + sourceAttr + formulaAttrs + '>';
         }
 
         if (typeValue == 'date') {
@@ -2941,8 +3144,12 @@ public with sharing class NativeFormsPublisher {
             String datePlaceholder = String.isNotBlank(placeholder) ? placeholder : datePlaceholder(config);
             String valueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
-            String controlHtml = '<input class="nf-control--ltr" type="text" id="' + baseId + '" inputmode="numeric" autocomplete="off" data-nativeforms-date="true"' + keyAttr + sourceAttr + dateRangeDataAttrs(config) + lockOnPrefillAttr + ' placeholder="' + escapeHtml(datePlaceholder) + '"' + valueAttr + requiredAttr + '>';
-            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+            String controlHtml = '<div class="nf-date-wrap" data-nativeforms-date-picker="true">';
+            controlHtml += '<input class="nf-control--ltr" type="text" id="' + baseId + '" inputmode="numeric" autocomplete="off" data-nativeforms-date="true"' + keyAttr + sourceAttr + dateRangeDataAttrs(config) + lockOnPrefillAttr + ' placeholder="' + escapeHtml(datePlaceholder) + '"' + valueAttr + requiredAttr + '>';
+            controlHtml += '<button type="button" class="nf-date-toggle" data-date-picker-toggle aria-label="' + escapeHtml(runtimeTextValue(languageCode, 'datePickerOpen', 'Open date picker')) + '" title="' + escapeHtml(runtimeTextValue(languageCode, 'datePickerOpen', 'Open date picker')) + '"><span class="nf-date-toggle__icon" aria-hidden="true"></span></button>';
+            controlHtml += '<div class="nf-date-picker" data-date-picker hidden></div>';
+            controlHtml += '</div>';
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'time') {
@@ -2952,7 +3159,7 @@ public with sharing class NativeFormsPublisher {
             String valueAttr = String.isNotBlank(displayValue) ? ' value="' + escapeHtml(displayValue) + '"' : '';
             String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             String controlHtml = '<input class="nf-control--ltr" type="text" id="' + baseId + '" inputmode="text" autocomplete="off" data-nativeforms-time="true" data-time-format="' + escapeHtml(timeFormat) + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + ' placeholder="' + escapeHtml(timePlaceholder) + '"' + valueAttr + requiredAttr + '>';
-            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'fileUpload') {
@@ -2974,7 +3181,7 @@ public with sharing class NativeFormsPublisher {
             controlHtml += '<div class="nf-upload__feedback" data-file-upload-feedback></div>';
             controlHtml += '<div class="nf-upload__list" data-file-upload-list></div>';
             controlHtml += '</div>';
-            return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+            return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
         }
 
         if (typeValue == 'signature') {
@@ -2982,7 +3189,8 @@ public with sharing class NativeFormsPublisher {
                 ? stringValue(config.get('clearButtonLabel'))
                 : runtimeTextValue(languageCode, 'signatureClear', 'Clear');
             String signatureHelpText = stringValue(config.get('helpText'));
-            String signatureHtml = '<div class="nf-field"><label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
+            String signatureFieldClass = showLabels ? 'nf-field nf-field--' + escapeHtml(labelPosition) : 'nf-field nf-field--hidden';
+            String signatureHtml = '<div class="' + signatureFieldClass + '"' + wrapperAttrs + '><label' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
             signatureHtml += '<div class="nf-signature" data-nativeforms-row-signature="true" data-row-signature-required="' + String.valueOf(required).toLowerCase() + '">';
             signatureHtml += '<canvas class="nf-signature__canvas" data-signature-canvas></canvas>';
             if (String.isNotBlank(signatureHelpText)) {
@@ -2996,8 +3204,8 @@ public with sharing class NativeFormsPublisher {
 
         String htmlType = normalizeInputType(typeValue);
         String labelHtml = '<label for="' + baseId + '"' + repeatLabelClassAttr + '>' + safeLabelWithRequired + '</label>';
-        String controlHtml = '<input' + inputDirectionClassAttr(typeValue) + ' type="' + escapeHtml(htmlType) + '" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + requiredAttr + '>';
-        return renderFieldWrapper('', '', labelPosition, labelHtml, controlHtml, rtlEnabled);
+        String controlHtml = '<input' + inputDirectionClassAttr(typeValue) + ' type="' + escapeHtml(htmlType) + '" id="' + baseId + '"' + keyAttr + sourceAttr + lockOnPrefillAttr + formulaAttrs + formulaReadonlyAttr + (String.isNotBlank(placeholder) ? ' placeholder="' + escapeHtml(placeholder) + '"' : '') + requiredAttr + '>';
+        return renderFieldWrapper('', wrapperAttrs, labelPosition, labelHtml, controlHtml, rtlEnabled);
     }
 
     private static String appendRequiredMarker(String safeLabel, Boolean required) {
@@ -3163,6 +3371,90 @@ public with sharing class NativeFormsPublisher {
         }
     }
 
+    private static String normalizedColumnLayout(Map<String, Object> config) {
+        Integer columns = safeSectionColumnCount(config);
+        String layout = config == null ? '' : stringValue(config.get('columnLayout'));
+        if (layout == 'narrowFirst' && columns == 2) {
+            return layout;
+        }
+        if (layout == 'wideFirst' && (columns == 2 || columns == 3)) {
+            return layout;
+        }
+        if (layout == 'wideMiddle' && columns == 3) {
+            return layout;
+        }
+        if (layout == 'wideLast' && columns == 3) {
+            return layout;
+        }
+        return 'equal';
+    }
+
+    private static String columnTemplate(Integer columns, String layout) {
+        Integer count = columns == null || columns < 1 ? 1 : (columns > 10 ? 10 : columns);
+        if (count == 1) {
+            return '1fr';
+        }
+        if (count == 2 && layout == 'narrowFirst') {
+            return 'minmax(0,1fr) minmax(0,2fr)';
+        }
+        if (count == 2 && layout == 'wideFirst') {
+            return 'minmax(0,2fr) minmax(0,1fr)';
+        }
+        if (count == 3 && layout == 'wideFirst') {
+            return 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)';
+        }
+        if (count == 3 && layout == 'wideMiddle') {
+            return 'minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)';
+        }
+        if (count == 3 && layout == 'wideLast') {
+            return 'minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)';
+        }
+        return count == 1 ? '1fr' : 'repeat(' + String.valueOf(count) + ',minmax(0,1fr))';
+    }
+
+    private static String columnLayoutClassKey(String elementId) {
+        String key = String.isBlank(elementId) ? 'container' : elementId.replaceAll('[^A-Za-z0-9_-]', '_');
+        if (key.length() == 0) {
+            key = 'container';
+        }
+        if (key.substring(0, 1).replaceAll('[A-Za-z_]', '').length() > 0) {
+            key = 'c_' + key;
+        }
+        return key;
+    }
+
+    private static String columnGridClass(NF_Form_Element__c elementRecord, Integer columns, Map<String, Object> config) {
+        String baseClass = 'nf-section__grid nf-section__grid--' + String.valueOf(columns);
+        if (normalizedColumnLayout(config) == 'equal') {
+            return baseClass;
+        }
+        return baseClass + ' nf-grid-layout-' + columnLayoutClassKey(elementRecord == null ? null : elementRecord.Element_Id__c);
+    }
+
+    private static String columnLayoutCss(List<NF_Form_Element__c> elements) {
+        String css = '';
+        if (elements == null) {
+            return css;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord == null) {
+                continue;
+            }
+            String typeValue = String.isBlank(elementRecord.Element_Type__c) ? 'text' : elementRecord.Element_Type__c;
+            if (typeValue != 'section' && typeValue != 'sectionBreak' && typeValue != 'group' && typeValue != 'repeatGroup') {
+                continue;
+            }
+            Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+            String layout = normalizedColumnLayout(config);
+            if (layout == 'equal') {
+                continue;
+            }
+            Integer columns = safeSectionColumnCount(config);
+            css += '.nf-grid-layout-' + columnLayoutClassKey(elementRecord.Element_Id__c) + '{grid-template-columns:' + columnTemplate(columns, layout) + ';}';
+        }
+        return css;
+    }
+
     private static Integer readSectionColumn(String rawJson) {
         Map<String, Object> config = parseJsonMap(rawJson);
         if (config == null || !config.containsKey('sectionColumn')) {
@@ -3318,7 +3610,7 @@ public with sharing class NativeFormsPublisher {
             return references;
         }
         Set<String> seen = new Set<String>();
-        Matcher matcher = Pattern.compile('\\{([A-Za-z0-9_]+)\\}').matcher(expression);
+        Matcher matcher = Pattern.compile('\\{((?:row\\.)?[A-Za-z0-9_]+)\\}').matcher(expression);
         while (matcher.find()) {
             String fieldKey = matcher.group(1);
             if (String.isBlank(fieldKey) || seen.contains(fieldKey)) {
@@ -3550,17 +3842,33 @@ public with sharing class NativeFormsPublisher {
                 continue;
             }
 
-            Set<String> allowedFieldNames = Schema.getGlobalDescribe().get(objectApiName).getDescribe().fields.getMap().keySet();
-            List<String> searchFields = canonicalLookupFields(config.get('lookupSearchFields'), allowedFieldNames);
-            List<String> displayFields = canonicalLookupFields(config.get('lookupDisplayFields'), allowedFieldNames);
-            if (searchFields.isEmpty()) {
-                searchFields.add(allowedFieldNames.contains('Name') ? 'Name' : 'Id');
+            Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(objectApiName).getDescribe().fields.getMap();
+            List<String> searchFields = canonicalLookupFields(config.get('lookupSearchFields'), fieldsMap);
+            List<Map<String, String>> setFields = normalizeLookupSetFields(config.get('lookupSetFields'), fieldsMap);
+            if (setFields.isEmpty()) {
+                setFields = normalizeLookupSetFields(config.get('lookupFieldMappings'), fieldsMap);
             }
-            if (displayFields.isEmpty()) {
-                displayFields.add(searchFields[0]);
+            if (searchFields.isEmpty()) {
+                searchFields.add(fieldsMap.containsKey('Name') ? 'Name' : 'Id');
+            }
+            List<String> displayFields = new List<String>{ searchFields[0] };
+            List<String> returnFields = new List<String>();
+            for (String displayField : displayFields) {
+                if (!returnFields.contains(displayField)) {
+                    returnFields.add(displayField);
+                }
+            }
+            for (Map<String, String> mapping : setFields) {
+                String sourceField = mapping.get('sourceField');
+                if (String.isNotBlank(sourceField) && !returnFields.contains(sourceField)) {
+                    returnFields.add(sourceField);
+                }
             }
             if (!displayFields.contains('Id')) {
                 displayFields.add('Id');
+            }
+            if (!returnFields.contains('Id')) {
+                returnFields.add('Id');
             }
 
             Integer minSearchLength = integerValue(config.get('lookupMinSearchLength'));
@@ -3572,6 +3880,8 @@ public with sharing class NativeFormsPublisher {
                 'targetObject' => objectApiName,
                 'searchFields' => searchFields,
                 'displayFields' => displayFields,
+                'returnFields' => returnFields,
+                'setFields' => setFields,
                 'minSearchLength' => minSearchLength == null || minSearchLength <= 0 ? 2 : Math.min(minSearchLength, 10),
                 'limit' => resultLimit == null || resultLimit <= 0 ? 10 : Math.min(resultLimit, 25)
             });
@@ -3640,9 +3950,9 @@ public with sharing class NativeFormsPublisher {
         return output;
     }
 
-    private static List<String> canonicalLookupFields(Object rawFields, Set<String> allowedFieldNames) {
+    private static List<String> canonicalLookupFields(Object rawFields, Map<String, Schema.SObjectField> fieldsMap) {
         List<String> fields = new List<String>();
-        if (allowedFieldNames == null || allowedFieldNames.isEmpty()) {
+        if (fieldsMap == null || fieldsMap.isEmpty()) {
             return fields;
         }
 
@@ -3661,9 +3971,9 @@ public with sharing class NativeFormsPublisher {
                 continue;
             }
             String canonicalField = null;
-            for (String allowedFieldName : allowedFieldNames) {
+            for (String allowedFieldName : fieldsMap.keySet()) {
                 if (allowedFieldName.equalsIgnoreCase(requestedField.trim())) {
-                    canonicalField = allowedFieldName;
+                    canonicalField = fieldsMap.get(allowedFieldName).getDescribe().getName();
                     break;
                 }
             }
@@ -3672,6 +3982,51 @@ public with sharing class NativeFormsPublisher {
             }
         }
         return fields;
+    }
+
+    private static List<Map<String, String>> normalizeLookupSetFields(Object rawMappings, Map<String, Schema.SObjectField> fieldsMap) {
+        List<Map<String, String>> mappings = new List<Map<String, String>>();
+        if (!(rawMappings instanceof List<Object>)) {
+            return mappings;
+        }
+        Set<String> targetKeys = new Set<String>();
+        for (Object rawMapping : (List<Object>) rawMappings) {
+            if (!(rawMapping instanceof Map<String, Object>)) {
+                continue;
+            }
+            Map<String, Object> rawMap = (Map<String, Object>) rawMapping;
+            String sourceField = stringValue(rawMap.containsKey('sourceField') ? rawMap.get('sourceField') : rawMap.get('source'));
+            String targetFieldKey = stringValue(rawMap.containsKey('targetFieldKey') ? rawMap.get('targetFieldKey') : rawMap.get('target'));
+            if (String.isBlank(sourceField) || String.isBlank(targetFieldKey)) {
+                continue;
+            }
+            String canonicalSourceField = null;
+            if (fieldsMap == null || fieldsMap.isEmpty()) {
+                canonicalSourceField = sourceField.trim();
+            } else {
+                for (String allowedFieldName : fieldsMap.keySet()) {
+                    if (allowedFieldName.equalsIgnoreCase(sourceField.trim())) {
+                        canonicalSourceField = fieldsMap.get(allowedFieldName).getDescribe().getName();
+                        break;
+                    }
+                }
+            }
+            if (String.isBlank(canonicalSourceField)
+                || !canonicalSourceField.replaceAll('[A-Za-z0-9_]', '').equals('')
+                || !targetFieldKey.replaceAll('[A-Za-z0-9_]', '').equals('')) {
+                continue;
+            }
+            String targetKey = targetFieldKey.toLowerCase();
+            if (targetKeys.contains(targetKey)) {
+                continue;
+            }
+            targetKeys.add(targetKey);
+            mappings.add(new Map<String, String>{
+                'sourceField' => canonicalSourceField,
+                'targetFieldKey' => targetFieldKey
+            });
+        }
+        return mappings;
     }
 
     private static Boolean containsSurveyField(List<NF_Form_Element__c> elements) {
@@ -3748,6 +4103,7 @@ public with sharing class NativeFormsPublisher {
 
             if (elementType == 'section' || elementType == 'sectionBreak' || elementType == 'group' || elementType == 'repeatGroup') {
                 item.put('columns', safeSectionColumnCount(config));
+                item.put('columnLayout', normalizedColumnLayout(config));
                 item.put('showTitle', !config.containsKey('showTitle') || booleanValue(config.get('showTitle')));
                 item.put('boxed', !config.containsKey('boxed') || booleanValue(config.get('boxed')));
                 item.put('text', stripHtmlForPdf(stringValue(config.get('text'))));
@@ -3857,7 +4213,8 @@ public with sharing class NativeFormsPublisher {
             'expiryMinutes' => integerValue(uiSettings.get('userVerificationExpiryMinutes')) == null ? 10 : Math.max(1, integerValue(uiSettings.get('userVerificationExpiryMinutes'))),
             'maxAttempts' => integerValue(uiSettings.get('userVerificationMaxAttempts')) == null ? 5 : Math.max(1, integerValue(uiSettings.get('userVerificationMaxAttempts'))),
             'allowResend' => uiSettings.containsKey('userVerificationAllowResend') ? booleanValue(uiSettings.get('userVerificationAllowResend')) : true,
-            'sessionMode' => defaultUserVerificationSessionMode(stringValue(uiSettings.get('userVerificationSessionMode')))
+            'sessionMode' => defaultUserVerificationSessionMode(stringValue(uiSettings.get('userVerificationSessionMode'))),
+            'senderEmail' => stringValue(uiSettings.get('userVerificationSenderEmail'))
         };
     }
 
@@ -4007,7 +4364,7 @@ public with sharing class NativeFormsPublisher {
 
     private static String hiddenBehaviorStyle(Map<String, Object> config) {
         if (config != null && stringValue(config.get('fieldBehavior')) == 'hidden') {
-            return ' style="display:none;"';
+            return ' data-hidden-behavior="true" style="display:none;"';
         }
         return '';
     }
@@ -4059,6 +4416,17 @@ public with sharing class NativeFormsPublisher {
             attrs.add(' data-future-months="' + escapeHtml(String.valueOf(config.get('futureMonths'))) + '"');
         }
         return String.join(attrs, '');
+    }
+
+    private static String lookupSetFieldsDataAttr(Map<String, Object> config) {
+        List<Map<String, String>> mappings = normalizeLookupSetFields(config == null ? null : config.get('lookupSetFields'), null);
+        if (mappings.isEmpty()) {
+            mappings = normalizeLookupSetFields(config == null ? null : config.get('lookupFieldMappings'), null);
+        }
+        if (mappings.isEmpty()) {
+            return '';
+        }
+        return ' data-lookup-set-fields="' + escapeHtml(JSON.serialize(mappings)) + '"';
     }
 
     private static String normalizedDateDisplayFormat(Map<String, Object> config) {
@@ -4222,10 +4590,13 @@ public with sharing class NativeFormsPublisher {
 
         Map<String, Object> theme = new Map<String, Object>{
             'logoUrl' => versionRecord.Form__r.Theme__r.Logo_URL__c,
+            'backgroundImageUrl' => versionRecord.Form__r.Theme__r.Background_Image_URL__c,
+            'footerImageUrl' => versionRecord.Form__r.Theme__r.Footer_Image_URL__c,
             'logoSizePx' => versionRecord.Form__r.Theme__r.Logo_Size_Px__c,
             'logoPosition' => versionRecord.Form__r.Theme__r.Logo_Position__c,
             'formWidth' => versionRecord.Form__r.Theme__r.Form_Width__c,
             'backgroundColor' => versionRecord.Form__r.Theme__r.Background_Color__c,
+            'backgroundGradientColor' => versionRecord.Form__r.Theme__r.Background_Gradient_Color__c,
             'formBackgroundColor' => versionRecord.Form__r.Theme__r.Form_Background_Color__c,
             'formBorderColor' => versionRecord.Form__r.Theme__r.Form_Border_Color__c,
             'titleFont' => versionRecord.Form__r.Theme__r.Title_Font__c,
@@ -4436,7 +4807,63 @@ public with sharing class NativeFormsPublisher {
 
     private static String cssFontFamily(Map<String, Object> source, String key, String fallbackValue) {
         String value = stringValue(source.get(key));
-        return String.isNotBlank(value) ? escapeHtml(value) : fallbackValue;
+        if (String.isBlank(value)) {
+            return fallbackValue;
+        }
+        String fontName = value.trim();
+        return '\'' + escapeHtml(fontName).replace('\'', '\\\'') + '\', Arial, sans-serif';
+    }
+
+    private static String googleFontsLink(Map<String, Object> theme) {
+        Set<String> familyNames = new Set<String>();
+        for (String key : new List<String>{ 'titleFont', 'sectionTitleFont', 'mainFont', 'buttonFont' }) {
+            String fontName = stringValue(theme == null ? null : theme.get(key));
+            if (isGoogleFont(fontName)) {
+                familyNames.add(fontName.trim());
+            }
+        }
+        if (familyNames.isEmpty()) {
+            return '';
+        }
+
+        List<String> sortedFamilies = new List<String>(familyNames);
+        sortedFamilies.sort();
+        List<String> familyParams = new List<String>();
+        for (String familyName : sortedFamilies) {
+            familyParams.add('family=' + EncodingUtil.urlEncode(familyName, 'UTF-8') + ':wght@400;500;600;700');
+        }
+        String href = 'https://fonts.googleapis.com/css2?' + String.join(familyParams, '&') + '&display=swap';
+        return '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="' + escapeHtml(href) + '" rel="stylesheet">';
+    }
+
+    private static Boolean isGoogleFont(String fontName) {
+        String normalized = String.isBlank(fontName) ? '' : fontName.trim().toLowerCase();
+        return new Set<String>{
+            'inter',
+            'roboto',
+            'roboto slab',
+            'open sans',
+            'lato',
+            'montserrat',
+            'assistant',
+            'heebo',
+            'rubik',
+            'noto sans hebrew',
+            'alef',
+            'frank ruhl libre'
+        }.contains(normalized);
+    }
+
+    private static String cssUrl(String value) {
+        String normalized = stringValue(value);
+        if (String.isBlank(normalized)) {
+            return 'none';
+        }
+        normalized = normalized.replace('\\', '\\\\')
+            .replace('"', '\\"')
+            .replace('\r', '')
+            .replace('\n', '');
+        return 'url("' + normalized + '")';
     }
 
     private static String cssFormWidth(Map<String, Object> source, String key, String fallbackValue) {
@@ -4446,6 +4873,14 @@ public with sharing class NativeFormsPublisher {
         if (value == 'standard') return '760px';
         if (value == 'wide') return '880px';
         if (value == 'full') return '100%';
+        try {
+            Decimal percentage = Decimal.valueOf(rawValue);
+            if (percentage >= 50 && percentage <= 100) {
+                return String.valueOf(percentage) + '%';
+            }
+        } catch (Exception e) {
+            // Preserve the existing fallback for invalid legacy or imported values.
+        }
         return fallbackValue;
     }
 

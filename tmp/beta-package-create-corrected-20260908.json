@@ -1,0 +1,15 @@
+{
+  "name": "PollingClientTimeout",
+  "message": "The client has timed out. Run 'sf package version create report -i 08cgL000000Ht9lQAC' to check the status.",
+  "exitCode": 1,
+  "context": "PackageVersionCreateCommand",
+  "data": {
+    "VersionCreateRequestId": "08cgL000000Ht9lQAC"
+  },
+  "stack": "PollingClientTimeout: The client has timed out. Run 'sf package version create report -i 08cgL000000Ht9lQAC' to check the status.\n    at SfCommandError.from (file:///C:/Users/Yosi/AppData/Local/sf/client/2.145.6-68665a5/node_modules/@salesforce/sf-plugins-core/lib/SfCommandError.js:48:16)\n    at PackageVersionCreateCommand.catch (file:///C:/Users/Yosi/AppData/Local/sf/client/2.145.6-68665a5/node_modules/@salesforce/sf-plugins-core/lib/sfCommand.js:332:47)\n    at PackageVersionCreateCommand._run (C:\\Users\\Yosi\\AppData\\Local\\sf\\client\\2.145.6-68665a5\\node_modules\\@oclif\\core\\lib\\command.js:187:29)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async Config.runCommand (C:\\Users\\Yosi\\AppData\\Local\\sf\\client\\2.145.6-68665a5\\node_modules\\@oclif\\core\\lib\\config\\config.js:422:25)\n    at async run (C:\\Users\\Yosi\\AppData\\Local\\sf\\client\\2.145.6-68665a5\\node_modules\\@oclif\\core\\lib\\main.js:97:16)\n    at async file:///C:/Users/Yosi/AppData/Local/sf/client/2.145.6-68665a5/bin/run.js:15:1",
+  "cause": "undefined",
+  "warnings": [],
+  "code": "PollingClientTimeout",
+  "status": 1,
+  "commandName": "PackageVersionCreateCommand"
+}

@@ -14,6 +14,7 @@ Use for S3 website publishing, Lambda deployment targets, region-aware AWS chang
 - The correct admin console publish target is `s3://nativeformspublish/admin-console/dev/`.
 - Current upgrade page publish target is `s3://nativeformspublish/upgrade/`.
 - Published forms also use `nativeformspublish`, and the runtime public base URL in AWS is `https://forms.twinaforms.com`.
+- Connected Org Snapshots Phase 3 should store full portable JSON snapshots in a private S3 bucket or private operational prefix with public access blocked and encryption enabled; do not put connected-org snapshot JSON under public published-form paths.
 - `NativeFormsBackend` owns publish lifecycle routes such as `POST /forms/register`, `POST /forms/publish/presign`, and `POST /forms/unpublish`, plus signed Salesforce admin-assist routes such as `POST /salesforce/layouts`.
 - `NativeFormsBackend` timeout is 15 seconds because Salesforce OAuth refresh plus UI API layout metadata reads can exceed the old 3-second default.
 - `POST /forms/unpublish` marks the `NativeFormsFormSecurity` record as `unpublished` and replaces the hosted form HTML with a small unavailable page when the publish key is known; it must not delete submission logs.

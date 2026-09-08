@@ -206,6 +206,14 @@
                                                 </lightning-combobox>
                                             </template>
                                             <template if:false={row.isValueSourceField}>
+                                                <template if:true={row.isValueSourceVerifiedEmail}>
+                                                    <lightning-input
+                                                        label={row.valueLabel}
+                                                        value={row.valuePlaceholder}
+                                                        disabled>
+                                                    </lightning-input>
+                                                </template>
+                                                <template if:false={row.isValueSourceVerifiedEmail}>
                                                 <template if:true={row.isValueSourceAlias}>
                                                     <div class="field-help-stack">
                                                         <div class="field-help-label">
@@ -247,6 +255,7 @@
                                                         value={row.valueText}
                                                         onchange={handleConditionChange}>
                                                     </lightning-input>
+                                                </template>
                                                 </template>
                                             </template>
                                             <lightning-button-icon
@@ -403,9 +412,9 @@
                                                 <div class="mapping-list">
                                                     <template for:each={group.fields} for:item="field">
                                                         <div key={field.key} class="mapping-row">
-                                                            <span class="mapping-row__label">{field.label}</span>
-                                                            <span class="mapping-row__arrow">&#8594;</span>
                                                             <span class="mapping-row__field">{field.fieldPath}</span>
+                                                            <span class="mapping-row__arrow">&#8594;</span>
+                                                            <span class="mapping-row__label">{field.label}</span>
                                                         </div>
                                                     </template>
                                                 </div>

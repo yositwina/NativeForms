@@ -98,7 +98,8 @@ import https from "https";
 import querystring from "querystring";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import { S3Client, DeleteObjectCommand, GetObjectCommand, GetObjectTaggingCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand, GetObjectTaggingCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import crypto from "crypto";
 import PDFDocument from "pdfkit";
 import path from "path";
@@ -112,6 +113,7 @@ const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSub
 const CAPTCHA_SECRET_KEY = String(process.env.CAPTCHA_SECRET_KEY || "").trim();
 const PUBLISH_BUCKET = process.env.PUBLISH_BUCKET || "nativeformspublish";
 const UPLOAD_STAGING_BUCKET = process.env.UPLOAD_STAGING_BUCKET || "";
+const PDF_RENDERER_FUNCTION_NAME = process.env.PDF_RENDERER_FUNCTION_NAME || "";
 const SALESFORCE_API_VERSION = "v60.0";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
@@ -127,6 +129,7 @@ const PDF_UNICODE_FONT_PATH = path.join(__dirname, "assets", "fonts", "NotoSansH
 const secretsClient = new SecretsManagerClient({});
 const dynamoClient = new DynamoDBClient({});
 const s3Client = new S3Client({});
+const lambdaClient = new LambdaClient({});
 const salesforceDescribeCache = new Map();
 let cachedSalesforceOAuthClientCredentials = null;
 
@@ -135,6 +138,7 @@ function jsonResponse(statusCode, payload) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type"
@@ -1694,6 +1698,51 @@ function formatDatePartsAsIso(parts) {
   return `${year}-${month}-${day}`;
 }
 
+function parseFlexibleTimeString(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  let match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+  if (!match) {
+    match = raw.match(/^(\d{1,2})(\d{2})$/);
+  }
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+  const milliseconds = match[4] === undefined ? 0 : Number(String(match[4]).slice(0, 3).padEnd(3, "0"));
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    !Number.isInteger(seconds) ||
+    !Number.isInteger(milliseconds) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    seconds < 0 ||
+    seconds > 59 ||
+    milliseconds < 0 ||
+    milliseconds > 999
+  ) {
+    return null;
+  }
+
+  return { hours, minutes, seconds, milliseconds };
+}
+
+function formatTimePartsForSalesforce(parts) {
+  if (!parts) {
+    return null;
+  }
+  return `${String(parts.hours).padStart(2, "0")}:${String(parts.minutes).padStart(2, "0")}:${String(parts.seconds).padStart(2, "0")}.${String(parts.milliseconds).padStart(3, "0")}Z`;
+}
+
 async function coerceFieldsForSalesforce(instanceUrl, accessToken, objectApiName, fields) {
   if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
     return fields;
@@ -1722,6 +1771,13 @@ async function coerceFieldsForSalesforce(instanceUrl, accessToken, objectApiName
       const parsed = parseFlexibleDateString(value);
       if (parsed) {
         coerced[fieldName] = formatDatePartsAsIso(parsed);
+      }
+      continue;
+    }
+    if (fieldType === "time") {
+      const parsed = parseFlexibleTimeString(value);
+      if (parsed) {
+        coerced[fieldName] = formatTimePartsForSalesforce(parsed);
       }
     }
   }
@@ -2123,6 +2179,7 @@ async function finalizeSubmittedSignatures({
 }
 
 async function finalizeRecordsListRowSignatures({
+  tenantRecord,
   formSecurity,
   inputPayload,
   results,
@@ -2135,6 +2192,9 @@ async function finalizeRecordsListRowSignatures({
   if (!configs.length) {
     return finalizedRowSignatures;
   }
+
+  const rowSignaturePlanDefinition = await getPlanDefinition(tenantRecord?.planCode);
+  const rowSignatureFeatureFlags = getEffectiveFeatureFlagsForTenant(tenantRecord, rowSignaturePlanDefinition);
 
   for (const config of configs) {
     const rows = submittedRepeatRows(inputPayload, config.groupKey);
@@ -2175,14 +2235,15 @@ async function finalizeRecordsListRowSignatures({
         );
         contentVersionId = versionResult.id;
 
-        const rowPdfBuffer = await buildRecordsListRowSignaturePdfBuffer({
+        const rowPdfBuffer = await renderRowSignaturePdf({
           formSecurity,
           groupKey: config.groupKey,
           row,
           rowIndex,
           submittedSignature,
           submittedAt,
-          event
+          event,
+          effectiveFeatureFlags: rowSignatureFeatureFlags
         });
         if (rowPdfBuffer.length) {
           pdfFileName = safeFileName
@@ -3066,6 +3127,137 @@ async function buildSubmissionPdfBuffer({
   return pdfDocumentToBuffer(doc);
 }
 
+// ---- PDF engine selection (PDFKit local vs Chromium renderer Lambda) ----
+
+function resolvePdfEngine(effectiveFeatureFlags) {
+  const override = String(process.env.PDF_RENDERER || "").trim().toLowerCase();
+  if (override === "chromium") {
+    return "chromium";
+  }
+  if (override === "pdfkit") {
+    return "pdfkit";
+  }
+  return effectiveFeatureFlags?.usePdfChromiumRenderer === true ? "chromium" : "pdfkit";
+}
+
+async function invokePdfRenderer(envelope) {
+  if (!PDF_RENDERER_FUNCTION_NAME) {
+    throw new Error("PDF_RENDERER_FUNCTION_NAME is not configured.");
+  }
+  let payload = JSON.stringify(envelope);
+  // Lambda RequestResponse request payload limit is 6MB; stage oversized envelopes in S3.
+  if (Buffer.byteLength(payload, "utf8") > 5 * 1024 * 1024) {
+    if (!UPLOAD_STAGING_BUCKET) {
+      throw new Error("PDF renderer payload exceeds 5MB and no staging bucket is configured.");
+    }
+    const key = `pdf-renderer-staging/${crypto.randomUUID()}.json`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: UPLOAD_STAGING_BUCKET,
+      Key: key,
+      Body: payload,
+      ContentType: "application/json"
+    }));
+    payload = JSON.stringify({ s3Staging: { bucket: UPLOAD_STAGING_BUCKET, key } });
+  }
+  const response = await lambdaClient.send(new InvokeCommand({
+    FunctionName: PDF_RENDERER_FUNCTION_NAME,
+    InvocationType: "RequestResponse",
+    Payload: Buffer.from(payload)
+  }));
+  const raw = response.Payload ? Buffer.from(response.Payload).toString("utf8") : "";
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error("PDF renderer returned an invalid response.");
+  }
+  if (response.FunctionError || !parsed?.ok || !parsed.pdfBase64) {
+    throw new Error(parsed?.error || response.FunctionError || "PDF renderer failed.");
+  }
+  return Buffer.from(parsed.pdfBase64, "base64");
+}
+
+async function renderSubmissionPdf({
+  config,
+  formSecurity,
+  inputPayload,
+  finalizedFiles,
+  finalizedSignatures,
+  finalizedRowSignatures,
+  submittedAt,
+  event,
+  effectiveFeatureFlags
+}) {
+  if (resolvePdfEngine(effectiveFeatureFlags) === "chromium") {
+    try {
+      return await invokePdfRenderer({
+        jobType: "submission",
+        config,
+        inputPayload,
+        finalizedFiles,
+        finalizedSignatures,
+        finalizedRowSignatures,
+        submittedAt,
+        meta: { clientIp: getClientIp(event), userAgent: getUserAgent(event) }
+      });
+    } catch (error) {
+      if (String(process.env.PDF_RENDERER_FALLBACK || "").toLowerCase() === "off") {
+        throw error;
+      }
+      console.warn("Chromium PDF renderer failed; falling back to PDFKit:", error?.message || error);
+    }
+  }
+  return buildSubmissionPdfBuffer({
+    formSecurity,
+    inputPayload,
+    finalizedFiles,
+    finalizedSignatures,
+    finalizedRowSignatures,
+    submittedAt,
+    event
+  });
+}
+
+async function renderRowSignaturePdf({
+  formSecurity,
+  groupKey,
+  row,
+  rowIndex,
+  submittedSignature,
+  submittedAt,
+  event,
+  effectiveFeatureFlags
+}) {
+  if (resolvePdfEngine(effectiveFeatureFlags) === "chromium") {
+    try {
+      return await invokePdfRenderer({
+        jobType: "rowSignature",
+        config: normalizeSubmissionPdfConfig(formSecurity),
+        groupKey,
+        row,
+        rowIndex,
+        submittedSignature,
+        submittedAt,
+        meta: { clientIp: getClientIp(event), userAgent: getUserAgent(event) }
+      });
+    } catch (error) {
+      if (String(process.env.PDF_RENDERER_FALLBACK || "").toLowerCase() === "off") {
+        throw error;
+      }
+      console.warn("Chromium row-signature renderer failed; falling back to PDFKit:", error?.message || error);
+    }
+  }
+  return buildRecordsListRowSignaturePdfBuffer({
+    formSecurity,
+    groupKey,
+    row,
+    rowIndex,
+    submittedSignature,
+    submittedAt,
+    event
+  });
+}
+
 async function finalizeSubmissionPdf({
   tenantRecord,
   formSecurity,
@@ -3109,14 +3301,16 @@ async function finalizeSubmissionPdf({
     throw buildFailureError(targetMessage, 400, "mapping");
   }
 
-  const pdfBuffer = await buildSubmissionPdfBuffer({
+  const pdfBuffer = await renderSubmissionPdf({
+    config,
     formSecurity,
     inputPayload,
     finalizedFiles,
     finalizedSignatures,
     finalizedRowSignatures,
     submittedAt,
-    event
+    event,
+    effectiveFeatureFlags
   });
   if (!pdfBuffer.length) {
     throw buildFailureError("Submission PDF could not be generated.", 500, "system");
@@ -3172,10 +3366,6 @@ async function executeUpsertManyCommand(command, context, sf) {
       resolveValue(command.fields, rowContext)
     );
 
-    if (command.relationshipField && relationshipValue !== undefined) {
-      resolvedFields[command.relationshipField] = relationshipValue;
-    }
-
     const rowId = getByPath(row, idField);
 
     if (rowId) {
@@ -3193,6 +3383,10 @@ async function executeUpsertManyCommand(command, context, sf) {
         action: "updated"
       });
       continue;
+    }
+
+    if (command.relationshipField && relationshipValue !== undefined) {
+      resolvedFields[command.relationshipField] = relationshipValue;
     }
 
     const createResult = await createSalesforceRecord(
@@ -3779,6 +3973,7 @@ export const handler = async (event) => {
     }
 
     const finalizedRowSignatures = await finalizeRecordsListRowSignatures({
+      tenantRecord,
       formSecurity,
       inputPayload,
       results,

@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "result": {
+    "attributes": {
+      "type": "Package2Version",
+      "url": "/services/data/v67.0/tooling/sobjects/Package2Version/05igL0000005ZjVQAU"
+    },
+    "Id": "05igL0000005ZjVQAU",
+    "Package2Id": "0HogL0000002CUvSAM",
+    "SubscriberPackageVersionId": "04tgL000000SAqrQAG",
+    "Name": "ver 0.15 beta",
+    "Description": "Beta with recent Designer and runtime improvements for customer sandbox testing.",
+    "Tag": null,
+    "Branch": null,
+    "AncestorId": "04tgL000000OO9FQAW",
+    "ValidationSkipped": false,
+    "MajorVersion": 0,
+    "MinorVersion": 15,
+    "PatchVersion": 0,
+    "BuildNumber": 10,
+    "IsReleased": false,
+    "ReleaseVersion": 67,
+    "BuildDurationInSeconds": 261,
+    "CreatedById": "005gL00000I0QbFQAV",
+    "ConvertedFromVersionId": " ",
+    "ValidatedAsync": false,
+    "TotalNumberOfMetadataFiles": 206,
+    "TotalSizeOfMetadataFiles": 2915541,
+    "Version": "0.15.0.10",
+    "PackageType": "Managed",
+    "AncestorVersion": "0.14.0.1",
+    "CodeCoverage": {
+      "apexCodeCoveragePercentage": 83
+    },
+    "HasPassedCodeCoverageCheck": true,
+    "Package2": {
+      "IsOrgDependent": "N/A"
+    },
+    "HasMetadataRemoved": "No",
+    "HasVpi": "false"
+  },
+  "warnings": []
+}

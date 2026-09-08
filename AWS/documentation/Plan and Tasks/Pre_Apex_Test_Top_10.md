@@ -27,7 +27,7 @@ It does **not** try to include:
   - submit
   - themes
   - multilingual
-  - verification number
+  - secret code
   - file upload
   - formula fields
   - logs

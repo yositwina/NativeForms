@@ -12,7 +12,7 @@ import {
   QueryCommand,
   ScanCommand
 } from "@aws-sdk/client-dynamodb";
-import { S3Client, DeleteObjectCommand, GetObjectTaggingCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand, GetObjectTaggingCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
@@ -37,6 +37,9 @@ const SUBMISSION_LOG_TABLE = process.env.SUBMISSION_LOG_TABLE || "NativeFormsSub
 const SETTINGS_TABLE = process.env.SETTINGS_TABLE || "NativeFormsAdminSettings";
 const BOOTSTRAP_V2_NONCE_TABLE = process.env.BOOTSTRAP_V2_NONCE_TABLE || "NativeFormsBootstrapV2Nonces";
 const BOOTSTRAP_V2_NONCE_KEY_ATTRIBUTE = process.env.BOOTSTRAP_V2_NONCE_KEY_ATTRIBUTE || "nonceKey";
+const CONNECTED_ORG_GROUP_TABLE = process.env.CONNECTED_ORG_GROUP_TABLE || "NativeFormsConnectedOrgGroups";
+const PORTABLE_SNAPSHOT_TABLE = process.env.PORTABLE_SNAPSHOT_TABLE || "NativeFormsPortableSnapshots";
+const PORTABLE_SNAPSHOT_BUCKET = process.env.PORTABLE_SNAPSHOT_BUCKET || "";
 const SALESFORCE_CONNECTION_SECRET_PREFIX = "NativeForms/SalesforceConnection";
 const SALESFORCE_OAUTH_CLIENT_SECRET_NAME = process.env.SALESFORCE_OAUTH_CLIENT_SECRET_NAME || "";
 const SALESFORCE_OAUTH_CLIENT_ID = process.env.SALESFORCE_OAUTH_CLIENT_ID || "";
@@ -375,6 +378,7 @@ function jsonResponse(statusCode, payload) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization"
@@ -469,11 +473,40 @@ async function getItemByKey(tableName, keyName, keyValue) {
   return result.Item ? unmarshallItem(result.Item) : null;
 }
 
+async function getItemByCompositeKey(tableName, key) {
+  const result = await dynamoClient.send(new GetItemCommand({
+    TableName: tableName,
+    Key: marshallItem(key)
+  }));
+
+  return result.Item ? unmarshallItem(result.Item) : null;
+}
+
 async function saveItem(tableName, record) {
   await dynamoClient.send(new PutItemCommand({
     TableName: tableName,
     Item: marshallItem(record)
   }));
+}
+
+async function queryItems(params) {
+  const items = [];
+  let exclusiveStartKey;
+
+  do {
+    const result = await dynamoClient.send(new QueryCommand({
+      ...params,
+      ExclusiveStartKey: exclusiveStartKey
+    }));
+
+    (result.Items || []).forEach((item) => {
+      items.push(unmarshallItem(item));
+    });
+
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return items;
 }
 
 async function scanAllItems(tableName) {
@@ -525,6 +558,584 @@ async function getTenantRecord(orgId) {
 
 function validateOrgId(orgId) {
   return typeof orgId === "string" && /^00D[A-Za-z0-9]{12,15}$/.test(normalizeOrgId(orgId));
+}
+
+function normalizePortableFormKey(value) {
+  return String(value || "").trim();
+}
+
+function validatePortableFormKey(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(normalizePortableFormKey(value));
+}
+
+function buildConnectedOrgPk(groupId) {
+  return `GROUP#${String(groupId || "").trim()}`;
+}
+
+function buildConnectedOrgSk(orgId) {
+  return `ORG#${normalizeOrgId(orgId)}`;
+}
+
+function buildConnectedOrgGsiPk(orgId) {
+  return `ORG#${normalizeOrgId(orgId)}`;
+}
+
+function buildConnectedOrgGsiSk(groupId) {
+  return `GROUP#${String(groupId || "").trim()}`;
+}
+
+function buildSnapshotPk(groupId) {
+  return `GROUP#${String(groupId || "").trim()}`;
+}
+
+function buildSnapshotSk(sourceOrgId, globalFormKey) {
+  return `SNAPSHOT#${normalizeOrgId(sourceOrgId)}#${normalizePortableFormKey(globalFormKey)}`;
+}
+
+function generateConnectedOrgGroupId() {
+  return `group_${crypto.randomBytes(12).toString("hex")}`;
+}
+
+function normalizeOrgType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["sandbox", "scratch", "production", "developer", "playground"].includes(normalized)) {
+    return normalized;
+  }
+  return "unknown";
+}
+
+function inferOrgTypeFromLoginUrl(loginBaseUrl) {
+  const value = String(loginBaseUrl || "").toLowerCase();
+  if (value.includes("test.salesforce.com")) {
+    return "sandbox";
+  }
+  return "production";
+}
+
+// The legacy /connect flow is browser-started, so AWS must treat its URL as
+// untrusted input. Keep this allowlist narrow enough to prevent SSRF while
+// preserving the Salesforce production, sandbox, and org-domain URLs emitted
+// by the package.
+function normalizeSalesforceLoginBaseUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = new URL(raw);
+    const hostname = parsed.hostname.toLowerCase();
+    const allowedHost =
+      hostname === "login.salesforce.com" ||
+      hostname === "test.salesforce.com" ||
+      hostname.endsWith(".salesforce.com") ||
+      hostname.endsWith(".salesforce-setup.com") ||
+      hostname.endsWith(".cloudforce.com");
+
+    if (
+      parsed.protocol !== "https:" ||
+      !allowedHost ||
+      parsed.username ||
+      parsed.password ||
+      (parsed.port && parsed.port !== "443") ||
+      (parsed.pathname !== "/" && parsed.pathname !== "") ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return null;
+    }
+
+    return `https://${hostname}`;
+  } catch (error) {
+    return null;
+  }
+}
+
+function invalidSalesforceLoginUrlResponse() {
+  return htmlResponse(400, "Connection Error", "The Salesforce connection URL is invalid.");
+}
+
+function sanitizeConnectedOrgMember(record) {
+  if (!record) return null;
+  return {
+    groupId: record.groupId || null,
+    orgId: record.orgId || null,
+    orgName: record.orgName || "",
+    orgType: record.orgType || "unknown",
+    loginBaseUrl: record.loginBaseUrl || null,
+    instanceUrl: record.instanceUrl || null,
+    status: record.status || "active",
+    role: record.role || "member",
+    connectedByOrgId: record.connectedByOrgId || null,
+    connectedAt: record.connectedAt || null,
+    lastSeenAt: record.lastSeenAt || null
+  };
+}
+
+function sanitizePortableSnapshotMetadata(record) {
+  if (!record) return null;
+  return {
+    snapshotId: record.snapshotId || `${record.sourceOrgId || ""}#${record.globalFormKey || ""}`,
+    groupId: record.groupId || null,
+    sourceOrgId: record.sourceOrgId || null,
+    sourceOrgName: record.sourceOrgName || "",
+    globalFormKey: record.globalFormKey || "",
+    formName: record.formName || "",
+    schemaVersion: record.schemaVersion || "",
+    publishedVersionNumber: record.publishedVersionNumber ?? null,
+    publishedAt: record.publishedAt || null,
+    snapshotSavedAt: record.snapshotSavedAt || null,
+    features: Array.isArray(record.features) ? record.features : [],
+    themeKey: record.themeKey || null,
+    themeName: record.themeName || null,
+    assetCount: record.assetCount ?? 0,
+    assetBytes: record.assetBytes ?? 0,
+    elementCount: record.elementCount ?? 0,
+    actionCount: record.actionCount ?? 0,
+    contentSha256: record.contentSha256 || null
+  };
+}
+
+async function queryConnectedOrgMembershipsByOrg(orgId) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+  if (!normalizedOrgId) {
+    return [];
+  }
+
+  return queryItems({
+    TableName: CONNECTED_ORG_GROUP_TABLE,
+    IndexName: "GSI1",
+    KeyConditionExpression: "gsi1pk = :orgPk",
+    ExpressionAttributeValues: {
+      ":orgPk": { S: buildConnectedOrgGsiPk(normalizedOrgId) }
+    }
+  });
+}
+
+async function getActiveConnectedOrgMembership(orgId) {
+  const memberships = await queryConnectedOrgMembershipsByOrg(orgId);
+  return memberships
+    .filter((item) => item?.status === "active")
+    .sort((left, right) => {
+      const leftTime = String(left?.updatedAt || left?.lastSeenAt || left?.connectedAt || "");
+      const rightTime = String(right?.updatedAt || right?.lastSeenAt || right?.connectedAt || "");
+      return rightTime.localeCompare(leftTime);
+    })[0] || null;
+}
+
+async function listConnectedOrgGroupMembers(groupId) {
+  if (!groupId) {
+    return [];
+  }
+
+  return queryItems({
+    TableName: CONNECTED_ORG_GROUP_TABLE,
+    KeyConditionExpression: "pk = :pk",
+    ExpressionAttributeValues: {
+      ":pk": { S: buildConnectedOrgPk(groupId) }
+    }
+  });
+}
+
+async function ensureConnectedOrgMembership(orgId, tenantRecord = null, options = {}) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+  if (!validateOrgId(normalizedOrgId)) {
+    const error = new Error("Invalid orgId");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const existing = await getActiveConnectedOrgMembership(normalizedOrgId);
+  if (existing?.groupId) {
+    return existing;
+  }
+
+  const now = options.now || new Date().toISOString();
+  const groupId = options.groupId || generateConnectedOrgGroupId();
+  const loginBaseUrl = options.loginBaseUrl || tenantRecord?.loginBaseUrl || null;
+  const member = {
+    pk: buildConnectedOrgPk(groupId),
+    sk: buildConnectedOrgSk(normalizedOrgId),
+    gsi1pk: buildConnectedOrgGsiPk(normalizedOrgId),
+    gsi1sk: buildConnectedOrgGsiSk(groupId),
+    groupId,
+    orgId: normalizedOrgId,
+    orgName: options.orgName || tenantRecord?.companyName || normalizedOrgId,
+    orgType: normalizeOrgType(options.orgType || inferOrgTypeFromLoginUrl(loginBaseUrl)),
+    loginBaseUrl,
+    instanceUrl: options.instanceUrl || null,
+    status: "active",
+    role: options.role || "owner",
+    connectedByOrgId: options.connectedByOrgId || normalizedOrgId,
+    connectedAt: now,
+    lastSeenAt: now,
+    updatedAt: now,
+    recordType: "connected-org-member"
+  };
+
+  await saveItem(CONNECTED_ORG_GROUP_TABLE, member);
+  return member;
+}
+
+async function upsertConnectedOrgMembership({ groupId, orgId, orgName, orgType, loginBaseUrl, instanceUrl, connectedByOrgId }) {
+  const normalizedOrgId = normalizeOrgId(orgId);
+  if (!groupId || !validateOrgId(normalizedOrgId)) {
+    const error = new Error("Missing connected org group or org id.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const now = new Date().toISOString();
+  const existing = await getItemByCompositeKey(CONNECTED_ORG_GROUP_TABLE, {
+    pk: buildConnectedOrgPk(groupId),
+    sk: buildConnectedOrgSk(normalizedOrgId)
+  });
+  const member = {
+    ...(existing || {}),
+    pk: buildConnectedOrgPk(groupId),
+    sk: buildConnectedOrgSk(normalizedOrgId),
+    gsi1pk: buildConnectedOrgGsiPk(normalizedOrgId),
+    gsi1sk: buildConnectedOrgGsiSk(groupId),
+    groupId,
+    orgId: normalizedOrgId,
+    orgName: orgName || existing?.orgName || normalizedOrgId,
+    orgType: normalizeOrgType(orgType || existing?.orgType || inferOrgTypeFromLoginUrl(loginBaseUrl)),
+    loginBaseUrl: loginBaseUrl || existing?.loginBaseUrl || null,
+    instanceUrl: instanceUrl || existing?.instanceUrl || null,
+    status: "active",
+    role: existing?.role || "member",
+    connectedByOrgId: connectedByOrgId || existing?.connectedByOrgId || null,
+    connectedAt: existing?.connectedAt || now,
+    lastSeenAt: now,
+    updatedAt: now,
+    recordType: "connected-org-member"
+  };
+
+  await saveItem(CONNECTED_ORG_GROUP_TABLE, member);
+  return member;
+}
+
+function createConnectedOrgState(payload, tenantRecord) {
+  if (!tenantRecord?.secret) {
+    const error = new Error("Tenant secret is not available for connected-org OAuth state.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const statePayload = {
+    kind: "connected-org",
+    requestingOrgId: normalizeOrgId(payload.requestingOrgId),
+    loginBaseUrl: payload.loginBaseUrl || null,
+    returnUrl: payload.returnUrl || null,
+    exp: Math.floor(Date.now() / 1000) + 10 * 60,
+    nonce: crypto.randomBytes(12).toString("base64url")
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(statePayload), "utf8").toString("base64url");
+  const signature = crypto.createHmac("sha256", tenantRecord.secret).update(encodedPayload).digest("base64url");
+  return `${encodedPayload}.${signature}`;
+}
+
+async function parseConnectedOrgState(rawState) {
+  const state = String(rawState || "");
+  const parts = state.split(".");
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+  } catch (error) {
+    return null;
+  }
+
+  if (payload?.kind !== "connected-org") {
+    return null;
+  }
+
+  const requestingOrgId = normalizeOrgId(payload.requestingOrgId);
+  if (!validateOrgId(requestingOrgId)) {
+    const error = new Error("Connected-org OAuth state is missing the requesting org.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (Number(payload.exp || 0) < Math.floor(Date.now() / 1000)) {
+    const error = new Error("Connected-org OAuth state expired. Start the connection again.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const tenantRecord = await getTenantRecord(requestingOrgId);
+  if (!tenantRecord?.secret) {
+    const error = new Error("Requesting org is not registered.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const expectedSignature = crypto.createHmac("sha256", tenantRecord.secret).update(parts[0]).digest("base64url");
+  const actualBuffer = Buffer.from(parts[1]);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) {
+    const error = new Error("Connected-org OAuth state signature is invalid.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return { ...payload, requestingOrgId, tenantRecord };
+}
+
+function extractPortableJsonPayload(value) {
+  if (typeof value === "string") {
+    return {
+      jsonText: value,
+      packageMap: JSON.parse(value)
+    };
+  }
+
+  if (value && typeof value === "object") {
+    return {
+      jsonText: JSON.stringify(value),
+      packageMap: value
+    };
+  }
+
+  throw new Error("Missing required field: portableJson");
+}
+
+function validatePortableSnapshotPackage(packageMap) {
+  const supportedSchemas = new Set(["linked-env-portable-form-v1", "linked-env-portable-form-v2"]);
+  if (!packageMap || typeof packageMap !== "object") {
+    throw new Error("Portable snapshot must be a JSON object.");
+  }
+  if (packageMap.packageType !== "twinaformsFormDefinition") {
+    throw new Error("This file is not a TwinaForms form definition export.");
+  }
+  if (!supportedSchemas.has(packageMap.schemaVersion)) {
+    throw new Error("This connected snapshot uses an unsupported TwinaForms schema.");
+  }
+  if (!packageMap.form || typeof packageMap.form !== "object") {
+    throw new Error("Portable snapshot is missing form data.");
+  }
+  if (!packageMap.version || typeof packageMap.version !== "object") {
+    throw new Error("Portable snapshot is missing version data.");
+  }
+  if (!packageMap.manifest || typeof packageMap.manifest !== "object") {
+    throw new Error("Portable snapshot is missing manifest data.");
+  }
+  if (!validatePortableFormKey(packageMap.globalFormKey)) {
+    throw new Error("Portable snapshot is missing a valid TwinaForms form number.");
+  }
+}
+
+function sumPortableAssetBytes(assets) {
+  if (!Array.isArray(assets)) {
+    return 0;
+  }
+
+  return assets.reduce((total, asset) => {
+    const base64 = String(asset?.base64Data || asset?.body || "");
+    return total + Math.floor(base64.length * 0.75);
+  }, 0);
+}
+
+function buildPortableSnapshotMetadata({ groupId, sourceOrgId, sourceOrgName, packageMap, publishedVersionNumber, publishedAt, snapshotS3Key, jsonText }) {
+  const globalFormKey = normalizePortableFormKey(packageMap.globalFormKey);
+  const assets = Array.isArray(packageMap.assets) ? packageMap.assets : [];
+  const elements = Array.isArray(packageMap.elements) ? packageMap.elements : [];
+  const actions = Array.isArray(packageMap.actions) ? packageMap.actions : [];
+  const manifest = packageMap.manifest || {};
+  const theme = packageMap.theme || {};
+  const now = new Date().toISOString();
+
+  return {
+    pk: buildSnapshotPk(groupId),
+    sk: buildSnapshotSk(sourceOrgId, globalFormKey),
+    snapshotId: `${normalizeOrgId(sourceOrgId)}#${globalFormKey}`,
+    groupId,
+    sourceOrgId: normalizeOrgId(sourceOrgId),
+    sourceOrgName: sourceOrgName || normalizeOrgId(sourceOrgId),
+    globalFormKey,
+    formName: packageMap.form?.description || packageMap.form?.name || packageMap.form?.Name || globalFormKey,
+    schemaVersion: packageMap.schemaVersion,
+    publishedVersionNumber: publishedVersionNumber ?? packageMap.version?.versionNumber ?? packageMap.version?.Version_Number__c ?? null,
+    publishedAt: publishedAt || packageMap.exportedAt || null,
+    snapshotSavedAt: now,
+    features: Array.isArray(manifest.features) ? manifest.features : [],
+    themeKey: theme.portableThemeKey || null,
+    themeName: theme.name || theme.Name || null,
+    assetCount: assets.length,
+    assetBytes: sumPortableAssetBytes(assets),
+    elementCount: elements.length,
+    actionCount: actions.length,
+    snapshotS3Key,
+    contentSha256: crypto.createHash("sha256").update(jsonText).digest("hex"),
+    updatedAt: now,
+    recordType: "portable-snapshot"
+  };
+}
+
+async function readS3ObjectText(bucket, key) {
+  const result = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const chunks = [];
+  for await (const chunk of result.Body) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function htmlEscape(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function htmlResponse(statusCode, title, message, extraHtml = "") {
+  return {
+    statusCode,
+    headers: { "Content-Type": "text/html", "X-Content-Type-Options": "nosniff" },
+    body: `
+      <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>${htmlEscape(title)}</h2>
+          <p>${htmlEscape(message)}</p>
+          ${extraHtml || ""}
+        </body>
+      </html>
+    `
+  };
+}
+
+async function exchangeSalesforceOAuthCode({ code, loginBaseUrl, redirectUri }) {
+  const { clientId, clientSecret } = await getSalesforceOAuthClientCredentials();
+  const params = new URLSearchParams();
+  params.append("grant_type", "authorization_code");
+  params.append("client_id", clientId);
+  params.append("client_secret", clientSecret);
+  params.append("redirect_uri", redirectUri);
+  params.append("code", code);
+
+  const tokenResponse = await fetch(`${loginBaseUrl}/services/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: params.toString()
+  });
+  const tokenData = await tokenResponse.json();
+  if (!tokenResponse.ok) {
+    const error = new Error(tokenData?.error_description || tokenData?.error || "Salesforce OAuth token exchange failed.");
+    error.statusCode = tokenResponse.status;
+    error.tokenData = tokenData;
+    throw error;
+  }
+  return tokenData;
+}
+
+async function resolveSalesforceOrgIdentity(tokenData, loginBaseUrl) {
+  const tokenOrgId = normalizeOrgId(String(tokenData?.id || tokenData?.id_url || "").split("/id/")[1]?.split("/")[0] || "");
+  const identity = {
+    orgId: tokenOrgId,
+    orgName: tokenOrgId,
+    orgType: inferOrgTypeFromLoginUrl(loginBaseUrl),
+    loginBaseUrl,
+    instanceUrl: tokenData?.instance_url || null
+  };
+
+  if (tokenData?.access_token && tokenData?.instance_url) {
+    try {
+      const orgResult = await salesforceGetJson(
+        tokenData.instance_url,
+        tokenData.access_token,
+        `/services/data/${SALESFORCE_API_VERSION}/query?q=${encodeURIComponent("SELECT Name, IsSandbox FROM Organization LIMIT 1")}`,
+        "Salesforce Organization"
+      );
+      const orgRecord = Array.isArray(orgResult?.records) ? orgResult.records[0] : null;
+      if (orgRecord?.Name) {
+        identity.orgName = orgRecord.Name;
+      }
+      if (orgRecord?.IsSandbox === true) {
+        identity.orgType = "sandbox";
+      } else if (orgRecord?.IsSandbox === false) {
+        identity.orgType = "production";
+      }
+    } catch (error) {
+      console.warn("Unable to read connected org Organization record:", error.message);
+    }
+  }
+
+  return identity;
+}
+
+async function handleConnectedOrgOAuthCallback(event, stateInfo) {
+  const code = event?.queryStringParameters?.code;
+  const error = event?.queryStringParameters?.error;
+  const errorDescription = event?.queryStringParameters?.error_description;
+  const returnUrl = stateInfo?.returnUrl || null;
+  const returnLink = returnUrl
+    ? `<p><a href="${htmlEscape(returnUrl)}">Return to Salesforce</a></p>`
+    : "";
+
+  if (error) {
+    return htmlResponse(200, "Connected Org OAuth Error", `${error}: ${errorDescription || ""}`, returnLink);
+  }
+  if (!code) {
+    return htmlResponse(200, "Connected Org OAuth", "No authorization code received.", returnLink);
+  }
+
+  const loginBaseUrl = normalizeSalesforceLoginBaseUrl(
+    stateInfo.loginBaseUrl || stateInfo.tenantRecord?.loginBaseUrl
+  );
+  if (!loginBaseUrl) {
+    return htmlResponse(400, "Connected Org OAuth Error", "Missing Salesforce login URL.", returnLink);
+  }
+
+  try {
+    const tokenData = await exchangeSalesforceOAuthCode({
+      code,
+      loginBaseUrl,
+      redirectUri: process.env.SF_REDIRECT_URI
+    });
+    const identity = await resolveSalesforceOrgIdentity(tokenData, loginBaseUrl);
+    if (!validateOrgId(identity.orgId)) {
+      return htmlResponse(403, "Connected Org OAuth Error", "Salesforce did not return a valid org id.", returnLink);
+    }
+
+    const requesterMembership = await ensureConnectedOrgMembership(
+      stateInfo.requestingOrgId,
+      stateInfo.tenantRecord,
+      {
+        orgName: stateInfo.tenantRecord?.companyName,
+        loginBaseUrl: stateInfo.tenantRecord?.loginBaseUrl,
+        connectedByOrgId: stateInfo.requestingOrgId
+      }
+    );
+    await upsertConnectedOrgMembership({
+      groupId: requesterMembership.groupId,
+      orgId: identity.orgId,
+      orgName: identity.orgName,
+      orgType: identity.orgType,
+      loginBaseUrl,
+      instanceUrl: identity.instanceUrl,
+      connectedByOrgId: stateInfo.requestingOrgId
+    });
+
+    return htmlResponse(
+      200,
+      "Connected Org Added",
+      `${identity.orgName || identity.orgId} is now connected to TwinaForms imports.`,
+      returnLink
+    );
+  } catch (callbackError) {
+    console.error("Connected org OAuth callback failed:", callbackError);
+    return htmlResponse(
+      callbackError.statusCode || 500,
+      "Connected Org OAuth Error",
+      callbackError.message || "TwinaForms could not complete connected-org setup.",
+      returnLink
+    );
+  }
 }
 
 function sanitizeTenantRecord(record) {
@@ -1826,7 +2437,10 @@ function httpsRequest(options, body = null) {
 
 async function refreshAccessToken(secret, loginUrl) {
   const credentials = await getSalesforceOAuthClientCredentials();
-  const normalizedLoginUrl = String(loginUrl || "https://login.salesforce.com").replace(/\/+$/, "");
+  const normalizedLoginUrl = normalizeSalesforceLoginBaseUrl(loginUrl || "https://login.salesforce.com");
+  if (!normalizedLoginUrl) {
+    throw new Error("Invalid Salesforce login URL.");
+  }
   const tokenBody = querystring.stringify({
     grant_type: "refresh_token",
     client_id: credentials.clientId,
@@ -1895,6 +2509,7 @@ function normalizeLookupConfig(definition) {
   const targetObject = String(definition?.targetObject || "").trim();
   const searchFields = normalizeLookupFields(definition?.searchFields);
   let displayFields = normalizeLookupFields(definition?.displayFields);
+  let returnFields = normalizeLookupFields(definition?.returnFields);
   if (!targetObject || !isSafeSalesforceIdentifier(targetObject) || searchFields.length === 0) {
     const error = new Error("Lookup field is not configured correctly.");
     error.statusCode = 400;
@@ -1903,13 +2518,25 @@ function normalizeLookupConfig(definition) {
   if (!displayFields.length) {
     displayFields = [...searchFields];
   }
+  if (!returnFields.length) {
+    returnFields = [...displayFields];
+  }
   if (!displayFields.some((field) => field.toLowerCase() === "id")) {
     displayFields.push("Id");
+  }
+  for (const field of displayFields) {
+    if (!returnFields.some((candidate) => candidate.toLowerCase() === field.toLowerCase())) {
+      returnFields.push(field);
+    }
+  }
+  if (!returnFields.some((field) => field.toLowerCase() === "id")) {
+    returnFields.push("Id");
   }
   return {
     targetObject,
     searchFields,
     displayFields,
+    returnFields,
     minSearchLength: Math.max(1, Math.min(Number(definition?.minSearchLength) || 2, 10)),
     limit: Math.max(1, Math.min(Number(definition?.limit) || 10, 25))
   };
@@ -2255,14 +2882,14 @@ function buildLookupLabel(record, displayFields) {
   return parts.length ? parts.join(" - ") : String(record?.Id || "");
 }
 
-function formatLookupRecord(record, displayFields) {
+function formatLookupRecord(record, displayFields, returnFields = displayFields) {
   if (!record?.Id) {
     return null;
   }
   return {
     id: record.Id,
     label: buildLookupLabel(record, displayFields),
-    fields: Object.fromEntries(displayFields.filter((field) => field !== "attributes").map((field) => [field, readSalesforceRecordField(record, field) ?? null]))
+    fields: Object.fromEntries(returnFields.filter((field) => field !== "attributes").map((field) => [field, readSalesforceRecordField(record, field) ?? null]))
   };
 }
 
@@ -2286,11 +2913,11 @@ async function runLookup(payload, formSecurity) {
   const accessToken = await refreshAccessToken(secret, tenantRecord.loginBaseUrl || secret.loginBaseUrl || "https://login.salesforce.com");
 
   if (payload.recordId) {
-    const record = await getSalesforceRecordById(secret.instance_url, accessToken, config.targetObject, String(payload.recordId), config.displayFields);
+    const record = await getSalesforceRecordById(secret.instance_url, accessToken, config.targetObject, String(payload.recordId), config.returnFields);
     return {
       success: true,
       mode: "resolve",
-      record: formatLookupRecord(record, config.displayFields)
+      record: formatLookupRecord(record, config.displayFields, config.returnFields)
     };
   }
 
@@ -2303,13 +2930,13 @@ async function runLookup(payload, formSecurity) {
     };
   }
 
-  const fieldsToSelect = Array.from(new Set(["Id", ...config.displayFields]));
+  const fieldsToSelect = Array.from(new Set(["Id", ...config.returnFields]));
   const searchTerm = `%${escapeSoqlValue(search)}%`;
   const whereClause = config.searchFields.map((field) => `${field} LIKE '${searchTerm}'`).join(" OR ");
   const soql = `SELECT ${fieldsToSelect.join(", ")} FROM ${config.targetObject} WHERE ${whereClause} ORDER BY LastModifiedDate DESC LIMIT ${config.limit}`;
   const result = await querySalesforce(secret.instance_url, accessToken, soql);
   const records = Array.isArray(result.records)
-    ? result.records.map((record) => formatLookupRecord(record, config.displayFields)).filter(Boolean)
+    ? result.records.map((record) => formatLookupRecord(record, config.displayFields, config.returnFields)).filter(Boolean)
     : [];
   return {
     success: true,
@@ -2639,9 +3266,16 @@ export const handler = async (event) => {
     }
 
     const query = event?.queryStringParameters || {};
+    const requestedLoginBaseUrl = query.loginBaseUrl
+      ? normalizeSalesforceLoginBaseUrl(query.loginBaseUrl)
+      : null;
+    if (query.loginBaseUrl && !requestedLoginBaseUrl) {
+      return invalidSalesforceLoginUrlResponse();
+    }
+
     let tenantRecord = await getTenantRecord(orgId);
     if (!tenantRecord) {
-      if (!query.loginBaseUrl) {
+      if (!requestedLoginBaseUrl) {
         return {
           statusCode: 400,
           headers: { "Content-Type": "text/html" },
@@ -2662,7 +3296,7 @@ export const handler = async (event) => {
         orgId,
         adminEmail: normalizeOptionalString(query.adminEmail) || "",
         companyName: normalizeOptionalString(query.companyName) || "TwinaForms Tenant",
-        loginBaseUrl: query.loginBaseUrl,
+        loginBaseUrl: requestedLoginBaseUrl,
         country: normalizeOptionalString(query.country),
         state: normalizeOptionalString(query.state),
         city: normalizeOptionalString(query.city),
@@ -2683,11 +3317,23 @@ export const handler = async (event) => {
       };
       await saveItem(TENANT_TABLE, tenantRecord);
     } else if (query.loginBaseUrl || query.adminEmail || query.companyName) {
+      const storedLoginBaseUrl = normalizeSalesforceLoginBaseUrl(tenantRecord.loginBaseUrl);
+      if (
+        requestedLoginBaseUrl &&
+        storedLoginBaseUrl &&
+        requestedLoginBaseUrl !== storedLoginBaseUrl
+      ) {
+        return htmlResponse(
+          409,
+          "Connection Error",
+          "The Salesforce connection URL cannot be changed through this connection link."
+        );
+      }
       tenantRecord = {
         ...tenantRecord,
         adminEmail: normalizeOptionalString(query.adminEmail) || tenantRecord.adminEmail,
         companyName: normalizeOptionalString(query.companyName) || tenantRecord.companyName,
-        loginBaseUrl: query.loginBaseUrl || tenantRecord.loginBaseUrl,
+        loginBaseUrl: requestedLoginBaseUrl || storedLoginBaseUrl || tenantRecord.loginBaseUrl,
         country: normalizeOptionalString(query.country) ?? tenantRecord.country,
         state: normalizeOptionalString(query.state) ?? tenantRecord.state,
         city: normalizeOptionalString(query.city) ?? tenantRecord.city,
@@ -2697,23 +3343,12 @@ export const handler = async (event) => {
     }
 
     assertTenantIsActive(tenantRecord);
-    if (!tenantRecord.loginBaseUrl) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "text/html" },
-        body: `
-          <html>
-            <body style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Missing Login Base URL</h2>
-              <p>Tenant ${orgId} does not have a stored Salesforce login base URL.</p>
-            </body>
-          </html>
-        `
-      };
+    const loginUrl = normalizeSalesforceLoginBaseUrl(tenantRecord.loginBaseUrl);
+    if (!loginUrl) {
+      return invalidSalesforceLoginUrlResponse();
     }
 
     const redirectUri = process.env.SF_REDIRECT_URI;
-    const loginUrl = tenantRecord.loginBaseUrl;
     let clientId;
 
     try {
@@ -2747,6 +3382,292 @@ export const handler = async (event) => {
       },
       body: ""
     };
+  }
+
+  if (path === "/connected-orgs/connect/start" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+      const orgId = normalizeOrgId(payload?.orgId || payload?.requestingOrgId);
+      if (!validateOrgId(orgId)) {
+        throw new Error("Missing or invalid orgId.");
+      }
+
+      const tenantRecord = await requireTenantAuth(event, orgId);
+      await ensureConnectedOrgMembership(orgId, tenantRecord, {
+        orgName: payload?.orgName || tenantRecord.companyName,
+        loginBaseUrl: tenantRecord.loginBaseUrl,
+        connectedByOrgId: orgId
+      });
+
+      const loginBaseUrl = normalizeSalesforceLoginBaseUrl(
+        payload?.loginBaseUrl || tenantRecord.loginBaseUrl || "https://login.salesforce.com"
+      );
+      if (!loginBaseUrl) {
+        throw new Error("Invalid Salesforce login URL.");
+      }
+      const redirectUri = process.env.SF_REDIRECT_URI;
+      if (!redirectUri) {
+        throw new Error("Server misconfigured: SF_REDIRECT_URI is required.");
+      }
+
+      const { clientId } = await getSalesforceOAuthClientCredentials();
+      const state = createConnectedOrgState({
+        requestingOrgId: orgId,
+        loginBaseUrl,
+        returnUrl: payload?.returnUrl || null
+      }, tenantRecord);
+      const connectUrl =
+        `${loginBaseUrl}/services/oauth2/authorize` +
+        `?response_type=code` +
+        `&client_id=${encodeURIComponent(clientId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&state=${encodeURIComponent(state)}`;
+
+      return jsonResponse(200, {
+        success: true,
+        connectUrl,
+        loginBaseUrl
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/connected-orgs" && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      if (!validateOrgId(orgId)) {
+        throw new Error("Missing or invalid orgId.");
+      }
+      const tenantRecord = await requireTenantAuth(event, orgId);
+      const membership = await ensureConnectedOrgMembership(orgId, tenantRecord, {
+        orgName: tenantRecord.companyName,
+        loginBaseUrl: tenantRecord.loginBaseUrl,
+        connectedByOrgId: orgId
+      });
+      const members = await listConnectedOrgGroupMembers(membership.groupId);
+
+      return jsonResponse(200, {
+        success: true,
+        groupId: membership.groupId,
+        orgs: members
+          .filter((member) => member?.status === "active")
+          .map(sanitizeConnectedOrgMember)
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/connected-orgs/disconnect" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+      const orgId = normalizeOrgId(payload?.orgId || payload?.requestingOrgId);
+      const targetOrgId = normalizeOrgId(payload?.targetOrgId || payload?.connectedOrgId);
+      if (!validateOrgId(orgId) || !validateOrgId(targetOrgId)) {
+        throw new Error("Missing or invalid org id.");
+      }
+      const tenantRecord = await requireTenantAuth(event, orgId);
+      const membership = await ensureConnectedOrgMembership(orgId, tenantRecord);
+      const target = await getItemByCompositeKey(CONNECTED_ORG_GROUP_TABLE, {
+        pk: buildConnectedOrgPk(membership.groupId),
+        sk: buildConnectedOrgSk(targetOrgId)
+      });
+      if (!target || target.status !== "active") {
+        return jsonResponse(200, {
+          success: true,
+          disconnected: false,
+          found: false
+        });
+      }
+      if (target.orgId === orgId) {
+        const error = new Error("Disconnect another connected org, not the current org.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const now = new Date().toISOString();
+      await saveItem(CONNECTED_ORG_GROUP_TABLE, {
+        ...target,
+        status: "disconnected",
+        disconnectedAt: now,
+        disconnectedByOrgId: orgId,
+        updatedAt: now
+      });
+
+      return jsonResponse(200, {
+        success: true,
+        disconnected: true,
+        org: sanitizeConnectedOrgMember({ ...target, status: "disconnected" })
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/portable-snapshots/latest" && method === "POST") {
+    try {
+      const payload = event?.body
+        ? (typeof event.body === "string" ? JSON.parse(event.body) : event.body)
+        : {};
+      const sourceOrgId = normalizeOrgId(payload?.sourceOrgId || payload?.orgId);
+      if (!validateOrgId(sourceOrgId)) {
+        throw new Error("Missing or invalid sourceOrgId.");
+      }
+      if (!PORTABLE_SNAPSHOT_BUCKET) {
+        throw new Error("Server misconfigured: PORTABLE_SNAPSHOT_BUCKET is required.");
+      }
+
+      const tenantRecord = await requireTenantAuth(event, sourceOrgId);
+      const membership = await ensureConnectedOrgMembership(sourceOrgId, tenantRecord, {
+        orgName: tenantRecord.companyName,
+        loginBaseUrl: tenantRecord.loginBaseUrl,
+        connectedByOrgId: sourceOrgId
+      });
+      const { jsonText, packageMap } = extractPortableJsonPayload(payload?.portableJson);
+      validatePortableSnapshotPackage(packageMap);
+      const globalFormKey = normalizePortableFormKey(payload?.globalFormKey || packageMap.globalFormKey);
+      if (!validatePortableFormKey(globalFormKey) || globalFormKey !== normalizePortableFormKey(packageMap.globalFormKey)) {
+        throw new Error("Snapshot form number does not match portable JSON.");
+      }
+
+      const snapshotS3Key = `portable-snapshots/${membership.groupId}/${sourceOrgId}/${globalFormKey}/latest.json`;
+      await s3Client.send(new PutObjectCommand({
+        Bucket: PORTABLE_SNAPSHOT_BUCKET,
+        Key: snapshotS3Key,
+        Body: jsonText,
+        ContentType: "application/json; charset=utf-8",
+        ServerSideEncryption: "AES256",
+        Metadata: {
+          sourceOrgId,
+          globalFormKey,
+          schemaVersion: String(packageMap.schemaVersion || "")
+        }
+      }));
+
+      const metadata = buildPortableSnapshotMetadata({
+        groupId: membership.groupId,
+        sourceOrgId,
+        sourceOrgName: membership.orgName || tenantRecord.companyName,
+        packageMap: {
+          ...packageMap,
+          globalFormKey
+        },
+        publishedVersionNumber: payload?.publishedVersionNumber,
+        publishedAt: payload?.publishedAt,
+        snapshotS3Key,
+        jsonText
+      });
+      await saveItem(PORTABLE_SNAPSHOT_TABLE, metadata);
+
+      return jsonResponse(200, {
+        success: true,
+        snapshotId: metadata.snapshotId,
+        snapshotSavedAt: metadata.snapshotSavedAt,
+        snapshot: sanitizePortableSnapshotMetadata(metadata)
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  if (path === "/portable-snapshots" && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      const includeSelf = String(event?.queryStringParameters?.includeSelf || "").toLowerCase() === "true";
+      if (!validateOrgId(orgId)) {
+        throw new Error("Missing or invalid orgId.");
+      }
+      const tenantRecord = await requireTenantAuth(event, orgId);
+      const membership = await ensureConnectedOrgMembership(orgId, tenantRecord);
+      const members = await listConnectedOrgGroupMembers(membership.groupId);
+      const activeOrgIds = new Set(members.filter((member) => member?.status === "active").map((member) => member.orgId));
+      const snapshots = await queryItems({
+        TableName: PORTABLE_SNAPSHOT_TABLE,
+        KeyConditionExpression: "pk = :pk",
+        ExpressionAttributeValues: {
+          ":pk": { S: buildSnapshotPk(membership.groupId) }
+        }
+      });
+
+      return jsonResponse(200, {
+        success: true,
+        groupId: membership.groupId,
+        snapshots: snapshots
+          .filter((snapshot) => activeOrgIds.has(snapshot.sourceOrgId))
+          .filter((snapshot) => includeSelf || snapshot.sourceOrgId !== orgId)
+          .sort((left, right) => String(right.snapshotSavedAt || "").localeCompare(String(left.snapshotSavedAt || "")))
+          .map(sanitizePortableSnapshotMetadata)
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
+  }
+
+  const portableSnapshotMatch = path.match(/^\/portable-snapshots\/([^/]+)\/([^/]+)$/);
+  if (portableSnapshotMatch && method === "GET") {
+    try {
+      const orgId = normalizeOrgId(event?.queryStringParameters?.orgId);
+      const sourceOrgId = normalizeOrgId(decodeURIComponent(portableSnapshotMatch[1]));
+      const globalFormKey = normalizePortableFormKey(decodeURIComponent(portableSnapshotMatch[2]));
+      if (!validateOrgId(orgId) || !validateOrgId(sourceOrgId) || !validatePortableFormKey(globalFormKey)) {
+        throw new Error("Missing or invalid snapshot request.");
+      }
+      const tenantRecord = await requireTenantAuth(event, orgId);
+      const membership = await ensureConnectedOrgMembership(orgId, tenantRecord);
+      const sourceMember = await getItemByCompositeKey(CONNECTED_ORG_GROUP_TABLE, {
+        pk: buildConnectedOrgPk(membership.groupId),
+        sk: buildConnectedOrgSk(sourceOrgId)
+      });
+      if (!sourceMember || sourceMember.status !== "active") {
+        const error = new Error("Connected source org is not available.");
+        error.statusCode = 404;
+        throw error;
+      }
+      const snapshot = await getItemByCompositeKey(PORTABLE_SNAPSHOT_TABLE, {
+        pk: buildSnapshotPk(membership.groupId),
+        sk: buildSnapshotSk(sourceOrgId, globalFormKey)
+      });
+      if (!snapshot?.snapshotS3Key) {
+        const error = new Error("Snapshot is no longer available.");
+        error.statusCode = 404;
+        throw error;
+      }
+      if (!PORTABLE_SNAPSHOT_BUCKET) {
+        throw new Error("Server misconfigured: PORTABLE_SNAPSHOT_BUCKET is required.");
+      }
+
+      const portableJson = await readS3ObjectText(PORTABLE_SNAPSHOT_BUCKET, snapshot.snapshotS3Key);
+      return jsonResponse(200, {
+        success: true,
+        snapshot: sanitizePortableSnapshotMetadata(snapshot),
+        portableJson
+      });
+    } catch (e) {
+      return jsonResponse(e.statusCode || 400, {
+        success: false,
+        error: e.message
+      });
+    }
   }
 
   if (path === "/tenant/status" && method === "GET") {
@@ -2980,7 +3901,22 @@ export const handler = async (event) => {
     const code = event?.queryStringParameters?.code;
     const error = event?.queryStringParameters?.error;
     const errorDescription = event?.queryStringParameters?.error_description;
-    const orgId = normalizeOrgId(event?.queryStringParameters?.state || event?.queryStringParameters?.orgId);
+    const rawState = event?.queryStringParameters?.state;
+    let connectedOrgState = null;
+    try {
+      connectedOrgState = await parseConnectedOrgState(rawState);
+    } catch (stateError) {
+      return htmlResponse(
+        stateError.statusCode || 400,
+        "Connected Org OAuth Error",
+        stateError.message || "Connected org state could not be verified."
+      );
+    }
+    if (connectedOrgState) {
+      return handleConnectedOrgOAuthCallback(event, connectedOrgState);
+    }
+
+    const orgId = normalizeOrgId(rawState || event?.queryStringParameters?.orgId);
 
     if (error) {
       return {
@@ -3047,7 +3983,10 @@ export const handler = async (event) => {
     }
 
     const redirectUri = process.env.SF_REDIRECT_URI;
-    const loginUrl = tenantRecord.loginBaseUrl;
+    const loginUrl = normalizeSalesforceLoginBaseUrl(tenantRecord.loginBaseUrl);
+    if (!loginUrl) {
+      return htmlResponse(400, "OAuth Callback Error", "The Salesforce connection could not be verified.");
+    }
     const existingConnection = await getSalesforceConnection(getSalesforceConnectionSecretName(orgId));
     let clientId;
     let clientSecret;
@@ -3187,7 +4126,7 @@ export const handler = async (event) => {
           : `
           <html>
             <body style="font-family: Arial, sans-serif; padding: 24px; max-width: 640px; margin: 0 auto; color: #16325c;">
-              <h2>NativeForms Is Connected</h2>
+              <h2>TwinaForms Is Connected</h2>
               <p>You can return to Salesforce now and finish setup.</p>
               <p>The org-specific Salesforce connection was saved successfully.</p>
               <p style="margin-top: 16px;"><a href="#" onclick="window.close(); return false;">Close this tab</a></p>

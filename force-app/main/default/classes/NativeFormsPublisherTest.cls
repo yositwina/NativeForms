@@ -1,5 +1,84 @@
 @IsTest
 private class NativeFormsPublisherTest {
+    @IsTest
+    static void recordsListFieldsRetainVisibilityConditions() {
+        Map<String, Object> config = new Map<String, Object>{
+            'conditionalEnabled' => true,
+            'conditionalConditions' => new List<Object>{new Map<String, Object>{
+                'fieldKey' => 'activity', 'operator' => 'equals', 'value' => 'Travel'
+            }},
+            'required' => true,
+            'options' => new List<Object>{new Map<String, Object>{'label' => 'One', 'value' => 'one'}}
+        };
+        for (String fieldType : new List<String>{'text', 'textarea', 'select', 'checkbox', 'radio', 'multiCheckbox', 'date', 'time', 'lookup', 'signature', 'heading', 'spacer', 'button'}) {
+            NF_Form_Element__c field = new NF_Form_Element__c(
+                Element_Type__c = fieldType, Field_Key__c = 'description', Label__c = 'Description',
+                Config_JSON__c = JSON.serialize(config)
+            );
+            String html = NativeFormsPublisher.renderRepeatGroupChildElement(field, 'activities', true, false, 'en');
+            System.assert(html.contains('data-conditions='), fieldType + ' must retain row visibility conditions.');
+            System.assert(html.contains('activity'), fieldType + ' must retain the controlling field key.');
+            System.assert(html.contains('Travel'), fieldType + ' must retain the comparison value.');
+            config.put('conditionalEnabled', false);
+            field.Config_JSON__c = JSON.serialize(config);
+            html = NativeFormsPublisher.renderRepeatGroupChildElement(field, 'activities', true, false, 'en');
+            System.assert(!html.contains('data-conditions='), fieldType + ' must omit conditions when disabled.');
+            config.put('conditionalEnabled', true);
+        }
+    }
+
+    @IsTest
+    static void recordsListFieldsCarryDefaultValue() {
+        Map<String, Object> config = new Map<String, Object>{
+            'defaultValue' => 'True',
+            'placeholder' => 'Enter text',
+            'options' => new List<Object>{new Map<String, Object>{'label' => 'True', 'value' => 'True'}}
+        };
+        for (String fieldType : new List<String>{'text', 'textarea', 'number', 'select', 'checkbox', 'radio', 'multiCheckbox', 'email', 'tel', 'url'}) {
+            NF_Form_Element__c field = new NF_Form_Element__c(
+                Element_Type__c = fieldType, Field_Key__c = 'condition', Label__c = 'Condition',
+                Config_JSON__c = JSON.serialize(config)
+            );
+            String html = NativeFormsPublisher.renderRepeatGroupChildElement(field, 'cases', true, false, 'en');
+            System.assert(
+                html.contains('data-repeat-default="True"'),
+                fieldType + ' must carry its default value into the row template.'
+            );
+        }
+
+        NF_Form_Element__c blankDefault = new NF_Form_Element__c(
+            Element_Type__c = 'text', Field_Key__c = 'condition', Label__c = 'Condition',
+            Config_JSON__c = JSON.serialize(new Map<String, Object>{'defaultValue' => '', 'placeholder' => 'Enter text'})
+        );
+        System.assert(
+            !NativeFormsPublisher.renderRepeatGroupChildElement(blankDefault, 'cases', true, false, 'en')
+                .contains('data-repeat-default'),
+            'A blank default must not emit the attribute.'
+        );
+
+        NF_Form_Element__c legacySeed = new NF_Form_Element__c(
+            Element_Type__c = 'text', Field_Key__c = 'condition', Label__c = 'Condition',
+            Config_JSON__c = JSON.serialize(new Map<String, Object>{'defaultValue' => 'Enter text'})
+        );
+        System.assert(
+            !NativeFormsPublisher.renderRepeatGroupChildElement(legacySeed, 'cases', true, false, 'en')
+                .contains('data-repeat-default'),
+            'A legacy seed default must not leak into the row as a real value.'
+        );
+
+        NF_Form_Element__c formulaField = new NF_Form_Element__c(
+            Element_Type__c = 'text', Field_Key__c = 'condition', Label__c = 'Condition',
+            Config_JSON__c = JSON.serialize(new Map<String, Object>{
+                'defaultValue' => 'True', 'isFormula' => true, 'formulaExpression' => '1+1'
+            })
+        );
+        System.assert(
+            !NativeFormsPublisher.renderRepeatGroupChildElement(formulaField, 'cases', true, false, 'en')
+                .contains('data-repeat-default'),
+            'A formula field must not carry a default value.'
+        );
+    }
+
     @TestSetup
     static void setupPermissions() {
         NativeFormsTestDataFactory.assignTwinaFormsUserPermissionSet();
@@ -12,6 +91,7 @@ private class NativeFormsPublisherTest {
         Integer presignCalls = 0;
         Integer uploadCalls = 0;
         Integer registerCalls = 0;
+        Integer snapshotCalls = 0;
         String uploadedHtml;
         String registerBody;
 
@@ -66,6 +146,18 @@ private class NativeFormsPublisherTest {
                 response.setBody(JSON.serialize(new Map<String, Object>{
                     'success' => true,
                     'status' => 'published'
+                }));
+                return response;
+            }
+
+            if (endpoint.contains('/portable-snapshots/latest')) {
+                snapshotCalls += 1;
+                response.setHeader('Content-Type', 'application/json');
+                response.setStatusCode(200);
+                response.setStatus('OK');
+                response.setBody(JSON.serialize(new Map<String, Object>{
+                    'success' => true,
+                    'snapshotId' => '00Dxx0000000000#rich-published-form'
                 }));
                 return response;
             }
@@ -152,6 +244,26 @@ private class NativeFormsPublisherTest {
         ];
         System.assertEquals('Publish Failed', invalidSlugVersion.Publish_Status__c, 'Invalid slug should mark publish as failed.');
         System.assert(invalidSlugVersion.Last_Publish_Error__c.contains('Friendly published URLs require NF Key before publish'), 'Invalid slug should persist the friendly failure message.');
+
+        NF_Form_Version__c blankSenderVersion = createBaseVersion(
+            'Blank Sender Form',
+            'blank-sender-form',
+            'Draft',
+            'Never Published',
+            false,
+            json(new Map<String, Object>{
+                'languageCode' => 'en',
+                'userVerificationEnabled' => true,
+                'userVerificationSenderEmail' => ''
+            })
+        );
+        NativeFormsPublisher.PublishResult blankSenderResult = NativeFormsPublisher.publishVersion(blankSenderVersion.Id);
+        System.assertEquals(false, blankSenderResult.success, 'User Verification publish should fail when sender email is blank.');
+        System.assertEquals(
+            'User Verification requires a sender email. Enter a verified Org-Wide Email Address or authorized sender email.',
+            blankSenderResult.message,
+            'Blank sender failure should explain the required field.'
+        );
 
         System.assertEquals(true, NativeFormsPublisher.hasSharedCaptchaSiteKey(), 'Shared CAPTCHA key helper should report the packaged key as present.');
         System.assert(String.isNotBlank(NativeFormsPublisher.getSharedCaptchaSiteKey()), 'Shared CAPTCHA key helper should return the packaged key value.');
@@ -282,6 +394,34 @@ private class NativeFormsPublisherTest {
         System.assert(String.isNotBlank(mock.uploadedHtml), 'Successful publish should upload generated HTML.');
         System.assert(mock.uploadedHtml.contains('nf-user-verification'), 'Generated HTML should include the User Verification section when enabled.');
         System.assert(mock.uploadedHtml.contains('data-formula-target="true"'), 'Generated HTML should include formula metadata for formula fields.');
+        System.assert(mock.uploadedHtml.contains('data-repeat-field-key="caseSummary" data-repeat-source-field="caseSummary" data-formula-target="true"'), 'Records List formula targets should publish as collected row fields.');
+        System.assert(mock.uploadedHtml.contains('data-formula-expression="CONCAT({email1}, &quot; - &quot;, {row.subject})"'), 'Records List formulas should support mixed top-level and same-row references.');
+        System.assert(mock.uploadedHtml.contains('readFormulaSourceValue(fieldKey,rowEl)'), 'Formula runtime should resolve same-row formula values from the active Records List row.');
+        System.assert(mock.uploadedHtml.contains('setRepeatFieldValue(field,value);applyLockState(field);'), 'Lookup field mapping must re-apply lock state to Records List row fields.');
+        for (String formulaFunctionName : new List<String>{
+            'LEFT:function', 'RIGHT:function', 'MID:function', 'LEN:function', 'TRIM:function',
+            'UPPER:function', 'LOWER:function', 'SUBSTITUTE:function', 'CONTAINS:function', 'BEGINS:function',
+            'WEEKDAY:function', 'DAYNAME:function', 'DATE:function', 'ADDMONTHS:function', 'DATEVALUE:function',
+            'AND:function', 'OR:function', 'NOT:function',
+            'MOD:function', 'CEILING:function', 'FLOOR:function', 'POWER:function', 'SQRT:function'
+        }) {
+            System.assert(
+                mock.uploadedHtml.contains(formulaFunctionName),
+                'Formula runtime should publish the ' + formulaFunctionName.replace(':function', '') + '() function.'
+            );
+        }
+        System.assert(
+            mock.uploadedHtml.contains('formulaReplaceOutsideStrings'),
+            'Formula runtime should skip quoted string literals when folding AND/OR to operators.'
+        );
+        System.assert(
+            mock.uploadedHtml.contains('\\bAND\\b(?!\\s*\\()'),
+            'Uppercase AND( should stay callable as a function instead of being folded to the operator.'
+        );
+        System.assert(
+            mock.uploadedHtml.contains('const dateOnly=value.match'),
+            'Date-only formula values should be parsed as local midnight so WEEKDAY/DAY are timezone-stable.'
+        );
         System.assert(mock.uploadedHtml.contains('uploadStatusUrl'), 'Generated HTML should publish the upload scan status endpoint.');
         System.assert(mock.uploadedHtml.contains('waitForSafeUpload'), 'Generated HTML should wait for malware scan completion before accepting uploaded files.');
         System.assert(mock.uploadedHtml.contains('Uploaded files are checked for safety'), 'Generated HTML should explain that uploaded files are checked before attachment.');
@@ -290,23 +430,71 @@ private class NativeFormsPublisherTest {
         System.assert(mock.uploadedHtml.contains('resolveFormulaPostSubmitUrl'), 'Generated HTML should include formula redirect resolution.');
         System.assert(mock.uploadedHtml.contains('URLENCODE:function'), 'Generated HTML should expose URLENCODE in the shared formula runtime.');
         System.assert(mock.uploadedHtml.contains('data-nativeforms-time="true"'), 'Generated HTML should render Time fields as TwinaForms-controlled text inputs.');
+        System.assert(mock.uploadedHtml.contains('nf-spacer--field-with-label'), 'Generated HTML should render the configured Blank Space with label space.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-date-picker="true"'), 'Generated HTML should wrap Date fields with the TwinaForms date picker control.');
+        System.assert(mock.uploadedHtml.contains('data-date-picker-toggle'), 'Generated HTML should include a visible Date picker button.');
+        System.assert(mock.uploadedHtml.contains('.nf-date-wrap{position:relative;display:block;min-width:0;}'), 'Date picker controls should share the date input width.');
+        System.assert(mock.uploadedHtml.contains('@container (max-width:620px)'), 'Repeat rows should collapse dense column layouts based on their actual container width.');
+        System.assert(mock.uploadedHtml.contains('@container (max-width:900px)'), 'Five-column repeat rows should step down to four columns when their container narrows.');
+        System.assert(mock.uploadedHtml.contains('function renderDatePicker(input)'), 'Generated HTML should include the TwinaForms calendar renderer.');
+        System.assert(mock.uploadedHtml.contains('function moveDatePickerMonth(input,delta)'), 'Generated HTML should support Date picker month navigation.');
+        System.assert(mock.uploadedHtml.contains('target.closest("[data-date-nav]")'), 'Generated HTML should handle Date picker arrows through delegated form clicks.');
+        System.assert(mock.uploadedHtml.contains('initDatePickers(rowsHost.lastElementChild)'), 'Dynamically added Records List rows should initialize Date picker controls.');
+        System.assert(mock.uploadedHtml.contains('wireLiveValidation(rowsHost.lastElementChild)'), 'Dynamically added Records List rows should initialize live validation controls.');
+        System.assert(mock.uploadedHtml.contains('data-validation-wired'), 'Live validation should guard against duplicate event binding.');
+        System.assert(mock.uploadedHtml.contains('function validateAllFields()'), 'Generated HTML should expose submit-time field validation.');
+        System.assert(mock.uploadedHtml.contains('invalidField.reportValidity();'), 'Submit should report only a visible invalid field.');
+        System.assert(mock.uploadedHtml.contains('<form class="nf-grid" novalidate'), 'Published forms must validate visible fields in the submit handler instead of browser pre-validation.');
+        System.assert(mock.uploadedHtml.contains('applyLockState(lookupEl)'), 'Prefill writes to Lookup controls should apply the existing lock behavior to that control.');
+        System.assert(mock.uploadedHtml.contains('fields.forEach(function(el){if(el.type==="checkbox")'), 'Prefill writes should apply lock behavior to each written control.');
+        System.assert(mock.uploadedHtml.contains('restoreUserVerificationSession();applyLockedFields();emitTwinaFormsEvent("form:ready"'), 'Published forms should apply lock behavior once during initialization for default values.');
         System.assert(mock.uploadedHtml.contains('data-time-format="24h"'), 'Generated HTML should include the configured Time display format.');
         System.assert(mock.uploadedHtml.contains('value="09:30"'), 'Generated HTML should keep plain HH:mm default values for Time fields.');
+        System.assert(mock.uploadedHtml.contains('.nf-shell[dir="rtl"] input[data-nativeforms-time="true"]{direction:ltr;text-align:right;}'), 'RTL forms should right-align Time values without reversing the time string.');
         System.assert(mock.uploadedHtml.contains('salesforceTimeMatch'), 'Generated HTML should normalize Salesforce Time prefill values with seconds or milliseconds.');
+        System.assert(mock.uploadedHtml.contains('clearStatus();}});});});}'), 'Generated HTML should clear stale time/date validation status after corrected input validates.');
         System.assert(!mock.uploadedHtml.contains('maxlength="254"'), 'Generated HTML should warn and validate textarea character limits without hard-blocking typing.');
         System.assert(mock.uploadedHtml.contains('data-character-limit="254"'), 'Generated HTML should include textarea character limit metadata.');
         System.assert(mock.uploadedHtml.contains('data-character-counter="true"'), 'Generated HTML should show a textarea character counter.');
+        System.assert(mock.uploadedHtml.contains('data-element-id="group-'), 'Generated HTML should include Group containers as runtime elements.');
+        System.assert(mock.uploadedHtml.contains('data-hidden-behavior="true" style="display:none;"'), 'Hidden Group containers should publish a static hidden marker on the full subtree wrapper.');
+        System.assert(mock.uploadedHtml.contains('const staticHidden=el.dataset.hiddenBehavior==="true"'), 'Runtime condition evaluation should preserve hidden Group/Section containers.');
+        System.assert(mock.uploadedHtml.contains('const visible=!staticHidden&&conditionVisible&&manualVisible'), 'Runtime visibility should never re-show statically hidden containers.');
         System.assert(mock.uploadedHtml.contains('data-nativeforms-multi-checkbox="true"'), 'Generated HTML should render Multi Checkbox options as checkbox controls.');
         System.assert(mock.uploadedHtml.contains('readMultiCheckboxValue'), 'Generated HTML should collect Multi Checkbox values as semicolon strings.');
         System.assert(mock.uploadedHtml.contains('validateMultiCheckboxGroups()'), 'Generated HTML should validate required Multi Checkbox groups before submit.');
         System.assert(mock.uploadedHtml.contains('<span>★★★★★</span>'), 'Generated HTML should render 1-5 Star Rating labels as star icons.');
         System.assert(!mock.uploadedHtml.contains('<span>stars 5</span>'), 'Generated HTML should not expose the stored star option text label.');
         System.assert(mock.uploadedHtml.contains('data-lookup-input="true"'), 'Generated HTML should render the visible Lookup input.');
-        System.assert(mock.uploadedHtml.contains('data-nativeforms-lookup="true" data-lookup-field-key="accountId" data-lookup-required="false" data-lookup-min-length="2" data-lock-on-prefill="true"'), 'Locked Lookup fields should mark the compound lookup control for runtime locking.');
+        System.assert(mock.uploadedHtml.contains('.nf-shell[dir="rtl"] .nf-lookup input[data-lookup-input="true"],.nf-shell[dir="rtl"] .nf-lookup__option,.nf-shell[dir="rtl"] .nf-lookup__status{direction:rtl;text-align:right;}'), 'RTL forms should right-align Lookup text, result options, and status text.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-lookup="true" data-lookup-field-key="accountId" data-lookup-required="false" data-lookup-min-length="2"'), 'Locked Lookup fields should mark the compound lookup control.');
+        System.assert(mock.uploadedHtml.contains('data-lock-on-prefill="true"'), 'Locked Lookup fields should mark the compound lookup control for runtime locking.');
+        System.assert(mock.uploadedHtml.contains('data-nativeforms-lookup="true" data-lookup-repeat="true" data-lookup-field-key="caseAccountId"'), 'Records List lookup fields should render as row-scoped lookup controls.');
+        System.assert(mock.uploadedHtml.contains('data-lookup-hidden="true" data-repeat-field-key="caseAccountId"'), 'Records List lookup fields should keep the selected record Id in the collected row value.');
+        System.assert(mock.uploadedHtml.contains('data-lookup-set-fields="'), 'Generated HTML should include lookup field-copy mappings.');
+        System.assert(mock.uploadedHtml.contains('&quot;sourceField&quot;:&quot;Phone&quot;'), 'Generated HTML should include top-level lookup source fields.');
+        System.assert(mock.uploadedHtml.contains('&quot;targetFieldKey&quot;:&quot;subject&quot;'), 'Generated HTML should include row-scoped lookup target fields.');
+        System.assert(mock.uploadedHtml.contains('lookupRecordFieldValue(fields,sourceField)'), 'Lookup mapping should resolve returned fields case-insensitively at runtime.');
+        System.assert(mock.uploadedHtml.contains('applyLookupSetFields(lookupEl,record,false)'), 'Lookup selection should copy selected record fields into mapped form fields.');
+        System.assert(mock.uploadedHtml.contains('lookupEl.dataset.lookupRepeat==="true"?lookupEl.closest("[data-repeat-row]")'), 'Records List lookup copies should stay within the active row.');
+        System.assert(mock.uploadedHtml.contains('applyLookupSetFields(lookupEl,null,true)'), 'Clearing a lookup should clear mapped form fields.');
+        System.assert(mock.uploadedHtml.contains('setLookupElementValue(lookupEl,button.dataset.lookupId'), 'Lookup selection should write to the active lookup element, not the first lookup with the same field key.');
+        System.assert(mock.uploadedHtml.contains('initLookupControls(rowsHost.lastElementChild)'), 'Dynamically added Records List rows should initialize lookup controls.');
+        System.assert(mock.uploadedHtml.contains('resolveLookupElementLabel(lookupEl,value)'), 'Prefilled Records List lookup Ids should resolve their visible labels per row.');
         System.assert(mock.uploadedHtml.contains('lookupEl.dataset.lookupLocked=hasLookupValue?"true":"false"'), 'Locked Lookup fields should lock the compound lookup control after prefill.');
         System.assert(mock.uploadedHtml.contains('input.readOnly=hasLookupValue'), 'Locked Lookup fields should make the visible lookup input read-only after prefill.');
         System.assert(mock.uploadedHtml.contains('clear.disabled=hasLookupValue'), 'Locked Lookup fields should disable the clear button after prefill.');
+        System.assert(mock.uploadedHtml.contains('--nf-bg-gradient:'), 'Generated HTML should expose the theme background gradient color.');
+        System.assert(mock.uploadedHtml.contains('linear-gradient(180deg,var(--nf-bg) 0%,var(--nf-bg-gradient) 100%)'), 'Generated HTML should keep theme start/end colors as the background fallback.');
         System.assert(mock.uploadedHtml.contains('https://example.com/theme-logo.png'), 'Generated HTML should include the theme logo URL.');
+        System.assert(mock.uploadedHtml.contains('https://example.com/theme-background.png'), 'Generated HTML should include the theme background image URL.');
+        System.assert(mock.uploadedHtml.contains('https://example.com/theme-footer.png'), 'Generated HTML should include the theme footer image URL.');
+        System.assert(mock.uploadedHtml.contains('nf-footer-image'), 'Generated HTML should render the theme footer image inside the form shell.');
+        System.assert(mock.uploadedHtml.contains('https://fonts.googleapis.com/css2?'), 'Generated HTML should load selected Google Fonts.');
+        System.assert(mock.uploadedHtml.contains('family=Rubik:wght@400;500;600;700'), 'Generated HTML should include selected title font.');
+        System.assert(mock.uploadedHtml.contains('family=Assistant:wght@400;500;600;700'), 'Generated HTML should include selected section font.');
+        System.assert(mock.uploadedHtml.contains('family=Heebo:wght@400;500;600;700'), 'Generated HTML should include selected main font.');
+        System.assert(mock.uploadedHtml.contains('family=Inter:wght@400;500;600;700'), 'Generated HTML should include selected button font.');
         System.assert(mock.uploadedHtml.contains('https://twinaforms.com/help/formulas'), 'Generated HTML should preserve rich text links.');
         System.assert(mock.uploadedHtml.contains('data:image/png;base64,'), 'Generated HTML should inline image assets when contentVersionId is present.');
         System.assert(mock.uploadedHtml.contains('window.TwinaForms=twinaFormsApi'), 'Generated HTML should expose the TwinaForms runtime API.');
@@ -345,10 +533,18 @@ private class NativeFormsPublisherTest {
         System.assertEquals(true, captcha.get('enabled'), 'Register payload should enable CAPTCHA when the form requires it.');
         System.assert(String.isNotBlank(String.valueOf(captcha.get('siteKey'))), 'Register payload should include the shared CAPTCHA site key.');
 
+        Map<String, Object> lookupDefinition = (Map<String, Object>) registerPayload.get('lookupDefinition');
+        Map<String, Object> lookupFields = (Map<String, Object>) lookupDefinition.get('fields');
+        Map<String, Object> accountLookup = (Map<String, Object>) lookupFields.get('accountId');
+        System.assert(listContainsIgnoreCase((List<Object>) accountLookup.get('returnFields'), 'Phone'), 'Lookup definition should include mapped source fields in the returned field list.');
+        System.assertEquals('Phone', String.valueOf(((Map<String, Object>) ((List<Object>) accountLookup.get('setFields'))[0]).get('sourceField')), 'Lookup definition should publish canonical Salesforce API field names.');
+        System.assertEquals('phone1', String.valueOf(((Map<String, Object>) ((List<Object>) accountLookup.get('setFields'))[0]).get('targetFieldKey')), 'Lookup definition should publish copy-to form field keys.');
+
         Map<String, Object> userVerificationConfig = (Map<String, Object>) registerPayload.get('userVerificationConfig');
         System.assertEquals(true, userVerificationConfig.get('enabled'), 'Register payload should include User Verification settings when enabled.');
         System.assertEquals('Email', String.valueOf(userVerificationConfig.get('matchField')), 'Register payload should preserve the configured User Verification match field.');
         System.assertEquals('short', String.valueOf(userVerificationConfig.get('sessionMode')), 'User Verification sessions should default to short mode.');
+        System.assertEquals('sender@example.com', String.valueOf(userVerificationConfig.get('senderEmail')), 'Register payload should include the User Verification sender email.');
         Map<String, Object> submissionPdfConfig = (Map<String, Object>) registerPayload.get('submissionPdf');
         System.assertEquals(true, submissionPdfConfig.get('rtlEnabled'), 'Submission PDF config should preserve the form RTL setting.');
         List<Object> submissionPdfSchema = (List<Object>) submissionPdfConfig.get('schema');
@@ -389,19 +585,25 @@ private class NativeFormsPublisherTest {
         List<Object> prefillCommands = (List<Object>) prefillDefinition.get('commands');
         System.assertEquals(2, prefillCommands.size(), 'Prefill definition should include field and Merged Document alias references.');
         Boolean foundMergedDocumentPrefillAlias = false;
+        Boolean foundVerifiedEmailContactPrefill = false;
         for (Object prefillCommandValue : prefillCommands) {
             Map<String, Object> prefillCommand = (Map<String, Object>) prefillCommandValue;
             if (String.valueOf(prefillCommand.get('storeResultAs')) == 'PrefilAccount') {
                 foundMergedDocumentPrefillAlias = true;
             }
+            if (String.valueOf(prefillCommand.get('storeResultAs')) == 'PrefilContact') {
+                foundVerifiedEmailContactPrefill = String.valueOf(prefillCommand.get('whereClause')).contains('{params.email}');
+            }
         }
         System.assertEquals(true, foundMergedDocumentPrefillAlias, 'Merged Document tokens should keep their referenced prefill aliases.');
+        System.assertEquals(true, foundVerifiedEmailContactPrefill, 'Verified Email prefill source should publish as the trusted verified email runtime parameter.');
 
         Map<String, Object> submitDefinition = (Map<String, Object>) registerPayload.get('submitDefinition');
         List<Object> submitCommands = (List<Object>) submitDefinition.get('commands');
         System.assertEquals(5, submitCommands.size(), 'Submit definition should include field-mapped commands plus the Submission PDF target action.');
         Map<String, Object> updateContactCommand;
         Map<String, Object> createContactCommand;
+        Map<String, Object> upsertCasesCommand;
         Map<String, Object> pdfTargetFindCommand;
         for (Object commandValue : submitCommands) {
             Map<String, Object> command = (Map<String, Object>) commandValue;
@@ -411,10 +613,16 @@ private class NativeFormsPublisherTest {
             if (String.valueOf(command.get('commandKey')) == 'submitAction1_create') {
                 createContactCommand = command;
             }
+            if (String.valueOf(command.get('commandKey')) == 'submitAction2') {
+                upsertCasesCommand = command;
+            }
             if (String.valueOf(command.get('commandKey')) == 'submitAction3_find') {
                 pdfTargetFindCommand = command;
             }
         }
+        System.assertNotEquals(null, upsertCasesCommand, 'Records List submit commands should publish.');
+        System.assertEquals('caseId', String.valueOf(upsertCasesCommand.get('idField')), 'Records List submit should use the prefilled row Id field to update existing rows.');
+        System.assertEquals(false, ((Map<String, Object>) upsertCasesCommand.get('fields')).containsKey('Id'), 'Records List submit should not try to write Salesforce Id as a normal field.');
         System.assertNotEquals(null, pdfTargetFindCommand, 'Submission PDF target-only actions should publish their find command.');
         System.assertEquals('SubmitPdfContact', String.valueOf(pdfTargetFindCommand.get('storeResultAs')), 'PDF target find command should preserve its result alias.');
         Map<String, Object> updateFields = (Map<String, Object>) updateContactCommand.get('fields');
@@ -476,7 +684,7 @@ private class NativeFormsPublisherTest {
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :successorDraft.Id
         ];
-        System.assertEquals(28, successorElementCount, 'Successor draft should clone all publishable elements including Merged Document, survey fields, Portal Buttons, and row Signature.');
+        System.assertEquals(31, successorElementCount, 'Successor draft should clone all publishable elements including Blank Space, Merged Document, survey fields, Portal Buttons, row Lookup, row Formula, and row Signature.');
         System.assertEquals(5, successorActionCount, 'Successor draft should clone all configured actions.');
         }
     }
@@ -594,7 +802,15 @@ private class NativeFormsPublisherTest {
         NF_Theme__c themeRecord = NativeFormsTestDataFactory.createTheme('Publisher Theme ' + formKey);
         update new NF_Theme__c(
             Id = themeRecord.Id,
-            Logo_URL__c = 'https://example.com/theme-logo.png'
+            Logo_URL__c = 'https://example.com/theme-logo.png',
+            Background_Image_URL__c = 'https://example.com/theme-background.png',
+            Footer_Image_URL__c = 'https://example.com/theme-footer.png',
+            Title_Font__c = 'Rubik',
+            Section_Title_Font__c = 'Assistant',
+            Main_Font__c = 'Heebo',
+            Button_Font__c = 'Inter',
+            Background_Color__c = '#229922',
+            Background_Gradient_Color__c = '#229922'
         );
 
         NF_Form__c formRecord = NativeFormsTestDataFactory.createForm(descriptionValue, null, formKey);
@@ -636,6 +852,7 @@ private class NativeFormsPublisherTest {
             'userVerificationSendButtonLabel' => 'Send Code',
             'userVerificationVerifyButtonLabel' => 'Verify Code',
             'userVerificationResendButtonLabel' => 'Resend Verification Number',
+            'userVerificationSenderEmail' => 'sender@example.com',
             'submissionPdfEnabled' => true,
             'submissionPdfAttachToRecord' => true,
             'submissionPdfTargetSubmitActionKey' => 'submitAction3',
@@ -686,7 +903,7 @@ private class NativeFormsPublisherTest {
                     new Map<String, Object>{
                         'fieldApiName' => 'Email',
                         'operator' => 'eq',
-                        'valueSource' => 'param',
+                        'valueSource' => 'verifiedEmail',
                         'valueText' => 'email'
                     }
                 },
@@ -801,12 +1018,14 @@ private class NativeFormsPublisherTest {
             2,
             20,
             json(new Map<String, Object>{
-                'columns' => 1
+                'columns' => 1,
+                'fieldBehavior' => 'hidden'
             }),
             section.Element_Id__c
         );
 
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'heading', 'Display Text', 'displayText1', 3, 30, withSectionColumn(json(new Map<String, Object>{ 'html' => '<p><a href="https://twinaforms.com/help/formulas">Learn more</a></p>' }), 1), section.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'spacer', 'Blank Space', null, 30, 32, withSectionColumn(json(new Map<String, Object>{ 'spacerSize' => 'fieldWithLabel' }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'mergedDocument', 'Merged Document', 'mergedDocument1', 29, 35, withSectionColumn(json(new Map<String, Object>{ 'html' => '<p>I, {{PrefilContact.FirstName}} from {{PrefilAccount.Name}}, agree.</p>' }), 1), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'image', 'Hero Image', 'image1', 4, 40, withSectionColumn(json(new Map<String, Object>{ 'contentVersionId' => String.valueOf(imageVersion.Id), 'altText' => 'Hero image', 'imageFit' => 'center', 'imageWidthPercent' => 50 }), 2), section.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'email', 'Email', 'email1', 5, 50, withSectionColumn(fieldConfig('above', false, true, 'PrefilContact', 'Email', true, 'submitAction1', 'Email'), 1), groupElement.Element_Id__c);
@@ -817,6 +1036,9 @@ private class NativeFormsPublisherTest {
             'lookupTargetObject' => 'Account',
             'lookupDisplayFields' => new List<Object>{ 'Name' },
             'lookupSearchFields' => new List<Object>{ 'Name' },
+            'lookupSetFields' => new List<Object>{
+                new Map<String, Object>{ 'sourceField' => 'Phone', 'targetFieldKey' => 'phone1' }
+            },
             'submitEnabled' => true,
             'submitActionKey' => 'submitAction1',
             'submitFieldPath' => 'AccountId',
@@ -915,13 +1137,38 @@ private class NativeFormsPublisherTest {
             'submitActionKey' => 'submitAction2',
             'submitFieldPath' => 'Needs__c'
         }), 2), repeatGroup.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'lookup', 'Case Account', 'caseAccountId', 30, 176, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'lookupTargetObject' => 'Account',
+            'lookupDisplayFields' => new List<Object>{ 'Name' },
+            'lookupSearchFields' => new List<Object>{ 'Name' },
+            'lookupSetFields' => new List<Object>{
+                new Map<String, Object>{ 'sourceField' => 'Name', 'targetFieldKey' => 'subject' }
+            },
+            'lookupMinSearchLength' => 2,
+            'lookupLimit' => 10,
+            'prefillEnabled' => true,
+            'prefillAlias' => 'PrefilCase',
+            'prefillFieldPath' => 'AccountId',
+            'submitEnabled' => true,
+            'submitActionKey' => 'submitAction2',
+            'submitFieldPath' => 'AccountId'
+        }), 1), repeatGroup.Element_Id__c);
+        NativeFormsTestDataFactory.createElement(versionRecord.Id, 'text', 'Case Summary', 'caseSummary', 31, 178, withSectionColumn(json(new Map<String, Object>{
+            'labelPosition' => 'above',
+            'isFormula' => true,
+            'formulaExpression' => 'CONCAT({email1}, " - ", {row.subject})',
+            'submitEnabled' => true,
+            'submitActionKey' => 'submitAction2',
+            'submitFieldPath' => 'Description'
+        }), 1), repeatGroup.Element_Id__c);
         NativeFormsTestDataFactory.createElement(versionRecord.Id, 'text', 'Case Id', 'caseId', 18, 180, withSectionColumn(json(new Map<String, Object>{
             'labelPosition' => 'above',
             'fieldBehavior' => 'hidden',
             'prefillEnabled' => true,
             'prefillAlias' => 'PrefilCase',
             'prefillFieldPath' => 'Id',
-            'submitEnabled' => true,
+            'submitEnabled' => false,
             'submitActionKey' => 'submitAction2',
             'submitFieldPath' => 'Id'
         }), 2), repeatGroup.Element_Id__c);
@@ -989,6 +1236,15 @@ private class NativeFormsPublisherTest {
 
     private static String json(Map<String, Object> value) {
         return JSON.serialize(value == null ? new Map<String, Object>() : value);
+    }
+
+    private static Boolean listContainsIgnoreCase(List<Object> values, String expectedValue) {
+        for (Object value : values) {
+            if (String.valueOf(value).equalsIgnoreCase(expectedValue)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<Object> selectOptions() {

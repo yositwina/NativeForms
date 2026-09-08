@@ -36,6 +36,8 @@ Examples:
   - `NativeForms Designer`
   - published HTML runtime
 - formula value included in submit payload
+- same-row formula targets inside Records Lists using `{row.fieldKey}` references
+- Records List formulas may also read top-level fields with normal `{fieldKey}` references
 - formula field can still use normal visibility behavior:
   - visible
   - hidden
@@ -45,7 +47,7 @@ Examples:
 
 ### Not Included in V1
 - formula-to-formula references
-- formula inside repeat groups
+- cross-row formulas, row totals, or references to another Records List row
 - submit-time server recheck of formula values
 - advanced date math beyond the approved function list
 - custom user-defined functions
@@ -106,6 +108,20 @@ Use field keys wrapped in braces:
 {amountText}
 ```
 
+Inside a Records List formula, use `row.` for fields in the same row:
+
+```text
+{row.quantity}
+{row.price}
+CONCAT({Name}, " - ", {row.Time})
+```
+
+Rules:
+- `{row.fieldKey}` reads from the same Records List row as the formula target.
+- `{fieldKey}` still reads a normal top-level form field.
+- A formula outside a Records List cannot use `{row.fieldKey}`.
+- A Records List formula cannot read fields from another Records List.
+
 ### Function style
 Functions are written in uppercase:
 
@@ -139,6 +155,16 @@ Numbers are entered normally:
 ### String
 - `CONCAT(...)`
 - `URLENCODE(value)`
+- `LEFT(text, count)`
+- `RIGHT(text, count)`
+- `MID(text, start, count)` — `start` is 1-based
+- `LEN(text)`
+- `TRIM(text)`
+- `UPPER(text)`
+- `LOWER(text)`
+- `SUBSTITUTE(text, old, new)` — replaces every occurrence; implemented with `split`/`join`, never a constructed `RegExp`
+- `CONTAINS(text, find)` — case-sensitive
+- `BEGINS(text, find)` — case-sensitive
 
 ### Conversion
 - `VALUE(text)`
@@ -148,12 +174,18 @@ Numbers are entered normally:
 - `IF(condition, trueValue, falseValue)`
 - `COALESCE(...)`
 - `ISBLANK(value)`
+- `AND(...)`, `OR(...)`, `NOT(value)` — function forms with the same truthiness as the infix `AND` / `OR` operators, which remain supported
 
 ### Number
 - `ROUND(num, digits)`
 - `ABS(num)`
 - `MIN(a, b, ...)`
 - `MAX(a, b, ...)`
+- `MOD(num, divisor)` — `null` when the divisor is `0`
+- `CEILING(num)`
+- `FLOOR(num)`
+- `POWER(base, exponent)`
+- `SQRT(num)` — `null` for negative input
 
 ### Date / time
 - `TODAY()`
@@ -161,6 +193,11 @@ Numbers are entered normally:
 - `YEAR(date)`
 - `MONTH(date)`
 - `DAY(date)`
+- `WEEKDAY(date)` — 1 = Sunday through 7 = Saturday, matching the Salesforce convention
+- `DAYNAME(date, locale?)` — localized long weekday name; defaults to the form's language code, overridable per call
+- `DATE(year, month, day)` — `null` for a date that does not exist
+- `ADDMONTHS(date, months)` — clamps to the last day of the target month
+- `DATEVALUE(value)` — date part of a datetime or date-like string
 
 ## Internal date representation
 All date values inside the formula engine are ISO strings.
@@ -169,6 +206,12 @@ All date values inside the formula engine are ISO strings.
 - Datetime: `YYYY-MM-DDTHH:mm:ss`
 
 For V1, all date functions evaluate in the user's browser local timezone.
+
+A bare `YYYY-MM-DD` string must be parsed as **local midnight**, not by handing it to `new Date(value)`
+— the JS engine treats a date-only string as UTC midnight, and every reader in the engine
+(`getFullYear` / `getMonth` / `getDate`, ISO formatting, day arithmetic) is local. Parsing it as UTC
+reported the previous day for any user west of Greenwich, which `WEEKDAY` / `DAYNAME` would surface
+as an outright wrong answer.
 
 ## Null and empty handling
 Every function should return `null` when given a null or invalid input rather than throwing.
@@ -206,7 +249,8 @@ Assignment, custom function definition, array operations, and other unused parse
 - wrong number of arguments
 - unsupported target field type
 - formula target referencing itself
-- formula inside repeat group
+- row references used outside a Records List
+- unknown same-row field references
 - blank expressions are allowed and should be treated as an empty derived value, not a validation failure
 
 ### Circular reference rule
@@ -231,7 +275,6 @@ If the formula is invalid:
 Formula controls appear only when:
 - `enableProFormulaFields` is enabled for the tenant
 - selected field type is `text` or `number`
-- the field is not inside a repeat group
 
 ### Right panel additions
 When a supported field is selected, add:
@@ -247,10 +290,11 @@ Formula editing should include an `Insert Field` picker similar to the post-subm
 Rules:
 - insert `{fieldKey}` at the current cursor position
 - only list valid source fields
+- inside a Records List, sibling row fields are inserted as `{row.fieldKey}`
 - exclude:
   - the current field itself
   - other formula fields
-  - repeat-group fields in V1
+  - fields from other Records Lists
 
 ### Canvas behavior
 - formula result previews live on the canvas
@@ -376,7 +420,7 @@ Implement Formula Fields later as a controlled `Pro` feature with:
 - a small fixed function set
 - `text` and `number` targets only
 - no formula chaining
-- no repeat-group support
+- Records List support is same-row only; no cross-row totals or other-row references
 - browser-only evaluation in V1
 
 This gives strong user value without turning NativeForms into a spreadsheet engine.

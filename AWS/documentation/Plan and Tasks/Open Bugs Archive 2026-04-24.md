@@ -100,7 +100,7 @@ click the button to view the Consumer Key
 and
 Consumer Secret
 
-- Tenant Verification Code
+- Tenant Secret Code
 
 oUo_ZuXUW3jIUQgQ-jehIo5oyXhLiQfa7sXmLdT-TQY
 plese delete the code after 5 minutes and nevert show it again 9add text that explain this), teh code is in teh email box of admin

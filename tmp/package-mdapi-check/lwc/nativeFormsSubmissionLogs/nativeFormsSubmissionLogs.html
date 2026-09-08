@@ -1,0 +1,274 @@
+<template>
+    <lightning-card title="TwinaForms Submission Logs" icon-name="custom:custom18">
+        <div class="shell">
+            <p class="intro">
+                Review recent form submissions and inspect private detail when this org stores encrypted logs.
+            </p>
+
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading submission logs"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <section class="logs-toolbar">
+                    <div class="logs-toolbar__field">
+                        <span class="logs-toolbar__label">Project</span>
+                        <lightning-combobox
+                            name="projectId"
+                            variant="label-hidden"
+                            label="Project"
+                            value={selectedProjectId}
+                            options={projectOptions}
+                            placeholder="Select project"
+                            onchange={handleProjectChange}>
+                        </lightning-combobox>
+                    </div>
+                    <div class="logs-toolbar__field">
+                        <span class="logs-toolbar__label">Form</span>
+                        <lightning-combobox
+                            name="formId"
+                            variant="label-hidden"
+                            label="Form"
+                            value={selectedFormId}
+                            options={formOptions}
+                            placeholder="Select form"
+                            onchange={handleFormChange}>
+                        </lightning-combobox>
+                    </div>
+
+                    <span class="logs-toolbar__divider"></span>
+
+                    <div class="logs-toolbar__stats">
+                        <span class="logs-stat"><strong>{loadedCount}</strong> Loaded</span>
+                        <span class="logs-stat logs-stat--danger"><strong>{failedCount}</strong> Failed</span>
+                        <span class="logs-stat logs-stat--success"><strong>{successCount}</strong> Success</span>
+                        <span class="logs-stat"><strong>{last24HoursCount}</strong> 24h</span>
+                    </div>
+
+                    <span class="logs-toolbar__divider"></span>
+
+                    <div class="logs-toolbar__field logs-toolbar__field--compact">
+                        <span class="logs-toolbar__label">Outcome</span>
+                        <lightning-combobox name="outcome" variant="label-hidden" label="Outcome" value={outcome} options={outcomeOptions} onchange={handleFilterChange}></lightning-combobox>
+                    </div>
+                    <div class="logs-toolbar__field logs-toolbar__field--date">
+                        <span class="logs-toolbar__label">From</span>
+                        <lightning-input type="date" name="dateFrom" variant="label-hidden" label="Date From" value={dateFrom} onchange={handleFilterChange}></lightning-input>
+                    </div>
+                    <div class="logs-toolbar__field logs-toolbar__field--date">
+                        <span class="logs-toolbar__label">To</span>
+                        <lightning-input type="date" name="dateTo" variant="label-hidden" label="Date To" value={dateTo} onchange={handleFilterChange}></lightning-input>
+                    </div>
+
+                    <div class="logs-toolbar__actions">
+                        <lightning-button variant="brand" label="Search" onclick={handleSearch}></lightning-button>
+                        <lightning-button label="Reset" onclick={handleReset}></lightning-button>
+                    </div>
+                </section>
+
+                <section class="content-grid">
+                    <article class="results-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="detail-kicker">Submission List</span>
+                                <h2>Recent Submissions</h2>
+                                <p class="panel-copy">Select a row to inspect submitted fields, Salesforce result, and technical context.</p>
+                            </div>
+                        </div>
+
+                        <template if:true={hasLogs}>
+                            <div class="table-wrap">
+                                <table class="logs-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Form</th>
+                                            <th>Outcome</th>
+                                            <th>Failure Stage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={logRows} for:item="row">
+                                            <tr key={row.submissionId} data-id={row.submissionId} class={row.rowClass} onclick={handleSelectRow}>
+                                                <td>{row.submittedAtLabel}</td>
+                                                <td>
+                                                    <div class="cell-title">{row.formDescription}</div>
+                                                </td>
+                                                <td><span class={row.outcomeClass}>{row.outcomeLabel}</span></td>
+                                                <td>{row.failureStageLabel}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <template if:true={nextToken}>
+                                <div class="actions actions--footer">
+                                    <lightning-button label="Load More" onclick={handleLoadMore} disabled={isLoadingMore}></lightning-button>
+                                </div>
+                            </template>
+                        </template>
+
+                        <template if:false={hasLogs}>
+                            <div class="empty-state">
+                                <h3>No submission logs found</h3>
+                                <p>Try a different form name, date range, or outcome filter.</p>
+                            </div>
+                        </template>
+                    </article>
+
+                    <article class="detail-panel">
+                        <template if:true={isLoadingDetail}>
+                            <div class="loading-wrap">
+                                <lightning-spinner alternative-text="Loading log detail" size="small"></lightning-spinner>
+                            </div>
+                        </template>
+
+                        <template if:false={isLoadingDetail}>
+                            <template if:true={selectedDetail}>
+                                <div class="detail-header">
+                                    <div>
+                                        <span class="detail-kicker">Submission Detail</span>
+                                        <h2>{selectedDetail.formHeading}</h2>
+                                        <template if:true={selectedDetail.formDescription}>
+                                            <p class="detail-meta">{selectedDetail.formDescription}</p>
+                                        </template>
+                                        <p class="detail-meta">{selectedDetail.submittedAtLabel}</p>
+                                    </div>
+                                </div>
+
+                                <div class="pill-row">
+                                    <span class={selectedDetail.outcomeClass}>{selectedDetail.outcomeLabel}</span>
+                                    <span class="detail-pill">{selectedDetail.detailModeLabel}</span>
+                                    <template if:true={selectedDetail.failureStageVisible}>
+                                        <span class="detail-pill">{selectedDetail.failureStageLabel}</span>
+                                    </template>
+                                </div>
+
+                                <template if:true={selectedDetail.metadataOnlyMessage}>
+                                    <div class="metadata-note">{selectedDetail.metadataOnlyMessage}</div>
+                                </template>
+
+                                <template if:true={selectedDetail.hasSubmissionRows}>
+                                    <section class="detail-section">
+                                        <h3>Submitted Fields</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.submissionRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasRepeatGroups}>
+                                    <section class="detail-section">
+                                        <h3>Repeat Groups</h3>
+                                        <template for:each={selectedDetail.repeatGroups} for:item="group">
+                                            <article key={group.groupKey} class="repeat-card">
+                                                <div class="repeat-header">
+                                                    <strong>{group.label}</strong>
+                                                    <span>{group.rowCountLabel}</span>
+                                                </div>
+                                                <template for:each={group.rows} for:item="row">
+                                                    <div key={row.key} class="repeat-row">
+                                                        <div class="repeat-row-title">{row.label}</div>
+                                                        <div class="kv-card">
+                                                            <template for:each={row.fields} for:item="field">
+                                                                <div key={field.key} class="kv-row kv-row--stackable">
+                                                                    <span class="kv-label">{field.label}</span>
+                                                                    <span class={field.valueClass}>{field.value}</span>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </article>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasPrefillRows}>
+                                    <section class="detail-section">
+                                        <h3>Prefill Snapshot</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.prefillRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasSalesforceResults}>
+                                    <section class="detail-section">
+                                        <h3>Salesforce Result</h3>
+                                        <template for:each={selectedDetail.salesforceResults} for:item="item">
+                                            <article key={item.key} class="result-card">
+                                                <div class="result-title">{item.title}</div>
+                                                <div class="kv-card">
+                                                    <template for:each={item.rows} for:item="row">
+                                                        <div key={row.key} class="kv-row kv-row--stackable">
+                                                            <span class="kv-label">{row.label}</span>
+                                                            <span class={row.valueClass}>{row.value}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </article>
+                                        </template>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasErrorRows}>
+                                    <section class="detail-section">
+                                        <h3>Error</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.errorRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                                <template if:true={selectedDetail.hasTechnicalRows}>
+                                    <section class="detail-section">
+                                        <h3>Technical Context</h3>
+                                        <div class="kv-card">
+                                            <template for:each={selectedDetail.technicalRows} for:item="row">
+                                                <div key={row.key} class="kv-row kv-row--stackable">
+                                                    <span class="kv-label">{row.label}</span>
+                                                    <span class={row.valueClass}>{row.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </section>
+                                </template>
+
+                            </template>
+
+                            <template if:false={selectedDetail}>
+                                <div class="empty-state empty-state--detail">
+                                    <h3>Select a submission</h3>
+                                    <p>Choose a row on the left to view submitted fields, support detail, and technical context.</p>
+                                </div>
+                            </template>
+                        </template>
+                    </article>
+                </section>
+            </template>
+        </div>
+    </lightning-card>
+</template>

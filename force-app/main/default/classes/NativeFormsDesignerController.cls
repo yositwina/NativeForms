@@ -61,6 +61,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String storeResultAs { get; set; }
         @AuraEnabled public String objectApiName { get; set; }
         @AuraEnabled public String commandType { get; set; }
+        @AuraEnabled public String repeatGroupKey { get; set; }
         @AuraEnabled public List<SelectOption> fieldOptions { get; set; }
     }
 
@@ -72,6 +73,7 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public String logoPosition { get; set; }
         @AuraEnabled public String formWidth { get; set; }
         @AuraEnabled public String backgroundColor { get; set; }
+        @AuraEnabled public String backgroundGradientColor { get; set; }
         @AuraEnabled public String formBackgroundColor { get; set; }
         @AuraEnabled public String formBorderColor { get; set; }
         @AuraEnabled public String titleFont { get; set; }
@@ -153,6 +155,8 @@ public with sharing class NativeFormsDesignerController {
         @AuraEnabled public Integer selectedVersionUserVerificationMaxAttempts { get; set; }
         @AuraEnabled public Boolean selectedVersionUserVerificationAllowResend { get; set; }
         @AuraEnabled public String selectedVersionUserVerificationSessionMode { get; set; }
+        @AuraEnabled public String selectedVersionUserVerificationSenderEmail { get; set; }
+        @AuraEnabled public String defaultUserVerificationSenderEmail { get; set; }
         @AuraEnabled public Boolean selectedVersionSubmitConditionalEnabled { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalFieldKey { get; set; }
         @AuraEnabled public String selectedVersionSubmitConditionalOperator { get; set; }
@@ -402,6 +406,59 @@ public with sharing class NativeFormsDesignerController {
         sortOptionsByLabel(options);
         return options;
     }
+
+    @AuraEnabled(cacheable=true)
+    public static List<SelectOption> getLookupFieldOptions(String objectApiName, String usage) {
+        List<SelectOption> options = new List<SelectOption>();
+        if (String.isBlank(objectApiName)) {
+            return options;
+        }
+
+        String canonicalObjectName = canonicalObjectName(objectApiName);
+        if (String.isBlank(canonicalObjectName)) {
+            return options;
+        }
+
+        Boolean searchUsage = String.valueOf(usage).equalsIgnoreCase('search');
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(canonicalObjectName).getDescribe().fields.getMap();
+        for (String fieldApiName : fieldsMap.keySet()) {
+            Schema.DescribeFieldResult describeResult = fieldsMap.get(fieldApiName).getDescribe();
+            if (!describeResult.isAccessible()) {
+                continue;
+            }
+            if (searchUsage && !isLookupSearchField(describeResult)) {
+                continue;
+            }
+            if (!searchUsage && !isLookupDisplayField(describeResult)) {
+                continue;
+            }
+            SelectOption option = new SelectOption();
+            option.label = describeResult.getLabel() + ' (' + describeResult.getName() + ')';
+            option.value = describeResult.getName();
+            options.add(option);
+        }
+        sortOptionsByLabel(options);
+        return options;
+    }
+
+    private static Boolean isLookupSearchField(Schema.DescribeFieldResult describeResult) {
+        Schema.DisplayType fieldType = describeResult.getType();
+        return fieldType == Schema.DisplayType.String
+            || fieldType == Schema.DisplayType.TextArea
+            || fieldType == Schema.DisplayType.Email
+            || fieldType == Schema.DisplayType.Phone
+            || fieldType == Schema.DisplayType.Url
+            || fieldType == Schema.DisplayType.Picklist
+            || fieldType == Schema.DisplayType.MultiPicklist;
+    }
+
+    private static Boolean isLookupDisplayField(Schema.DescribeFieldResult describeResult) {
+        Schema.DisplayType fieldType = describeResult.getType();
+        return fieldType != Schema.DisplayType.Base64
+            && fieldType != Schema.DisplayType.Address
+            && fieldType != Schema.DisplayType.Location;
+    }
+
     @AuraEnabled(cacheable=true)
     public static List<SelectOption> getPicklistValueOptions(String objectApiName, String fieldApiName) {
         List<SelectOption> options = new List<SelectOption>();
@@ -563,7 +620,7 @@ public with sharing class NativeFormsDesignerController {
         if (selectedForm.Theme__c != null) {
             workspace.selectedTheme = toThemeRecord([
                 SELECT Id, Name, Logo_URL__c, Logo_Size_Px__c, Logo_Position__c,
-                       Form_Width__c, Background_Color__c, Form_Background_Color__c, Form_Border_Color__c,
+                       Form_Width__c, Background_Color__c, Background_Gradient_Color__c, Form_Background_Color__c, Form_Border_Color__c,
                        Title_Font__c, Title_Font_Size_Px__c, Title_Text_Color__c,
                        Section_Title_Font__c, Section_Title_Font_Size_Px__c, Section_Title_Text_Color__c,
                        Main_Font__c, Main_Text_Size_Px__c, Main_Text_Color__c, Hint_Text_Color__c,
@@ -689,6 +746,10 @@ public with sharing class NativeFormsDesignerController {
         workspace.selectedVersionUserVerificationSessionMode = defaultUserVerificationSessionMode(
             stringValue(versionUiSettings.get('userVerificationSessionMode'))
         );
+        workspace.defaultUserVerificationSenderEmail = defaultUserVerificationSenderEmail();
+        workspace.selectedVersionUserVerificationSenderEmail = versionUiSettings.containsKey('userVerificationSenderEmail')
+            ? normalizeEmailText(stringValue(versionUiSettings.get('userVerificationSenderEmail')))
+            : workspace.defaultUserVerificationSenderEmail;
         workspace.selectedVersionSubmitConditionalEnabled = booleanValue(versionUiSettings.get('submitConditionalEnabled'));
         workspace.selectedVersionSubmitConditionalFieldKey = stringValue(versionUiSettings.get('submitConditionalFieldKey'));
         workspace.selectedVersionSubmitConditionalOperator = defaultConditionalOperator(
@@ -756,7 +817,7 @@ public with sharing class NativeFormsDesignerController {
 
         Integer submitActionNumber = 1;
         for (NF_Form_Action__c actionRecord : [
-            SELECT Command_Key__c, Store_Result_As__c, Object_Api_Name__c, Command_Type__c
+            SELECT Command_Key__c, Store_Result_As__c, Object_Api_Name__c, Command_Type__c, Config_JSON__c
             FROM NF_Form_Action__c
             WHERE Form_Version__c = :effectiveVersionId
               AND Action_Scope__c = 'Submit'
@@ -769,6 +830,7 @@ public with sharing class NativeFormsDesignerController {
             detail.storeResultAs = actionRecord.Store_Result_As__c;
             detail.objectApiName = actionRecord.Object_Api_Name__c;
             detail.commandType = actionRecord.Command_Type__c;
+            detail.repeatGroupKey = stringValue(parseJsonMap(actionRecord.Config_JSON__c).get('repeatGroupKey'));
             detail.fieldOptions = getWritableFieldOptions(actionRecord.Object_Api_Name__c);
             workspace.submitActions.add(detail);
             submitActionNumber += 1;
@@ -895,6 +957,28 @@ public with sharing class NativeFormsDesignerController {
         }
 
         update as user recordsToUpdate;
+    }
+
+    @AuraEnabled
+    public static void updateUserVerificationSenderEmail(Id formId, Id versionId, String userVerificationSenderEmail) {
+        if (formId == null || versionId == null) {
+            throw new AuraHandledException('Form and version are required.');
+        }
+        NF_Form_Version__c versionRecord = [
+            SELECT Id, Form__c, UI_Settings_JSON__c
+            FROM NF_Form_Version__c
+            WHERE Id = :versionId
+            WITH USER_MODE LIMIT 1
+        ];
+        if (versionRecord.Form__c != formId) {
+            throw new AuraHandledException('Selected version does not belong to the selected form.');
+        }
+        Map<String, Object> uiSettings = parseJsonMap(versionRecord.UI_Settings_JSON__c);
+        uiSettings.put('userVerificationSenderEmail', normalizeEmailText(userVerificationSenderEmail));
+        update as user new NF_Form_Version__c(
+            Id = versionRecord.Id,
+            UI_Settings_JSON__c = JSON.serializePretty(uiSettings)
+        );
     }
 
     @AuraEnabled
@@ -1692,6 +1776,90 @@ public with sharing class NativeFormsDesignerController {
         }
     }
 
+    @AuraEnabled
+    public static ElementRecord cloneField(String inputJson) {
+        NativeFormsBuilderController.ElementUpsertInput inputValue = (NativeFormsBuilderController.ElementUpsertInput) JSON.deserialize(
+            inputJson, NativeFormsBuilderController.ElementUpsertInput.class
+        );
+        if (inputValue == null || inputValue.id == null) {
+            throw new AuraHandledException('Select a field to clone first.');
+        }
+        NF_Form_Element__c source = [
+            SELECT Id, Form_Version__c, Element_Type__c, Parent_Element_Id__c, Config_JSON__c, Label__c
+            FROM NF_Form_Element__c WHERE Id = :inputValue.id WITH USER_MODE LIMIT 1
+        ];
+        ensureVersionEditable(source.Form_Version__c);
+        Set<String> fieldTypes = new Set<String>{'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature'};
+        String fieldType = String.isBlank(inputValue.elementType) ? source.Element_Type__c : inputValue.elementType;
+        if (!fieldTypes.contains(source.Element_Type__c) || !fieldTypes.contains(fieldType)) {
+            throw new AuraHandledException('Only individual fields can be cloned.');
+        }
+        String configJson = inputValue.configJson == null ? source.Config_JSON__c : inputValue.configJson;
+        Map<String, Object> config = parseJsonMap(configJson);
+        if (booleanValue(config.get('isFormula')) && !NativeFormsFeatureFlags.isProFormulaFieldsEnabled()) {
+            throw new AuraHandledException('Formula fields are not available on your current TwinaForms plan.');
+        }
+        NF_Form_Element__c copy = new NF_Form_Element__c(
+            Form_Version__c = source.Form_Version__c, Element_Type__c = fieldType,
+            Label__c = inputValue.label == null ? source.Label__c : inputValue.label,
+            Config_JSON__c = configJson, Parent_Element_Id__c = source.Parent_Element_Id__c
+        );
+        if (String.isNotBlank(source.Parent_Element_Id__c)) {
+            NF_Form_Element__c parent = [
+                SELECT Id, Element_Id__c, Element_Type__c FROM NF_Form_Element__c
+                WHERE Form_Version__c = :source.Form_Version__c AND Element_Id__c = :source.Parent_Element_Id__c
+                WITH USER_MODE LIMIT 1
+            ];
+            validateContainerPlacement(parent, copy);
+            validateRecordsListSignaturePlacement(source.Form_Version__c, parent, copy);
+        }
+        Savepoint cloneSavepoint = Database.setSavepoint();
+        try {
+            // Reuse normal creation so entitlement checks and identity allocation stay aligned.
+            ElementRecord created = addElement(source.Form_Version__c, fieldType, stringValue(config.get('presentation')));
+            copy.Id = created.id;
+            copy.Element_Id__c = created.elementId;
+            copy.Element_Index__c = created.elementIndex;
+            Set<String> existingKeys = new Set<String>();
+            for (NF_Form_Element__c field : [
+                SELECT Field_Key__c FROM NF_Form_Element__c
+                WHERE Form_Version__c = :source.Form_Version__c AND Id != :copy.Id WITH USER_MODE
+            ]) {
+                if (String.isNotBlank(field.Field_Key__c)) existingKeys.add(field.Field_Key__c.toLowerCase());
+            }
+            if (String.isNotBlank(inputValue.fieldKey)) existingKeys.add(inputValue.fieldKey.toLowerCase());
+            String newKey = created.fieldKey;
+            Integer suffix = 1;
+            while (existingKeys.contains(newKey.toLowerCase())) {
+                newKey = created.fieldKey + 'Copy' + suffix++;
+            }
+            copy.Field_Key__c = newKey;
+            List<NF_Form_Element__c> siblings = [
+                SELECT Id, Order__c FROM NF_Form_Element__c
+                WHERE Form_Version__c = :source.Form_Version__c
+                  AND Parent_Element_Id__c = :source.Parent_Element_Id__c AND Id != :copy.Id
+                WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
+            ];
+            Integer orderValue = 10;
+            List<NF_Form_Element__c> updates = new List<NF_Form_Element__c>();
+            for (NF_Form_Element__c sibling : siblings) {
+                sibling.Order__c = orderValue;
+                updates.add(sibling);
+                orderValue += 10;
+                if (sibling.Id == source.Id) {
+                    copy.Order__c = orderValue;
+                    updates.add(copy);
+                    orderValue += 10;
+                }
+            }
+            update as user updates;
+            return toElementRecord(copy);
+        } catch (Exception error) {
+            Database.rollback(cloneSavepoint);
+            throw error;
+        }
+    }
+
     public static ElementRecord addElement(Id versionId, String elementType) {
         return addElement(versionId, elementType, null);
     }
@@ -1706,7 +1874,7 @@ public with sharing class NativeFormsDesignerController {
             throw new AuraHandledException('Choose an element type first.');
         }
         String normalizedPreset = normalizeElementPreset(elementType, elementPreset);
-        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'mergedDocument', 'image', 'button', 'repeatGroup' }.contains(elementType)) {
+        if (!new Set<String>{ 'text', 'textarea', 'number', 'date', 'time', 'email', 'tel', 'url', 'checkbox', 'select', 'multiCheckbox', 'lookup', 'location', 'radio', 'ranking', 'fileUpload', 'signature', 'section', 'group', 'heading', 'mergedDocument', 'image', 'button', 'repeatGroup', 'spacer' }.contains(elementType)) {
             throw new AuraHandledException('This Designer prototype currently supports visual-only field and display elements.');
         }
         if (elementType == 'repeatGroup' && !NativeFormsFeatureFlags.isProRepeatGroupsEnabled()) {
@@ -2300,6 +2468,9 @@ public with sharing class NativeFormsDesignerController {
         dto.logoPosition = row.Logo_Position__c;
         dto.formWidth = row.Form_Width__c;
         dto.backgroundColor = row.Background_Color__c;
+        dto.backgroundGradientColor = String.isBlank(row.Background_Gradient_Color__c)
+            ? row.Background_Color__c
+            : row.Background_Gradient_Color__c;
         dto.formBackgroundColor = row.Form_Background_Color__c;
         dto.formBorderColor = row.Form_Border_Color__c;
         dto.titleFont = row.Title_Font__c;
@@ -2365,6 +2536,7 @@ public with sharing class NativeFormsDesignerController {
                 'heading' => 'Display Text',
                 'mergedDocument' => 'Merged Document',
                 'image' => 'Image',
+                'spacer' => 'Blank Space',
                 'button' => 'Continue',
                 'fileUpload' => 'File Upload',
                 'signature' => 'Signature',
@@ -2395,6 +2567,7 @@ public with sharing class NativeFormsDesignerController {
                 'heading' => '\u05D8\u05E7\u05E1\u05D8 \u05DC\u05EA\u05E6\u05D5\u05D2\u05D4',
                 'mergedDocument' => '\u05DE\u05E1\u05DE\u05DA \u05DE\u05DE\u05D5\u05D6\u05D2',
                 'image' => '\u05EA\u05DE\u05D5\u05E0\u05D4',
+                'spacer' => '\u05E8\u05D5\u05D5\u05D7 \u05E8\u05D9\u05E7',
                 'button' => '\u05D4\u05DE\u05E9\u05DA',
                 'fileUpload' => '\u05D4\u05E2\u05DC\u05D0\u05EA \u05E7\u05D5\u05D1\u05E5',
                 'signature' => '\u05D7\u05EA\u05D9\u05DE\u05D4',
@@ -2547,6 +2720,9 @@ public with sharing class NativeFormsDesignerController {
 
     private static String defaultConfigJsonForType(String elementType, String languageCode, String elementPreset) {
         Map<String, Object> config = new Map<String, Object>();
+        if (elementType == 'spacer') {
+            config.put('spacerSize', 'field');
+        }
         if (elementType == 'text') {
             config.put('defaultValue', '');
             config.put('placeholder', NativeFormsRuntimeI18n.text(languageCode, 'placeholderText', 'Enter text'));
@@ -2706,6 +2882,7 @@ public with sharing class NativeFormsDesignerController {
             config.put('boxed', true);
             config.put('columns', 2);
             config.put('repeatSourceAlias', '');
+            config.put('repeatSubmitActionKey', '');
             config.put('allowAddRows', true);
             config.put('allowDeleteRows', true);
         }
@@ -3601,7 +3778,8 @@ public with sharing class NativeFormsDesignerController {
             'userVerificationExpiryMinutes' => 10,
             'userVerificationMaxAttempts' => 5,
             'userVerificationAllowResend' => true,
-            'userVerificationSessionMode' => 'short'
+            'userVerificationSessionMode' => 'short',
+            'userVerificationSenderEmail' => defaultUserVerificationSenderEmail()
         };
         return JSON.serializePretty(uiSettings);
     }
@@ -3697,6 +3875,40 @@ public with sharing class NativeFormsDesignerController {
 
     private static String defaultUserVerificationMatchField(String value) {
         return 'Email';
+    }
+
+    private static String defaultUserVerificationSenderEmail() {
+        List<OrgWideEmailAddress> preferredRows = [
+            SELECT Id, Address, Purpose, IsVerified
+            FROM OrgWideEmailAddress
+            WHERE IsVerified = true
+              AND Purpose = 'UserSelectionAndDefaultNoReply'
+              AND Address != null
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+            LIMIT 1
+        ];
+        if (!preferredRows.isEmpty()) {
+            return normalizeEmailText(preferredRows[0].Address);
+        }
+
+        List<OrgWideEmailAddress> fallbackRows = [
+            SELECT Id, Address, IsVerified
+            FROM OrgWideEmailAddress
+            WHERE IsVerified = true
+              AND Address != null
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+            LIMIT 1
+        ];
+        if (!fallbackRows.isEmpty()) {
+            return normalizeEmailText(fallbackRows[0].Address);
+        }
+        return normalizeEmailText(UserInfo.getUserEmail());
+    }
+
+    private static String normalizeEmailText(String value) {
+        return String.isBlank(value) ? '' : value.trim().toLowerCase();
     }
 
     private static String defaultUserVerificationIntroText(String value, String languageCode) {
@@ -3984,9 +4196,6 @@ public with sharing class NativeFormsDesignerController {
         }
         if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'fileUpload') {
             throw new AuraHandledException('File Upload fields are not supported inside repeat groups in Pro V1.');
-        }
-        if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'lookup') {
-            throw new AuraHandledException('Lookup fields are not supported inside repeat groups in Starter V1.');
         }
         if (sectionRecord.Element_Type__c == 'repeatGroup' && elementRecord.Element_Type__c == 'location') {
             throw new AuraHandledException('Country / State / City fields are not supported inside Records Lists in Pro V1.');

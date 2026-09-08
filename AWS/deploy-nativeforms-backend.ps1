@@ -9,6 +9,7 @@ $sourceFile = Join-Path $workspaceRoot "AWS\NativeFormsBackend.mjs"
 $bootstrapV2HmacFile = Join-Path $workspaceRoot "AWS\bootstrap-v2-hmac.mjs"
 $bootstrapV2SalesforceFile = Join-Path $workspaceRoot "AWS\bootstrap-v2-salesforce.mjs"
 $geoLocationsPolicyFile = Join-Path $workspaceRoot "AWS\infrastructure\backend-geolocations-role-policy.json"
+$connectedOrgSnapshotsPolicyFile = Join-Path $workspaceRoot "AWS\infrastructure\connected-org-snapshots-backend-role-policy.json"
 $tempRoot = Join-Path $workspaceRoot ".codex_tmp\NativeFormsBackendDeploy"
 $zipPath = Join-Path $workspaceRoot ".codex_tmp\NativeFormsBackend.zip"
 
@@ -52,38 +53,49 @@ if (Test-Path $geoLocationsPolicyFile) {
     --profile nativeforms-codex
 }
 
-if (![string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
-  aws lambda wait function-updated `
-    --function-name NativeFormsBackend `
-    --region eu-north-1 `
-    --profile nativeforms-codex
-
-  $configurationJson = aws lambda get-function-configuration `
-    --function-name NativeFormsBackend `
-    --region eu-north-1 `
-    --profile nativeforms-codex
-
-  if ([string]::IsNullOrWhiteSpace($configurationJson)) {
-    throw "Unable to read Lambda configuration for NativeFormsBackend."
-  }
-
-  $configuration = $configurationJson | ConvertFrom-Json
-  $variables = @{}
-
-  if ($null -ne $configuration.Environment -and $null -ne $configuration.Environment.Variables) {
-    $configuration.Environment.Variables.PSObject.Properties | ForEach-Object {
-      $variables[$_.Name] = [string]$_.Value
-    }
-  }
-
-  $variables["UPLOAD_STAGING_BUCKET"] = $UploadStagingBucket
-  $environmentJson = @{ Variables = $variables } | ConvertTo-Json -Compress
-  $environmentPath = Join-Path $tempRoot "lambda-environment.json"
-  $environmentJson | Set-Content -Path $environmentPath -Encoding Ascii
-
-  aws lambda update-function-configuration `
-    --function-name NativeFormsBackend `
-    --environment ("file://" + $environmentPath) `
-    --region eu-north-1 `
+if (Test-Path $connectedOrgSnapshotsPolicyFile) {
+  aws iam put-role-policy `
+    --role-name NativeFormsBackend-role-pqo9wb23 `
+    --policy-name NativeFormsConnectedOrgSnapshotsAccess `
+    --policy-document ("file://" + $connectedOrgSnapshotsPolicyFile) `
     --profile nativeforms-codex
 }
+
+aws lambda wait function-updated `
+  --function-name NativeFormsBackend `
+  --region eu-north-1 `
+  --profile nativeforms-codex
+
+$configurationJson = aws lambda get-function-configuration `
+  --function-name NativeFormsBackend `
+  --region eu-north-1 `
+  --profile nativeforms-codex
+
+if ([string]::IsNullOrWhiteSpace($configurationJson)) {
+  throw "Unable to read Lambda configuration for NativeFormsBackend."
+}
+
+$configuration = $configurationJson | ConvertFrom-Json
+$variables = @{}
+
+if ($null -ne $configuration.Environment -and $null -ne $configuration.Environment.Variables) {
+  $configuration.Environment.Variables.PSObject.Properties | ForEach-Object {
+    $variables[$_.Name] = [string]$_.Value
+  }
+}
+
+if (![string]::IsNullOrWhiteSpace($UploadStagingBucket)) {
+  $variables["UPLOAD_STAGING_BUCKET"] = $UploadStagingBucket
+}
+$variables["CONNECTED_ORG_GROUP_TABLE"] = "NativeFormsConnectedOrgGroups"
+$variables["PORTABLE_SNAPSHOT_TABLE"] = "NativeFormsPortableSnapshots"
+$variables["PORTABLE_SNAPSHOT_BUCKET"] = "nativeforms-portable-snapshots-355617663345-eu-north-1"
+$environmentJson = @{ Variables = $variables } | ConvertTo-Json -Compress
+$environmentPath = Join-Path $tempRoot "lambda-environment.json"
+$environmentJson | Set-Content -Path $environmentPath -Encoding Ascii
+
+aws lambda update-function-configuration `
+  --function-name NativeFormsBackend `
+  --environment ("file://" + $environmentPath) `
+  --region eu-north-1 `
+  --profile nativeforms-codex

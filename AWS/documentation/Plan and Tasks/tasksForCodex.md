@@ -1,7 +1,7 @@
 
 1. missing contact field
 I am testing teh layout to form feature, this is teh layout
-but I found that the contact field is missing in the new form created (all otehrs there),  why, maybe becasue teh verification number with contact ? maybe bug is not related. 
+but I found that the contact field is missing in the new form created (all otehrs there),  why, maybe becasue teh secret code with contact ? maybe bug is not related. 
 
 2. missing mutli picklist option
 

@@ -146,6 +146,43 @@ function resolveRowsSource(rows, context) {
   return Array.isArray(resolvedRows) ? resolvedRows : [];
 }
 
+function parseFlexibleTimeString(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  let match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+  if (!match) {
+    match = raw.match(/^(\d{1,2})(\d{2})$/);
+  }
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+  const milliseconds = match[4] === undefined ? 0 : Number(String(match[4]).slice(0, 3).padEnd(3, "0"));
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    !Number.isInteger(seconds) ||
+    !Number.isInteger(milliseconds) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    seconds < 0 ||
+    seconds > 59 ||
+    milliseconds < 0 ||
+    milliseconds > 999
+  ) {
+    return null;
+  }
+  return { hours, minutes, seconds, milliseconds };
+}
+
+function formatTimePartsForSalesforce(parts) {
+  if (!parts) return null;
+  return `${String(parts.hours).padStart(2, "0")}:${String(parts.minutes).padStart(2, "0")}:${String(parts.seconds).padStart(2, "0")}.${String(parts.milliseconds).padStart(3, "0")}Z`;
+}
+
 async function run() {
   const context = {
     params: {
@@ -197,27 +234,37 @@ async function run() {
   const notFound = normalizeNotFoundConfig({ onNotFound: { action: "error", message: "Missing contact" } }, {});
   assert.deepEqual(notFound, { action: "error", message: "Missing contact" });
 
+  assert.equal(formatTimePartsForSalesforce(parseFlexibleTimeString("9:00")), "09:00:00.000Z");
+  assert.equal(formatTimePartsForSalesforce(parseFlexibleTimeString("19:05:06.7")), "19:05:06.700Z");
+  assert.equal(formatTimePartsForSalesforce(parseFlexibleTimeString("25:00")), null);
+
   const rows = resolveRowsSource("{input.issueUpdates}", context);
   assert.equal(rows.length, 2);
 
+  const relationshipField = "Case__c";
+  const relationshipValue = context.createdCase.id;
   const previewOps = rows.map((row, rowIndex) => {
     const rowContext = buildRowContext(context, row, rowIndex);
     const fields = resolveValue({
       Title__c: "{row.title}",
-      Notes__c: "{row.notes}",
-      Case__c: "{createdCase.id}"
+      Notes__c: "{row.notes}"
     }, rowContext);
+    const rowId = getByPath(row, "Id");
+    if (!rowId && relationshipValue !== undefined) {
+      fields[relationshipField] = relationshipValue;
+    }
 
     return {
-      action: row.Id ? "update" : "create",
-      id: row.Id || null,
+      action: rowId ? "update" : "create",
+      id: rowId || null,
       fields
     };
   });
 
   assert.equal(previewOps[0].action, "update");
-  assert.equal(previewOps[0].fields.Case__c, "500xx0000007777AAA");
+  assert.equal(Object.prototype.hasOwnProperty.call(previewOps[0].fields, "Case__c"), false);
   assert.equal(previewOps[1].action, "create");
+  assert.equal(previewOps[1].fields.Case__c, "500xx0000007777AAA");
   assert.equal(context.input._deletedRepeatGroups.issueUpdates[0], "a01delete");
 
   console.log("All NativeForms AWS protocol tests passed.");

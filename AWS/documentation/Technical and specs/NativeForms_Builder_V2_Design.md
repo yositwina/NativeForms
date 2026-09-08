@@ -159,6 +159,10 @@ These items should stay visible while we iterate on the new `NativeForms Designe
 
 ### 4. Conditional Fields
 - Fields and display blocks should be able to appear conditionally.
+- The designer always shows conditional items for editing; visibility rules apply to the published form.
+- In a Records List, a condition referencing a field in that list reads the value from the same row, including blank and false values. References absent from that row resolve against regular form fields.
+- Evaluate visibility on initial load, prefill, input/change, and when adding a row. Rows must evaluate independently.
+- Conditionally hidden fields do not block validation; showing them restores normal validation. Visibility does not clear stored field values or change the submission mapping.
 - Examples:
   - show field B only if checkbox A is checked
   - show a section only if picklist value = X
@@ -166,7 +170,13 @@ These items should stay visible while we iterate on the new `NativeForms Designe
 - It ties to:
   - future right-panel property rules
   - runtime form behavior
-  - badges/indicators on canvas items
+- badges/indicators on canvas items
+
+### Clone an individual field
+- The right properties panel offers Clone beneath Field Type for persisted input fields only. Containers (sections, groups, columns, Records Lists), display elements, and virtual controls are excluded.
+- Clone preserves the current label and complete field configuration, including prefill, submit, formula references, conditions, validation, and styling. It assigns a new record ID, element ID, element index, and unique field key.
+- Insert the clone immediately after the original in the same parent and column, and select it. Preserve existing source-field references and mappings; do not rewrite them to the new field key.
+- Cloning is draft-only, respects plan and placement restrictions (including one signature per Records List), supports Undo, and must not leave a partial copy after failure.
 
 ## Suggested Tie-In To Current Open Work
 

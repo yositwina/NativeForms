@@ -202,6 +202,70 @@
     line-height: 1.2;
 }
 
+.custom-help {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 999px;
+    background: #706e6b;
+    color: #fff;
+    font-size: 0.62rem;
+    line-height: 1;
+    cursor: help;
+    outline: none;
+}
+
+.custom-help:focus {
+    box-shadow: 0 0 0 2px #0176d3;
+}
+
+.custom-help__bubble {
+    position: absolute;
+    z-index: 20;
+    top: 1.45rem;
+    left: 50%;
+    display: none;
+    width: min(26rem, calc(100vw - 3rem));
+    padding: 0.85rem 0.95rem;
+    border-radius: 0.28rem;
+    background: #032d60;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    font-size: 0.78rem;
+    font-weight: 400;
+    line-height: 1.45;
+    transform: translateX(-50%);
+}
+
+.custom-help__bubble::before {
+    content: "";
+    position: absolute;
+    top: -0.45rem;
+    left: 50%;
+    border-right: 0.45rem solid transparent;
+    border-bottom: 0.45rem solid #032d60;
+    border-left: 0.45rem solid transparent;
+    transform: translateX(-50%);
+}
+
+.custom-help__bubble strong,
+.custom-help__bubble span {
+    display: block;
+}
+
+.custom-help__bubble strong:not(:first-child) {
+    margin-top: 0.75rem;
+}
+
+.custom-help:hover .custom-help__bubble,
+.custom-help:focus .custom-help__bubble,
+.custom-help:focus-within .custom-help__bubble {
+    display: block;
+}
+
 .condition-row {
     display: grid;
     gap: 0.55rem;

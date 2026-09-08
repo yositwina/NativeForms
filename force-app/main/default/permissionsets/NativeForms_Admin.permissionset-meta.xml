@@ -141,6 +141,15 @@
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
 
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>NF_Admin__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
     <fieldPermissions>
         <editable>true</editable>
         <field>NativeForms_Config__c.Enable_Pro_Condition_Logic__c</field>
@@ -213,6 +222,21 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>NF_Theme__c.Background_Gradient_Color__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NF_Theme__c.Background_Image_Content_Document_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NF_Theme__c.Background_Image_URL__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>NF_Theme__c.Button_Background_Color__c</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -259,6 +283,16 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>NF_Theme__c.Form_Width__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NF_Theme__c.Footer_Image_Content_Document_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>NF_Theme__c.Footer_Image_URL__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

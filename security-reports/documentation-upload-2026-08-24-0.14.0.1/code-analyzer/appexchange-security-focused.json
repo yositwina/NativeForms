@@ -1,0 +1,689 @@
+{
+  "runDir": "C:\\Users\\Yosi\\NativeFormsAWS\\",
+  "violationCounts": {
+    "total": 28,
+    "sev1": 0,
+    "sev2": 0,
+    "sev3": 28,
+    "sev4": 0,
+    "sev5": 0
+  },
+  "versions": {
+    "code-analyzer": "0.49.0",
+    "pmd": "0.43.0"
+  },
+  "violations": [
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Command_Key__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 11,
+          "endColumn": 14
+        }
+      ],
+      "message": "Command_Key__c is a potential auth token in a custom object: NF_Form_Action__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Field_Key__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 11,
+          "endColumn": 14
+        }
+      ],
+      "message": "Field_Key__c is a potential auth token in a custom object: NF_Form_Element__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Publication_Status__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 19,
+          "endColumn": 14
+        }
+      ],
+      "message": "Publication_Status__c is a potential auth token in a custom object: NF_Form_Publication__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Publication_Type__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 20,
+          "endColumn": 14
+        }
+      ],
+      "message": "Publication_Type__c is a potential auth token in a custom object: NF_Form_Publication__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Publish_Token__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 11,
+          "endColumn": 14
+        }
+      ],
+      "message": "Publish_Token__c is a potential auth token in a custom object: NF_Form_Version__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Form__c\\fields\\NF_Key__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 13,
+          "endColumn": 14
+        }
+      ],
+      "message": "NF_Key__c is a potential auth token in a custom object: NF_Form__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Submission_Log_Key__c\\fields\\Key_Version__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 11,
+          "endColumn": 14
+        }
+      ],
+      "message": "Key_Version__c is a potential auth token in a custom object: NF_Submission_Log_Key__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NF_Submission_Log_Key__c\\fields\\Public_Key__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 11,
+          "endColumn": 14
+        }
+      ],
+      "message": "Public_Key__c is a potential auth token in a custom object: NF_Submission_Log_Key__c",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Captcha_Site_Key__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 12,
+          "endColumn": 14
+        }
+      ],
+      "message": "Captcha_Site_Key__c is a potential auth token in the object: NativeForms_Config__c with public visibility",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "ProtectSensitiveData",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "XML"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_SF_Secret_Code_Auth__c.field-meta.xml",
+          "startLine": 1,
+          "startColumn": 1,
+          "endLine": 11,
+          "endColumn": 14
+        }
+      ],
+      "message": "Enable_Pro_SF_Secret_Code_Auth__c is a potential auth token in the object: NativeForms_Config__c with public visibility",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#protectsensitivedata"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInFieldDecls",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsBootstrapV2Signer.cls",
+          "startLine": 2,
+          "startColumn": 32,
+          "endLine": 2,
+          "endColumn": 67
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: SIGNATURE_ALGORITHM  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinfielddecls"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 1923,
+          "startColumn": 13,
+          "endLine": 1923,
+          "endColumn": 31
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: placedRowSignature  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 1923,
+          "startColumn": 13,
+          "endLine": 1923,
+          "endColumn": 31
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: placedRowSignature  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 2125,
+          "startColumn": 13,
+          "endLine": 2125,
+          "endColumn": 31
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: placedRowSignature  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 2125,
+          "startColumn": 13,
+          "endLine": 2125,
+          "endColumn": 31
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: placedRowSignature  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarDecls",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 3600,
+          "startColumn": 16,
+          "endLine": 3600,
+          "endColumn": 93
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: objectToken  matched the token: TOKEN",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvardecls"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 3603,
+          "startColumn": 13,
+          "endLine": 3603,
+          "endColumn": 24
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: objectToken  matched the token: TOKEN",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+          "startLine": 3606,
+          "startColumn": 13,
+          "endLine": 3606,
+          "endColumn": 24
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: objectToken  matched the token: TOKEN",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarDecls",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 2998,
+          "startColumn": 20,
+          "endLine": 2998,
+          "endColumn": 132
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvardecls"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarDecls",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 2998,
+          "startColumn": 20,
+          "endLine": 2998,
+          "endColumn": 132
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvardecls"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 2999,
+          "startColumn": 13,
+          "endLine": 2999,
+          "endColumn": 26
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3000,
+          "startColumn": 13,
+          "endLine": 3000,
+          "endColumn": 26
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3002,
+          "startColumn": 17,
+          "endLine": 3002,
+          "endColumn": 30
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3002,
+          "startColumn": 17,
+          "endLine": 3002,
+          "endColumn": 30
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3004,
+          "startColumn": 13,
+          "endLine": 3004,
+          "endColumn": 26
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3004,
+          "startColumn": 13,
+          "endLine": 3004,
+          "endColumn": 26
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3005,
+          "startColumn": 13,
+          "endLine": 3005,
+          "endColumn": 26
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    },
+    {
+      "rule": "AvoidHardcodedCredentialsInVarAssign",
+      "engine": "pmd",
+      "severity": 3,
+      "tags": [
+        "AppExchange",
+        "Security",
+        "Apex"
+      ],
+      "primaryLocationIndex": 0,
+      "locations": [
+        {
+          "file": "force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+          "startLine": 3006,
+          "startColumn": 13,
+          "endLine": 3006,
+          "endColumn": 26
+        }
+      ],
+      "message": "Hard coded credentials assigned to variable: signatureHtml  matched the token: SIGNATURE",
+      "resources": [
+        "https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-pmd-appexchange.html#avoidhardcodedcredentialsinvarassign"
+      ]
+    }
+  ]
+}

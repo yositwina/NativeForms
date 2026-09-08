@@ -9,6 +9,7 @@ Use for Lambda auth, tenant registration, bearer-secret flows, connected app or 
 ## NativeForms Rules
 - Keep tenant trust separate from public form trust.
 - Salesforce package/admin calls use Bootstrap V2 HMAC signatures. Public HTML never uses package service credentials.
+- Connected Org Snapshots Phase 3 should use connected group membership plus signed package calls. Snapshot list/download must verify the requesting org and source org are active members of the same group; do not use public form tokens, and do not store connected-org refresh tokens unless a later AWS-to-Salesforce call path is explicitly added.
 - Public runtime uses `formId` plus per-form `publishToken`, then resolves tenant ownership indirectly through the stored form record.
 - User-verification same-tab verification sessions are public runtime tokens only. AWS must derive the allowed session mode from the published form config, not from the browser request, and cap same-tab expiry at 12 hours even when the browser asks for local midnight.
 - Store tenant-specific Salesforce connection data per org, but do not store subscriber-entered OAuth client credentials per tenant.

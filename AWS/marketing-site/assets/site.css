@@ -70,6 +70,7 @@ a {
 }
 
 .brand {
+  order: 2;
   gap: 12px;
   color: var(--ink);
   font-size: 1.3rem;
@@ -91,6 +92,7 @@ a {
 }
 
 .site-nav {
+  order: 1;
   gap: 22px;
   font-size: 0.95rem;
 }
@@ -225,6 +227,15 @@ h3 {
   color: #384358;
   font-size: 1.22rem;
   font-weight: 500;
+  line-height: 1.55;
+}
+
+.hero-note {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: #0b2b5c;
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1.55;
 }
 
@@ -611,6 +622,29 @@ h3 {
   color: var(--green);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.plan-offer {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(47, 168, 102, 0.28);
+  border-radius: 8px;
+  background: rgba(47, 168, 102, 0.08);
+  color: var(--text);
+}
+
+.plan-offer strong {
+  color: var(--green-dark);
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.plan-offer span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .plan-card-featured {

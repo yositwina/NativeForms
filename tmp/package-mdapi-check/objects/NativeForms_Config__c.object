@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customSettingsType>Hierarchy</customSettingsType>
+    <label>TwinaForms Config</label>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>Captcha_Site_Key__c</fullName>
+        <description>Google reCAPTCHA site key used by published TwinaForms HTML pages.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Paste the Google reCAPTCHA site key that should be rendered on published forms.</inlineHelpText>
+        <label>CAPTCHA Site Key</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Demo_Data_Installed__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Tracks whether the packaged TwinaForms demo data has been installed for this org.</description>
+        <inlineHelpText>Set automatically when the demo-data installer completes.</inlineHelpText>
+        <label>Demo Data Installed</label>
+        <trackHistory>false</trackHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Demo_Data_Installed_At__c</fullName>
+        <description>Timestamp of the last successful TwinaForms demo data installation.</description>
+        <inlineHelpText>Updated automatically after demo records are installed.</inlineHelpText>
+        <label>Demo Data Installed At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>Demo_Data_Last_Message__c</fullName>
+        <description>Last status message produced by the TwinaForms demo data installer.</description>
+        <inlineHelpText>Stores the latest success or informational message from demo-data setup.</inlineHelpText>
+        <label>Demo Data Last Message</label>
+        <trackHistory>false</trackHistory>
+        <type>TextArea</type>
+    </fields>
+    <fields>
+        <fullName>Demo_Data_Record_Ids__c</fullName>
+        <description>Serialized JSON of record ids created by the TwinaForms demo data installer.</description>
+        <inlineHelpText>Used internally for demo-data tracking and future cleanup/reset support.</inlineHelpText>
+        <label>Demo Data Record Ids</label>
+        <trackHistory>false</trackHistory>
+        <type>TextArea</type>
+    </fields>
+    <fields>
+        <fullName>Demo_Data_Version__c</fullName>
+        <description>Version tag for the currently installed TwinaForms demo data bundle.</description>
+        <inlineHelpText>Updated automatically so future installs can detect whether demo data is already current.</inlineHelpText>
+        <label>Demo Data Version</label>
+        <length>40</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Advanced_Submit_Modes__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Enable Pro Advanced Submit Modes</label>
+        <trackFeedHistory>false</trackFeedHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Condition_Logic__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Enables the Pro condition builder with numbered rows and custom logic expressions.</description>
+        <externalId>false</externalId>
+        <label>Enable Pro Condition Logic</label>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Formula_Fields__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Enable Pro Formula Fields</label>
+        <trackFeedHistory>false</trackFeedHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Load_File__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Legacy local toggle for the Pro file uploads feature. AWS plan entitlements remain the runtime source of truth.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Legacy local toggle for file uploads. Public runtime entitlement should come from AWS plan data using enableProLoadFile.</inlineHelpText>
+        <label>Enable Pro File Uploads</label>
+        <trackFeedHistory>false</trackFeedHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Post_Submit_Auto_Link__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Enables the Pro-only post-submit auto link / redirect feature.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Enable the Pro-only automatic post-submit next-step link behavior.</inlineHelpText>
+        <label>Enable Pro Post Submit Auto Link</label>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Prefill_Alias_References__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Enable Pro Prefill Alias References</label>
+        <trackFeedHistory>false</trackFeedHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_Repeat_Groups__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Enable Pro Repeat Groups</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_SF_Secret_Code_Auth__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Controls the Pro feature for email-based User Verification.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Enable the Pro feature for Salesforce-side User Verification.</inlineHelpText>
+        <label>Enable Pro User Verification</label>
+        <trackFeedHistory>false</trackFeedHistory>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>Enable_Pro_User_Verification__c</fullName>
+        <defaultValue>false</defaultValue>
+        <description>Controls the Pro feature for email-based User Verification.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Enable the Pro feature for Salesforce-side User Verification.</inlineHelpText>
+        <label>Enable Pro User Verification</label>
+        <trackFeedHistory>false</trackFeedHistory>
+        <type>Checkbox</type>
+    </fields>
+</CustomObject>

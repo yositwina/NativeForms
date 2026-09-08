@@ -1,0 +1,519 @@
+<template>
+    <lightning-card>
+        <div class="shell">
+            <div class="toolbar">
+                <template if:true={workspaceLoaded}>
+                    <div class="version-meta">
+                        <span class="meta-chip">{selectedFormName}</span>
+                        <span class="meta-chip">Version: {selectedVersionName}</span>
+                        <span class="meta-chip">Status: {selectedVersionStatus}</span>
+                    </div>
+                </template>
+            </div>
+
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading submit actions"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="layout">
+                    <section class="pane pane-list">
+                        <div class="pane-header">
+                            <h2>Submit Actions</h2>
+                            <p class="pane-copy">Define which Salesforce records are created or updated on submit.</p>
+                        </div>
+
+                        <div class="pane-actions">
+                            <div class="button-help-row">
+                                <button
+                                    type="button"
+                                    class="pane-action-button"
+                                    onclick={handleRefreshFromDesigner}>
+                                    Refresh from Designer
+                                </button>
+                                <lightning-helptext content={refreshFromDesignerHelpText}></lightning-helptext>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="pane-action-button pane-action-button--brand"
+                                onclick={handleAddAction}>
+                                New Submit Action
+                            </button>
+                        </div>
+
+                        <template if:true={actions.length}>
+                            <div class="action-list">
+                                <template for:each={actions} for:item="item">
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        class={item.cardClass}
+                                        data-id={item.id}
+                                        onclick={handleSelectAction}>
+                                        <span class="action-meta">Action {item.displayNumber}</span>
+                                        <span class="action-title">{item.objectApiName}</span>
+                                        <span class="action-meta">{item.commandType}</span>
+                                        <span class="action-meta">Result alias: {item.storeResultAs}</span>
+                                        <span class="action-meta">Action Key: {item.actionKey}</span>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+
+                        <div class="concept-panel">
+                            <h3>What This Page Does</h3>
+                            <p>Here you define which Salesforce records are created or updated when the form is submitted.</p>
+                            <p>Each submit action saves one record flow, and the form’s element properties can later map fields into that action.</p>
+                            <p>You can create a new record, update an existing one, find a matching record first, or save repeat-group rows.</p>
+                        </div>
+                    </section>
+
+                    <section class="pane pane-editor">
+                        <div class="pane-header">
+                            <h2>Action Definition</h2>
+                        </div>
+
+                        <template if:true={selectedAction}>
+                            <div class="editor-grid">
+                                <div class="editor-grid-top">
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>Result Alias</span>
+                                            <lightning-helptext content={resultAliasHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-input
+                                            name="storeResultAs"
+                                            variant="label-hidden"
+                                            label="Result Alias"
+                                            value={draftAction.storeResultAs}
+                                            onchange={handleDraftChange}>
+                                        </lightning-input>
+                                    </div>
+
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>Salesforce Object</span>
+                                            <lightning-helptext content={salesforceObjectHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-combobox
+                                            name="objectApiName"
+                                            variant="label-hidden"
+                                            label="Salesforce Object"
+                                            value={draftAction.objectApiName}
+                                            options={filteredObjectOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </div>
+
+                                    <div class="field-help-stack">
+                                        <div class="field-help-label">
+                                            <span>Submit Mode</span>
+                                            <lightning-helptext content={submitModeHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-combobox
+                                            name="commandType"
+                                            variant="label-hidden"
+                                            label="Submit Mode"
+                                            value={draftAction.commandType}
+                                            options={commandTypeOptions}
+                                            onchange={handleDraftChange}>
+                                        </lightning-combobox>
+                                    </div>
+
+                                    <template if:true={showNotFoundChoice}>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>If No Matching Record Is Found</span>
+                                                <lightning-helptext content={ifNoMatchFoundHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-combobox
+                                                name="onNotFound"
+                                                variant="label-hidden"
+                                                label="If No Matching Record Is Found"
+                                                value={draftAction.onNotFound}
+                                                options={notFoundOptions}
+                                                onchange={handleDraftChange}>
+                                            </lightning-combobox>
+                                        </div>
+                                    </template>
+                                </div>
+                                <p class="mode-help">{modeHelpText}</p>
+
+                                <template if:true={isUpdateById}>
+                                    <div class="field-help-stack field-help-stack--wide">
+                                        <div class="field-help-label">
+                                            <span>Record Id Source</span>
+                                            <lightning-helptext content={recordIdSourceHelpText}></lightning-helptext>
+                                        </div>
+                                        <lightning-input
+                                            name="recordIdSource"
+                                            variant="label-hidden"
+                                            label="Record Id Source"
+                                            value={draftAction.recordIdSource}
+                                            onchange={handleDraftChange}>
+                                        </lightning-input>
+                                    </div>
+                                </template>
+
+                                <template if:true={isFindAndUpdate}>
+                                    <div class="condition-builder">
+                                        <div class="condition-builder__header">
+                                            <span class="condition-builder__title">Match Conditions</span>
+                                        </div>
+                                        <template for:each={conditionRows} for:item="row" for:index="index">
+                                            <div key={row.id} class="condition-row">
+                                                <div class="condition-index">{row.displayIndex}</div>
+                                                <div class="field-help-stack">
+                                                    <div class="field-help-label">
+                                                        <span>Salesforce Field</span>
+                                                        <lightning-helptext content={salesforceFieldHelpText}></lightning-helptext>
+                                                    </div>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="fieldApiName"
+                                                        variant="label-hidden"
+                                                        label="Salesforce Field"
+                                                        value={row.fieldApiName}
+                                                        options={fieldOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                </div>
+                                                <div class="field-help-stack">
+                                                    <div class="field-help-label">
+                                                        <span>Operator</span>
+                                                        <lightning-helptext content={operatorHelpText}></lightning-helptext>
+                                                    </div>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="operator"
+                                                        variant="label-hidden"
+                                                        label="Operator"
+                                                        value={row.operator}
+                                                        options={operatorOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                </div>
+                                                <div class="field-help-stack">
+                                                    <div class="field-help-label">
+                                                        <span>Value Source</span>
+                                                        <lightning-helptext content={valueSourceHelpText}></lightning-helptext>
+                                                    </div>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="valueSource"
+                                                        variant="label-hidden"
+                                                        label="Value Source"
+                                                        value={row.valueSource}
+                                                        options={valueSourceOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                </div>
+                                                <template if:true={row.isValueSourceField}>
+                                                    <lightning-combobox
+                                                        data-index={index}
+                                                        name="valueText"
+                                                        label={row.valueLabel}
+                                                        value={row.valueText}
+                                                        placeholder={row.valuePlaceholder}
+                                                        options={formFieldOptions}
+                                                        onchange={handleConditionChange}>
+                                                    </lightning-combobox>
+                                                </template>
+                                                <template if:false={row.isValueSourceField}>
+                                                    <template if:true={row.isValueSourceAlias}>
+                                                        <div class="field-help-stack">
+                                                            <div class="field-help-label">
+                                                                <span>Result Alias</span>
+                                                                <lightning-helptext content={resultAliasFieldHelpText}></lightning-helptext>
+                                                            </div>
+                                                            <lightning-combobox
+                                                                data-index={index}
+                                                                name="aliasName"
+                                                                variant="label-hidden"
+                                                                label="Result Alias"
+                                                                value={row.selectedAliasName}
+                                                                options={row.aliasOptions}
+                                                                onchange={handleConditionChange}>
+                                                            </lightning-combobox>
+                                                        </div>
+                                                        <div class="field-help-stack">
+                                                            <div class="field-help-label">
+                                                                <span>Alias Field</span>
+                                                                <lightning-helptext content={aliasFieldHelpText}></lightning-helptext>
+                                                            </div>
+                                                            <lightning-combobox
+                                                                data-index={index}
+                                                                name="aliasField"
+                                                                variant="label-hidden"
+                                                                label="Alias Field"
+                                                                value={row.selectedAliasField}
+                                                                options={row.aliasFieldOptions}
+                                                                onchange={handleConditionChange}>
+                                                            </lightning-combobox>
+                                                        </div>
+                                                    </template>
+                                                    <template if:false={row.isValueSourceAlias}>
+                                                        <lightning-input
+                                                            data-index={index}
+                                                            name="valueText"
+                                                            label={row.valueLabel}
+                                                            placeholder={row.valuePlaceholder}
+                                                            value={row.valueText}
+                                                            onchange={handleConditionChange}>
+                                                        </lightning-input>
+                                                    </template>
+                                                </template>
+                                                <lightning-button-icon
+                                                    data-index={index}
+                                                    icon-name="utility:delete"
+                                                    alternative-text="Delete condition"
+                                                    onclick={handleDeleteCondition}>
+                                                </lightning-button-icon>
+                                            </div>
+                                        </template>
+                                        <template if:true={showConditionExpression}>
+                                            <div class="field-help-stack field-help-stack--wide">
+                                                <div class="field-help-label">
+                                                    <span>Condition Logic</span>
+                                                    <lightning-helptext content={conditionLogicHelpText}></lightning-helptext>
+                                                </div>
+                                                <lightning-input
+                                                    name="conditionExpression"
+                                                    variant="label-hidden"
+                                                    label="Condition Logic"
+                                                    value={draftAction.conditionExpression}
+                                                    onchange={handleConditionExpressionChange}>
+                                                </lightning-input>
+                                            </div>
+                                        </template>
+                                        <template if:true={canAddCondition}>
+                                            <lightning-button
+                                                label="Add Condition"
+                                                onclick={handleAddCondition}>
+                                            </lightning-button>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template if:true={showRepeatGroupConfig}>
+                                    <div class="condition-builder">
+                                        <div class="condition-builder__header">
+                                            <span class="condition-builder__title">Records List Parent Id Definition</span>
+                                        </div>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Records List</span>
+                                                <lightning-helptext content={repeatGroupHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-combobox
+                                                name="repeatGroupKey"
+                                                variant="label-hidden"
+                                                label="Records List"
+                                                value={draftAction.repeatGroupKey}
+                                                options={repeatGroupOptions}
+                                                onchange={handleDraftChange}>
+                                            </lightning-combobox>
+                                        </div>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Parent Relationship Field</span>
+                                                <lightning-helptext content={parentRelationshipFieldHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-combobox
+                                                name="relationshipField"
+                                                variant="label-hidden"
+                                                label="Parent Relationship Field"
+                                                value={draftAction.relationshipField}
+                                                options={fieldOptions}
+                                                onchange={handleRepeatRelationshipChange}>
+                                            </lightning-combobox>
+                                        </div>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Relationship Value Source</span>
+                                                <lightning-helptext content={relationshipValueSourceHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-combobox
+                                                name="relationshipValueSource"
+                                                variant="label-hidden"
+                                                label="Relationship Value Source"
+                                                value={draftAction.relationshipValueSource}
+                                                options={valueSourceOptions}
+                                                onchange={handleRepeatRelationshipSourceChange}>
+                                            </lightning-combobox>
+                                        </div>
+                                        <template if:true={draftAction.relationshipValueSource}>
+                                            <template if:true={isRepeatRelationshipValueField}>
+                                                <div class="field-help-stack">
+                                                    <div class="field-help-label">
+                                                        <span>Relationship Value</span>
+                                                        <lightning-helptext content={relationshipValueHelpText}></lightning-helptext>
+                                                    </div>
+                                                    <lightning-combobox
+                                                        name="relationshipValueText"
+                                                        variant="label-hidden"
+                                                        label="Relationship Value"
+                                                        value={draftAction.relationshipValueText}
+                                                        options={formFieldOptions}
+                                                        onchange={handleRepeatRelationshipChange}>
+                                                    </lightning-combobox>
+                                                </div>
+                                            </template>
+                                            <template if:false={isRepeatRelationshipValueField}>
+                                                <template if:true={isRepeatRelationshipValueAlias}>
+                                                    <div class="field-help-stack">
+                                                        <div class="field-help-label">
+                                                            <span>Result Alias</span>
+                                                            <lightning-helptext content={resultAliasFieldHelpText}></lightning-helptext>
+                                                        </div>
+                                                        <lightning-combobox
+                                                            name="relationshipAliasName"
+                                                            variant="label-hidden"
+                                                            label="Result Alias"
+                                                            value={selectedRelationshipAliasName}
+                                                            options={prefillAliasOptions}
+                                                            onchange={handleRepeatRelationshipChange}>
+                                                        </lightning-combobox>
+                                                    </div>
+                                                    <div class="field-help-stack">
+                                                        <div class="field-help-label">
+                                                            <span>Alias Field</span>
+                                                            <lightning-helptext content={aliasFieldHelpText}></lightning-helptext>
+                                                        </div>
+                                                        <lightning-combobox
+                                                            name="relationshipAliasField"
+                                                            variant="label-hidden"
+                                                            label="Alias Field"
+                                                            value={selectedRelationshipAliasField}
+                                                            options={relationshipAliasFieldOptions}
+                                                            onchange={handleRepeatRelationshipChange}>
+                                                        </lightning-combobox>
+                                                    </div>
+                                                </template>
+                                                <template if:false={isRepeatRelationshipValueAlias}>
+                                                    <div class="field-help-stack">
+                                                        <div class="field-help-label">
+                                                            <span>Relationship Value</span>
+                                                            <lightning-helptext content={relationshipValueHelpText}></lightning-helptext>
+                                                        </div>
+                                                        <lightning-input
+                                                            name="relationshipValueText"
+                                                            variant="label-hidden"
+                                                            label="Relationship Value"
+                                                            value={draftAction.relationshipValueText}
+                                                            onchange={handleRepeatRelationshipChange}>
+                                                        </lightning-input>
+                                                    </div>
+                                                </template>
+                                            </template>
+                                        </template>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Allow Deleting Rows On Submit</span>
+                                                <lightning-helptext content={allowDeleteHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-input
+                                                type="checkbox"
+                                                name="allowDelete"
+                                                variant="label-hidden"
+                                                label="Allow Deleting Rows On Submit"
+                                                checked={draftAction.allowDelete}
+                                                onchange={handleRepeatRelationshipChange}>
+                                            </lightning-input>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <lightning-accordion allow-multiple-sections-open>
+                                    <lightning-accordion-section name="advanced" label="Advanced">
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Action Key</span>
+                                                <lightning-helptext content={actionKeyHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-input
+                                                name="actionKey"
+                                                variant="label-hidden"
+                                                label="Action Key"
+                                                value={draftAction.actionKey}
+                                                read-only>
+                                            </lightning-input>
+                                        </div>
+                                        <div class="field-help-stack">
+                                            <div class="field-help-label">
+                                                <span>Config JSON</span>
+                                                <lightning-helptext content={configJsonHelpText}></lightning-helptext>
+                                            </div>
+                                            <lightning-textarea
+                                                name="configJson"
+                                                variant="label-hidden"
+                                                label="Config JSON"
+                                                value={draftAction.configJson}
+                                                read-only>
+                                            </lightning-textarea>
+                                        </div>
+                                    </lightning-accordion-section>
+                                </lightning-accordion>
+
+                                <div class="editor-actions">
+                                    <lightning-button
+                                        variant="brand"
+                                        label="Save Submit Action"
+                                        onclick={handleSaveAction}>
+                                    </lightning-button>
+                                    <lightning-button
+                                        variant="destructive-text"
+                                        label="Delete"
+                                        onclick={handleDeleteAction}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+                        </template>
+                    </section>
+
+                    <section class="pane pane-help">
+                        <div class="pane-header">
+                            <h2>Form Mapping Summary</h2>
+                        </div>
+                        <div class="help-copy">
+                            <template if:true={hasMappingGroups}>
+                                <div class="mapping-groups">
+                                    <template for:each={mappingGroups} for:item="group">
+                                        <div key={group.key} class={group.groupClass}>
+                                            <p><strong>Action:</strong> <code>{group.title}</code></p>
+                                            <p><strong>Salesforce Object:</strong> <code>{group.objectApiName}</code></p>
+                                            <template if:true={group.hasFields}>
+                                                <div class="mapping-list">
+                                                    <template for:each={group.fields} for:item="field">
+                                                        <div key={field.key} class="mapping-row">
+                                                            <span class="mapping-row__label">{field.label}</span>
+                                                            <span class="mapping-row__arrow">&#8594;</span>
+                                                            <span class="mapping-row__field">{field.fieldPath}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <template if:false={group.hasFields}>
+                                                <p>No form fields are mapped to this submit action yet.</p>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template if:false={hasMappingGroups}>
+                                <p>No submit actions exist for this form yet.</p>
+                            </template>
+                        </div>
+                    </section>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

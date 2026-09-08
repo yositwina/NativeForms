@@ -67,6 +67,11 @@
                                     </div>
 
                                     <button class="preview-button" style={previewButtonStyle} data-target="buttonBackgroundColor" onclick={handlePreviewTargetClick}>Submit</button>
+                                    <template if:true={hasFooterImage}>
+                                        <div class="preview-footer-image-wrap">
+                                            <img src={draft.footerImageUrl} alt="Theme footer" class="preview-footer-image" />
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -87,22 +92,32 @@
                                     <h3>Branding</h3>
                                     <lightning-input label="Theme Name" value={draft.name} onchange={handleFieldChange} data-field="name"></lightning-input>
                                     <lightning-textarea label="Description" value={draft.description} onchange={handleFieldChange} data-field="description"></lightning-textarea>
-                                    <lightning-input type="file" label="Logo Image" accept="image/*" onchange={handleLogoFileChange}></lightning-input>
-                                    <lightning-input label="Logo URL" value={draft.logoUrl} onchange={handleFieldChange} data-field="logoUrl"></lightning-input>
+                                    <lightning-input type="file" label="Header Image" accept="image/*" onchange={handleLogoFileChange}></lightning-input>
+                                    <lightning-input label="Header Image URL" value={draft.logoUrl} onchange={handleFieldChange} data-field="logoUrl"></lightning-input>
                                     <div class="inline-row inline-row--two">
-                                        <lightning-input type="number" label="Logo Size" value={draft.logoSizePx} onchange={handleFieldChange} data-field="logoSizePx"></lightning-input>
-                                        <lightning-combobox label="Logo Position" value={draft.logoPosition} options={logoPositionOptions} onchange={handleFieldChange} data-field="logoPosition"></lightning-combobox>
+                                        <lightning-input type="number" label="Header Image Size" value={draft.logoSizePx} onchange={handleFieldChange} data-field="logoSizePx"></lightning-input>
+                                        <lightning-combobox label="Header Image Position" value={draft.logoPosition} options={logoPositionOptions} onchange={handleFieldChange} data-field="logoPosition"></lightning-combobox>
                                     </div>
+                                    <lightning-input type="file" label="Background Image" accept="image/*" onchange={handleBackgroundImageFileChange}></lightning-input>
+                                    <lightning-input label="Background Image URL" value={draft.backgroundImageUrl} onchange={handleFieldChange} data-field="backgroundImageUrl"></lightning-input>
+                                    <lightning-input type="file" label="Footer Image" accept="image/*" onchange={handleFooterImageFileChange}></lightning-input>
+                                    <lightning-input label="Footer Image URL" value={draft.footerImageUrl} onchange={handleFieldChange} data-field="footerImageUrl"></lightning-input>
                                 </div>
 
                                 <div class="editor-section">
                                     <h3>Layout</h3>
-                                    <lightning-combobox label="Form Width" value={draft.formWidth} options={formWidthOptions} onchange={handleFieldChange} data-field="formWidth"></lightning-combobox>
+                                    <lightning-input type="number" label="Desktop Form Width (%)" field-level-help="Choose a width from 50% to 100%. Mobile forms use 100% width." min="50" max="100" step="1" value={formWidthPercent} onchange={handleFieldChange} data-field="formWidth"></lightning-input>
                                     <div class="color-field">
                                         <div class={backgroundColorFieldClass} data-focus-field="backgroundColor">
-                                            <lightning-input label="Background Color" value={draft.backgroundColor} onchange={handleFieldChange} data-field="backgroundColor"></lightning-input>
+                                            <lightning-input label="Background Start Color" value={draft.backgroundColor} onchange={handleFieldChange} data-field="backgroundColor"></lightning-input>
                                         </div>
                                         <input class="native-color-input" type="color" value={draft.backgroundColor} data-field="backgroundColor" onchange={handleColorPickerChange} />
+                                    </div>
+                                    <div class="color-field">
+                                        <div class={backgroundGradientColorFieldClass} data-focus-field="backgroundGradientColor">
+                                            <lightning-input label="Background Gradient Color" value={draft.backgroundGradientColor} onchange={handleFieldChange} data-field="backgroundGradientColor"></lightning-input>
+                                        </div>
+                                        <input class="native-color-input" type="color" value={draft.backgroundGradientColor} data-field="backgroundGradientColor" onchange={handleColorPickerChange} />
                                     </div>
                                     <div class="color-field">
                                         <div class={formBackgroundColorFieldClass} data-focus-field="formBackgroundColor">

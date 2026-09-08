@@ -197,6 +197,19 @@ CONCAT({firstName}, " ", {lastName})</pre>
         <p class="example-subtitle">Text formula. Builds a unique-looking id the user can quote in support.</p>
         <pre class="code-block">CONCAT("REF-", YEAR(TODAY()), "-", {email})</pre>
       </div>
+
+      <div class="example-block">
+        <p class="example-title">Day of the week for a chosen date</p>
+        <p class="example-subtitle">Text formula. <span class="inline">DAYNAME</span> follows the form's language, so a Hebrew form shows &#1497;&#1493;&#1501; &#1513;&#1497;&#1513;&#1497;.</p>
+        <pre class="code-block">DAYNAME({appointmentDate})</pre>
+      </div>
+
+      <div class="example-block">
+        <p class="example-title">Block weekend bookings</p>
+        <p class="example-subtitle">Text formula. <span class="inline">WEEKDAY</span> returns 1 for Sunday through 7 for Saturday.</p>
+        <pre class="code-block">IF(OR(WEEKDAY({appointmentDate}) == 6, WEEKDAY({appointmentDate}) == 7),
+   "Please pick a weekday", "")</pre>
+      </div>
     </section>
 
     <section class="section" id="gotchas">
@@ -236,6 +249,14 @@ CONCAT({firstName}, " ", {lastName})</pre>
           <span class="fn-name">ISBLANK(value)</span>
           <p class="fn-desc">True when the value is empty, null, or whitespace-only.</p>
         </div>
+        <div class="fn-card">
+          <span class="fn-name">AND(&hellip;), OR(&hellip;)</span>
+          <p class="fn-desc">True when all / any of the arguments are true. The infix forms <span class="inline">{a} AND {b}</span> and <span class="inline">{a} OR {b}</span> also work.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">NOT(value)</span>
+          <p class="fn-desc">Inverts a true/false value.</p>
+        </div>
       </div>
 
       <h3>Text</h3>
@@ -251,6 +272,42 @@ CONCAT({firstName}, " ", {lastName})</pre>
         <div class="fn-card">
           <span class="fn-name">URLENCODE(value)</span>
           <p class="fn-desc">Encodes text so it is safe inside a URL query parameter.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">LEFT(text, count)</span>
+          <p class="fn-desc">First <em>count</em> characters.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">RIGHT(text, count)</span>
+          <p class="fn-desc">Last <em>count</em> characters.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">MID(text, start, count)</span>
+          <p class="fn-desc"><em>count</em> characters starting at position <em>start</em>. The first character is position 1.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">LEN(text)</span>
+          <p class="fn-desc">Number of characters.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">TRIM(text)</span>
+          <p class="fn-desc">Removes leading and trailing whitespace.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">UPPER(text), LOWER(text)</span>
+          <p class="fn-desc">Converts to upper or lower case.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">SUBSTITUTE(text, old, new)</span>
+          <p class="fn-desc">Replaces every occurrence of <em>old</em> with <em>new</em>.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">CONTAINS(text, find)</span>
+          <p class="fn-desc">True when <em>find</em> appears anywhere in <em>text</em>. Case-sensitive.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">BEGINS(text, find)</span>
+          <p class="fn-desc">True when <em>text</em> starts with <em>find</em>. Case-sensitive.</p>
         </div>
       </div>
 
@@ -271,6 +328,22 @@ CONCAT({firstName}, " ", {lastName})</pre>
         <div class="fn-card">
           <span class="fn-name">MIN(&hellip;), MAX(&hellip;)</span>
           <p class="fn-desc">Smallest / largest value among the arguments.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">MOD(num, divisor)</span>
+          <p class="fn-desc">Remainder after division. Blank when the divisor is 0.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">CEILING(num), FLOOR(num)</span>
+          <p class="fn-desc">Rounds up / down to a whole number.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">POWER(base, exponent)</span>
+          <p class="fn-desc"><em>base</em> raised to <em>exponent</em>.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">SQRT(num)</span>
+          <p class="fn-desc">Square root. Blank for negative numbers.</p>
         </div>
       </div>
 
@@ -295,6 +368,26 @@ CONCAT({firstName}, " ", {lastName})</pre>
         <div class="fn-card">
           <span class="fn-name">DAY(date)</span>
           <p class="fn-desc">Day of month as 1&ndash;31.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">WEEKDAY(date)</span>
+          <p class="fn-desc">Day of week as a number, 1 = Sunday through 7 = Saturday.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">DAYNAME(date)</span>
+          <p class="fn-desc">Day of week as text in the form's language &mdash; <span class="inline">Friday</span>, <span class="inline">&#1497;&#1493;&#1501; &#1513;&#1497;&#1513;&#1497;</span>. Pass a language to override: <span class="inline">DAYNAME({date1}, "en")</span>.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">DATE(year, month, day)</span>
+          <p class="fn-desc">Builds a date from three numbers. Blank if the date isn't real, such as 31 February.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">ADDMONTHS(date, months)</span>
+          <p class="fn-desc">Shifts a date by whole months, clamping to the last day of the target month. Use a negative number to go back.</p>
+        </div>
+        <div class="fn-card">
+          <span class="fn-name">DATEVALUE(value)</span>
+          <p class="fn-desc">Takes the date part of a timestamp or date text, as <span class="inline">YYYY-MM-DD</span>.</p>
         </div>
       </div>
     </section>

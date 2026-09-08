@@ -12,10 +12,15 @@ public with sharing class NativeFormsThemesController {
         @AuraEnabled public String description { get; set; }
         @AuraEnabled public String logoUrl { get; set; }
         @AuraEnabled public String logoContentDocumentId { get; set; }
+        @AuraEnabled public String backgroundImageUrl { get; set; }
+        @AuraEnabled public String backgroundImageContentDocumentId { get; set; }
+        @AuraEnabled public String footerImageUrl { get; set; }
+        @AuraEnabled public String footerImageContentDocumentId { get; set; }
         @AuraEnabled public Decimal logoSizePx { get; set; }
         @AuraEnabled public String logoPosition { get; set; }
         @AuraEnabled public String formWidth { get; set; }
         @AuraEnabled public String backgroundColor { get; set; }
+        @AuraEnabled public String backgroundGradientColor { get; set; }
         @AuraEnabled public String formBackgroundColor { get; set; }
         @AuraEnabled public String formBorderColor { get; set; }
         @AuraEnabled public String titleFont { get; set; }
@@ -46,7 +51,7 @@ public with sharing class NativeFormsThemesController {
         @AuraEnabled public ThemeRecord selectedTheme { get; set; }
     }
 
-    public class UploadedLogoResult {
+    public class UploadedImageResult {
         @AuraEnabled public Id contentDocumentId { get; set; }
         @AuraEnabled public Id contentVersionId { get; set; }
         @AuraEnabled public String previewUrl { get; set; }
@@ -79,8 +84,11 @@ public with sharing class NativeFormsThemesController {
         workspace.selectedThemeId = effectiveThemeId;
         if (effectiveThemeId != null) {
             workspace.selectedTheme = toThemeRecord([
-                SELECT Id, Name, Description__c, Logo_URL__c, Logo_Content_Document_Id__c, Logo_Size_Px__c, Logo_Position__c,
-                       Form_Width__c, Background_Color__c, Form_Background_Color__c, Form_Border_Color__c,
+                SELECT Id, Name, Description__c, Logo_URL__c, Logo_Content_Document_Id__c,
+                       Background_Image_URL__c, Background_Image_Content_Document_Id__c,
+                       Footer_Image_URL__c, Footer_Image_Content_Document_Id__c,
+                       Logo_Size_Px__c, Logo_Position__c,
+                       Form_Width__c, Background_Color__c, Background_Gradient_Color__c, Form_Background_Color__c, Form_Border_Color__c,
                        Title_Font__c, Title_Font_Size_Px__c, Title_Text_Color__c,
                        Section_Title_Font__c, Section_Title_Font_Size_Px__c, Section_Title_Text_Color__c,
                        Main_Font__c, Main_Text_Size_Px__c, Main_Text_Color__c, Link_Text_Color__c, Hint_Text_Color__c, Error_Color__c,
@@ -106,8 +114,9 @@ public with sharing class NativeFormsThemesController {
             Description__c = 'Starter reusable theme',
             Logo_Size_Px__c = 120,
             Logo_Position__c = 'left',
-            Form_Width__c = 'wide',
+            Form_Width__c = '90',
             Background_Color__c = '#EEF3F8',
+            Background_Gradient_Color__c = '#DCE9F7',
             Form_Background_Color__c = '#FFFFFF',
             Form_Border_Color__c = '#D5DFEA',
             Title_Font__c = 'Roboto Slab',
@@ -142,8 +151,11 @@ public with sharing class NativeFormsThemesController {
         }
 
         NF_Theme__c sourceRow = [
-            SELECT Id, Name, Description__c, Logo_URL__c, Logo_Content_Document_Id__c, Logo_Size_Px__c, Logo_Position__c,
-                   Form_Width__c, Background_Color__c, Form_Background_Color__c, Form_Border_Color__c,
+            SELECT Id, Name, Description__c, Logo_URL__c, Logo_Content_Document_Id__c,
+                   Background_Image_URL__c, Background_Image_Content_Document_Id__c,
+                   Footer_Image_URL__c, Footer_Image_Content_Document_Id__c,
+                   Logo_Size_Px__c, Logo_Position__c,
+                   Form_Width__c, Background_Color__c, Background_Gradient_Color__c, Form_Background_Color__c, Form_Border_Color__c,
                    Title_Font__c, Title_Font_Size_Px__c, Title_Text_Color__c,
                    Section_Title_Font__c, Section_Title_Font_Size_Px__c, Section_Title_Text_Color__c,
                    Main_Font__c, Main_Text_Size_Px__c, Main_Text_Color__c, Link_Text_Color__c, Hint_Text_Color__c, Error_Color__c,
@@ -179,10 +191,15 @@ public with sharing class NativeFormsThemesController {
         row.Description__c = inputValue.description;
         row.Logo_URL__c = inputValue.logoUrl;
         row.Logo_Content_Document_Id__c = inputValue.logoContentDocumentId;
+        row.Background_Image_URL__c = inputValue.backgroundImageUrl;
+        row.Background_Image_Content_Document_Id__c = inputValue.backgroundImageContentDocumentId;
+        row.Footer_Image_URL__c = inputValue.footerImageUrl;
+        row.Footer_Image_Content_Document_Id__c = inputValue.footerImageContentDocumentId;
         row.Logo_Size_Px__c = inputValue.logoSizePx;
         row.Logo_Position__c = inputValue.logoPosition;
         row.Form_Width__c = inputValue.formWidth;
         row.Background_Color__c = inputValue.backgroundColor;
+        row.Background_Gradient_Color__c = inputValue.backgroundGradientColor;
         row.Form_Background_Color__c = inputValue.formBackgroundColor;
         row.Form_Border_Color__c = inputValue.formBorderColor;
         row.Title_Font__c = inputValue.titleFont;
@@ -224,16 +241,30 @@ public with sharing class NativeFormsThemesController {
     }
 
     @AuraEnabled
-    public static UploadedLogoResult uploadLogo(Id themeId, String fileName, String base64Data) {
+    public static UploadedImageResult uploadLogo(Id themeId, String fileName, String base64Data) {
+        return uploadThemeImage(themeId, fileName, base64Data, 'header');
+    }
+
+    @AuraEnabled
+    public static UploadedImageResult uploadBackgroundImage(Id themeId, String fileName, String base64Data) {
+        return uploadThemeImage(themeId, fileName, base64Data, 'background');
+    }
+
+    @AuraEnabled
+    public static UploadedImageResult uploadFooterImage(Id themeId, String fileName, String base64Data) {
+        return uploadThemeImage(themeId, fileName, base64Data, 'footer');
+    }
+
+    private static UploadedImageResult uploadThemeImage(Id themeId, String fileName, String base64Data, String imageRole) {
         if (themeId == null) {
-            throw new AuraHandledException('Theme id is required before uploading a logo.');
+            throw new AuraHandledException('Theme id is required before uploading a theme image.');
         }
         if (String.isBlank(fileName) || String.isBlank(base64Data)) {
             throw new AuraHandledException('Choose an image file first.');
         }
         Blob imageBlob = EncodingUtil.base64Decode(base64Data);
         if (imageBlob.size() > MAX_EMBEDDED_IMAGE_BYTES) {
-            throw new AuraHandledException('Logo image is too large. Please upload an optimized image under 69 KB.');
+            throw new AuraHandledException('Theme image is too large. Please upload an optimized image under 69 KB.');
         }
 
         ContentVersion versionRecord = new ContentVersion(
@@ -256,10 +287,18 @@ public with sharing class NativeFormsThemesController {
             WHERE Id = :themeId
             WITH USER_MODE LIMIT 1
         ];
-        row.Logo_Content_Document_Id__c = String.valueOf(versionRecord.ContentDocumentId);
-        row.Logo_URL__c = buildContentVersionUrl(versionRecord.Id);
+        if (imageRole == 'background') {
+            row.Background_Image_Content_Document_Id__c = String.valueOf(versionRecord.ContentDocumentId);
+            row.Background_Image_URL__c = buildContentVersionUrl(versionRecord.Id);
+        } else if (imageRole == 'footer') {
+            row.Footer_Image_Content_Document_Id__c = String.valueOf(versionRecord.ContentDocumentId);
+            row.Footer_Image_URL__c = buildContentVersionUrl(versionRecord.Id);
+        } else {
+            row.Logo_Content_Document_Id__c = String.valueOf(versionRecord.ContentDocumentId);
+            row.Logo_URL__c = buildContentVersionUrl(versionRecord.Id);
+        }
         update as user row;
-        UploadedLogoResult result = new UploadedLogoResult();
+        UploadedImageResult result = new UploadedImageResult();
         result.contentDocumentId = versionRecord.ContentDocumentId;
         result.contentVersionId = versionRecord.Id;
         result.previewUrl = buildContentVersionUrl(versionRecord.Id);
@@ -274,10 +313,17 @@ public with sharing class NativeFormsThemesController {
         dto.description = row.Description__c;
         dto.logoUrl = row.Logo_URL__c;
         dto.logoContentDocumentId = row.Logo_Content_Document_Id__c;
+        dto.backgroundImageUrl = row.Background_Image_URL__c;
+        dto.backgroundImageContentDocumentId = row.Background_Image_Content_Document_Id__c;
+        dto.footerImageUrl = row.Footer_Image_URL__c;
+        dto.footerImageContentDocumentId = row.Footer_Image_Content_Document_Id__c;
         dto.logoSizePx = row.Logo_Size_Px__c;
         dto.logoPosition = row.Logo_Position__c;
         dto.formWidth = row.Form_Width__c;
         dto.backgroundColor = row.Background_Color__c;
+        dto.backgroundGradientColor = String.isBlank(row.Background_Gradient_Color__c)
+            ? row.Background_Color__c
+            : row.Background_Gradient_Color__c;
         dto.formBackgroundColor = row.Form_Background_Color__c;
         dto.formBorderColor = row.Form_Border_Color__c;
         dto.titleFont = row.Title_Font__c;
@@ -346,6 +392,7 @@ public with sharing class NativeFormsThemesController {
             Logo_Position__c = 'left',
             Form_Width__c = 'wide',
             Background_Color__c = '#0061C2',
+            Background_Gradient_Color__c = '#DCE9F7',
             Form_Background_Color__c = '#FFFFFF',
             Form_Border_Color__c = '#D5DFEA',
             Title_Font__c = 'Roboto Slab',
@@ -379,6 +426,7 @@ public with sharing class NativeFormsThemesController {
             existingOceanBlue.Logo_Position__c = oceanBlueTheme.Logo_Position__c;
             existingOceanBlue.Form_Width__c = oceanBlueTheme.Form_Width__c;
             existingOceanBlue.Background_Color__c = oceanBlueTheme.Background_Color__c;
+            existingOceanBlue.Background_Gradient_Color__c = oceanBlueTheme.Background_Gradient_Color__c;
             existingOceanBlue.Form_Background_Color__c = oceanBlueTheme.Form_Background_Color__c;
             existingOceanBlue.Form_Border_Color__c = oceanBlueTheme.Form_Border_Color__c;
             existingOceanBlue.Title_Font__c = oceanBlueTheme.Title_Font__c;
@@ -412,6 +460,7 @@ public with sharing class NativeFormsThemesController {
                 Logo_Position__c = 'center',
                 Form_Width__c = 'wide',
                 Background_Color__c = '#FFF4E8',
+                Background_Gradient_Color__c = '#F8FBFF',
                 Form_Background_Color__c = '#FFFFFF',
                 Form_Border_Color__c = '#F3C47E',
                 Title_Font__c = 'Roboto Slab',
@@ -445,6 +494,7 @@ public with sharing class NativeFormsThemesController {
                 Logo_Position__c = 'left',
                 Form_Width__c = 'standard',
                 Background_Color__c = '#F5F7FA',
+                Background_Gradient_Color__c = '#F5F7FA',
                 Form_Background_Color__c = '#FFFFFF',
                 Form_Border_Color__c = '#C9D3DF',
                 Title_Font__c = 'Georgia',

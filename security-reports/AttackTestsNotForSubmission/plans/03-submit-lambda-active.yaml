@@ -1,0 +1,56 @@
+---
+# ACTIVE ATTACK SCAN - NOT FOR ISV SUBMISSION
+# Submit Lambda WRITES to Salesforce. To avoid creating attack-payload records
+# in the live tenant org, this plan seeds ONLY rejection cases (invalid/missing
+# token, wrong form id). The active scanner fuzzes the pre-auth parsing/auth
+# attack surface. It does NOT exercise the authenticated write path.
+# Full write-path injection testing should be run against a scratch/test org.
+env:
+  contexts:
+    - name: TwinaForms Submit Lambda
+      urls:
+        - https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    continueOnFailure: true
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Seed submit with invalid publish token (rejection case)
+        url: https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+        data: "{\"formId\":\"nf-00Dg5000008sWZN-a04g5000001BARhAAO\",\"publishToken\":\"invalid-zap-token\",\"input\":{\"email\":\"liam.carter@example.com\"}}"
+      - name: Seed submit with wrong form id (rejection case)
+        url: https://hfkuwm6emqiaz2drmuip6zqn5m0agbyp.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+        data: "{\"formId\":\"nf-00Dg5000008sWZN-wrong\",\"publishToken\":\"2bd0d0c2161c3c2697ad1822c913f356\",\"input\":{\"email\":\"liam.carter@example.com\"}}"
+
+  - type: activeScan
+    parameters:
+      context: TwinaForms Submit Lambda
+      maxScanDurationInMins: 8
+      maxRuleDurationInMins: 2
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\AttackTestsNotForSubmission\reports
+      reportFile: 03-submit-lambda-active.html
+      reportTitle: TwinaForms Submit Lambda ACTIVE Attack Scan (NOT FOR SUBMISSION)
+      reportDescription: Active OWASP ZAP attack scan of the public submit Lambda using rejection-case seeds only (no valid token). Tests the pre-auth parsing/auth attack surface without creating Salesforce records. Internal hardening evidence only, not part of the ISV submission packet.

@@ -115,7 +115,7 @@ private class NativeFormsThemeAndLogsTest {
             NativeFormsThemesController.createTheme();
         System.assertNotEquals(null, createdTheme.id);
         System.assertEquals('New Theme', createdTheme.name);
-        System.assertEquals('wide', createdTheme.formWidth);
+        System.assertEquals('90', createdTheme.formWidth);
 
         NativeFormsThemesController.ThemeWorkspace populatedWorkspace =
             NativeFormsThemesController.getWorkspace(null);
@@ -133,10 +133,15 @@ private class NativeFormsThemeAndLogsTest {
         updateInput.description = 'Updated test theme';
         updateInput.logoUrl = 'https://example.com/logo.png';
         updateInput.logoContentDocumentId = '069000000000001';
+        updateInput.backgroundImageUrl = 'https://example.com/background.png';
+        updateInput.backgroundImageContentDocumentId = '069000000000002';
+        updateInput.footerImageUrl = 'https://example.com/footer.png';
+        updateInput.footerImageContentDocumentId = '069000000000003';
         updateInput.logoSizePx = 140;
         updateInput.logoPosition = 'center';
-        updateInput.formWidth = 'narrow';
+        updateInput.formWidth = '70';
         updateInput.backgroundColor = '#FFFFFF';
+        updateInput.backgroundGradientColor = '#FFFFFF';
         updateInput.formBackgroundColor = '#FAFAFA';
         updateInput.formBorderColor = '#CCCCCC';
         updateInput.titleFont = 'Georgia';
@@ -164,7 +169,10 @@ private class NativeFormsThemeAndLogsTest {
             NativeFormsThemesController.saveTheme(JSON.serialize(updateInput));
         System.assertEquals('Customer Theme', savedTheme.name);
         System.assertEquals('https://example.com/logo.png', savedTheme.logoUrl);
-        System.assertEquals('narrow', savedTheme.formWidth);
+        System.assertEquals('https://example.com/background.png', savedTheme.backgroundImageUrl);
+        System.assertEquals('https://example.com/footer.png', savedTheme.footerImageUrl);
+        System.assertEquals('70', savedTheme.formWidth);
+        System.assertEquals('#FFFFFF', savedTheme.backgroundGradientColor);
 
         NativeFormsThemesController.ensureSampleThemes();
         Set<String> expectedNames = new Set<String>{ 'Ocean Blue', 'ColorFull', 'Official' };
@@ -216,7 +224,7 @@ private class NativeFormsThemeAndLogsTest {
             assertAuraHandled(e, null);
         }
 
-        NativeFormsThemesController.UploadedLogoResult uploadResult =
+        NativeFormsThemesController.UploadedImageResult uploadResult =
             NativeFormsThemesController.uploadLogo(
                 themeRecord.Id,
                 'company-logo.png',
@@ -235,6 +243,22 @@ private class NativeFormsThemeAndLogsTest {
         ];
         System.assertEquals(uploadResult.previewUrl, persistedTheme.Logo_URL__c);
         System.assertEquals(String.valueOf(uploadResult.contentDocumentId), persistedTheme.Logo_Content_Document_Id__c);
+
+        NativeFormsThemesController.UploadedImageResult backgroundUploadResult =
+            NativeFormsThemesController.uploadBackgroundImage(
+                themeRecord.Id,
+                'theme-background.png',
+                base64Value('background')
+            );
+        System.assertEquals(backgroundUploadResult.previewUrl, backgroundUploadResult.theme.backgroundImageUrl);
+
+        NativeFormsThemesController.UploadedImageResult footerUploadResult =
+            NativeFormsThemesController.uploadFooterImage(
+                themeRecord.Id,
+                'theme-footer.png',
+                base64Value('footer')
+            );
+        System.assertEquals(footerUploadResult.previewUrl, footerUploadResult.theme.footerImageUrl);
         }
     }
 

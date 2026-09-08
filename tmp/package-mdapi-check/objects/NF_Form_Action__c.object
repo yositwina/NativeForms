@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Server-side executable form actions for a TwinaForms form version.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableLicensing>false</enableLicensing>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>NF Form Action</label>
+    <nameField>
+        <displayFormat>ACT-{0000}</displayFormat>
+        <label>Action Name</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>NF Form Actions</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>Action_Scope__c</fullName>
+        <description>Whether the action belongs to prefill or submit.</description>
+        <inlineHelpText>Prefill or Submit.</inlineHelpText>
+        <label>Action Scope</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>Prefill</fullName>
+                    <default>true</default>
+                    <label>Prefill</label>
+                </value>
+                <value>
+                    <fullName>Submit</fullName>
+                    <default>false</default>
+                    <label>Submit</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Command_Key__c</fullName>
+        <description>Stable command key used in logs and runtime results.</description>
+        <inlineHelpText>Command key.</inlineHelpText>
+        <label>Command Key</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Command_Type__c</fullName>
+        <description>Command type used by the AWS execution runtime.</description>
+        <inlineHelpText>Execution command type.</inlineHelpText>
+        <label>Command Type</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>findOne</fullName>
+                    <default>true</default>
+                    <label>findOne</label>
+                </value>
+                <value>
+                    <fullName>getById</fullName>
+                    <default>false</default>
+                    <label>getById</label>
+                </value>
+                <value>
+                    <fullName>findMany</fullName>
+                    <default>false</default>
+                    <label>findMany</label>
+                </value>
+                <value>
+                    <fullName>create</fullName>
+                    <default>false</default>
+                    <label>create</label>
+                </value>
+                <value>
+                    <fullName>update</fullName>
+                    <default>false</default>
+                    <label>update</label>
+                </value>
+                <value>
+                    <fullName>updateById</fullName>
+                    <default>false</default>
+                    <label>updateById</label>
+                </value>
+                <value>
+                    <fullName>findAndUpdate</fullName>
+                    <default>false</default>
+                    <label>findAndUpdate</label>
+                </value>
+                <value>
+                    <fullName>delete</fullName>
+                    <default>false</default>
+                    <label>delete</label>
+                </value>
+                <value>
+                    <fullName>upsertMany</fullName>
+                    <default>false</default>
+                    <label>upsertMany</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Config_JSON__c</fullName>
+        <description>Command-specific configuration JSON.</description>
+        <inlineHelpText>Stores flexible command configuration such as where clauses, fields, limit, orderBy, runIf, rows, relationship settings, and delete ids.</inlineHelpText>
+        <label>Config JSON</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>10</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Form_Version__c</fullName>
+        <description>Parent form version for this action.</description>
+        <inlineHelpText>Form version that owns this action.</inlineHelpText>
+        <label>Form Version</label>
+        <referenceTo>NF_Form_Version__c</referenceTo>
+        <relationshipLabel>Form Actions</relationshipLabel>
+        <relationshipName>FormActions</relationshipName>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+        <trackHistory>false</trackHistory>
+        <type>MasterDetail</type>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+    </fields>
+    <fields>
+        <fullName>Object_Api_Name__c</fullName>
+        <description>Target Salesforce object for the command.</description>
+        <inlineHelpText>Object API name.</inlineHelpText>
+        <label>Object API Name</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Order__c</fullName>
+        <description>Execution order within the action scope.</description>
+        <inlineHelpText>Execution order.</inlineHelpText>
+        <label>Order</label>
+        <precision>8</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <trackHistory>false</trackHistory>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>Store_Result_As__c</fullName>
+        <description>Optional runtime alias used to store the command result.</description>
+        <inlineHelpText>Optional runtime alias.</inlineHelpText>
+        <label>Store Result As</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <listViews>
+        <fullName>Debug_All_Records</fullName>
+        <columns>NAME</columns>
+        <columns>Form_Version__c</columns>
+        <columns>Action_Scope__c</columns>
+        <columns>Command_Key__c</columns>
+        <columns>Command_Type__c</columns>
+        <columns>Object_Api_Name__c</columns>
+        <columns>Store_Result_As__c</columns>
+        <columns>Order__c</columns>
+        <filterScope>Everything</filterScope>
+        <label>Debug - All Records</label>
+    </listViews>
+</CustomObject>

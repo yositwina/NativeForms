@@ -1,0 +1,76 @@
+
+
+===== PAGE 1 =====
+ISV Partner Program Business Development Plan 
+Your Salesforce Application 
+a) Official legal entity of your company:
+b) Website:
+c) Select the Partner Type that best describes your business:
+d) If you have previously listed on the AppExchange, please provide a link to your listings
+here:
+e) Official name of your Application:
+f) Describe the product you're building for our ecosystem and what business problems your
+AppExchange product solves:
+g) Select the Applications Primary Salesforce Cloud dependency:
+(Optional) Select the Applications Secondary Salesforce Cloud dependency if required i.e. 
+Agentforce: 
+h) Application Type:
+i) Customer Contract Length:
+A Native App is built entirely on the Force.com platform. A Composite App has components on the
+Force.com platform and components on external services. A Client App uses the Force.com API, but has
+no components on the Force.com platform.
+
+===== PAGE 2 =====
+Technical Overview  
+a) Describe the end-to-end user journey or highlight 1-2 use-cases for your application:
+b) Describe whether your product predominately uses custom o r standard objects in your App:
+c) Specify any API connections used in your App and how it is architected to stay secure:
+● Partners must adhere to the guidelines around CA/ECA comp liance.
+d) What are the key milestones on your product roadmap for the next 12 to 24 months?
+e) Do you have an in-house deve lopment team, or are you partnering with a certified Product
+Development Outsourcer (PDO) to build your solution?
+● If in-house, what is your team's experience level with Salesforce-specific devel opment
+frameworks (e.g., Apex, Lightning Web Components, Flow)?
+f) How is Agentforce embedded into your Application?
+● Explain the Use-Case fo r this Agent.
+● Describe the Action or Prompt.
+
+===== PAGE 3 =====
+Partnership Goals & Strategy 
+a) What do you aim to achieve with this partnership in the next 12 months?
+b) Primary industry focus (e.g. Manufacturing, Retail, Financial Services):
+c) Target company size (e.g. SMB, Mid-Market, Enterprise):
+d) Primary geographic focus for the first 12 months:
+e) Primary user personas (specific job titles):
+f) Please list your top 3 competitors and describe your product’s differentiation:
+Licensing, Pricing & Cost Structure 
+a) What is your standard pricing for this Application? Please state as Per User or Per Org.
+b) What is your expected average deal size and number of licenses per cus tomer? (e.g. $3K per
+customer, 10 licenses)
+c) Does your customer pay for any fee of any kind for product or service (one-off or re curring)
+to use this application at any given time?
+d) Please provide an example of how Salesforce's revenue share will be applied to the selling
+price of your application. Please note: Commercial distribution of an application is subject to any applicable 
+floor pricing requirements, as determined by the Partner Development Team.
+
+===== PAGE 4 =====
+Go-To-Market (GTM) Readiness 
+a) Who in your company will be responsible for selling the combined solution (your app +
+Salesforce)? (List names & roles, specify team size.)
+b) Current pipeline status for your Salesforce-integrated application
+(Please list company name, deal size, close dates, average deal cycle):
+● Beta customers (for initial POC)
+● Early-stage opportunities (before quote shared with customers):
+● Late-stage opportunities (after quote shared with customers):
+● Existing customers using the Salesforce app:
+c) Expected or target sales numbers in Year 1 of distributing the Application?
+(e.g. Year 1 = $50,000, Deal Size = $5,000, Expected Number of Deals = 10)
+d) What is the market size and demand for your product? (Please validate with external
+resources.)
+e) Please share a high-level marketing and sales GTM plan for this solution:
+Timeline & Milestones 
+a) Target date for signing the Salesforce Partner Application Distribution Agreement:
+b) Can you complete development and submit for Security Review within 6 months of signing?
+c) Can you submit a first deal within 6 months after passing Security Review?
+d) What is your expected launch date for your first paid Salesforce-integrated customer?
+e) Is there a Launch or Sponsorship event driving your timeline?

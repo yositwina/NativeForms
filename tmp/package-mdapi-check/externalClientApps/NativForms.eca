@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExternalClientApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <contactEmail>yosi@harmony-it.co.il</contactEmail>
+    <description>TwinaForms packaged external client app for subscriber-org Salesforce authorization.</description>
+    <distributionState>Packaged</distributionState>
+    <isProtected>false</isProtected>
+    <label>TwinaForms</label>
+    <orgScopedExternalApp>00DgL00000Q8RC9:NativForms</orgScopedExternalApp>
+</ExternalClientApplication>

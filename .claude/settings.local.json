@@ -3,7 +3,12 @@
     "allow": [
       "Bash(ls -1 \"C:/Users/Yosi/NativeFormsAWS/force-app/main/default/classes\"/*.cls)",
       "Bash(grep -E \"\\\\.md$|\\\\.pdf$\")",
-      "Read(//c/Users/Yosi/.claude/projects/c--Users-Yosi-NativeFormsAWS/memory/**)"
+      "Read(//c/Users/Yosi/.claude/projects/c--Users-Yosi-NativeFormsAWS/memory/**)",
+      "WebSearch",
+      "Bash(node --check AWS/NativeForms-SubmitForm.mjs)",
+      "Bash(aws configure *)",
+      "PowerShell(.\\\\AWS\\\\deploy-nativeforms-submit.ps1)",
+      "Bash(node --check AWS/admin-console/app.js)"
     ]
   }
 }

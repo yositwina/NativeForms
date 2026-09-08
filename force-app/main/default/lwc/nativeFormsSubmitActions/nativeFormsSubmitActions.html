@@ -115,7 +115,17 @@
                                     <div class="field-help-stack">
                                         <div class="field-help-label">
                                             <span>Submit Mode</span>
-                                            <lightning-helptext content={submitModeHelpText}></lightning-helptext>
+                                            <span class="custom-help" tabindex="0" aria-label={submitModeHelpText}>
+                                                i
+                                                <span class="custom-help__bubble" role="tooltip">
+                                                    <strong>Create new record:</strong>
+                                                    <span>Creates a new Salesforce record. It does not update existing data.</span>
+                                                    <strong>Find and update existing record:</strong>
+                                                    <span>Finds one record using the match conditions below, then updates it. If no record is found, choose whether to show an error or create a new record.</span>
+                                                    <strong>Save records list:</strong>
+                                                    <span>Use only with a Records List element. Saves each row from that Records List. Set the Parent Id here so new child rows are linked to the parent record.</span>
+                                                </span>
+                                            </span>
                                         </div>
                                         <lightning-combobox
                                             name="commandType"
@@ -305,7 +315,7 @@
                                 <template if:true={showRepeatGroupConfig}>
                                     <div class="condition-builder">
                                         <div class="condition-builder__header">
-                                            <span class="condition-builder__title">Records List Settings</span>
+                                            <span class="condition-builder__title">Records List Parent Id Definition</span>
                                         </div>
                                         <div class="field-help-stack">
                                             <div class="field-help-label">

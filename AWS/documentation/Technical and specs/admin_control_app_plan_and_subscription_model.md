@@ -99,7 +99,7 @@ Suggested values:
     "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
-    "enableProUserVerification": false,
+    "enableProSfSecretCodeAuth": false,
     "enableProLoadFile": false
   },
 
@@ -182,7 +182,7 @@ This is where Pro feature defaults live.
     "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
-    "enableProUserVerification": false,
+    "enableProSfSecretCodeAuth": false,
     "enableProLoadFile": false
   }
 }
@@ -212,7 +212,7 @@ This is where Pro feature defaults live.
     "enableProPageLayoutClone": true,
     "enableProFormulaFields": true,
     "enableProPostSubmitAutoLink": true,
-    "enableProUserVerification": true,
+    "enableProSfSecretCodeAuth": true,
     "enableProLoadFile": true
   }
 }
@@ -242,7 +242,7 @@ This is where Pro feature defaults live.
     "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
-    "enableProUserVerification": false,
+    "enableProSfSecretCodeAuth": false,
     "enableProLoadFile": false
   }
 }
@@ -272,7 +272,7 @@ This is where Pro feature defaults live.
     "enableProPageLayoutClone": true,
     "enableProFormulaFields": true,
     "enableProPostSubmitAutoLink": true,
-    "enableProUserVerification": true,
+    "enableProSfSecretCodeAuth": true,
     "enableProLoadFile": true
   }
 }
@@ -346,7 +346,7 @@ Example:
   "enableProPageLayoutClone": false,
   "enableProFormulaFields": false,
   "enableProPostSubmitAutoLink": false,
-  "enableProUserVerification": false,
+  "enableProSfSecretCodeAuth": false,
   "enableProLoadFile": false
 }
 ```
@@ -422,7 +422,7 @@ Example:
     "enableProPageLayoutClone": false,
     "enableProFormulaFields": false,
     "enableProPostSubmitAutoLink": false,
-    "enableProUserVerification": false,
+    "enableProSfSecretCodeAuth": false,
     "enableProLoadFile": false
   },
 
@@ -465,7 +465,7 @@ Based on the current NativeForms Admin Features page, these flags belong in the 
 - `enableProPageLayoutClone`
 - `enableProFormulaFields`
 - `enableProPostSubmitAutoLink`
-- `enableProUserVerification`
+- `enableProSfSecretCodeAuth`
 - `enableProLoadFile` internally, shown to admins/customers as `File Uploads`
 
 These should be treated as:

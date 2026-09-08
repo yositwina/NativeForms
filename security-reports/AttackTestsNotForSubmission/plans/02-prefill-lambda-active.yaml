@@ -1,0 +1,48 @@
+---
+# ACTIVE ATTACK SCAN - NOT FOR ISV SUBMISSION
+# Prefill Lambda is READ-ONLY (queries Salesforce for prefill values).
+# Seeded with a VALID publish token so the active scanner fuzzes the real
+# prefill/query path - this is the primary SOQL-injection test surface.
+# No records are written by the prefill path.
+env:
+  contexts:
+    - name: TwinaForms Prefill Lambda
+      urls:
+        - https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://a2guxusajjhwzakf3tg6ispb640pgsno\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    continueOnFailure: true
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Seed prefill with valid publish token and sample lookup
+        url: https://a2guxusajjhwzakf3tg6ispb640pgsno.lambda-url.eu-north-1.on.aws/
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+        data: "{\"publishToken\":\"2bd0d0c2161c3c2697ad1822c913f356\",\"request\":{\"formId\":\"nf-00Dg5000008sWZN-a04g5000001BARhAAO\",\"params\":{\"email\":\"liam.carter@example.com\"}}}"
+
+  - type: activeScan
+    parameters:
+      context: TwinaForms Prefill Lambda
+      maxScanDurationInMins: 10
+      maxRuleDurationInMins: 2
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\AttackTestsNotForSubmission\reports
+      reportFile: 02-prefill-lambda-active.html
+      reportTitle: TwinaForms Prefill Lambda ACTIVE Attack Scan (NOT FOR SUBMISSION)
+      reportDescription: Active OWASP ZAP attack scan of the public prefill Lambda using a valid publish token. Fuzzes the read/query path for injection. Internal hardening evidence only, not part of the ISV submission packet.

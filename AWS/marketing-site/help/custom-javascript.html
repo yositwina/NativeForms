@@ -47,6 +47,7 @@
         <a href="#pattern">Basic pattern</a>
         <a href="#multiple">Multiple functions</a>
         <a href="#examples">Examples</a>
+        <a href="#example-special-font">Special font</a>
         <a href="#example-gmt-sf">GMT with Salesforce</a>
         <a href="#practices">Good practices</a>
       </nav>
@@ -232,6 +233,35 @@
 
   syncSection();
 })(TwinaForms);</pre>
+          </div>
+
+          <div class="example-block" id="example-special-font">
+            <p class="example-title">Load a special font</p>
+            <p class="example-subtitle">Use this when a customer needs a font that is not available in the Theme font picklist. Keep a safe fallback font such as <span class="inline">Arial</span> or <span class="inline">Tahoma</span> in the theme, then use JavaScript to override the selected Theme font on the published form.</p>
+            <pre class="code-block">(function () {
+  const fontName = "Heebo";
+
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&amp;display=swap";
+  document.head.appendChild(link);
+
+  document.documentElement.style.setProperty(
+    "--nf-font",
+    "'" + fontName + "', Arial, sans-serif"
+  );
+
+  document.documentElement.style.setProperty(
+    "--nf-title-font",
+    "'" + fontName + "', Arial, sans-serif"
+  );
+
+  document.documentElement.style.setProperty(
+    "--nf-section-font",
+    "'" + fontName + "', Arial, sans-serif"
+  );
+})();</pre>
+            <p class="example-subtitle">In this example, <span class="inline">Heebo</span> replaces the Theme font for normal text, titles, and section headings on the published form. To use another font, replace both <span class="inline">fontName</span> and the Google Fonts URL. The Designer preview can still show the fallback font, and the visitor's browser must be allowed to load the font URL.</p>
           </div>
 
           <div class="example-block" id="example-gmt-sf">

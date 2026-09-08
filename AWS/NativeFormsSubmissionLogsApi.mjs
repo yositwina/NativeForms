@@ -26,6 +26,7 @@ function jsonResponse(statusCode, payload) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization,X-TwinaForms-Org-Id,X-TwinaForms-Bootstrap-V2-Timestamp,X-TwinaForms-Bootstrap-V2-Nonce,X-TwinaForms-Bootstrap-V2-Body-Sha256,X-TwinaForms-Bootstrap-V2-Signature,X-TwinaForms-Bootstrap-V2-Algorithm"

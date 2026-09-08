@@ -200,16 +200,20 @@ public with sharing class NativeFormsSubmitActionsController {
               AND Action_Scope__c = 'Submit'
             WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
         ]) {
-            workspace.actions.add(toRecord(actionRecord, actionNumber));
+            SubmitActionRecord dto = toRecord(actionRecord, actionNumber);
+            workspace.actions.add(dto);
             actionNumber += 1;
         }
 
-        for (NF_Form_Element__c elementRecord : [
-            SELECT Id, Label__c, Field_Key__c, Element_Type__c, Config_JSON__c
+        List<NF_Form_Element__c> elementRecords = [
+            SELECT Id, Label__c, Field_Key__c, Element_Id__c, Parent_Element_Id__c, Element_Type__c, Config_JSON__c
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :effectiveVersionId
             WITH USER_MODE ORDER BY Order__c ASC, CreatedDate ASC
-        ]) {
+        ];
+        Map<String, NF_Form_Element__c> recordsByElementId = elementsByElementId(elementRecords);
+        Set<String> explicitMappingKeys = new Set<String>();
+        for (NF_Form_Element__c elementRecord : elementRecords) {
             if (elementRecord.Element_Type__c == 'repeatGroup' && String.isNotBlank(elementRecord.Field_Key__c)) {
                 SelectOption groupOption = new SelectOption();
                 groupOption.label = String.isBlank(elementRecord.Label__c)
@@ -242,6 +246,42 @@ public with sharing class NativeFormsSubmitActionsController {
             mapping.actionKey = actionKey;
             mapping.fieldPath = fieldPath;
             workspace.mappings.add(mapping);
+            explicitMappingKeys.add(actionKey + ':' + elementRecord.Field_Key__c);
+        }
+
+        for (SubmitActionRecord action : workspace.actions) {
+            if (action == null || action.commandType != 'upsertMany' || String.isBlank(action.actionKey)) {
+                continue;
+            }
+            String repeatGroupKey = stringValue(parseJsonMap(action.configJson).get('repeatGroupKey'));
+            if (String.isBlank(repeatGroupKey)) {
+                continue;
+            }
+            for (NF_Form_Element__c elementRecord : elementRecords) {
+                if (elementRecord == null || String.isBlank(elementRecord.Field_Key__c) || String.isBlank(elementRecord.Config_JSON__c)) {
+                    continue;
+                }
+                if (explicitMappingKeys.contains(action.actionKey + ':' + elementRecord.Field_Key__c)) {
+                    continue;
+                }
+                NF_Form_Element__c repeatGroupParent = repeatGroupParentForElement(elementRecord, recordsByElementId);
+                if (repeatGroupParent == null || repeatGroupParent.Field_Key__c != repeatGroupKey) {
+                    continue;
+                }
+                Map<String, Object> config = parseJsonMap(elementRecord.Config_JSON__c);
+                if (stringValue(config.get('prefillFieldPath')) != 'Id') {
+                    continue;
+                }
+                MappingRecord mapping = new MappingRecord();
+                mapping.elementId = elementRecord.Id;
+                mapping.elementLabel = elementRecord.Label__c;
+                mapping.fieldKey = elementRecord.Field_Key__c;
+                mapping.actionKey = action.actionKey;
+                mapping.fieldPath = 'Id';
+                workspace.mappings.add(mapping);
+                explicitMappingKeys.add(action.actionKey + ':' + elementRecord.Field_Key__c);
+                break;
+            }
         }
 
         return workspace;
@@ -418,6 +458,39 @@ public with sharing class NativeFormsSubmitActionsController {
 
         sortOptionsByLabel(options);
         return options;
+    }
+
+    private static Map<String, NF_Form_Element__c> elementsByElementId(List<NF_Form_Element__c> elements) {
+        Map<String, NF_Form_Element__c> recordsByElementId = new Map<String, NF_Form_Element__c>();
+        if (elements == null) {
+            return recordsByElementId;
+        }
+        for (NF_Form_Element__c elementRecord : elements) {
+            if (elementRecord != null && String.isNotBlank(elementRecord.Element_Id__c)) {
+                recordsByElementId.put(elementRecord.Element_Id__c, elementRecord);
+            }
+        }
+        return recordsByElementId;
+    }
+
+    private static NF_Form_Element__c repeatGroupParentForElement(
+        NF_Form_Element__c elementRecord,
+        Map<String, NF_Form_Element__c> recordsByElementId
+    ) {
+        if (elementRecord == null || String.isBlank(elementRecord.Parent_Element_Id__c) || recordsByElementId == null) {
+            return null;
+        }
+        NF_Form_Element__c parentRecord = recordsByElementId.get(elementRecord.Parent_Element_Id__c);
+        while (parentRecord != null) {
+            if (parentRecord.Element_Type__c == 'repeatGroup') {
+                return parentRecord;
+            }
+            if (String.isBlank(parentRecord.Parent_Element_Id__c)) {
+                return null;
+            }
+            parentRecord = recordsByElementId.get(parentRecord.Parent_Element_Id__c);
+        }
+        return null;
     }
 
     private static List<SelectOption> getReadableFieldOptions(String objectApiName) {

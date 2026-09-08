@@ -1,0 +1,37 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ConnectedOrgGroupTableAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:eu-north-1:355617663345:table/NativeFormsConnectedOrgGroups",
+        "arn:aws:dynamodb:eu-north-1:355617663345:table/NativeFormsConnectedOrgGroups/index/GSI1"
+      ]
+    },
+    {
+      "Sid": "PortableSnapshotsTableAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:eu-north-1:355617663345:table/NativeFormsPortableSnapshots"
+    },
+    {
+      "Sid": "PortableSnapshotObjectAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::nativeforms-portable-snapshots-355617663345-eu-north-1/portable-snapshots/*"
+    }
+  ]
+}

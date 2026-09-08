@@ -6,6 +6,8 @@ import cloneTheme from '@salesforce/apex/NativeFormsThemesController.cloneTheme'
 import saveTheme from '@salesforce/apex/NativeFormsThemesController.saveTheme';
 import deleteTheme from '@salesforce/apex/NativeFormsThemesController.deleteTheme';
 import uploadLogo from '@salesforce/apex/NativeFormsThemesController.uploadLogo';
+import uploadBackgroundImage from '@salesforce/apex/NativeFormsThemesController.uploadBackgroundImage';
+import uploadFooterImage from '@salesforce/apex/NativeFormsThemesController.uploadFooterImage';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 const MAX_EMBEDDED_IMAGE_BYTES = 69 * 1024;
@@ -22,23 +24,28 @@ export default class NativeFormsThemes extends LightningElement {
     @track draft = null;
 
     fontOptions = [
-        { label: 'Roboto Slab', value: 'Roboto Slab' },
-        { label: 'Inter', value: 'Inter' },
+        { label: 'Arial', value: 'Arial' },
+        { label: 'Tahoma', value: 'Tahoma' },
         { label: 'Georgia', value: 'Georgia' },
-        { label: 'Custom', value: 'Custom' }
+        { label: 'Times New Roman', value: 'Times New Roman' },
+        { label: 'Inter', value: 'Inter' },
+        { label: 'Roboto', value: 'Roboto' },
+        { label: 'Roboto Slab', value: 'Roboto Slab' },
+        { label: 'Open Sans', value: 'Open Sans' },
+        { label: 'Lato', value: 'Lato' },
+        { label: 'Montserrat', value: 'Montserrat' },
+        { label: 'Assistant', value: 'Assistant' },
+        { label: 'Heebo', value: 'Heebo' },
+        { label: 'Rubik', value: 'Rubik' },
+        { label: 'Noto Sans Hebrew', value: 'Noto Sans Hebrew' },
+        { label: 'Alef', value: 'Alef' },
+        { label: 'Frank Ruhl Libre', value: 'Frank Ruhl Libre' }
     ];
 
     logoPositionOptions = [
         { label: 'Left', value: 'left' },
         { label: 'Center', value: 'center' },
         { label: 'Right', value: 'right' }
-    ];
-
-    formWidthOptions = [
-        { label: 'Narrow', value: 'narrow' },
-        { label: 'Standard', value: 'standard' },
-        { label: 'Wide', value: 'wide' },
-        { label: 'Full Width', value: 'full' }
     ];
 
     async connectedCallback() {
@@ -58,11 +65,25 @@ export default class NativeFormsThemes extends LightningElement {
     }
 
     get previewOuterClass() {
-        return `preview-page preview-page--${this.draft?.formWidth || 'wide'}`;
+        return 'preview-page';
+    }
+
+    get formWidthPercent() {
+        const legacyWidths = { narrow: 70, standard: 80, wide: 90, full: 100 };
+        const rawValue = this.draft?.formWidth;
+        const parsed = Number(rawValue);
+        if (Number.isFinite(parsed)) {
+            return Math.min(100, Math.max(50, parsed));
+        }
+        return legacyWidths[String(rawValue || '').toLowerCase()] || 90;
     }
 
     get backgroundColorFieldClass() {
         return this.fieldWrapperClass('backgroundColor');
+    }
+
+    get backgroundGradientColorFieldClass() {
+        return this.fieldWrapperClass('backgroundGradientColor');
     }
 
     get formBackgroundColorFieldClass() {
@@ -94,13 +115,19 @@ export default class NativeFormsThemes extends LightningElement {
     }
 
     get previewOuterStyle() {
-        return `background:${this.safeColor(this.draft?.backgroundColor, '#EEF3F8')};`;
+        const startColor = this.safeColor(this.draft?.backgroundColor, '#EEF3F8');
+        const endColor = this.safeColor(this.draft?.backgroundGradientColor, startColor);
+        if (this.draft?.backgroundImageUrl) {
+            return `background:linear-gradient(180deg, rgba(255,255,255,.52), rgba(255,255,255,.52)), url("${this.escapeStyleUrl(this.draft.backgroundImageUrl)}") center/cover no-repeat, linear-gradient(180deg, ${startColor} 0%, ${endColor} 100%);`;
+        }
+        return `background:linear-gradient(180deg, ${startColor} 0%, ${endColor} 100%);`;
     }
 
     get previewFormStyle() {
         return [
             `background:${this.safeColor(this.draft?.formBackgroundColor, '#FFFFFF')}`,
             `border-color:${this.safeColor(this.draft?.formBorderColor, '#D5DFEA')}`,
+            `max-width:${this.formWidthPercent}%`,
             `font-family:${this.safeFont(this.draft?.mainFont)}`,
             `color:${this.safeColor(this.draft?.mainTextColor, '#17324D')}`
         ].join(';');
@@ -171,8 +198,16 @@ export default class NativeFormsThemes extends LightningElement {
         ].join(';');
     }
 
+    get hasFooterImage() {
+        return Boolean(this.draft?.footerImageUrl);
+    }
+
     get backgroundColorStyle() {
         return `background:${this.safeColor(this.draft?.backgroundColor, '#EEF3F8')};`;
+    }
+
+    get backgroundGradientColorStyle() {
+        return `background:${this.safeColor(this.draft?.backgroundGradientColor, this.safeColor(this.draft?.backgroundColor, '#EEF3F8'))};`;
     }
 
     get formBackgroundColorStyle() {
@@ -311,25 +346,37 @@ export default class NativeFormsThemes extends LightningElement {
     }
 
     async handleLogoFileChange(event) {
+        await this.uploadThemeImageFile(event, uploadLogo, 'Header image', 'Header image uploaded.');
+    }
+
+    async handleBackgroundImageFileChange(event) {
+        await this.uploadThemeImageFile(event, uploadBackgroundImage, 'Background image', 'Background image uploaded.');
+    }
+
+    async handleFooterImageFileChange(event) {
+        await this.uploadThemeImageFile(event, uploadFooterImage, 'Footer image', 'Footer image uploaded.');
+    }
+
+    async uploadThemeImageFile(event, uploadMethod, label, successMessage) {
         const file = event.target.files?.[0];
         if (!file || !this.selectedThemeId) {
             return;
         }
-        if (!this.validateEmbeddedImageFile(file, 'Logo image')) {
+        if (!this.validateEmbeddedImageFile(file, label)) {
             event.target.value = null;
             return;
         }
         this.isLoading = true;
         try {
             const base64Data = await this.readFileAsBase64(file);
-            const result = await uploadLogo({
+            const result = await uploadMethod({
                 themeId: this.selectedThemeId,
                 fileName: file.name,
                 base64Data
             });
             this.draft = { ...result.theme };
             await this.loadWorkspace(this.selectedThemeId);
-            this.showToast('Logo uploaded', 'Theme logo updated.', 'success');
+            this.showToast(label + ' uploaded', successMessage, 'success');
         } catch (error) {
             this.errorMessage = this.normalizeError(error);
         } finally {
@@ -358,7 +405,7 @@ export default class NativeFormsThemes extends LightningElement {
                 const commaIndex = result.indexOf(',');
                 resolve(commaIndex >= 0 ? result.substring(commaIndex + 1) : result);
             };
-            reader.onerror = () => reject(new Error('Could not read the selected logo file.'));
+            reader.onerror = () => reject(new Error('Could not read the selected image file.'));
             reader.readAsDataURL(file);
         });
     }
@@ -391,5 +438,9 @@ export default class NativeFormsThemes extends LightningElement {
 
     fieldWrapperClass(fieldName) {
         return `field-focus-wrap${this.highlightedField === fieldName ? ' field-focus-wrap--active' : ''}`;
+    }
+
+    escapeStyleUrl(value) {
+        return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     }
 }

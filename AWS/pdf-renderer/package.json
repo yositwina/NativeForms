@@ -1,0 +1,12 @@
+{
+  "name": "nativeforms-pdf-renderer",
+  "version": "0.1.0",
+  "description": "HTML->Chromium submission PDF renderer Lambda (parallel to PDFKit)",
+  "type": "module",
+  "main": "index.mjs",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.772.0",
+    "@sparticuz/chromium": "^131.0.0",
+    "puppeteer-core": "^23.0.0"
+  }
+}

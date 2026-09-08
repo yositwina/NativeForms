@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <fullName>NativeForms_Secret_Code__c</fullName>
+        <description>Stores the latest NativeForms verification number for support and admin visibility.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Latest NativeForms 6-digit verification number sent to this Contact.</inlineHelpText>
+        <label>NativeForms Verification Number</label>
+        <length>6</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>NativeForms_Secret_Code_Attempts__c</fullName>
+        <description>How many failed verification attempts were made against the latest NativeForms verification number.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Failed attempts for the latest NativeForms verification number.</inlineHelpText>
+        <label>NativeForms Verification Number Attempts</label>
+        <precision>3</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <trackHistory>false</trackHistory>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>NativeForms_Secret_Code_Expires_At__c</fullName>
+        <description>When the latest NativeForms verification number expires.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Expiration date/time for the latest NativeForms verification number.</inlineHelpText>
+        <label>NF Verification Number Expires At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>NativeForms_Secret_Code_Verified_At__c</fullName>
+        <description>When the latest NativeForms verification number was successfully verified.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Last successful NativeForms verification number verification time.</inlineHelpText>
+        <label>NF Verification Completed At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>NativeForms_User_Verification_Number__c</fullName>
+        <description>Stores the latest NativeForms verification number for support and admin visibility.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Latest NativeForms 6-digit verification number sent to this Contact.</inlineHelpText>
+        <label>NativeForms Verification Number</label>
+        <length>6</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>NF_User_Verification_Attempts__c</fullName>
+        <description>How many failed verification attempts were made against the latest NativeForms verification number.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Failed attempts for the latest NativeForms verification number.</inlineHelpText>
+        <label>NativeForms Verification Number Attempts</label>
+        <precision>3</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <trackHistory>false</trackHistory>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>NF_User_Verification_Expires_At__c</fullName>
+        <description>When the latest NativeForms verification number expires.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Expiration date/time for the latest NativeForms verification number.</inlineHelpText>
+        <label>NF Verification Number Expires At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>NF_User_Verification_Verified_At__c</fullName>
+        <description>When the latest NativeForms verification number was successfully verified.</description>
+        <externalId>false</externalId>
+        <inlineHelpText>Last successful NativeForms verification number verification time.</inlineHelpText>
+        <label>NF Verification Completed At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+</CustomObject>

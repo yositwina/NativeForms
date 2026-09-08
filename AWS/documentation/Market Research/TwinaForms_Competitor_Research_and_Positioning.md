@@ -20,7 +20,7 @@ The strongest launch wedge is not maximum enterprise depth. It is a combination 
 - Lower per-org pricing.
 - Public forms without Experience Cloud setup.
 - Salesforce-focused prefill and submit flows.
-- Secure Salesforce update links protected by user-verification verification.
+- Secure Salesforce update links protected by secret-code verification.
 - Custom objects and standard objects.
 - Advanced Pro behavior such as custom JavaScript and live calculations.
 - Simpler admin mental model than broad external form platforms.
@@ -459,7 +459,7 @@ Recommended market lane:
 
 Recommended plan framing:
 
-- Starter: simple public Salesforce forms, secure Salesforce update links with user-verification verification, ready-to-use Salesforce registration form, prefill, submit, standard/custom objects, enough limits for real small teams.
+- Starter: simple public Salesforce forms, secure Salesforce update links with secret-code verification, ready-to-use Salesforce registration form, prefill, submit, standard/custom objects, enough limits for real small teams.
 - Pro: custom JavaScript, live calculations, file uploads, higher limits, advanced form behavior, and richer registration kit capabilities.
 - Enterprise/custom later: custom domains, special security requirements, higher scale, hands-on support.
 
@@ -486,7 +486,7 @@ Recommended website emphasis:
 - Native Salesforce app.
 - Public forms without Experience Cloud.
 - Create secure multilingual external forms from existing Salesforce page layouts.
-- Secure Salesforce update links protected by user-verification verification.
+- Secure Salesforce update links protected by secret-code verification.
 - Ready-to-use Salesforce registration forms.
 - Salesforce remains the source of truth.
 - Affordable per-org pricing.

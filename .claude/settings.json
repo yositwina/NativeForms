@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sI \"https://twinaforms.com/he/solutions/npsp/event-registration-form/\")",
+      "Bash(curl -s \"https://twinaforms.com/sitemap.xml\")",
+      "WebSearch",
+      "Bash(git commit *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Yosi\\\\NativeFormsAWS\\\\AWS\\\\marketing-site\\\\\" -Recurse -Filter \"*.html\" | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Yosi\\\\NativeFormsAWS\\\\AWS\\\\marketing-site\\\\help\\\\\" -Filter \"*.html\" | Select-Object -ExpandProperty Name)",
+      "PowerShell(aws cloudfront get-distribution-config --id E2LZYP4RR814H --profile nativeforms-codex --query \"DistributionConfig.Origins.Items[].{Id:Id,Domain:DomainName,OriginPath:OriginPath}\" --output json)",
+      "PowerShell(aws s3 ls s3://nativeformspublish/ --profile nativeforms-codex)",
+      "PowerShell(aws s3 sync \"C:\\\\Users\\\\Yosi\\\\NativeFormsAWS\\\\AWS\\\\marketing-site\" s3://nativeformspublish/ --dryrun --profile nativeforms-codex)",
+      "PowerShell(aws s3 sync \"C:\\\\Users\\\\Yosi\\\\NativeFormsAWS\\\\AWS\\\\marketing-site\" s3://nativeformspublish/ --profile nativeforms-codex)",
+      "Bash(git add *)",
+      "Bash(node verify-renderer.mjs)",
+      "Bash(node --check AWS/pdf-renderer/schemaTree.mjs)",
+      "Bash(node --check AWS/pdf-renderer/htmlBuilder.mjs)",
+      "Bash(node --check AWS/pdf-renderer/index.mjs)",
+      "Bash(node --check AWS/pdf-renderer/chromium.mjs)",
+      "Bash(npm install *)",
+      "Bash(node --check AWS/pdf-renderer/local-test.mjs)",
+      "Bash(npm test *)",
+      "PowerShell(aws --version)",
+      "PowerShell(aws sts get-caller-identity --profile nativeforms-codex --region eu-north-1)",
+      "PowerShell(aws lambda get-function-configuration --function-name NativeForms-SubmitForm --query \"Role\" --output text --profile nativeforms-codex --region eu-north-1)",
+      "PowerShell(& \"C:\\\\Users\\\\Yosi\\\\NativeFormsAWS\\\\AWS\\\\deploy-nativeforms-pdf-renderer.ps1\")",
+      "PowerShell(aws lambda get-function-configuration --function-name NativeForms-SubmitForm --query \"Environment.Variables.{PDF_RENDERER_FUNCTION_NAME:PDF_RENDERER_FUNCTION_NAME,PDF_RENDERER:PDF_RENDERER}\" --output json --profile nativeforms-codex --region eu-north-1)",
+      "PowerShell(aws iam get-role-policy --role-name NativeForms-SubmitForm-role-6svhnubr --policy-name InvokePdfRenderer --query \"PolicyDocument.Statement[0].Action\" --output text --profile nativeforms-codex --region eu-north-1)",
+      "Bash(grep -iv \"//\")",
+      "Bash(npm ls *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Yosi\\.claude\\projects\\c--Users-Yosi-NativeFormsAWS\\memory",
+      "C:\\Users\\Yosi\\pdfmake-demo"
+    ]
+  }
+}

@@ -400,6 +400,69 @@ private class NativeFormsActionControllersTest {
     }
 
     @IsTest
+    static void submitWorkspaceShowsPrefilledRecordsListIdMapping() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+        setAllActionFlagsEnabled();
+
+        NF_Form__c formRecord = NativeFormsTestDataFactory.createForm('Submit Row Id Summary Test');
+        NF_Form_Version__c versionRecord = NativeFormsTestDataFactory.createDraftVersion(formRecord.Id);
+        NativeFormsTestDataFactory.assignCurrentVersions(formRecord.Id, versionRecord.Id, null);
+
+        NativeFormsTestDataFactory.createAction(
+            versionRecord.Id,
+            'Submit',
+            'Case',
+            'submitCases',
+            'savedCases',
+            'upsertMany',
+            20,
+            submitConfig(new Map<String, Object>{ 'repeatGroupKey' => 'records1' })
+        );
+        NF_Form_Element__c repeatGroup = NativeFormsTestDataFactory.createElement(
+            versionRecord.Id,
+            'repeatGroup',
+            'Cases',
+            'records1',
+            1,
+            10,
+            NativeFormsTestConfigFactory.repeatGroupConfigJson(),
+            null
+        );
+        NativeFormsTestDataFactory.createElement(
+            versionRecord.Id,
+            'text',
+            'Subject',
+            'subject',
+            2,
+            20,
+            submitMappingConfig('submitCases', 'Subject'),
+            repeatGroup.Element_Id__c
+        );
+        NativeFormsTestDataFactory.createElement(
+            versionRecord.Id,
+            'text',
+            'RowId',
+            'rowId',
+            3,
+            30,
+            prefillMappingConfig('casesPrefill', 'Id'),
+            repeatGroup.Element_Id__c
+        );
+
+        NativeFormsSubmitActionsController.SubmitWorkspace workspace =
+            NativeFormsSubmitActionsController.getWorkspace(versionRecord.Id);
+
+        Boolean foundInferredRowId = false;
+        for (NativeFormsSubmitActionsController.MappingRecord mapping : workspace.mappings) {
+            if (mapping.actionKey == 'submitCases' && mapping.fieldKey == 'rowId' && mapping.fieldPath == 'Id') {
+                foundInferredRowId = true;
+            }
+        }
+        System.assertEquals(true, foundInferredRowId, 'Submit summary should show the prefilled Records List row Id used for update/create routing.');
+        }
+    }
+
+    @IsTest
     static void submitAddSaveDeleteAndFieldLookupWork() {
         System.runAs(new User(Id = UserInfo.getUserId())) {
         setAllActionFlagsEnabled();

@@ -1,0 +1,1282 @@
+[
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\applications\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\applications\\NativeForms.app-meta.xml",
+        "Hash":  "98B750AE9ED6C12E40359F1D4916354BF14C774AA96DA4CDD0533A105C152B12"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\aura\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsActionControllersTest.cls",
+        "Hash":  "A22AD11ABBA340C82EA00B3AF16F9E9886F326D22D17AB77D9D001AEC5AAD658"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsActionControllersTest.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAdminController.cls",
+        "Hash":  "A0439431BE7306DC7C61EE8A56832821023C327D2B84ADFFAF222B210F05C076"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAdminController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAgentforceActions.cls",
+        "Hash":  "2F098B7040F7973C329E90A282EE4E6B686809AD42C8943912F12D4BA99A0E3A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAgentforceActions.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAgentforceActionsTest.cls",
+        "Hash":  "212A45C9B62DB1FFF2D87878BDEEDB932C38CB72663BA279D5E58B3A64612040"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAgentforceActionsTest.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAwsClient.cls",
+        "Hash":  "29EB9DD766BEB7B9F27A301C4784DB7461D63383E28543EF0E806BC14A3E9244"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAwsClient.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAwsControllersTest.cls",
+        "Hash":  "2A4EE4A77E4689FDB6613C60E325B8CB4D5A47C087F54FBAF9D79935EBF6DA3A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAwsControllersTest.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAwsMockFactory.cls",
+        "Hash":  "5B47763622DCE78D26DFCD62F8140585A51E69E499486255136B6B78E2498598"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsAwsMockFactory.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2Api.cls",
+        "Hash":  "ACEE8807CF0726CD4A7DD46C3603500D041F2631C38777C9216BB588E9829B2F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2Api.cls-meta.xml",
+        "Hash":  "87B91A7450C6F89862EAF12FD41E143807888C976D917C53283BCFA8BF75CB1F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2ApiTest.cls",
+        "Hash":  "3C010F35DB0E100CF423027C9390BB1EAD24CBC8443F5F068E64743ACAFDC7CC"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2ApiTest.cls-meta.xml",
+        "Hash":  "87B91A7450C6F89862EAF12FD41E143807888C976D917C53283BCFA8BF75CB1F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2Signer.cls",
+        "Hash":  "C2CF502690907438384B6B850BA5D88025A77AE7D2B94992C9702354BA989E5C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2Signer.cls-meta.xml",
+        "Hash":  "87B91A7450C6F89862EAF12FD41E143807888C976D917C53283BCFA8BF75CB1F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2SignerTest.cls",
+        "Hash":  "BDA43AA0FBC931E36C36E6F061F1B17F8B5CB0AB846A33D9063CF911BAC0D9BE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBootstrapV2SignerTest.cls-meta.xml",
+        "Hash":  "87B91A7450C6F89862EAF12FD41E143807888C976D917C53283BCFA8BF75CB1F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBuilderController.cls",
+        "Hash":  "A74B1203AF3F57EC265C97F9405CAA5919973BACB5416F978EF1E4F1CC2C2A5E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsBuilderController.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsConnectedOrgController.cls",
+        "Hash":  "5C4E59B06E233360D5E9CEC973C60281E37370BE64F0430B0AE2B18D88225A4F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsConnectedOrgController.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsConnectedOrgControllerTest.cls",
+        "Hash":  "639A1CF746E3834639F8C53911ED3A3CFA663875BF699EC64E51D323AF9682D8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsConnectedOrgControllerTest.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsCoreServicesTest.cls",
+        "Hash":  "8D6DC48A72585D21D00C1DE7878BA61402F1BF13F06A05A0519178161E57460B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsCoreServicesTest.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDemoDataController.cls",
+        "Hash":  "11E801ED815291FECD59B3205BA8948E134D13ED12DF9DF5A8CC59CA21628CCA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDemoDataController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDemoDataService.cls",
+        "Hash":  "0A3241B79184B8215DB909BCD0D836062642F12330A3CD7D164CAEB9BEB7F4B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDemoDataService.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDemoDataTest.cls",
+        "Hash":  "7B671672486C35433A7CEF7B341ACFD3FAEF6A1E18A5B7D8689FB0F38A2C80B9"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDemoDataTest.cls-meta.xml",
+        "Hash":  "C466162820821E3C40495634338D43418D3E8EE16442CDD1AB08F3FE44370C14"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDesignerBuilderTest.cls",
+        "Hash":  "0528FA90B45652D3C0F8778D2F0E2AE611CD2842A6E8D5BF52515B5AF53678FD"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDesignerBuilderTest.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDesignerController.cls",
+        "Hash":  "868C39588C88AFE1366C2EB311A76F62211EB57D0893DB6A8D8E68AAED9DBB9A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsDesignerController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFeatureFlags.cls",
+        "Hash":  "2DE0F4B2FFA3D08B88863BD9D919D25BB6C97FD7AF057FBA65116E2289E75577"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFeatureFlags.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormKeyService.cls",
+        "Hash":  "0F2586BF989E63B321D2164340557725156A8A3D5BE2191E8DB3844E62321193"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormKeyService.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormPortabilityController.cls",
+        "Hash":  "660BF93508FC64F055893B742A9807CAC25C3BC2EF0B88A57E1D0BDEE36F29C4"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormPortabilityController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormPortabilityControllerTest.cls",
+        "Hash":  "D3DFFA31C050023E0B8E402EE406AE7C263F3EB03653AB59CA0090E876D00955"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormPortabilityControllerTest.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormulaExprEval.cls",
+        "Hash":  "995D28606EE474DC0E575F6F54AAF82400756402BF66C65C72DB340FE9B32BA8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsFormulaExprEval.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsHomeController.cls",
+        "Hash":  "4F519A7103D2145030A81DB5AD9E50FC4A41352E57D78E236B3ED712289ED8DB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsHomeController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPortableSnapshotSyncJob.cls",
+        "Hash":  "C8879223D674666234AEEBB1994B0B403B41A9C7B0C828D7E703406D50F18174"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPortableSnapshotSyncJob.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPrefillActionsController.cls",
+        "Hash":  "7D5A0B71185CE922CD261DFDAA03ACFC5F7CE6E9F5AC1DC1E5C544AE400AC4A1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPrefillActionsController.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsProjectService.cls",
+        "Hash":  "43AF190FBF78F157C9850250AD5DB6E71C0E75080B14AEEDDB7ABBE888EE1948"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsProjectService.cls-meta.xml",
+        "Hash":  "2D4AA15FFC3F7DEE59ACCD322C084A696A3CCE69705EBE994C97FBB9B2093237"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPublisher.cls",
+        "Hash":  "287CDE01F12F63338965DE06C8AB9F5294348BA7949E307A293BB25E81842A19"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPublisher.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPublisherTest.cls",
+        "Hash":  "11BE1E114F149B5E533FE743BE59F703958CE7C38588B97BCB6B84413E801DC3"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsPublisherTest.cls-meta.xml",
+        "Hash":  "C466162820821E3C40495634338D43418D3E8EE16442CDD1AB08F3FE44370C14"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsRuntimeI18n.cls",
+        "Hash":  "BCA1DBABB82A30A8AA054AFC12BE69A33E0FF056485ECA2740A2C6B35CDBD7BB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsRuntimeI18n.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSecretCodeApi.cls",
+        "Hash":  "0986E1EA86D46144D5F3A890B460C2C414F21D78C573B4DC2B43BF99D2A5D5DD"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSecretCodeApi.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSecretCodeApiTest.cls",
+        "Hash":  "A9090CD00C422CE73C2B615441C066CB8E29BBFCB1DA7B1B4E2F1CCCD8772D71"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSecretCodeApiTest.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSetupController.cls",
+        "Hash":  "978F0308A738EC4E95629F9949F75BF07E38028AE1321077F1B5054F3F155037"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSetupController.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSubmissionLogsController.cls",
+        "Hash":  "1397147272D1428AA0CA8BA1D0C44D39646D77F972B7EF09D1E10876B80D6B71"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSubmissionLogsController.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSubmitActionsController.cls",
+        "Hash":  "27CFEC9B82B509E98E39199D339DC456EB97DF2854A63DD84022A3B8D9202250"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsSubmitActionsController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsTenantEntitlements.cls",
+        "Hash":  "26A1366EF68A71BD88065609384CE1433A42E299F8130C1B93F606E774178F3D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsTenantEntitlements.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsTestConfigFactory.cls",
+        "Hash":  "AA5C8E4FEB797E518B6633C3A43FA12CBF48737C6D7DD906354FD9353F8325ED"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsTestConfigFactory.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsTestDataFactory.cls",
+        "Hash":  "6FDD4CE62666B0958812C257CD86E2C0A86F46927260B33172D734704F949A20"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsTestDataFactory.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsThemeAndLogsTest.cls",
+        "Hash":  "4F7E0AE8AD3B2A3F0B01A6E943BE5CC23FAA2067501573CA98238AFE4C3E3BAB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsThemeAndLogsTest.cls-meta.xml",
+        "Hash":  "991F1CA647A6D030B8F1828AD18737C5E94ECBE63A944A972FD685C6AB98F84A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsThemesController.cls",
+        "Hash":  "F73AF747834A7EBBAD3B0B41FB6DBB474F3F949B02C75A38536B8F9503E62D9B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsThemesController.cls-meta.xml",
+        "Hash":  "A61E37B18BA9D57FA759172EFBEF606598726708E2519B4CEB0EC9791D57B401"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsUserVerificationApi.cls",
+        "Hash":  "56A67231259063EC72ECE5295C6277FD38FD8A46E276C1F71867B664100F8050"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsUserVerificationApi.cls-meta.xml",
+        "Hash":  "356DB61093648679FC9B3A801E41D51C94FA51E993380EAC65B0BB076A20B6B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsUserVerificationApiTest.cls",
+        "Hash":  "BD5F08DF844688EA89E4375DC37FDE5EED1A447D83532E91BD998A3EB09AE020"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\classes\\NativeFormsUserVerificationApiTest.cls-meta.xml",
+        "Hash":  "C466162820821E3C40495634338D43418D3E8EE16442CDD1AB08F3FE44370C14"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\connectedApps\\README.md",
+        "Hash":  "1C283409B10C847730E3D6FE232B1F1DD3BB5C38AA5A1B9145B51692C89223AD"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\contentassets\\TwinaForms_App_Logo.asset",
+        "Hash":  "DA9B38EF818FBD1A66887DDCA187280863A2FB792E8CBD31F0132143405A3E63"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\contentassets\\TwinaForms_App_Logo.asset-meta.xml",
+        "Hash":  "4B9FD174456D65CCD56B22306F86F8342797429CB9A146B1B659F0915C616065"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\email\\TwinaForms.emailFolder-meta.xml",
+        "Hash":  "CB6FC1290FC473FE3E53500510AC410557FDD79078E8DCC46422AE70F3FAEE30"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\email\\TwinaForms\\NativeForms_Secret_Code_Default.email",
+        "Hash":  "86CD749C056DFEC8F7CA4C8D4512C339EFCA6E398D49FA227EC092723A606689"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\email\\TwinaForms\\NativeForms_Secret_Code_Default.email-meta.xml",
+        "Hash":  "0A5BE8918824F1BF22F9FCF19FD89E19A008FCC5D9A6CC88FB7CBA2883021E0D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\email\\TwinaForms\\NativeForms_User_Verification_Default.email",
+        "Hash":  "051A0974194F75BAE1B3DE1A0D3A40F8719173480D80A0B0396225BBBDE975A1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\email\\TwinaForms\\NativeForms_User_Verification_Default.email-meta.xml",
+        "Hash":  "11677B9DE4BE559D8AE817E1D542270E01251D59787D9426A3404875D54CF28B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\externalClientApps\\NativForms.eca-meta.xml",
+        "Hash":  "1BA7CD4117C5F408D201181BBB8F94E659066DAACB6FAB019B9257EE09770318"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\extlClntAppGlobalOauthSets\\README.md",
+        "Hash":  "B4A848B72BDB64C8C7821969F5BDA5AF024450552FB045BD2E0A1B31C5C17C3D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\extlClntAppOauthConfigurablePolicies\\README.md",
+        "Hash":  "BF776E65041428567B9DAAA93DA5FED787F6C81FF97B90987B2042A4AA2588E2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\extlClntAppOauthSettings\\NativForms_oauth.ecaOauth-meta.xml",
+        "Hash":  "917DB7B047DAEB9682B134EDB8418C715023964E26113D64F727F6253C1DE210"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\flexipages\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Form_Action__c-NF Form Action Layout.layout-meta.xml",
+        "Hash":  "2B1A731D7D400070EC0E148A9194A12AF0FB97C0087B7920A3DFABF15D19392A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Form_Element__c-NF Form Element Layout.layout-meta.xml",
+        "Hash":  "E4C0F7788FE39038B76E1321EFA7F7D6B74A880EC1E81C8319DF53783966B944"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Form_Publication__c-NF Form Publication Layout.layout-meta.xml",
+        "Hash":  "E4FC9D5D0F878B56C90C319AB4E5D297B3073DD34D136DB01D5D6AEB6B1357C1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Form_Version__c-NF Form Version Layout.layout-meta.xml",
+        "Hash":  "889E45B9BF333BD1053AE9EDD57B7D854534667527445FDB5851DDBECF59FD2F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Form__c-NF Form Layout.layout-meta.xml",
+        "Hash":  "27CC69BA7283CE9E70678E1AE4F3326D58877DB4A8BC72768EEF7AC56B5F94A9"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Project__c-NF Project Layout.layout-meta.xml",
+        "Hash":  "580C173CCDBE971BEE47CC8F8D348BD4C52C00CACB837C3AF2D69F7B10DB475E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\layouts\\NF_Theme__c-NF Theme Layout.layout-meta.xml",
+        "Hash":  "0AF3E199E6EEAF8D3BC9228A5C50A1CDF62F013EAA8A267B99346457F399BDBF"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\jsconfig.json",
+        "Hash":  "1586DC2EF4A64D8BD8828A9E354655BC31154EC2EDE91409FB497F6DF6AFE3F2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsAdminFeatures\\nativeFormsAdminFeatures.css",
+        "Hash":  "C7456F4403FED63148D2AB90DEA32BFF4481162CDC240497C4D6D1D53F9DC2A4"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsAdminFeatures\\nativeFormsAdminFeatures.html",
+        "Hash":  "F94D3F7C93DCD48E80F5073349FBD19EB1417EEBD0C6264FA7844FE07F93C1BD"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsAdminFeatures\\nativeFormsAdminFeatures.js",
+        "Hash":  "6B12D2F678AA7FCC7634A1200E2922A735EE55D639CA9166919E549E5837504E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsAdminFeatures\\nativeFormsAdminFeatures.js-meta.xml",
+        "Hash":  "53BE1644C8D167B3A327062F28D53730E7B6ADE62FFE46FB0A3EE58293C1F710"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsConnect\\nativeFormsConnect.css",
+        "Hash":  "3684924FC7825AADB0E9901198DBEB4BD41EDC315A17DE1792481299E88D05E9"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsConnect\\nativeFormsConnect.html",
+        "Hash":  "AC37D945D7AB7BE57D00507B9D65680B994B14159D2DB1667327A4B57AA7A8A1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsConnect\\nativeFormsConnect.js",
+        "Hash":  "5C82B655151C6E2CFED69D11109FFEA8E99A342C31C7149549A676B8ED0DE733"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsConnect\\nativeFormsConnect.js-meta.xml",
+        "Hash":  "2F5D67A37149B7B59B72EF745E793AB2299E7828C5FBD0B11C88BBE6AB0E1D91"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsDesigner\\formulaEngine.js",
+        "Hash":  "3E136FB718888770CE0CCF4D7CCB8E5A7CF5965F9B8B08858EC550706F5B6619"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsDesigner\\formulaExprEval.js",
+        "Hash":  "F22579BA06AF36F44686937446FA8574883082254D5E58448D05F643295511BB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsDesigner\\nativeFormsDesigner.css",
+        "Hash":  "6C121FB20547FC4A0FF4C68F9FF10CD80EB985CB60D714B8C897365523256C37"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsDesigner\\nativeFormsDesigner.html",
+        "Hash":  "C206654DC30B2AC6540C9D875C39648538F178F06620E594A74D30BD161299C3"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsDesigner\\nativeFormsDesigner.js",
+        "Hash":  "553B1806BBC6D882983613904E614F8A478C22421C02F5CDB9C3EE5DDC9744B0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsDesigner\\nativeFormsDesigner.js-meta.xml",
+        "Hash":  "EAFB58D119673899EB1AAD5D2F9790E578682388A7EE617340A7C036936061F3"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsHome\\nativeFormsHome.css",
+        "Hash":  "766F39175862ECAF4AEA4E4794A139CE7C697265E1D04FD73E8F6E26C618C40B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsHome\\nativeFormsHome.html",
+        "Hash":  "009EFC547E2C704EFE460C8F7400C6F5013836BD69A9B53D635E654F01FCF6BF"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsHome\\nativeFormsHome.js",
+        "Hash":  "0F6AF8AEA5A85D15364CAC7DA53A240461A8713AE031821E96BB5D172C5F2C80"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsHome\\nativeFormsHome.js-meta.xml",
+        "Hash":  "907141218B3703B378B900DBF96C2F9256D5A2952DD8DA1DA03BFF924A2845D5"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsPrefillActions\\nativeFormsPrefillActions.css",
+        "Hash":  "1465300FAB27EA0A6CCD2D2269148AC4BB8D30514B0E920804C08C43E3D90C72"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsPrefillActions\\nativeFormsPrefillActions.html",
+        "Hash":  "437A9EA7595BCB3A8BD6C78A10ACC25C25120AD59B02CB8E73B8A64B343A37A0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsPrefillActions\\nativeFormsPrefillActions.js",
+        "Hash":  "5165398F9547361CDB68CEEC5F08AB43BF179D3420630F99E7C84B161115A069"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsPrefillActions\\nativeFormsPrefillActions.js-meta.xml",
+        "Hash":  "DAAC4B72827D81A3A3A65649D66D1487B37FF73A52FCE86E22695BA71A862459"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmissionLogs\\nativeFormsSubmissionLogs.css",
+        "Hash":  "26D909D458E1C2A6AC0E43FA30208A84EE334269F4C80763A2A9C76D4B8719BE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmissionLogs\\nativeFormsSubmissionLogs.html",
+        "Hash":  "0CFFEC3A5930E3B61E1A2CECAC721C655F0FD549F49905C46D4501A99C04B14A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmissionLogs\\nativeFormsSubmissionLogs.js",
+        "Hash":  "5556DE0C2DF3026725E22DCE949F1DE02B1DA525000A9C3CAA616C960288DCCB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmissionLogs\\nativeFormsSubmissionLogs.js-meta.xml",
+        "Hash":  "03CC972E9C69122A25C1CAE0045E93DF55C1C91F2109D6B91C27CAB1F7C2633E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmitActions\\nativeFormsSubmitActions.css",
+        "Hash":  "ECCD4F84A377C5EB9CA762E9427608AA5826F691CD2DEAA990E932018DC94753"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmitActions\\nativeFormsSubmitActions.html",
+        "Hash":  "085428AB72CA72C8A351D229FDCC1ED8883023A46C36541B41E3276EDB7E0655"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmitActions\\nativeFormsSubmitActions.js",
+        "Hash":  "ACFD300A3393B306D2AF4DF1EB052B8AAE44D1AA536C1B2033626D63D6BC6A29"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsSubmitActions\\nativeFormsSubmitActions.js-meta.xml",
+        "Hash":  "26D4F25CF4E614E1FBB72F9B86CAF14F3A3F8BDD6031DF8DA522141EEB717253"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsThemes\\nativeFormsThemes.css",
+        "Hash":  "8E132B4C2A48E499B495068A0A7A706F3710D5F15DDA70844B5093F77C795B74"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsThemes\\nativeFormsThemes.html",
+        "Hash":  "A5C5B3144637A06AC846202E8129618E3F9054AB33D7F85618F0C776DC2667ED"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsThemes\\nativeFormsThemes.js",
+        "Hash":  "CF88BBD4256536A370326116FA45CDC5E65674654F1BE44F5C0595E468593820"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\lwc\\nativeFormsThemes\\nativeFormsThemes.js-meta.xml",
+        "Hash":  "6429C2193C36C9B72CFF71E820DF6A46AB627819EFAE1A751AFDC80248749053"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NativeForms_Secret_Code_Attempts__c.field-meta.xml",
+        "Hash":  "E5F2DF57BF3FC7B1AF5393637C8F77EE0C8F057BCCB68290741260A9EB5518AC"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NativeForms_Secret_Code_Expires_At__c.field-meta.xml",
+        "Hash":  "7AD5BA91A35430EDBADD4AD755D20044CF415B61B69C0C56E8DE21A2D6E8C86E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NativeForms_Secret_Code_Verified_At__c.field-meta.xml",
+        "Hash":  "F091A354A8B9454984CBB4FEDC07F19D4AC7BF997E720AE77940D1EA1FF09F8C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NativeForms_Secret_Code__c.field-meta.xml",
+        "Hash":  "AC333E918D0DE72BDDF96D6A45D82605EBF9E53B28CFF8ACDFC1E995641F2A33"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NativeForms_User_Verification_Number__c.field-meta.xml",
+        "Hash":  "848A122724A3CC700E9B5683889D6BA8A12D152FF1B23F0AF47974DEBAC4509E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NF_User_Verification_Attempts__c.field-meta.xml",
+        "Hash":  "F8C45C37BAD88C0A0C6E47D8CD9211465C5025D290090C97213F57907398AA60"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NF_User_Verification_Expires_At__c.field-meta.xml",
+        "Hash":  "7756F4CA534CC1FE865BC49575FC0FDBF6AFED027E559FD8B1BECE244F0C3991"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\Contact\\fields\\NF_User_Verification_Verified_At__c.field-meta.xml",
+        "Hash":  "F1923DDE16A39AA0D8924C16F183AF02D75E3814168DC6611E85856019B6D268"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\NativeForms_Config__c.object-meta.xml",
+        "Hash":  "A5D682030618680FAAC4F7EBA6DB4C2F9762CE9F19FD56C2DDF4199A369D2BA8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Captcha_Site_Key__c.field-meta.xml",
+        "Hash":  "56C694C3685635F113CFFEC2DD9735C309866F0AE60933673CE7253FF3144DE3"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Demo_Data_Installed_At__c.field-meta.xml",
+        "Hash":  "91F6940B53E56D33A6A74E944FDF115421979D8CA289EFA691D9D740E6C92C80"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Demo_Data_Installed__c.field-meta.xml",
+        "Hash":  "5F88F6DEB25692903CAC83F9BDF557DE5E94629AA59CE663F730C36129827121"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Demo_Data_Last_Message__c.field-meta.xml",
+        "Hash":  "0B54FE5FF0F382D9E919D5035A7D39F4D1393BE1AB3C7FA3C73906EC5D6BE14B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Demo_Data_Record_Ids__c.field-meta.xml",
+        "Hash":  "A553C63929E04E3221DCFC144581718395CDC9BDFED776ABB5803916045A0D98"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Demo_Data_Version__c.field-meta.xml",
+        "Hash":  "A86BA6E71A6EAFC8D0FA4ECB5A5191B4F2621438DBAB538FCD9A5C67846BE580"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Advanced_Submit_Modes__c.field-meta.xml",
+        "Hash":  "12FE718445EDA6E401DEC6E5324941E0FB6B9990C02F5D68A650EE36DD8CE2FB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Condition_Logic__c.field-meta.xml",
+        "Hash":  "3CEC02DD58A82B25842797EEA23649077ACC5D7C44F3526DBBA4FD759CD41747"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Formula_Fields__c.field-meta.xml",
+        "Hash":  "B442DE6B2EC541727E60CB4A3AF6E66E115CE0CEF7B2120A17252DEBFA3F5DE5"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Load_File__c.field-meta.xml",
+        "Hash":  "2C684FDB5F770206499776D68652CAB689E0F36A1431B6B7EBC057202A48FBDF"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Post_Submit_Auto_Link__c.field-meta.xml",
+        "Hash":  "2AC616A40DEC20AB7560389E590918BAB749E0D7C59E0D33FA2BA68C25D14ECB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Prefill_Alias_References__c.field-meta.xml",
+        "Hash":  "6F0FA8490DA57CB25212D6CF4C2F7826E2B10EF99AC773B6A38DEBBB5CF9ACC6"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_Repeat_Groups__c.field-meta.xml",
+        "Hash":  "06B38370705F459D9AD157DE79DA9BCA9C71BC6FC76F9E09BC021B2D5B487D84"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_SF_Secret_Code_Auth__c.field-meta.xml",
+        "Hash":  "6D6C2B0A4A37B5C3B49F3330D4E6CF768DCDAD6765CFC3C7A847DE9F706A9575"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Config__c\\fields\\Enable_Pro_User_Verification__c.field-meta.xml",
+        "Hash":  "0DADE4A3F62A1D645C9833A84D9E9FE3D208B68495FCD062B5D08481B08257A4"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Protected_Config__c\\NativeForms_Protected_Config__c.object-meta.xml",
+        "Hash":  "D59D25E3C0C76B4A5C43AD3699A75EF4091B5A564155BE7BD3B7ECCB1EC89924"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Protected_Config__c\\fields\\Bootstrap_V2_Signing_Secret__c.field-meta.xml",
+        "Hash":  "B52542DB4311F0F2A508B7BEBBFFA0FC52B87619BDFBAB0F9EA0C838EF7EA019"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NativeForms_Protected_Config__c\\fields\\Submission_Log_Wrap_Secret__c.field-meta.xml",
+        "Hash":  "5E2337B985B8D0F8E268C76DB8014CECAAEA67EDE62A79E1F59103F12DB70B7D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Admin__c\\NF_Admin__c.object-meta.xml",
+        "Hash":  "52CDC7F0899DA5574570A940C6DEAC898000C95C4F4566B98FC18A64DC5F73DE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Admin__c\\fields\\Scope__c.field-meta.xml",
+        "Hash":  "9874ACEE88CD8952A4A97C09234520E047503A927F2E0271E44A54706DC764AB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\NF_Form_Action__c.object-meta.xml",
+        "Hash":  "0E950D1696088444E14B4D2AC8338ECCB8DA0DACA73FA82357B6FC5D177B62E6"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Action_Scope__c.field-meta.xml",
+        "Hash":  "AC112283F35D39AA9F1844DABF9CAAC493EDD5D75696A1BFD7BF1EF0E1488048"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Command_Key__c.field-meta.xml",
+        "Hash":  "66630BF9D7864D8FCD4C7D5EAC9575DED985759718B63093BD050108F79E2F63"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Command_Type__c.field-meta.xml",
+        "Hash":  "1F3287116B982BBC5019DBCF861B79CA290BB1BA732092CE4F59C8054126B952"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Config_JSON__c.field-meta.xml",
+        "Hash":  "8DDD8980202EDEB960D04839B7389EB803E8556C379ED00DAA87714BE469DC24"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Form_Version__c.field-meta.xml",
+        "Hash":  "D630DEF0348B0286B24EE11A0DD2ED0233D2C3DE9C4E18852F70F19B4827CD15"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Object_Api_Name__c.field-meta.xml",
+        "Hash":  "10CA3F0659285AB5B647173748B0C84855647A918EF8005C8706911C34BF3242"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Order__c.field-meta.xml",
+        "Hash":  "032B4E87DDE0BF46EF944CA89D4899BEB4221D97E850F2376BC7AC2C9BB8808F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\fields\\Store_Result_As__c.field-meta.xml",
+        "Hash":  "BA7712BEB5B5F0D06A256E11974802E7A6A0494195092032633703E29043441C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Action__c\\listViews\\Debug_All_Records.listView-meta.xml",
+        "Hash":  "032F876B96F3BDF3AE43FDA94C475B1231904453C2D74034304F3A47CF599424"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\NF_Form_Element__c.object-meta.xml",
+        "Hash":  "560B4855D9682D6151A7969BE4A65B7CC1C934B876D44D48DA6DA522A574E4E2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Config_JSON__c.field-meta.xml",
+        "Hash":  "CA2EBA635E722593FDE64D62A44DBA8939B053C6747C9013480FE70F3155EBF8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Element_Id__c.field-meta.xml",
+        "Hash":  "0B413ABE1F27AEC628BE418985149911E3F9B99E2F9A10F81CE37E498A5231D8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Element_Index__c.field-meta.xml",
+        "Hash":  "614A0DAD4D4EA7F54558EEFF8F8D6AE088F1112FB75338696049A40DECD93571"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Element_Type__c.field-meta.xml",
+        "Hash":  "B8F0D40C040B3A888B837516607041E4F01BC9FCE60CDCA247A4A5329E3342E5"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Field_Key__c.field-meta.xml",
+        "Hash":  "F3C019CABE9CCE900EDF48F6AD2D775A957AA499C6CC41FED10B63A74EED4DBB"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Form_Version__c.field-meta.xml",
+        "Hash":  "3C84A7CE80BB1279636952B734D9C97A9F5400A228D1945623D3FA7FB3DB1B08"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Label__c.field-meta.xml",
+        "Hash":  "8CC2234378F364FD30CF73771CC5791B2067FCF4D2887300BFCD50E2E2D88113"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Order__c.field-meta.xml",
+        "Hash":  "5D488BBC19C04DA27A70D29374C9FBCC72052FA5A4434E810F6E769C27F2EA1A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\fields\\Parent_Element_Id__c.field-meta.xml",
+        "Hash":  "F58AD12E14221E6F8AD09B116BE6799BE40CEA8DDC3623E184B6E6A8ADA7FEEF"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Element__c\\listViews\\Debug_All_Records.listView-meta.xml",
+        "Hash":  "E67B818356D6AB981A7198E7CB96B95835C5AF45DC3FB9D32C6ABC3946CA3AD4"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\NF_Form_Publication__c.object-meta.xml",
+        "Hash":  "3909353F50529643189F1A551644F9406644A0F362E9E3E7B09D44FBA66E2D96"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\AWS_Response_JSON__c.field-meta.xml",
+        "Hash":  "CB8FC5119759B53B008762A6B49A5FE2EA52F97FFADFE67CA1D7D0C0DCDAB82C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Error_Message__c.field-meta.xml",
+        "Hash":  "3BBF8FE3BE8C723D13AE1ACF6910D8D28276857DEEFE737A1BEB08CEE0008B61"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Form_Version__c.field-meta.xml",
+        "Hash":  "0C402866D27FBBD708FEEE721E2B33FB0FAB88EA30618646F679B174C8DFC4F1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Form__c.field-meta.xml",
+        "Hash":  "FD9D11BC5E4A322A514BD59A1B95C2660788438FE382F7B065257AC4AC7C21C9"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Generated_HTML_Ref__c.field-meta.xml",
+        "Hash":  "660D8542EE5AAD65DB6998EB6751E4C3DD30C6770931EDD8FF0DD1E37780E4BA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Publication_Status__c.field-meta.xml",
+        "Hash":  "6DBFA4F20EA505CDD751A674095A2AEEE0D05B64F506A893477F6E4075CF93E3"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Publication_Type__c.field-meta.xml",
+        "Hash":  "7882C7CA99560B3FEEFB77AA5166B73AFD2AECDE3F2A39CE2CF7CC1520322360"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Published_At__c.field-meta.xml",
+        "Hash":  "30847B16946D29F4EF54F24020410B8CEDF43123E9F98CCAE3E429CCE7AC3CEE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Published_By__c.field-meta.xml",
+        "Hash":  "021E593658E9C521C80F8F8682D039A0D9B285470D865A0BB3AFF607034E8985"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\fields\\Published_Form_Id__c.field-meta.xml",
+        "Hash":  "01EDBB2BC5B69793FB73FEDDBE5B0B607446785AD367A365C9AF5DA3C81F7748"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Publication__c\\listViews\\Debug_All_Records.listView-meta.xml",
+        "Hash":  "B56190FB9E8A8F55CA7979E2C8DC79ED56608373518FCFBF8FD78B576AC46497"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\NF_Form_Version__c.object-meta.xml",
+        "Hash":  "45DE20A4A77FF28E15E87BE0257BA18E5F569F68FA9F5C1CE55F1175D6AF1E36"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Custom_CSS__c.field-meta.xml",
+        "Hash":  "B262F8D02AF894F13611CB7C98AAADD6A7B04C31A5B20BE5C2FB825DB91C4053"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Custom_JS__c.field-meta.xml",
+        "Hash":  "257E062AFF920B05C57A7B3F9698646DEC7B9C8AF840604DC98F70217C7EFD44"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Form_Id__c.field-meta.xml",
+        "Hash":  "FC9E76CABB3F6D1BFE12EB74F17644B75D51806FA479B37FAA2438C181136ADA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Form__c.field-meta.xml",
+        "Hash":  "8668411E67485E1279E701C53C4F4C5289CE33AC7378715EE335A48FD14C8AB2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Last_Published_At__c.field-meta.xml",
+        "Hash":  "53CEC29F64C5E7E94FE14C027A9A0EC1509A5C5D49191EAC399553CD237D43A8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Last_Published_By__c.field-meta.xml",
+        "Hash":  "D7985EB7C3B7759A824B20926281C9B7FDD961795774203F0DFA76E31AC0B4BE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Last_Publish_Error__c.field-meta.xml",
+        "Hash":  "4FBA0648DFDFA4F8C3E395D3C0B96D9E4F3B3B8914590C9C3980D12C521F321B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Prefill_Params_JSON__c.field-meta.xml",
+        "Hash":  "B41C871FF882EC0181AADAB5E8AFA4E0590ED678F78AB79D6ED127A4611F24E3"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Publish_Status__c.field-meta.xml",
+        "Hash":  "5CCD4651C5926B7918EDE1D44EF9EFB3C4FAF42360B47634C5BF940A501AAAC7"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Publish_Token__c.field-meta.xml",
+        "Hash":  "438E9CF6E995ADA313BE30DA7855F3F19F4D0C2D91E7029C0C3B7CEDDCF0BAC0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Rate_Limit_Profile__c.field-meta.xml",
+        "Hash":  "17A4A018FF838602DE98271AFF2283FFC3E114FE1D28E5F5C8FF8FB0E2009824"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Security_Mode__c.field-meta.xml",
+        "Hash":  "6C7C6CDF9F7F72F0AA6E481F576C1CB4EEE49037922B58E25309AED6D8863EAD"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Theme_JSON__c.field-meta.xml",
+        "Hash":  "62F5C225B23942BD6FF75BE35066902F0BB0A2CEE65136EF03CB3AF6CEEDECDE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\UI_Settings_JSON__c.field-meta.xml",
+        "Hash":  "7E94ECD4B1E8D40D96FC8D03FF05719AC0F592627C047723388615B582AD6C6C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Version_Number__c.field-meta.xml",
+        "Hash":  "96EE46167606361C2B71F34195C54C165EEBE22B7C5790758950ECE899A99B11"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\fields\\Version_Status__c.field-meta.xml",
+        "Hash":  "54526692FBCB52C4C1959459E0D1C565D26F5721FFE2C81CBABBAB7982721D4D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form_Version__c\\listViews\\Debug_All_Records.listView-meta.xml",
+        "Hash":  "80050B2B63361AC15279A287AE5CBEFEF9473C063C267245BC1917DA5739487A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\NF_Form__c.object-meta.xml",
+        "Hash":  "95BBF0FB2CE6986C1A7F5BDE317D04A542957F1566AACF63F7D2802AE8E21286"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Business_Owner__c.field-meta.xml",
+        "Hash":  "91A6042CE4793E527C092A478457E3C289A183E9253130FB5F601E08D413FB47"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Category__c.field-meta.xml",
+        "Hash":  "811DF45D346CC6EC4DF6F2847D3EECFF3CE14D4CD6E3ACD72C805D7C6F46C3B2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Current_Draft_Version__c.field-meta.xml",
+        "Hash":  "87D646591B0E8CBB8AB0BCE6E2FF6AE2D4841D16EE6619D2801475F3C9AD6D61"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Current_Published_Version__c.field-meta.xml",
+        "Hash":  "E675EDACC19D432682E485EA3AD0F571EF7A1702B0FB529781A040DF205662D4"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Description__c.field-meta.xml",
+        "Hash":  "EEF9267BA839F1C7113834DC5BE692207D59500354A86656C1B0EE970EC8720A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Enable_Captcha__c.field-meta.xml",
+        "Hash":  "E13E4CE00ADE0E3342E07762F784F0B147BA84673B77A18234974FFAB9DBF107"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\NF_Key__c.field-meta.xml",
+        "Hash":  "E3274478D2F73EEC117CD37313A64B9302C898766113029C473EC8E57285979F"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Project__c.field-meta.xml",
+        "Hash":  "4370DF7A273A161F5A10BE22059BE69AC0504C1871A87CC506964C9BD0F14F9B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Status__c.field-meta.xml",
+        "Hash":  "34933D827B27A046505EA3601A91626EF7F1C578A733A9260590759C1771D98A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\fields\\Theme__c.field-meta.xml",
+        "Hash":  "AD088D9ADBC9426B08537AD7223A30812F113CF484BE9A73646D20F1C28BB6DA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\listViews\\All.listView-meta.xml",
+        "Hash":  "90F61B8E1CC9B141E69C5247A9AECC86B12E3B475E2B853F04AEAC5737FE4757"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Form__c\\listViews\\Debug_All_Records.listView-meta.xml",
+        "Hash":  "39DB0B7B8FE6D29F5FE828A51CD07C22C18E40C1DA2673293A2C63354E092313"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Project__c\\NF_Project__c.object-meta.xml",
+        "Hash":  "44385556693ECA536DDE7229270C043BA7958C0CDFF5F679CC63E96D43779DAD"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Project__c\\fields\\Description__c.field-meta.xml",
+        "Hash":  "80D5C8AE542C6A4CC1714FA29DEBE8FA6891538EFE56D096811E1D845B8E61BE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Submission_Log_Key__c\\NF_Submission_Log_Key__c.object-meta.xml",
+        "Hash":  "B74DF381EA3E2232ADDDC2CE233A0906D3D751652671ED9BDFFC3FF304629120"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Submission_Log_Key__c\\fields\\Key_Version__c.field-meta.xml",
+        "Hash":  "292CBD65E78335E75CCB2576940CF91F8E3F1415FE54909D9023A27F030A0B72"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Submission_Log_Key__c\\fields\\Public_Key__c.field-meta.xml",
+        "Hash":  "4798DD112D9C70787C822E4CDE41CE67DD5DB01D491557CC4E15147E919617C8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Submission_Log_Key__c\\fields\\Sealed_Log_Data__c.field-meta.xml",
+        "Hash":  "0BCC80D2F7F92540795A70C15C4FFC36C3DA43F40D779FA5EBD0D51D89975F0A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\NF_Theme__c.object-meta.xml",
+        "Hash":  "541047677E1CA230A1BFF134476EAFE0DA1BEF0155595C6148B5E06EB124ECB6"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Background_Color__c.field-meta.xml",
+        "Hash":  "89F07AC0A0AF413CD91B7EF6F622ABA0A8DE7066D87AF4490A920B5AB2D1CF02"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Background_Gradient_Color__c.field-meta.xml",
+        "Hash":  "E6600F15B2A938517C9D58C25897267D6F95A6C87E63C3DF6F0DCC4B3501185D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Background_Image_Content_Document_Id__c.field-meta.xml",
+        "Hash":  "D521F467D34AA17031BA7271A398F1FD63B6BADAC72B8C1E85CDFA9DE004454A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Background_Image_URL__c.field-meta.xml",
+        "Hash":  "76768BC72867A67FAEE33DB7AAE174AA9B1980A4593EF4E4CD852FD1351A6B73"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Button_Background_Color__c.field-meta.xml",
+        "Hash":  "26BE2D67AFE1554B73CF596436CBC55408F36C457995733DA79860AF39B887FE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Button_Font_Size_Px__c.field-meta.xml",
+        "Hash":  "CA6D623C5D1943B70C021A675A2D639EEEBFC0DDA9776D05E759DB4AD58A2A09"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Button_Font__c.field-meta.xml",
+        "Hash":  "A80FCB6DCE0DA09BE9D8D5B458BBD1303FDDB12BDF8EC6C960674C4BDDABDF45"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Button_Hover_Background_Color__c.field-meta.xml",
+        "Hash":  "E6E5C541083070AB3C9516D4E989508EE43DFFD1284FA789661DC86C94F3D6EA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Button_Text_Color__c.field-meta.xml",
+        "Hash":  "DBAE36FB3C5EEA9AB3B084D8F815F846305CCC08DCCA45C89021D7578AFFB45B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Description__c.field-meta.xml",
+        "Hash":  "F15EFBB822C415364FC215C00EE6127662D04F3BD663DD3538263E0AE93C0298"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Error_Color__c.field-meta.xml",
+        "Hash":  "8474CB3D6916AE4EB07CE52520748EF95E87CE84434C01655BB22DDFCFDCFE0C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Footer_Image_Content_Document_Id__c.field-meta.xml",
+        "Hash":  "BEA828516E8E4D237A9A06A08A10F8FBFF4B9A3C3039F7D840E955B1FD6CB005"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Footer_Image_URL__c.field-meta.xml",
+        "Hash":  "98E00C766862D848F0D14FDFDCC51C644FA962AA07A44EE30F9E012093433C92"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Form_Background_Color__c.field-meta.xml",
+        "Hash":  "0E98B355A7AE4E429F398764E3D655636525A980F3AE57C8EF41EDCC640FC2E5"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Form_Border_Color__c.field-meta.xml",
+        "Hash":  "852D68773D41358CBD4275A06D2CA8FC985C843882D20A6AC321B503855A71DA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Form_Width__c.field-meta.xml",
+        "Hash":  "726CC062A44C686157AA94F8662DE2D20AF363C78CA2F3B7EC38EE66AEC58EEC"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Hint_Text_Color__c.field-meta.xml",
+        "Hash":  "8BA0A6498B4A6B4A1B948CC4663610D76A409A8CDD76A25F6AEFFD4BE6B1D397"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Input_Background_Color__c.field-meta.xml",
+        "Hash":  "10768D8ED9942E976F072EED8641543616CBCD9E004C6A53F73304F55CA3F128"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Input_Border_Color__c.field-meta.xml",
+        "Hash":  "D55202E8310C9FCBB99A56752FA1B243C9A2B62B701B4072A47975556D12397D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Input_Border_Radius_Px__c.field-meta.xml",
+        "Hash":  "2D20CC30D672B31079AB084394B115B5F9665CECC0B34108E6B262D3CE2A9E2D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Link_Text_Color__c.field-meta.xml",
+        "Hash":  "EE592A1178211B82996367A567E186AF3A0726035719716AF6E3B87F9071D54D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Logo_Content_Document_Id__c.field-meta.xml",
+        "Hash":  "2FC66C048E3FF85347A7131933490704D77241254AB9552A0C0FB23B54DA31C8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Logo_Position__c.field-meta.xml",
+        "Hash":  "8E3651417CD9FE8AB872975EA874B4D164F924ECE7802FD4D9F70E5D48B6D2C0"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Logo_Size_Px__c.field-meta.xml",
+        "Hash":  "3A4C038494377B614CFA4339E2B6A8A6298FF9425180598678EB707010D0C9E1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Logo_URL__c.field-meta.xml",
+        "Hash":  "26A242E92A4549F4BC481AAB31E0A757544CBD293DE48184CCD5EFE39EF9D363"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Main_Font__c.field-meta.xml",
+        "Hash":  "B4364BC416DC9243A783DCA0F1D7CCA301F85FA0561A57D4BFC54AB84E45D23A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Main_Text_Color__c.field-meta.xml",
+        "Hash":  "8DA0C963D3CA9486FD9ACE82EA9D2188B421138EF600A534DE69B5B23F4E171A"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Main_Text_Size_Px__c.field-meta.xml",
+        "Hash":  "B684FC07DF48BDD2188879EEE80B2A94D4DBB6844D7B2D5C548D2B9E50B96357"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Section_Title_Font_Size_Px__c.field-meta.xml",
+        "Hash":  "DABC74E24F0A36D2F83EFAB3D6D9A4F386031475A5A9CE58C1E05099A4E59130"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Section_Title_Font__c.field-meta.xml",
+        "Hash":  "5BE3B2F51CC9E01D43B0449A804D205F8CAA4AB77D033EDC2F79A1F37E8C71A2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Section_Title_Text_Color__c.field-meta.xml",
+        "Hash":  "5E7F7FFA122DC26F54876CC8FCCE96DD11A862E29074C2ACAADBFCFC57F578F8"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Title_Font_Size_Px__c.field-meta.xml",
+        "Hash":  "5911F6590EAB587A8F7985E4E1E696189A60A3AF869CA7E5CEA1DC2B7040C7FA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Title_Font__c.field-meta.xml",
+        "Hash":  "F8A581E1F9D84587094D2A86B2A882A4833087D624BDA0863ABA716B0928C3B1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\fields\\Title_Text_Color__c.field-meta.xml",
+        "Hash":  "A2B91371703B5E8331FA66638A0594291AD7C1994C427B281515A10427A3F86D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\objects\\NF_Theme__c\\listViews\\All.listView-meta.xml",
+        "Hash":  "F8BC76DA21A18BA19C1F553FEB8668EB44F9739B1D15C1BDE6D2A651EE57B8C5"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\permissionsets\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\permissionsets\\NativeForms_Admin.permissionset-meta.xml",
+        "Hash":  "ABE9A9A3A2447D5D704BC47F80E29A4791681028C209DBC155679DD7EBD88D85"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\permissionsets\\TwinaForms_User.permissionset-meta.xml",
+        "Hash":  "BCC2098F4770F5707F5EB20B7C73AFB7524E8B248C4D6D5231B4F414D82884D1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\remoteSiteSettings\\NativeForms_Bootstrap.remoteSite-meta.xml",
+        "Hash":  "CDF55BE61CBC18350247A8B9270FFD358E2E9E88CE990E16205EEA94613F7E3B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\remoteSiteSettings\\NativeForms_Main.remoteSite-meta.xml",
+        "Hash":  "938D21E54579CA68022BA10F49E2EC1FE8F972E86140CED936EAC13A010A50EA"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\remoteSiteSettings\\NativeForms_S3_Publish.remoteSite-meta.xml",
+        "Hash":  "B0542A6B5F75CE526290000B00CF65AD2FB310325B7B85B68CC277C0A7C2FE17"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\remoteSiteSettings\\NativeForms_SubmissionLogs.remoteSite-meta.xml",
+        "Hash":  "3D71D9B54B1DF7325A8172D8E059607A23068CF7698335083F0513904B646FAE"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\nativeFormsConnectStep1.png",
+        "Hash":  "D5435662BDAE87F77AD9F29B062666E04512DAC55C7CC86D8B950F7FDFEAC501"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\nativeFormsConnectStep1.resource-meta.xml",
+        "Hash":  "525A9C438B73791738981D67405B6FEB09BBAD842CD418D42D447FFED8A76A65"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\nativeFormsConnectStep2.png",
+        "Hash":  "4A890D98967A70481BA9B2039B84E8B510E6C3FAB5008B4206376BE1B0154A22"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\nativeFormsConnectStep2.resource-meta.xml",
+        "Hash":  "525A9C438B73791738981D67405B6FEB09BBAD842CD418D42D447FFED8A76A65"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\nativeFormsConnectStep3.png",
+        "Hash":  "3FA8C9E5BB736538A4C8F9814AC2DAA609A5307546E77BA7FBD20D83B2AE3CE4"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\staticresources\\nativeFormsConnectStep3.resource-meta.xml",
+        "Hash":  "525A9C438B73791738981D67405B6FEB09BBAD842CD418D42D447FFED8A76A65"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\.gitkeep",
+        "Hash":  "01BA4719C80B6FE911B091A7C05124B64EEECE964E09C058EF8F9805DACA546B"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Admin_Features.tab-meta.xml",
+        "Hash":  "185363D6B9A0AC809560C38133409ABEC04DE8C66E500A5A219DD8312267FF14"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Connect.tab-meta.xml",
+        "Hash":  "C8E8AF4F631B914723260001328CA51C4167718B36693F122F271C5354C6E83D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Designer.tab-meta.xml",
+        "Hash":  "8F19A9B5E421B5ECE633B3938D766B598EA4E2F6361B37FDC7AD9E3080709C0C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Home.tab-meta.xml",
+        "Hash":  "1000FE043EEEBB70A46CDDFB6F5487009F26DA12E483A8215C48C18BD3B9CAD2"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Prefill_Actions.tab-meta.xml",
+        "Hash":  "7EA7D6ED43E12AF182BF6237B58BA3FF91078AAB173D39ADA9ADE7C7AC72CD39"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Submission_Logs.tab-meta.xml",
+        "Hash":  "522BAD0116E200F4B357C0FC4159D5C3DB4CA54CA7982726FED15B484897B30E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Submit_Actions.tab-meta.xml",
+        "Hash":  "66DB65819F6DAFE4363A53D36BEB008C655B7373A9B9811A687E5797C5012950"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NativeForms_Themes.tab-meta.xml",
+        "Hash":  "10AAA4F2A38D4FA5C2E15AEE19FD1AEAC44F9023F704C50E587C77FC3E58E29D"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Form_Action__c.tab-meta.xml",
+        "Hash":  "84EE70BAB3028FD64856E635861B03BDEC6E5CD4A7FA4FAEB9BF13371EC44E99"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Form_Element__c.tab-meta.xml",
+        "Hash":  "2596C76CED713D1BF1D1C98ACB0E6ADDD24BE316DA91FB54377E4503C89DAB0C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Form_Publication__c.tab-meta.xml",
+        "Hash":  "38C51909584F9B22D88483E8E7F2C4E8A5B53C7B39B6CF517B6420C88E71FE6C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Form_Version__c.tab-meta.xml",
+        "Hash":  "85314B076D59414FABC9F70AEEED523C58D5FBA3BF0827B30D702F852AFA3EB1"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Form__c.tab-meta.xml",
+        "Hash":  "1101F8EC580E8EC764A315B8BCADD875B0F5620099C6A80693D4524898BFF965"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Project__c.tab-meta.xml",
+        "Hash":  "A0779E8D879721F9FE292ACC7BC23F91142BFFE65AF0895D4E060A27393FB27C"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\tabs\\NF_Theme__c.tab-meta.xml",
+        "Hash":  "F84D33963299200510293E1875DAC2E5EE7BE19195ED281EB95614CF6B0E5495"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\triggers\\NFFormTrigger.trigger",
+        "Hash":  "0BC2384C4975BDBE79BAAE0EE1EE588167D142EF1EF7B10E899AC191099A07E5"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\triggers\\NFFormTrigger.trigger-meta.xml",
+        "Hash":  "ADF36B535E9F1311B8362B5C35B9F62F0EEE3E7511296D1E14BBF5A637255132"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\triggers\\NFProjectTrigger.trigger",
+        "Hash":  "659F43334716FBD9CFD5A264319EF7016C883172C4206EAB04561EE19617EE9E"
+    },
+    {
+        "Path":  "C:\\Users\\Yosi\\NativeFormsAWS\\force-app\\main\\default\\triggers\\NFProjectTrigger.trigger-meta.xml",
+        "Hash":  "3E281F4973F11EE8787AD60A6CE887072AB93D08026550ED06558FB797DDE139"
+    }
+]

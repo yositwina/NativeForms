@@ -1,0 +1,38 @@
+---
+env:
+  contexts:
+    - name: TwinaForms Published Form Page
+      urls:
+        - https://forms.twinaforms.com/
+      includePaths:
+        - https://forms\.twinaforms\.com/twinaforms/form1.*
+      excludePaths: []
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Published form page with sample prefill parameter
+        url: https://forms.twinaforms.com/twinaforms/form1?email=liam.carter@example.com
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ISV passive scan"
+        responseCode: 200
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\zap\isv-submission-2026-08-20-0.14.0.1\official-reports
+      reportFile: 01-published-form-page.html
+      reportTitle: TwinaForms Published Form Page ZAP Report
+      reportDescription: Passive ZAP requestor report for the public TwinaForms published form page. This report does not run an active attack scan.
+
+

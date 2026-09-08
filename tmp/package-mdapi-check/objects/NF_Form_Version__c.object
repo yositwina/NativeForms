@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Versioned publishable snapshot of a TwinaForms form.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableLicensing>false</enableLicensing>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>NF Form Version</label>
+    <nameField>
+        <displayFormat>VER-{0000}</displayFormat>
+        <label>Version Name</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>NF Form Versions</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>Custom_CSS__c</fullName>
+        <description>Optional custom CSS source for the generated public form.</description>
+        <inlineHelpText>Optional custom CSS.</inlineHelpText>
+        <label>Custom CSS</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>10</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Custom_JS__c</fullName>
+        <description>Optional custom JavaScript source for the generated public form.</description>
+        <inlineHelpText>Optional custom JavaScript.</inlineHelpText>
+        <label>Custom JS</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>10</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Form__c</fullName>
+        <description>Parent form for this version.</description>
+        <inlineHelpText>Parent form record.</inlineHelpText>
+        <label>Form</label>
+        <referenceTo>NF_Form__c</referenceTo>
+        <relationshipLabel>Form Versions</relationshipLabel>
+        <relationshipName>FormVersions</relationshipName>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+        <trackHistory>false</trackHistory>
+        <type>MasterDetail</type>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+    </fields>
+    <fields>
+        <fullName>Form_Id__c</fullName>
+        <description>AWS/public form id used by generated HTML and Lambda.</description>
+        <inlineHelpText>Stable form id used in AWS and public HTML.</inlineHelpText>
+        <label>Form Id</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Last_Publish_Error__c</fullName>
+        <description>Last publish failure summary.</description>
+        <inlineHelpText>Last publish error details.</inlineHelpText>
+        <label>Last Publish Error</label>
+        <length>32768</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>4</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Last_Published_At__c</fullName>
+        <description>Datetime of the latest successful or attempted publish operation.</description>
+        <inlineHelpText>Last published at.</inlineHelpText>
+        <label>Last Published At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>Last_Published_By__c</fullName>
+        <deleteConstraint>SetNull</deleteConstraint>
+        <description>User who last published this form version.</description>
+        <inlineHelpText>Last published by.</inlineHelpText>
+        <label>Last Published By</label>
+        <referenceTo>User</referenceTo>
+        <relationshipLabel>NF Form Versions Last Published By</relationshipLabel>
+        <relationshipName>NFFormVersionsLastPublishedBy</relationshipName>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Lookup</type>
+    </fields>
+    <fields>
+        <fullName>Prefill_Params_JSON__c</fullName>
+        <description>Client-side prefill parameter mapping source JSON.</description>
+        <inlineHelpText>Optional prefill params JSON.</inlineHelpText>
+        <label>Prefill Params JSON</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>6</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Publish_Status__c</fullName>
+        <description>Operational publish status for the version.</description>
+        <inlineHelpText>Status of the latest publish attempt.</inlineHelpText>
+        <label>Publish Status</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>Never Published</fullName>
+                    <default>true</default>
+                    <label>Never Published</label>
+                </value>
+                <value>
+                    <fullName>Publish Pending</fullName>
+                    <default>false</default>
+                    <label>Publish Pending</label>
+                </value>
+                <value>
+                    <fullName>Published</fullName>
+                    <default>false</default>
+                    <label>Published</label>
+                </value>
+                <value>
+                    <fullName>Publish Failed</fullName>
+                    <default>false</default>
+                    <label>Publish Failed</label>
+                </value>
+                <value>
+                    <fullName>Unpublished</fullName>
+                    <default>false</default>
+                    <label>Unpublished</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Publish_Token__c</fullName>
+        <description>Long-lived per-form publish token sent to AWS.</description>
+        <inlineHelpText>Protected publish token used when generating the public form artifact.</inlineHelpText>
+        <label>Publish Token</label>
+        <length>255</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Rate_Limit_Profile__c</fullName>
+        <description>Reserved field for future AWS-side rate limit profile selection.</description>
+        <inlineHelpText>Future rate limit profile for publish output.</inlineHelpText>
+        <label>Rate Limit Profile</label>
+        <length>80</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Security_Mode__c</fullName>
+        <description>Security mode compiled into the AWS registration payload.</description>
+        <inlineHelpText>Controls AWS-side execution restrictions for the form version.</inlineHelpText>
+        <label>Security Mode</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>public-create</fullName>
+                    <default>true</default>
+                    <label>Public Create</label>
+                </value>
+                <value>
+                    <fullName>public-prefill</fullName>
+                    <default>false</default>
+                    <label>Public Prefill</label>
+                </value>
+                <value>
+                    <fullName>secure-edit</fullName>
+                    <default>false</default>
+                    <label>Secure Edit</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Theme_JSON__c</fullName>
+        <description>Theme source JSON used to generate the public HTML artifact.</description>
+        <inlineHelpText>Theme and look-and-feel JSON.</inlineHelpText>
+        <label>Theme JSON</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>8</visibleLines>
+    </fields>
+    <fields>
+        <fullName>UI_Settings_JSON__c</fullName>
+        <description>Additional UI settings source JSON used in HTML generation.</description>
+        <inlineHelpText>Additional UI settings JSON.</inlineHelpText>
+        <label>UI Settings JSON</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>8</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Version_Number__c</fullName>
+        <description>Numeric version number.</description>
+        <inlineHelpText>Version number for this form version.</inlineHelpText>
+        <label>Version Number</label>
+        <precision>6</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <trackHistory>false</trackHistory>
+        <type>Number</type>
+    </fields>
+    <fields>
+        <fullName>Version_Status__c</fullName>
+        <description>Lifecycle state of the version record.</description>
+        <inlineHelpText>Draft, published, or archived state for the version.</inlineHelpText>
+        <label>Version Status</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>Draft</fullName>
+                    <default>true</default>
+                    <label>Draft</label>
+                </value>
+                <value>
+                    <fullName>Published</fullName>
+                    <default>false</default>
+                    <label>Published</label>
+                </value>
+                <value>
+                    <fullName>Archived</fullName>
+                    <default>false</default>
+                    <label>Archived</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <listViews>
+        <fullName>Debug_All_Records</fullName>
+        <columns>NAME</columns>
+        <columns>Form__c</columns>
+        <columns>Form_Id__c</columns>
+        <columns>Version_Number__c</columns>
+        <columns>Version_Status__c</columns>
+        <columns>Publish_Status__c</columns>
+        <columns>Publish_Token__c</columns>
+        <columns>Security_Mode__c</columns>
+        <columns>Rate_Limit_Profile__c</columns>
+        <columns>Last_Published_At__c</columns>
+        <columns>Last_Published_By__c</columns>
+        <columns>Last_Publish_Error__c</columns>
+        <filterScope>Everything</filterScope>
+        <label>Debug - All Records</label>
+    </listViews>
+</CustomObject>

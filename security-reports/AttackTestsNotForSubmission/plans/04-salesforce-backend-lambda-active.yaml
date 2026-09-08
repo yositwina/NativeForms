@@ -1,0 +1,62 @@
+---
+# ACTIVE ATTACK SCAN - NOT FOR ISV SUBMISSION
+# Backend Lambda. Public routes (/public/plans, /tenant/status?orgId=) are
+# fuzzed in full. Protected routes are seeded without a bearer token, so the
+# scanner fuzzes the pre-auth attack surface (stays at the 401 rejection layer).
+env:
+  contexts:
+    - name: TwinaForms Salesforce Backend Lambda
+      urls:
+        - https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/
+      includePaths:
+        - https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh\.lambda-url\.eu-north-1\.on\.aws/.*
+      excludePaths: []
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    continueOnFailure: true
+    progressToStdout: true
+
+jobs:
+  - type: requestor
+    requests:
+      - name: Seed public plans endpoint
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/public/plans
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+      - name: Seed tenant status public setup endpoint
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/status?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+      - name: Seed tenant auth-health protected route (no bearer)
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/tenant/auth-health?orgId=00Dg5000008sWZN
+        method: GET
+        headers:
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+      - name: Seed forms register protected route (no bearer)
+        url: https://f4apx2tkemgn5i2vagzhboeyjm0nnnjh.lambda-url.eu-north-1.on.aws/forms/register
+        method: POST
+        headers:
+          - "Content-Type:application/json"
+          - "User-Agent:Mozilla/5.0 ZAP TwinaForms ACTIVE attack scan (not for submission)"
+        data: "{\"orgId\":\"00Dg5000008sWZN\",\"formId\":\"zap-form\",\"publishToken\":\"zap-token\",\"publishedVersionId\":\"zap-version\",\"status\":\"active\",\"securityMode\":\"public\",\"companySlug\":\"zap-company\",\"formSlug\":\"zap-form\",\"prefillPolicy\":{},\"submitPolicy\":{},\"prefillDefinition\":{\"commands\":[],\"responseMapping\":{}},\"submitDefinition\":{\"commands\":[]}}"
+
+  - type: activeScan
+    parameters:
+      context: TwinaForms Salesforce Backend Lambda
+      maxScanDurationInMins: 10
+      maxRuleDurationInMins: 2
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 3
+
+  - type: report
+    parameters:
+      template: risk-confidence-html
+      reportDir: C:\Users\Yosi\NativeFormsAWS\security-reports\AttackTestsNotForSubmission\reports
+      reportFile: 04-salesforce-backend-lambda-active.html
+      reportTitle: TwinaForms Salesforce Backend Lambda ACTIVE Attack Scan (NOT FOR SUBMISSION)
+      reportDescription: Active OWASP ZAP attack scan of the Salesforce-to-AWS backend Lambda. Public routes fuzzed fully; protected routes fuzzed without bearer at the pre-auth layer. Internal hardening evidence only, not part of the ISV submission packet.

@@ -1,0 +1,95 @@
+<template>
+    <lightning-card title="TwinaForms Admin" icon-name="utility:settings">
+        <div class="shell">
+            <template if:true={errorMessage}>
+                <div class="panel-error">{errorMessage}</div>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-wrap">
+                    <lightning-spinner alternative-text="Loading feature settings"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="admin-grid">
+                    <section class="feature-panel feature-panel--admin">
+                        <h2>Admin Settings</h2>
+                        <p class="feature-copy">Use this right section for org-level settings and connection testing tools.</p>
+
+                        <div class="status-box">
+                            <p class="status-line"><strong>Salesforce Connection:</strong> {salesforceConnectionLabel}</p>
+                            <p class="status-line"><strong>Signed Service Access:</strong> {serviceAccessLabel}</p>
+                            <p class="status-line"><strong>Setup State:</strong> {setupState}</p>
+                            <template if:true={tenantAuthErrorMessage}>
+                                <p class="status-error">{tenantAuthErrorMessage}</p>
+                            </template>
+                        </div>
+
+                        <div class="actions">
+                            <lightning-button
+                                label="Refresh Connection"
+                                onclick={handleRefreshConnection}>
+                            </lightning-button>
+                            <lightning-button
+                                variant="destructive"
+                                label="Disconnect For Testing"
+                                onclick={handleDisconnect}
+                                disabled={disconnectDisabled}>
+                            </lightning-button>
+                        </div>
+
+                        <p class="feature-copy">Disconnect clears the Salesforce OAuth connection only. It keeps the customer registration in place so you can reconnect quickly.</p>
+
+                        <h3>Google CAPTCHA</h3>
+                        <p class="feature-copy">CAPTCHA is now managed centrally by TwinaForms for forms published on <strong>forms.twinaforms.com</strong>. Customers do not need to paste or manage Google CAPTCHA keys in Salesforce.</p>
+
+                        <lightning-input
+                            name="captchaSiteKey"
+                            label="Shared CAPTCHA Site Key"
+                            value={captchaSiteKey}
+                            disabled>
+                        </lightning-input>
+
+                        <lightning-input
+                            type="password"
+                            name="captchaSecretKey"
+                            label="CAPTCHA Secret Key"
+                            value={captchaSecretKey}
+                            placeholder="Managed in AWS only"
+                            disabled>
+                        </lightning-input>
+
+                        <h3>Submission Logs</h3>
+                        <p class="feature-copy">Submission Logs now follow the customer plan automatically. Org users do not choose the log mode or paste keys manually, and TwinaForms will try to prepare and sync the hidden crypto setup automatically.</p>
+
+                        <div class="status-box">
+                            <p class="status-line"><strong>Current Plan:</strong> {submissionLogPlanLabel}</p>
+                            <p class="status-line"><strong>Detailed Logs:</strong> {submissionLogsIncludedLabel}</p>
+                            <p class="status-line"><strong>Retention:</strong> {submissionLogRetentionLabel}</p>
+                            <p class="status-line"><strong>Encryption Status:</strong> {submissionLogEncryptionLabel}</p>
+                            <p class="status-line"><strong>Key Version:</strong> {submissionLogKeyVersion}</p>
+                            <p class="status-line"><strong>Last Sync:</strong> {submissionLogSyncLabel}</p>
+                        </div>
+
+                        <p class="feature-copy">{submissionLogStatusCopy}</p>
+
+                        <div class="actions">
+                            <lightning-button
+                                label="Repair Submission Logs"
+                                onclick={handlePrepareSubmissionLogs}
+                                disabled={prepareSubmissionLogsDisabled}>
+                            </lightning-button>
+                            <lightning-button
+                                variant="brand"
+                                label="Resync Submission Logs To AWS"
+                                onclick={handleSyncSubmissionLogs}
+                                disabled={syncSubmissionLogsDisabled}>
+                            </lightning-button>
+                        </div>
+                    </section>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

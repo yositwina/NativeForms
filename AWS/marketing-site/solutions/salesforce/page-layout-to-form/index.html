@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create a Salesforce Form from a Page Layout — One Click | TwinaForms</title>
+  <meta name="description" content="Stop rebuilding fields by hand. TwinaForms turns a Salesforce object's page layout into a working public form in one click — every field added, prefill and submit wired automatically. Build a Salesforce form in minutes, not hours.">
+  <meta name="keywords" content="create salesforce form from page layout, salesforce page layout to web form, generate salesforce form automatically, auto generate form from salesforce object, build salesforce form fast, one click salesforce form, salesforce form generator, convert salesforce object to form, salesforce form builder no manual setup, turn salesforce fields into a form, formassembly alternative quick setup">
+  <link rel="alternate" hreflang="en" href="/solutions/salesforce/page-layout-to-form/">
+  <link rel="alternate" hreflang="x-default" href="/solutions/salesforce/page-layout-to-form/">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="canonical" href="https://twinaforms.com/solutions/salesforce/page-layout-to-form/">
+  <link rel="icon" type="image/png" href="/assets/Mango.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TwinaForms">
+  <meta property="og:title" content="Create a Salesforce Form from a Page Layout — One Click | TwinaForms">
+  <meta property="og:description" content="Turn a Salesforce page layout into a working public form in one click — every field added, prefill and submit wired automatically. Build a Salesforce form in minutes, not hours.">
+  <meta property="og:url" content="https://twinaforms.com/solutions/salesforce/page-layout-to-form/">
+  <meta property="og:image" content="https://twinaforms.com/assets/image.png">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Create a Salesforce Form from a Page Layout — One Click | TwinaForms">
+  <meta name="twitter:description" content="Turn a Salesforce page layout into a working public form in one click — fields, prefill, and submit wired automatically.">
+  <meta name="twitter:image" content="https://twinaforms.com/assets/image.png">
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://twinaforms.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://twinaforms.com/solutions/"},{"@type":"ListItem","position":3,"name":"Salesforce","item":"https://twinaforms.com/solutions/salesforce/"},{"@type":"ListItem","position":4,"name":"Page Layout to Form","item":"https://twinaforms.com/solutions/salesforce/page-layout-to-form/"}]}</script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I create a Salesforce form without rebuilding every field?","acceptedAnswer":{"@type":"Answer","text":"With TwinaForms you don't rebuild anything. Open the Designer, click Create From Layout, and pick a Salesforce object. TwinaForms reads that object's page layout and generates a working form with every supported field already placed, in the layout's order, plus the prefill and submit actions wired to each field automatically. What would be an hour of dragging and mapping fields becomes one click."}},{"@type":"Question","name":"Can TwinaForms generate a form from a Salesforce object or page layout?","acceptedAnswer":{"@type":"Answer","text":"Yes. That is exactly what the Page Layout to Form feature does. You choose a standard or custom Salesforce object and TwinaForms builds a draft form from its page layout — input elements for each field with the matching type (text, number, picklist, date, lookup, etc.), the layout's sections preserved, and prefill and submit actions created and mapped for you."}},{"@type":"Question","name":"How fast is it to build a Salesforce form this way?","acceptedAnswer":{"@type":"Answer","text":"Minutes. The form is functional immediately after the one-click generation — you preview it, polish labels, and publish. Most of the time-consuming work, adding each field and wiring prefill and submit, is done for you, so a form that would take an hour by hand is ready in a few minutes."}},{"@type":"Question","name":"Does the generated form prefill and write back to Salesforce?","acceptedAnswer":{"@type":"Answer","text":"Yes. Page Layout to Form creates a prefill action that can load an existing record into the form and a submit action that writes the form's values back to the same Salesforce object — both with every field already mapped. The form works end-to-end the moment it is generated."}},{"@type":"Question","name":"Which fields are skipped when generating the form?","acceptedAnswer":{"@type":"Answer","text":"Salesforce system fields (Owner, Created By, Created Date, Last Modified By/Date, System Modstamp) and formula fields are intentionally left off, because they are managed by Salesforce and not meant for visitor input. Fields with no TwinaForms equivalent (Rich Text Area, compound Address, Geolocation, Encrypted Text) are also omitted; you can add plain Text fields afterwards if needed."}},{"@type":"Question","name":"Can I generate the same Salesforce form in multiple languages?","acceptedAnswer":{"@type":"Answer","text":"Yes. Page Layout to Form is multilingual. When you choose a non-English form language, TwinaForms pulls translated object, section, and field labels from your Salesforce Translation Workbench, and Hebrew is set to right-to-left automatically. Run it once per language to produce the same form in each language you maintain."}},{"@type":"Question","name":"How is this different from FormAssembly or building forms by hand?","acceptedAnswer":{"@type":"Answer","text":"External tools like FormAssembly require you to build the form and map every field to Salesforce through a connector, outside your org. TwinaForms is native: it reads your Salesforce page layout directly and generates the whole form — fields, prefill, and submit — in one click, managed entirely from the Salesforce Designer, with no connector to maintain and no per-user license for the people filling the form."}}]}</script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img class="brand-logo" src="/assets/Twinaformslogo.png" alt="TwinaForms">
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/solutions/" aria-current="page">Solutions</a>
+      <a href="/#security">Security</a>
+      <a href="/#plans">Plans</a>
+      <a href="/help/index.html">Help</a>
+      <a class="nav-cta" href="/contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">Page Layout to Form · One-click form builder</p>
+        <h1>Turn a Salesforce page layout into a working form <span>— in one click.</span></h1>
+        <p class="lead">Don't rebuild your fields. TwinaForms reads a Salesforce object's page layout and generates a complete public form &mdash; every field placed, prefill and submit wired automatically. A Salesforce form that used to take an hour is ready in minutes.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000OO9FQAW" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/help/page-layout-to-form.html">How it works (docs)</a>
+        </div>
+        <ul class="trust-pills" aria-label="Key attributes of Page Layout to Form">
+          <li class="trust-pill trust-pill--blue">Native to Salesforce</li>
+          <li class="trust-pill trust-pill--green">One click, every field</li>
+          <li class="trust-pill trust-pill--green">Prefill &amp; submit auto-wired</li>
+          <li class="trust-pill trust-pill--amber">Ready to publish in minutes</li>
+        </ul>
+      </div>
+      <figure class="product-screenshot-frame">
+        <img class="product-screenshot" src="/assets/image-2.png" alt="TwinaForms Salesforce Designer toolbar showing the Create From Layout button that turns a page layout into a form in one click">
+      </figure>
+    </section>
+
+    <!-- ===== THE PROBLEM ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">The problem</p>
+        <h2>Building a Salesforce form by hand is slow and repetitive.</h2>
+        <p>Your object already has the fields, the layout, and the structure. But every form tool makes you build it all again from scratch &mdash; by hand, field by field.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">01</span>
+          <h3>Re-adding every field</h3>
+          <p>You drag in each field one at a time and set its type, even though Salesforce already knows all of this from the object.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">02</span>
+          <h3>Wiring prefill by hand</h3>
+          <p>To load an existing record, you map every field to a query, one by one &mdash; tedious and easy to get wrong.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">03</span>
+          <h3>Wiring submit by hand</h3>
+          <p>Then you map every field again for the write-back so the form actually saves to Salesforce. Double the work.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">04</span>
+          <h3>Hours you don't have</h3>
+          <p>A simple form becomes an afternoon. Multiply that across objects and languages and form-building eats your week.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== THE SOLUTION ===== -->
+    <section class="split-section">
+      <div>
+        <p class="eyebrow">The solution</p>
+        <h2>One click. The whole form, generated for you.</h2>
+        <p class="lead">Page Layout to Form is a native TwinaForms feature. Pick a Salesforce object and TwinaForms builds the entire form from its page layout &mdash; fields, sections, prefill, and submit &mdash; in a single click. You preview, polish, and publish.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000OO9FQAW" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/help/page-layout-to-form.html">See the docs</a>
+        </div>
+      </div>
+      <div class="strength-list">
+        <div>
+          <h3>Every field, already placed</h3>
+          <p>An input for each field on the layout, with the matching type &mdash; text, number, picklist, date, lookup &mdash; in the layout's own order.</p>
+        </div>
+        <div>
+          <h3>Prefill action, auto-mapped</h3>
+          <p>A prefill action that loads an existing record is created and wired to every field, so the form can pre-populate with no manual mapping.</p>
+        </div>
+        <div>
+          <h3>Submit action, auto-mapped</h3>
+          <p>A submit action writes the values back to the same Salesforce object, every field mapped for you. The form works end-to-end immediately.</p>
+        </div>
+        <div>
+          <h3>Multilingual &amp; RTL-ready</h3>
+          <p>Pick a language and TwinaForms pulls translated labels from your Translation Workbench; Hebrew switches the form to right-to-left automatically.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== WHAT YOU GET ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">What you get</p>
+        <h2>A working draft form, the moment you click.</h2>
+        <p>No blank canvas. The generated form mirrors how your team already works with the record in Salesforce &mdash; ready to preview and publish.</p>
+      </div>
+      <figure class="product-screenshot-frame" style="margin-top:8px">
+        <img class="product-screenshot" src="/assets/image-3.png" alt="A TwinaForms public form generated from a Salesforce Contact page layout — First Name, Last Name, Email, Phone, and a Lookup field, with prefill and submit already configured">
+      </figure>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">How it works</p>
+        <h2>From Salesforce object to published form in four steps.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">1</span>
+          <h3>Open the Designer</h3>
+          <p>In TwinaForms, open the Designer page where you build and publish your Salesforce forms.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">2</span>
+          <h3>Click Create From Layout</h3>
+          <p>In the top toolbar, click <strong>Create From Layout</strong> &mdash; the one-click Page Layout to Form shortcut.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">3</span>
+          <h3>Pick a Salesforce object</h3>
+          <p>Choose any standard or custom object. TwinaForms reads its page layout and generates the draft form instantly.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">4</span>
+          <h3>Polish &amp; publish</h3>
+          <p>Tidy labels, hide internal fields, confirm submit mode, and publish a public form that writes straight to Salesforce.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== COMPARISON ===== -->
+    <section class="section security-band">
+      <div class="section-heading">
+        <p class="eyebrow">By hand vs. one click</p>
+        <h2>Why generating from the layout beats building forms manually.</h2>
+        <p>Whether you build by hand in another tool or wire up a connector, you do the same work twice. TwinaForms reads the layout for you.</p>
+      </div>
+      <div class="plf-compare">
+        <table>
+          <thead>
+            <tr><th>&nbsp;</th><th>TwinaForms (Page Layout to Form)</th><th>Building a form by hand / external tool</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Adding fields</td><td>Generated from the page layout in one click</td><td>Dragged in and typed one by one</td></tr>
+            <tr><td>Prefill mapping</td><td>Created and wired to every field automatically</td><td>Mapped manually, field by field</td></tr>
+            <tr><td>Submit mapping</td><td>Created and wired to every field automatically</td><td>Mapped again for write-back</td></tr>
+            <tr><td>Time to a working form</td><td>Minutes</td><td>Often an hour or more per form</td></tr>
+            <tr><td>Where it runs</td><td>Native in Salesforce, from the Designer</td><td>Outside Salesforce, via a connector</td></tr>
+            <tr><td>Multiple languages</td><td>Re-run per language, labels pulled from Salesforce</td><td>Rebuilt and re-translated by hand</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== USE CASES ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Where teams use it</p>
+        <h2>Any object on your page layout can become a form.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">CU</span>
+          <h3>Contact / record update forms</h3>
+          <p>Generate a self-update form straight from the Contact layout, then prefill and lock the fields you choose.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">TS</span>
+          <h3><a href="/solutions/salesforce/timesheet-form/" style="color:inherit;text-decoration:none">Timesheets &amp; custom objects</a></h3>
+          <p>Lay your custom object out once and generate the form. <a href="/solutions/salesforce/timesheet-form/" style="color:var(--blue);font-weight:700;text-decoration:none">See the timesheet form &rarr;</a></p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">QZ</span>
+          <h3><a href="/solutions/salesforce/quiz-form/" style="color:inherit;text-decoration:none">Quizzes &amp; assessments</a></h3>
+          <p>Model questions as fields, generate the form, add a scoring formula. <a href="/solutions/salesforce/quiz-form/" style="color:var(--blue);font-weight:700;text-decoration:none">See the quiz form &rarr;</a></p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== FAQ ===== -->
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">FAQ</p>
+        <h2>Common questions about generating a Salesforce form from a layout.</h2>
+      </div>
+      <div class="plf-faq">
+        <details>
+          <summary>How do I create a Salesforce form without rebuilding every field?</summary>
+          <p>With TwinaForms you don't rebuild anything. Open the Designer, click <strong>Create From Layout</strong>, and pick a Salesforce object. TwinaForms reads that object's page layout and generates a working form with every supported field already placed, in the layout's order, plus the prefill and submit actions wired to each field automatically. What would be an hour of dragging and mapping fields becomes one click.</p>
+        </details>
+        <details>
+          <summary>Can TwinaForms generate a form from a Salesforce object or page layout?</summary>
+          <p>Yes. That is exactly what the Page Layout to Form feature does. You choose a standard or custom Salesforce object and TwinaForms builds a draft form from its page layout &mdash; input elements for each field with the matching type (text, number, picklist, date, lookup, etc.), the layout's sections preserved, and prefill and submit actions created and mapped for you.</p>
+        </details>
+        <details>
+          <summary>How fast is it to build a Salesforce form this way?</summary>
+          <p>Minutes. The form is functional immediately after the one-click generation &mdash; you preview it, polish labels, and publish. Most of the time-consuming work, adding each field and wiring prefill and submit, is done for you, so a form that would take an hour by hand is ready in a few minutes.</p>
+        </details>
+        <details>
+          <summary>Does the generated form prefill and write back to Salesforce?</summary>
+          <p>Yes. Page Layout to Form creates a prefill action that can load an existing record into the form and a submit action that writes the form's values back to the same Salesforce object &mdash; both with every field already mapped. The form works end-to-end the moment it is generated.</p>
+        </details>
+        <details>
+          <summary>Which fields are skipped when generating the form?</summary>
+          <p>Salesforce system fields (Owner, Created By, Created Date, Last Modified By/Date, System Modstamp) and formula fields are intentionally left off, because they are managed by Salesforce and not meant for visitor input. Fields with no TwinaForms equivalent (Rich Text Area, compound Address, Geolocation, Encrypted Text) are also omitted; you can add plain Text fields afterwards if needed.</p>
+        </details>
+        <details>
+          <summary>Can I generate the same Salesforce form in multiple languages?</summary>
+          <p>Yes. Page Layout to Form is multilingual. When you choose a non-English form language, TwinaForms pulls translated object, section, and field labels from your Salesforce Translation Workbench, and Hebrew is set to right-to-left automatically. Run it once per language to produce the same form in each language you maintain.</p>
+        </details>
+        <details>
+          <summary>How is this different from FormAssembly or building forms by hand?</summary>
+          <p>External tools like FormAssembly require you to build the form and map every field to Salesforce through a connector, outside your org. TwinaForms is native: it reads your Salesforce page layout directly and generates the whole form &mdash; fields, prefill, and submit &mdash; in one click, managed entirely from the Salesforce Designer, with no connector to maintain and no per-user license for the people filling the form. For step-by-step setup, see the <a href="/help/page-layout-to-form.html">Page Layout to Form documentation</a>.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING CTA ===== -->
+    <section class="about-section" style="grid-template-columns: 1fr">
+      <div>
+        <p class="eyebrow">Stop rebuilding fields</p>
+        <h2>Generate your next Salesforce form in one click.</h2>
+        <p style="margin-top:20px">Page Layout to Form is included on the Pro plan. Install TwinaForms into a sandbox, open the Designer, and turn a page layout into a working public form before your coffee's cold. Nonprofit discount available.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://test.salesforce.com/packaging/installPackage.apexp?p0=04tgL000000OO9FQAW" target="_blank" rel="noopener">Try in a sandbox</a>
+          <a class="button button-secondary" href="/contact.html">Talk to us</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>TwinaForms</strong>
+      <span>A Harmony-IT product</span>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href="/">Home</a>
+      <a href="/solutions/">Solutions</a>
+      <a href="/help/index.html">Help</a>
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </footer>
+
+  <style>
+    .plf-compare { overflow-x: auto; }
+    .plf-compare table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 0.96rem;
+    }
+    .plf-compare th, .plf-compare td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .plf-compare thead th {
+      background: #f4f8fb;
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .plf-compare thead th:nth-child(2) { color: var(--blue-dark); }
+    .plf-compare td:first-child { color: var(--muted); font-weight: 700; }
+    .plf-compare td:nth-child(2) { color: var(--ink); font-weight: 600; }
+    .plf-compare tbody tr:last-child td { border-bottom: none; }
+
+    .plf-faq { display: grid; gap: 12px; }
+    .plf-faq details {
+      padding: 18px 20px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(16, 35, 63, 0.04);
+    }
+    .plf-faq summary {
+      cursor: pointer; list-style: none;
+      color: var(--ink); font-weight: 800; font-size: 1.02rem;
+    }
+    .plf-faq summary::-webkit-details-marker { display: none; }
+    .plf-faq summary::after {
+      content: '+';
+      float: right; margin-left: 12px;
+      color: var(--blue); font-weight: 900;
+    }
+    .plf-faq details[open] summary::after { content: '\2212'; }
+    .plf-faq p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+  </style>
+
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "963b187768934fe5bbf288119c289e18"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

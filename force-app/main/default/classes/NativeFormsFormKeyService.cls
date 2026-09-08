@@ -43,15 +43,7 @@ public with sharing class NativeFormsFormKeyService {
         }
 
         List<NF_Form__c> recordsNeedingKeys = new List<NF_Form__c>();
-        Integer maxSuffix = 0;
-
-        for (NF_Form__c record : [
-            SELECT NF_Key__c
-            FROM NF_Form__c
-            WHERE NF_Key__c LIKE 'form%' WITH USER_MODE
-        ]) {
-            maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(record.NF_Key__c));
-        }
+        Integer maxExistingSuffix = 0;
 
         for (NF_Form__c record : newRecords) {
             if (record == null) {
@@ -63,12 +55,89 @@ public with sharing class NativeFormsFormKeyService {
                 continue;
             }
 
-            maxSuffix = Math.max(maxSuffix, readAutoKeySuffix(record.NF_Key__c));
+            maxExistingSuffix = Math.max(maxExistingSuffix, readAutoKeySuffix(record.NF_Key__c));
         }
 
+        if (recordsNeedingKeys.isEmpty()) {
+            return;
+        }
+
+        NF_Admin__c adminRecord = getLockedAdminRecord(maxExistingSuffix);
+        Integer nextNumber = readSequenceFromScope(adminRecord.Scope__c);
         for (NF_Form__c record : recordsNeedingKeys) {
-            maxSuffix += 1;
-            record.NF_Key__c = 'form' + String.valueOf(maxSuffix);
+            nextNumber += 1;
+            record.NF_Key__c = 'form' + String.valueOf(nextNumber);
+        }
+        adminRecord.Scope__c = sequenceScope(nextNumber);
+        update as user adminRecord;
+    }
+
+    public static void reserveImportedKey(String formKey) {
+        Integer importedSuffix = readAutoKeySuffix(formKey);
+        if (importedSuffix <= 0) {
+            return;
+        }
+
+        NF_Admin__c adminRecord = getLockedAdminRecord(0);
+        Integer currentNumber = readSequenceFromScope(adminRecord.Scope__c);
+        if (importedSuffix > currentNumber) {
+            adminRecord.Scope__c = sequenceScope(importedSuffix);
+            update as user adminRecord;
+        }
+    }
+
+    private static NF_Admin__c getLockedAdminRecord(Integer minimumNumber) {
+        List<NF_Admin__c> adminRecords = [
+            SELECT Id, Scope__c
+            FROM NF_Admin__c
+            WHERE Scope__c LIKE 'ORG%'
+            WITH USER_MODE
+            LIMIT 1
+            FOR UPDATE
+        ];
+        if (!adminRecords.isEmpty()) {
+            NF_Admin__c existing = adminRecords[0];
+            Integer currentNumber = readSequenceFromScope(existing.Scope__c);
+            if (minimumNumber > currentNumber) {
+                existing.Scope__c = sequenceScope(minimumNumber);
+                update as user existing;
+            } else if (existing.Scope__c == 'ORG') {
+                existing.Scope__c = sequenceScope(currentNumber);
+                update as user existing;
+            }
+            return existing;
+        }
+
+        Integer highestNumber = minimumNumber;
+        for (NF_Form__c record : [
+            SELECT NF_Key__c
+            FROM NF_Form__c
+            WHERE NF_Key__c LIKE 'form%'
+            WITH USER_MODE
+        ]) {
+            highestNumber = Math.max(highestNumber, readAutoKeySuffix(record.NF_Key__c));
+        }
+
+        NF_Admin__c created = new NF_Admin__c(
+            Scope__c = sequenceScope(highestNumber)
+        );
+        insert as user created;
+        return created;
+    }
+
+    private static String sequenceScope(Integer value) {
+        return 'ORG|' + String.valueOf(value == null ? 0 : value);
+    }
+
+    private static Integer readSequenceFromScope(String scope) {
+        if (String.isBlank(scope)) {
+            return 0;
+        }
+        String value = scope.startsWith('ORG|') ? scope.substringAfter('ORG|') : '0';
+        try {
+            return Integer.valueOf(value);
+        } catch (Exception e) {
+            return 0;
         }
     }
 

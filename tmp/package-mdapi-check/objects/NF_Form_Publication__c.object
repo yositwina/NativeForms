@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Operational publication history for a TwinaForms form version.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableLicensing>false</enableLicensing>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>NF Form Publication</label>
+    <nameField>
+        <displayFormat>PUB-{0000}</displayFormat>
+        <label>Publication Name</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>NF Form Publications</pluralLabel>
+    <sharingModel>ReadWrite</sharingModel>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>AWS_Response_JSON__c</fullName>
+        <description>Optional admin-only AWS registration or publish response payload.</description>
+        <inlineHelpText>AWS response JSON for debugging or audit purposes.</inlineHelpText>
+        <label>AWS Response JSON</label>
+        <length>131072</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>8</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Error_Message__c</fullName>
+        <description>Failure summary if the publication operation did not succeed.</description>
+        <inlineHelpText>Error summary.</inlineHelpText>
+        <label>Error Message</label>
+        <length>32768</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>LongTextArea</type>
+        <visibleLines>4</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Form__c</fullName>
+        <deleteConstraint>SetNull</deleteConstraint>
+        <description>Form associated with this publication record.</description>
+        <inlineHelpText>Related form.</inlineHelpText>
+        <label>Form</label>
+        <referenceTo>NF_Form__c</referenceTo>
+        <relationshipLabel>Form Publications</relationshipLabel>
+        <relationshipName>FormPublications</relationshipName>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Lookup</type>
+    </fields>
+    <fields>
+        <fullName>Form_Version__c</fullName>
+        <deleteConstraint>SetNull</deleteConstraint>
+        <description>Form version associated with this publication record.</description>
+        <inlineHelpText>Related form version.</inlineHelpText>
+        <label>Form Version</label>
+        <referenceTo>NF_Form_Version__c</referenceTo>
+        <relationshipLabel>Version Publications</relationshipLabel>
+        <relationshipName>VersionPublications</relationshipName>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Lookup</type>
+    </fields>
+    <fields>
+        <fullName>Generated_HTML_Ref__c</fullName>
+        <description>Reference to the generated HTML output location.</description>
+        <inlineHelpText>HTML output location or storage reference.</inlineHelpText>
+        <label>Generated HTML Ref</label>
+        <length>255</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <fields>
+        <fullName>Publication_Status__c</fullName>
+        <description>Status of the publication operation.</description>
+        <inlineHelpText>Pending, success, or failed.</inlineHelpText>
+        <label>Publication Status</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>Pending</fullName>
+                    <default>true</default>
+                    <label>Pending</label>
+                </value>
+                <value>
+                    <fullName>Success</fullName>
+                    <default>false</default>
+                    <label>Success</label>
+                </value>
+                <value>
+                    <fullName>Failed</fullName>
+                    <default>false</default>
+                    <label>Failed</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Publication_Type__c</fullName>
+        <description>Publication operation type.</description>
+        <inlineHelpText>Publish, republish, unpublish, or register only.</inlineHelpText>
+        <label>Publication Type</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>Publish</fullName>
+                    <default>true</default>
+                    <label>Publish</label>
+                </value>
+                <value>
+                    <fullName>Republish</fullName>
+                    <default>false</default>
+                    <label>Republish</label>
+                </value>
+                <value>
+                    <fullName>Unpublish</fullName>
+                    <default>false</default>
+                    <label>Unpublish</label>
+                </value>
+                <value>
+                    <fullName>Register Only</fullName>
+                    <default>false</default>
+                    <label>Register Only</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Published_At__c</fullName>
+        <description>Datetime when the publication operation occurred.</description>
+        <inlineHelpText>Published at.</inlineHelpText>
+        <label>Published At</label>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>DateTime</type>
+    </fields>
+    <fields>
+        <fullName>Published_By__c</fullName>
+        <deleteConstraint>SetNull</deleteConstraint>
+        <description>User who initiated the publication operation.</description>
+        <inlineHelpText>Published by.</inlineHelpText>
+        <label>Published By</label>
+        <referenceTo>User</referenceTo>
+        <relationshipLabel>NF Form Publications Published By</relationshipLabel>
+        <relationshipName>NFFormPublicationsPublishedBy</relationshipName>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Lookup</type>
+    </fields>
+    <fields>
+        <fullName>Published_Form_Id__c</fullName>
+        <description>Form id used by the publication operation.</description>
+        <inlineHelpText>Published form id.</inlineHelpText>
+        <label>Published Form Id</label>
+        <length>120</length>
+        <required>false</required>
+        <trackHistory>false</trackHistory>
+        <type>Text</type>
+    </fields>
+    <listViews>
+        <fullName>Debug_All_Records</fullName>
+        <columns>NAME</columns>
+        <columns>Form__c</columns>
+        <columns>Form_Version__c</columns>
+        <columns>Publication_Status__c</columns>
+        <columns>Publication_Type__c</columns>
+        <columns>Published_Form_Id__c</columns>
+        <columns>Generated_HTML_Ref__c</columns>
+        <columns>Published_At__c</columns>
+        <columns>Published_By__c</columns>
+        <columns>Error_Message__c</columns>
+        <filterScope>Everything</filterScope>
+        <label>Debug - All Records</label>
+    </listViews>
+</CustomObject>
