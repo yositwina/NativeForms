@@ -629,15 +629,33 @@ private class NativeFormsDesignerBuilderTest {
         System.assertEquals('Submit_Contact', submitAction.Store_Result_As__c);
         System.assertEquals('updateById', submitAction.Command_Type__c);
         System.assertEquals('create', String.valueOf(submitConfig.get('onNotFound')));
-        System.assertEquals('{input.recordId}', String.valueOf(submitConfig.get('recordIdSource')));
+        System.assertEquals('{input.ContactId}', String.valueOf(submitConfig.get('recordIdSource')),
+            'The hidden record Id field is named after the object.');
 
         System.assertEquals(1, [
             SELECT COUNT()
             FROM NF_Form_Element__c
             WHERE Form_Version__c = :result.versionId
               AND Element_Type__c = 'hidden'
-              AND Field_Key__c = 'recordId'
+              AND Field_Key__c = 'ContactId'
         ]);
+        // Plumbing belongs at the end of the form, not above the first real field.
+        NF_Form_Element__c hiddenIdElement = [
+            SELECT Order__c, Label__c
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId AND Field_Key__c = 'ContactId'
+            LIMIT 1
+        ];
+        AggregateResult maxOrder = [
+            SELECT MAX(Order__c) topOrder
+            FROM NF_Form_Element__c
+            WHERE Form_Version__c = :result.versionId
+        ];
+        System.assertEquals(
+            Decimal.valueOf(String.valueOf(maxOrder.get('topOrder'))),
+            hiddenIdElement.Order__c,
+            'The hidden record Id must be the last element in the form.'
+        );
         System.assert([
             SELECT COUNT()
             FROM NF_Form_Element__c

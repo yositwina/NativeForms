@@ -253,6 +253,7 @@ public with sharing class NativeFormsDesignerController {
         String submitWhen;
         Boolean createOnly;
         Boolean required;
+        Boolean readOnly = false;
         List<Object> options;
     }
 
@@ -1337,7 +1338,7 @@ public with sharing class NativeFormsDesignerController {
                 relatedChildAlias,
                 submitActionKey,
                 relatedChildSubmitKey,
-                'recordId',
+                pageLayoutRecordIdFieldKey(plan.objectApiName),
                 relatedRepeatGroupKey
             ));
         }
@@ -1372,7 +1373,7 @@ public with sharing class NativeFormsDesignerController {
             String submitCommandType = 'create';
             if (secureMode) {
                 submitCommandType = 'updateById';
-                submitConfig.put('recordIdSource', '{input.recordId}');
+                submitConfig.put('recordIdSource', '{input.' + pageLayoutRecordIdFieldKey(plan.objectApiName) + '}');
                 if (normalizedMode == 'secureUpdateOrCreate') {
                     submitConfig.put('onNotFound', 'create');
                 }
@@ -1399,7 +1400,9 @@ public with sharing class NativeFormsDesignerController {
             normalizedLanguageCode
         );
         if (relatedSpec != null) {
-            Set<String> usedFieldKeys = new Set<String>{ 'recordId', 'layoutSection', relatedRepeatGroupKey };
+            Set<String> usedFieldKeys = new Set<String>{
+                pageLayoutRecordIdFieldKey(plan.objectApiName), 'layoutSection', relatedRepeatGroupKey
+            };
             Integer nextOrder = 10;
             Integer nextIndex = 1;
             for (NF_Form_Element__c existingElement : elements) {
@@ -3154,14 +3157,16 @@ public with sharing class NativeFormsDesignerController {
                         plan,
                         canonicalField,
                         layoutFieldLabel(rawField, canonicalField),
-                        'Unsupported or read-only field',
-                        'TwinaForms cannot import this Salesforce field type, or the field is not accessible.',
-                        'Use a supported editable field type, or adjust field-level security.'
+                        pageLayoutUnsupportedReason(fieldDescribe),
+                        pageLayoutUnsupportedImpact(fieldDescribe),
+                        pageLayoutUnsupportedHint(fieldDescribe)
                     );
                     continue;
                 }
 
-                String inclusionMode = pageLayoutFieldInclusionMode(rawField, fieldDescribe, plan.mode);
+                String inclusionMode = fieldSpec.readOnly == true
+                    ? 'always'
+                    : pageLayoutFieldInclusionMode(rawField, fieldDescribe, plan.mode);
                 if (String.isBlank(inclusionMode)) {
                     plan.skippedFieldCount++;
                     addPageLayoutSkippedDetail(
@@ -3340,6 +3345,58 @@ public with sharing class NativeFormsDesignerController {
         return String.isBlank(fallback) ? 'Unknown field' : fallback;
     }
 
+
+    /** Names why a Salesforce field could not be imported, instead of one catch-all message. */
+    private static String pageLayoutUnsupportedReason(Schema.DescribeFieldResult fieldDescribe) {
+        if (fieldDescribe == null) {
+            return 'Field not available';
+        }
+        if (!fieldDescribe.isAccessible()) {
+            return 'Field not visible to you';
+        }
+        Schema.DisplayType fieldType = fieldDescribe.getType();
+        if (fieldType == Schema.DisplayType.Reference) {
+            List<Schema.SObjectType> targets = fieldDescribe.getReferenceTo();
+            return targets != null && targets.size() > 1
+                ? 'Relationship points at more than one object'
+                : 'Related object cannot be searched';
+        }
+        if (fieldType == Schema.DisplayType.Picklist || fieldType == Schema.DisplayType.MultiPicklist) {
+            return 'Picklist has no active values';
+        }
+        return 'Field type not supported yet';
+    }
+
+    private static String pageLayoutUnsupportedImpact(Schema.DescribeFieldResult fieldDescribe) {
+        if (fieldDescribe == null) {
+            return 'The field was left out of the form.';
+        }
+        if (!fieldDescribe.isAccessible()) {
+            return 'Field-level security hides this field from you, so it could not be read or imported.';
+        }
+        Schema.DisplayType fieldType = fieldDescribe.getType();
+        if (fieldType == Schema.DisplayType.Reference) {
+            List<Schema.SObjectType> targets = fieldDescribe.getReferenceTo();
+            return targets != null && targets.size() > 1
+                ? 'This lookup can point at several different objects, so a form cannot know which one to search.'
+                : 'The object this lookup points at is not searchable, so no picker could be built.';
+        }
+        if (fieldType == Schema.DisplayType.Picklist || fieldType == Schema.DisplayType.MultiPicklist) {
+            return 'Every value on this picklist is inactive, so there would be nothing to choose from.';
+        }
+        return 'TwinaForms has no form control for the Salesforce type ' + String.valueOf(fieldType) + ' yet.';
+    }
+
+    private static String pageLayoutUnsupportedHint(Schema.DescribeFieldResult fieldDescribe) {
+        if (fieldDescribe != null && !fieldDescribe.isAccessible()) {
+            return 'Ask an administrator to grant you read access to this field, then import again.';
+        }
+        if (fieldDescribe != null && fieldDescribe.getType() == Schema.DisplayType.Picklist) {
+            return 'Activate at least one picklist value in Salesforce, then import again.';
+        }
+        return 'Add an equivalent field to the form manually after the import.';
+    }
+
     private static String pageLayoutFieldInclusionMode(Map<String, Object> rawField, Schema.DescribeFieldResult fieldDescribe, String mode) {
         if (fieldDescribe == null) {
             return null;
@@ -3454,7 +3511,7 @@ public with sharing class NativeFormsDesignerController {
             return null;
         }
         String fieldName = fieldDescribe.getName();
-        if (fieldName == 'Id' || fieldDescribe.isCalculated() || fieldDescribe.isAutoNumber()) {
+        if (fieldName == 'Id') {
             return null;
         }
 
@@ -3464,6 +3521,14 @@ public with sharing class NativeFormsDesignerController {
         fieldSpec.required = !fieldDescribe.isNillable() && !fieldDescribe.isDefaultedOnCreate();
         fieldSpec.createOnly = false;
         fieldSpec.submitWhen = 'always';
+        // Formula and auto-number fields cannot be written, but they are still worth showing.
+        // They import as prefilled, locked, non-submitting fields rather than being dropped.
+        fieldSpec.readOnly = fieldDescribe.isCalculated()
+            || fieldDescribe.isAutoNumber()
+            || (!fieldDescribe.isCreateable() && !fieldDescribe.isUpdateable());
+        if (fieldSpec.readOnly) {
+            fieldSpec.required = false;
+        }
         Schema.DisplayType fieldType = fieldDescribe.getType();
 
         if (fieldType == Schema.DisplayType.Boolean) {
@@ -3586,29 +3651,9 @@ public with sharing class NativeFormsDesignerController {
         List<NF_Form_Element__c> elements = new List<NF_Form_Element__c>();
         Integer orderValue = 10;
         Integer elementIndex = 1;
+        String recordIdFieldKey = pageLayoutRecordIdFieldKey(plan.objectApiName);
 
-        if (secureMode) {
-            elements.add(new NF_Form_Element__c(
-                Form_Version__c = versionId,
-                Element_Id__c = 'layout-record-id',
-                Element_Type__c = 'hidden',
-                Field_Key__c = 'recordId',
-                Element_Index__c = elementIndex++,
-                Label__c = 'Record Id',
-                Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
-                    'fieldBehavior' => 'hidden',
-                    'defaultValue' => '',
-                    'prefillEnabled' => true,
-                    'prefillAlias' => prefillAlias,
-                    'prefillFieldPath' => 'Id',
-                    'submitEnabled' => false
-                }),
-                Order__c = orderValue
-            ));
-            orderValue += 10;
-        }
-
-        Set<String> usedFieldKeys = new Set<String>{ 'recordId', 'layoutSection' };
+        Set<String> usedFieldKeys = new Set<String>{ recordIdFieldKey, 'layoutSection' };
         Integer sectionIndex = 1;
         for (PageLayoutImportSection sectionSpec : plan.sections) {
             String sectionElementId = 'layout-section-' + String.valueOf(sectionIndex);
@@ -3651,7 +3696,45 @@ public with sharing class NativeFormsDesignerController {
             }
             sectionIndex++;
         }
+
+        // The hidden record Id belongs at the end: it is plumbing, not something the
+        // author wants to see above their first real field.
+        if (secureMode) {
+            elements.add(new NF_Form_Element__c(
+                Form_Version__c = versionId,
+                Element_Id__c = 'layout-record-id',
+                Element_Type__c = 'hidden',
+                Field_Key__c = recordIdFieldKey,
+                Element_Index__c = elementIndex++,
+                Label__c = plan.objectLabel + ' Id',
+                Config_JSON__c = JSON.serializePretty(new Map<String, Object>{
+                    'fieldBehavior' => 'hidden',
+                    'defaultValue' => '',
+                    'prefillEnabled' => true,
+                    'prefillAlias' => prefillAlias,
+                    'prefillFieldPath' => 'Id',
+                    'submitEnabled' => false
+                }),
+                Order__c = orderValue
+            ));
+        }
         return elements;
+    }
+
+    /** Contact -> ContactId, Daily_Report__c -> DailyReportId. */
+    private static String pageLayoutRecordIdFieldKey(String objectApiName) {
+        String token = String.isBlank(objectApiName) ? 'Record' : objectApiName.trim();
+        if (token.endsWith('__c')) {
+            token = token.substring(0, token.length() - 3);
+        }
+        token = token.replaceAll('[^A-Za-z0-9]', '');
+        if (String.isBlank(token)) {
+            token = 'Record';
+        }
+        if (Pattern.matches('^[0-9].*', token)) {
+            token = 'Object' + token;
+        }
+        return token + 'Id';
     }
 
     private static List<NF_Form_Element__c> filterStorableImportedElements(List<NF_Form_Element__c> elements, PageLayoutImportPlan plan) {
@@ -3710,16 +3793,19 @@ public with sharing class NativeFormsDesignerController {
         String submitActionKey,
         String languageCode
     ) {
+        Boolean readOnlyField = fieldSpec.readOnly == true;
         Map<String, Object> config = new Map<String, Object>{
             'labelPosition' => fieldSpec.elementType == 'checkbox' ? 'inline' : 'above',
-            'fieldBehavior' => fieldSpec.createOnly == true ? 'readonlyWhenPrefilled' : 'editable',
-            'required' => fieldSpec.required == true,
+            'fieldBehavior' => (readOnlyField || fieldSpec.createOnly == true) ? 'readonlyWhenPrefilled' : 'editable',
+            'required' => !readOnlyField && fieldSpec.required == true,
             'defaultValue' => '',
-            'submitEnabled' => true,
-            'submitActionKey' => submitActionKey,
-            'submitFieldPath' => fieldSpec.apiName,
+            'submitEnabled' => !readOnlyField,
             'submitWhen' => String.isBlank(fieldSpec.submitWhen) ? 'always' : fieldSpec.submitWhen
         };
+        if (!readOnlyField) {
+            config.put('submitActionKey', submitActionKey);
+            config.put('submitFieldPath', fieldSpec.apiName);
+        }
         if (secureMode) {
             config.put('prefillEnabled', true);
             config.put('prefillAlias', prefillAlias);
@@ -4643,7 +4729,9 @@ public with sharing class NativeFormsDesignerController {
                 continue;
             }
             PageLayoutImportField fieldSpec = toPageLayoutImportField(fieldDescribe);
-            if (fieldSpec == null || !RELATED_ROW_SUPPORTED_TYPES.contains(fieldSpec.elementType)) {
+            // Rows exist to be edited, so read-only fields are not offered as columns.
+            if (fieldSpec == null || fieldSpec.readOnly == true
+                || !RELATED_ROW_SUPPORTED_TYPES.contains(fieldSpec.elementType)) {
                 continue;
             }
             options.add(new Map<String, Object>{
@@ -5009,7 +5097,8 @@ public with sharing class NativeFormsDesignerController {
                 continue;
             }
             PageLayoutImportField fieldSpec = toPageLayoutImportField(field.getDescribe());
-            if (fieldSpec == null || !RELATED_ROW_SUPPORTED_TYPES.contains(fieldSpec.elementType)) {
+            if (fieldSpec == null || fieldSpec.readOnly == true
+                || !RELATED_ROW_SUPPORTED_TYPES.contains(fieldSpec.elementType)) {
                 warnings.add('Field ' + apiName + ' is not supported inside a Records List row and was skipped.');
                 continue;
             }

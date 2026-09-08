@@ -203,10 +203,10 @@
   - Notes: Do not solve yet. Discovered while sizing the row limit for the Page Layout to Form related-records feature (`AWS/documentation/New features after 0.1/Layout_to_Form_Related_Records_Table.md`). Until this is fixed, cap the generated related-records list at 20 rows rather than 50. With sObject Collections in place, 100+ rows becomes safe.
 
 - [ ] ENH-024 Records List should support a configurable row sort field and direction
-  - Severity: Medium
+  - Severity: Low
   - Area: Salesforce Designer / Records List element / Prefill `findMany`
   - Request: On the Records List element, let the author choose which field the rows are sorted by and whether the order is ascending or descending.
-  - Actual: Row order is whatever the prefill query returns. There is no per-element sort control in the designer.
+  - Actual: Sorting already works, but it lives on the Prefill Action (Order By + Sort Direction, `nativeFormsPrefillActions.html:296-327`), not on the Records List element. Authors configuring a table look for it on the element and do not find it. This is a discoverability gap, not a missing capability.
   - Expected: Two new settings on the Records List element - a sort field picker (limited to the fields present in that list) and an Ascending/Descending toggle. The published form should render prefilled rows in that order.
-  - Concept Solution: `findMany` already supports `orderBy`, so this is mostly designer UX plus passing the chosen field/direction into the generated prefill command. Decide whether the sort applies only to prefilled rows or also re-sorts after the user adds rows - simplest is prefill order only, since re-sorting under the user while they type is disorienting.
+  - Concept Solution: Surface the existing Order By / Sort Direction settings on the Records List element and write them through to the linked prefill action, so the same setting is edited where authors expect it rather than duplicated. Decide whether the sort applies only to prefilled rows or also re-sorts after the user adds rows - simplest is prefill order only, since re-sorting under the user while they type is disorienting.
   - Notes: Default when unset should be `CreatedDate DESC` (newest first). Raised alongside the Page Layout to Form related-records feature, which needs a sensible default ordering for generated lists.
